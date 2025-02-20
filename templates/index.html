@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Powerball Simulator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <h1>Powerball Simulator</h1>
+    <form method="POST" action="{{ url_for('generate') }}">
+        <label for="odd_even_choice">Odd/Even Combination:</label>
+        <select name="odd_even_choice" id="odd_even_choice">
+            <option value="All Even">All Even</option>
+            <option value="All Odd">All Odd</option>
+            <option value="3 Even / 2 Odd">3 Even / 2 Odd</option>
+            <option value="3 Odd / 2 Even">3 Odd / 2 Even</option>
+            <option value="1 Even / 4 Odd">1 Even / 4 Odd</option>
+            <option value="1 Odd / 4 Even">1 Odd / 4 Even</option>
+        </select><br>
+
+        <label for="combo_choice">Combo Type:</label>
+        <select name="combo_choice" id="combo_choice">
+            <option value="No Combo">No Combo</option>
+            <option value="2-combo">2-combo</option>
+            <option value="3-combo">3-combo</option>
+        </select><br>
+
+        <label for="white_ball_min">White Ball Min:</label>
+        <input type="number" name="white_ball_min" id="white_ball_min" value="1"><br>
+
+        <label for="white_ball_max">White Ball Max:</label>
+        <input type="number" name="white_ball_max" id="white_ball_max" value="69"><br>
+
+        <label for="powerball_min">Powerball Min:</label>
+        <input type="number" name="powerball_min" id="powerball_min" value="1"><br>
+
+        <label for="powerball_max">Powerball Max:</label>
+        <input type="number" name="powerball_max" id="powerball_max" value="26"><br>
+
+        <label for="excluded_numbers">Excluded Numbers (comma-separated):</label>
+        <input type="text" name="excluded_numbers" id="excluded_numbers"><br>
+
+        <label for="prime_count">Minimum Prime Numbers:</label>
+        <input type="number" name="prime_count" id="prime_count" value="0"><br>
+
+        <label for="multiple_of">Multiple Of:</label>
+        <input type="number" name="multiple_of" id="multiple_of" value="0"><br>
+
+        <label for="high_low_balance">High/Low Balance (e.g., '3 2'):</label>
+        <input type="text" name="high_low_balance" id="high_low_balance"><br>
+
+        <button type="submit">Generate Numbers</button>
+    </form>
+
+    {% if white_balls %}
+    <h2>Generated Numbers</h2>
+    <p>White Balls: {{ white_balls }}</p>
+    <p>Powerball: {{ powerball }}</p>
+    {% endif %}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <ul>
+            {% for category, message in messages %}
+                <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+
+    <h2>Analysis</h2>
+    <ul>
+        <li><a href="{{ url_for('frequency_analysis_route') }}">Frequency Analysis</a></li>
+        <li><a href="{{ url_for('hot_cold_numbers_route') }}">Hot and Cold Numbers</a></li>
+        <li><a href="{{ url_for('monthly_white_ball_analysis_route') }}">Monthly White Ball Analysis</a></li>
+        <li><a href="{{ url_for('sum_of_main_balls_route') }}">Sum of Main Balls</a></li>
+        <li><a href="{{ url_for('winning_probability_route') }}">Winning Probability</a></li>
+        <li><a href="{{ url_for('partial_match_probabilities_route') }}">Partial Match Probabilities</a></li>
+    </ul>
+
+    <form method="POST" action="{{ url_for('find_results_by_sum_route') }}">
+        <label for="target_sum">Find Results by Sum:</label>
+        <input type="number" name="target_sum" id="target_sum">
+        <button type="submit">Search</button>
+    </form>
+
+    <form method="POST" action="{{ url_for('simulate_multiple_draws_route') }}">
+        <label for="num_draws">Simulate Multiple Draws:</label>
+        <input type="number" name="num_draws" id="num_draws">
+        <button type="submit">Simulate</button>
+    </form>
+
+    <a href="{{ url_for('export_analysis_results_route') }}">Export Analysis Results</a>
+</body>
+</html>
