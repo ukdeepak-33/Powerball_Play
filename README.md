@@ -88,6 +88,21 @@ python app.py
 
 Open your web browser and navigate to http://127.0.0.1:5000/.
 
+# Running the Application
+
+Install the dependencies:
+
+bash pip install -r requirements.txt
+
+Run the Flask application:
+
+bash python app.py
+
+Open your web browser and navigate to http://127.0.0.1:5000/ to interact with the Powerball Simulator.
+
+This Flask application provides a web interface for generating Powerball numbers, performing frequency analysis, and other features available in the original script.
+
+
 # Usage
 
 1. Generate Powerball Numbers
