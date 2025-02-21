@@ -249,7 +249,7 @@ def export_analysis_results(df, file_path="analysis_results.csv"):
     print(f"Analysis results saved to {file_path}")
 
 # Default file path
-file_path = '/Users/bunny/Downloads/powerball_results_02.tsv'
+file_path = '/Users/bunny/Powerball_App/powerball_results_02.tsv'
 
 # Load historical data
 try:
@@ -269,9 +269,12 @@ white_ball_range = (1, 69)
 powerball_range = (1, 26)
 excluded_numbers = []
 
+
 @app.route('/')
 def index():
-    return render_template('index.html')
+    last_draw = get_last_draw(df)  # Call the function and store the result
+    last_draw_dict = last_draw.to_dict()  # Convert the Series to a dictionary
+    return render_template('index.html', last_draw=last_draw_dict)
 
 @app.route('/generate', methods=['POST'])
 def generate():
@@ -295,34 +298,49 @@ def generate():
         flash(f"These numbers were drawn on: {match_date}", 'info')
     else:
         flash("These numbers have never been drawn before.", 'info')
+        
+        last_draw = get_last_draw(df)  # Fetch the last draw result again
+    return render_template('index.html', white_balls=white_balls, powerball=powerball, last_draw=last_draw)
 
-    return render_template('index.html', white_balls=white_balls, powerball=powerball)
 
 @app.route('/frequency_analysis')
 def frequency_analysis_route():
     white_ball_freq, powerball_freq = frequency_analysis(df)
-    return render_template('index.html', white_ball_freq=white_ball_freq.to_dict(), powerball_freq=powerball_freq.to_dict())
+    last_draw = get_last_draw(df)  # Fetch the last draw result
+    return render_template('index.html', 
+                           white_ball_freq=white_ball_freq.to_dict(), 
+                           powerball_freq=powerball_freq.to_dict(), 
+                           last_draw=last_draw.to_dict())
 
 @app.route('/hot_cold_numbers')
 def hot_cold_numbers_route():
     hot_numbers, cold_numbers = hot_cold_numbers(df, last_draw['Draw Date'])
-    return render_template('index.html', hot_numbers=hot_numbers.to_dict(), cold_numbers=cold_numbers.to_dict())
+    return render_template('index.html', 
+                           hot_numbers=hot_numbers.to_dict(), 
+                           cold_numbers=cold_numbers.to_dict(), 
+                           last_draw=last_draw.to_dict())
 
 @app.route('/monthly_white_ball_analysis')
 def monthly_white_ball_analysis_route():
     monthly_balls = monthly_white_ball_analysis(df, last_draw['Draw Date'])
-    return render_template('index.html', monthly_balls=monthly_balls.to_dict())
+    return render_template('index.html', 
+                           monthly_balls=monthly_balls.to_dict(), 
+                           last_draw=last_draw.to_dict())
 
 @app.route('/sum_of_main_balls')
 def sum_of_main_balls_route():
     sum_data = sum_of_main_balls(df)
-    return render_template('index.html', sum_data=sum_data.to_dict())
+    return render_template('index.html', 
+                           sum_data=sum_data.to_dict('records'), 
+                           last_draw=last_draw.to_dict())
 
 @app.route('/find_results_by_sum', methods=['POST'])
 def find_results_by_sum_route():
     target_sum = int(request.form.get('target_sum'))
     results = find_results_by_sum(df, target_sum)
-    return render_template('index.html', results=results.to_dict())
+    return render_template('index.html', 
+                           results=results.to_dict('records'), 
+                           last_draw=last_draw.to_dict())
 
 @app.route('/simulate_multiple_draws', methods=['POST'])
 def simulate_multiple_draws_route():
@@ -333,12 +351,17 @@ def simulate_multiple_draws_route():
 @app.route('/winning_probability')
 def winning_probability_route():
     probability_1_in_x, probability_percentage = winning_probability(white_ball_range, powerball_range)
-    return render_template('index.html', probability_1_in_x=probability_1_in_x, probability_percentage=probability_percentage)
+    return render_template('index.html', 
+                           probability_1_in_x=probability_1_in_x, 
+                           probability_percentage=probability_percentage, 
+                           last_draw=last_draw.to_dict())
 
 @app.route('/partial_match_probabilities')
 def partial_match_probabilities_route():
     probabilities = partial_match_probabilities(white_ball_range, powerball_range)
-    return render_template('index.html', probabilities=probabilities)
+    return render_template('index.html', 
+                           probabilities=probabilities, 
+                           last_draw=last_draw.to_dict())
 
 @app.route('/export_analysis_results')
 def export_analysis_results_route():
