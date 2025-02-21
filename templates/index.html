@@ -8,6 +8,15 @@
 </head>
 <body>
     <h1>Powerball Simulator</h1>
+
+    <!-- Display Last Draw Results -->
+    {% if last_draw %}
+    <h2>Last Draw Result</h2>
+    <p>Draw Date: {{ last_draw['Draw Date'] }}</p>
+    <p>Numbers: {{ last_draw['Number 1'] }}, {{ last_draw['Number 2'] }}, {{ last_draw['Number 3'] }}, {{ last_draw['Number 4'] }}, {{ last_draw['Number 5'] }}</p>
+    <p>Powerball: {{ last_draw['Powerball'] }}</p>
+    {% endif %}
+
     <form method="POST" action="{{ url_for('generate') }}">
         <label for="odd_even_choice">Odd/Even Combination:</label>
         <select name="odd_even_choice" id="odd_even_choice">
@@ -53,12 +62,14 @@
         <button type="submit">Generate Numbers</button>
     </form>
 
+    <!-- Display Generated Numbers -->
     {% if white_balls %}
     <h2>Generated Numbers</h2>
     <p>White Balls: {{ white_balls }}</p>
     <p>Powerball: {{ powerball }}</p>
     {% endif %}
 
+    <!-- Display Flashed Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             <ul>
@@ -69,6 +80,7 @@
         {% endif %}
     {% endwith %}
 
+    <!-- Analysis Links -->
     <h2>Analysis</h2>
     <ul>
         <li><a href="{{ url_for('frequency_analysis_route') }}">Frequency Analysis</a></li>
@@ -79,6 +91,7 @@
         <li><a href="{{ url_for('partial_match_probabilities_route') }}">Partial Match Probabilities</a></li>
     </ul>
 
+    <!-- Forms for Other Functionality -->
     <form method="POST" action="{{ url_for('find_results_by_sum_route') }}">
         <label for="target_sum">Find Results by Sum:</label>
         <input type="number" name="target_sum" id="target_sum">
@@ -92,5 +105,86 @@
     </form>
 
     <a href="{{ url_for('export_analysis_results_route') }}">Export Analysis Results</a>
+
+    <!-- Frequency Analysis Results -->
+    {% if white_ball_freq %}
+    <h2>Frequency Analysis</h2>
+    <h3>White Ball Frequencies</h3>
+    <ul>
+        {% for number, frequency in white_ball_freq.items() %}
+        <li>Number {{ number }}: {{ frequency }} times</li>
+        {% endfor %}
+    </ul>
+    <h3>Powerball Frequencies</h3>
+    <ul>
+        {% for number, frequency in powerball_freq.items() %}
+        <li>Powerball {{ number }}: {{ frequency }} times</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <!-- Hot and Cold Numbers Results -->
+    {% if hot_numbers %}
+    <h2>Hot and Cold Numbers</h2>
+    <h3>Hot Numbers</h3>
+    <ul>
+        {% for number, frequency in hot_numbers.items() %}
+        <li>Number {{ number }}: {{ frequency }} times</li>
+        {% endfor %}
+    </ul>
+    <h3>Cold Numbers</h3>
+    <ul>
+        {% for number, frequency in cold_numbers.items() %}
+        <li>Number {{ number }}: {{ frequency }} times</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <!-- Monthly White Ball Analysis Results -->
+    {% if monthly_balls %}
+    <h2>Monthly White Ball Analysis</h2>
+    <ul>
+        {% for month, balls in monthly_balls.items() %}
+        <li>{{ month }}: {{ balls }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <!-- Sum of Main Balls Results -->
+    {% if sum_data %}
+    <h2>Sum of Main Balls</h2>
+    <ul>
+        {% for row in sum_data %}
+        <li>Draw Date: {{ row['Draw Date'] }}, Sum: {{ row['Sum'] }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <!-- Winning Probability Results -->
+    {% if probability_1_in_x %}
+    <h2>Winning Probability</h2>
+    <p>Probability: {{ probability_1_in_x }}</p>
+    <p>Percentage: {{ probability_percentage }}</p>
+    {% endif %}
+
+    <!-- Partial Match Probabilities Results -->
+    {% if probabilities %}
+    <h2>Partial Match Probabilities</h2>
+    <ul>
+        {% for match, probability in probabilities.items() %}
+        <li>{{ match }}: {{ probability }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <!-- Find Results by Sum Results -->
+    {% if results %}
+    <h2>Results by Sum</h2>
+    <ul>
+        {% for row in results %}
+        <li>Draw Date: {{ row['Draw Date'] }}, Numbers: {{ row['Number 1'] }}, {{ row['Number 2'] }}, {{ row['Number 3'] }}, {{ row['Number 4'] }}, {{ row['Number 5'] }}, Sum: {{ row['Sum'] }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
 </body>
 </html>
