@@ -1,42 +1,78 @@
 # Powerball_App
 
-The Powerball Simulator Flask Application is a web-based tool that allows users to generate Powerball numbers, analyze historical Powerball data, and calculate winning probabilities. The application is built using Python and the Flask framework, providing an interactive and user-friendly interface for Powerball enthusiasts.
+The Powerball Simulator Flask Application is a web-based tool that allows users to generate Powerball numbers, analyze historical Powerball data, and calculate winning probabilities. The application is built using Python and the Flask framework, providing an interactive and user-friendly interface for Powerball enthusiasts.The Powerball app is designed to simulate Powerball number generation, analyze historical data, and provide insights into winning probabilities. Below is a revised breakdown of its functionality:
 
 # Features
 
 **Generate Powerball Numbers:**
 
-1.Customize number ranges for white balls and Powerball.
+Functionality: Generates random Powerball numbers based on user-defined constraints.
 
-2.Exclude specific numbers.
+Constraints:
 
-3.Apply advanced filters such as prime numbers, multiples, and high/low balance.
+Odd/Even Combination: Users can choose specific odd/even distributions (e.g., 3 even and 2 odd).
 
-4.Choose odd/even combinations and combo types.
+Combo Type: Users can specify if they want 2-number or 3-number combinations.
+
+Range for White Balls and Powerball: Users can set custom ranges for white balls (1–69) and Powerball (1–26).
+
+Excluded Numbers: Users can exclude specific numbers from being generated.
+
+High/Low Balance: Users can specify a balance between high (35–69) and low (1–34) numbers.
+
+Output: Generates 5 white balls and 1 Powerball number that meet the constraints.
+
 
 # Historical Data Analysis:
 
-1.Frequency analysis of white balls and Powerball numbers.
+Functionality: Analyzes historical Powerball data to provide insights.
 
-2.Hot and cold numbers analysis (most and least frequent numbers in the last year).
+Features:
 
-3.Monthly white ball frequency analysis.
+Frequency Analysis: Shows how often each white ball and Powerball number has been drawn.
 
-4.Sum of main balls analysis.
+Hot and Cold Numbers: Identifies the most and least frequently drawn numbers in the last year.
+
+Monthly White Ball Analysis: Provides a breakdown of white balls drawn in the last 6 months.
+
+Sum of Main Balls: Calculates the sum of the 5 white balls for each draw and allows users to search for draws with a specific sum.
+
+Last Draw Dates for Numbers: Finds the most recent draw date for each individual number (white balls and Powerball).
+
 
 # Winning Probability Calculator:
+Functionality: Calculates the probability of winning and partial matches.
 
-1.Calculate the probability of winning the jackpot.
+Features:
 
-2.Calculate partial match probabilities (e.g., matching 3 white balls + Powerball).
+Winning Probability: Calculates the overall probability of winning the Powerball jackpot.
 
-3.Simulate Multiple Draws:
+Partial Match Probabilities: Calculates the odds of matching a subset of white balls and the Powerball.
 
-4.Simulate multiple Powerball draws to analyze number frequencies.
 
 # Export Results:
 
+Functionality: Allows users to export analysis results and save generated numbers.
+
+Features:
+
+Export Analysis Results: Exports frequency analysis, hot/cold numbers, and other insights to a CSV file.
+
+Save Generated Numbers: Saves generated Powerball numbers to a text file.
+
 1.Export generated numbers and analysis results to CSV files.
+
+# Web Interface
+
+Functionality: Provides a user-friendly web interface for interacting with the app.
+
+Features:
+
+Forms: Users can input constraints and preferences for number generation.
+
+Results Display: Displays generated numbers, analysis results, and historical data insights.
+
+Flashed Messages: Provides feedback (e.g., success or error messages) to users.
 
 # Prerequisites
 
@@ -105,47 +141,37 @@ This Flask application provides a web interface for generating Powerball numbers
 
 # Usage
 
-1. Generate Powerball Numbers
-   
-   On the homepage, customize the number ranges, excluded numbers, and advanced filters.
-   
-   Click Generate Numbers to generate Powerball numbers based on your preferences.
+Generate Numbers:
 
-2. Analyze Historical Data
-   
-   Use the Analysis section to perform various analyses:
-   
-   **Frequency Analysis:**
-   
-    View the frequency of white balls and Powerball numbers.
-   
-   **Hot and Cold Numbers:**
-   
-   Identify the most and least frequent numbers in the last year.
-   
-   **Monthly White Ball Analysis:**
-   
-   Analyze white ball frequencies over the last 6 months.
-   
-   **Sum of Main Balls:**
-   
-   Calculate the sum of the 5 white balls for each draw.
+Use the form to set constraints (e.g., odd/even combinations, excluded numbers).
 
-4. Winning Probability Calculator
-   
-   Use the Winning Probability section to calculate:
-   
-   The probability of winning the jackpot.
-   
-   Partial match probabilities (e.g., matching 3 white balls + Powerball).
+Click "Generate Numbers" to generate Powerball numbers.
 
-5. Simulate Multiple Draws
-   Enter the number of draws to simulate and click Simulate to analyze the frequency of numbers across multiple draws.
+Analyze Historical Data:
 
-6. Export Results
-   Click Export Analysis Results to save the analysis results to a CSV file.
+Use the analysis links (e.g., Frequency Analysis, Hot/Cold Numbers) to view insights.
+
+Calculate Probabilities:
+
+Use the "Winning Probability" and "Partial Match Probabilities" links to view odds.
+
+Simulate Draws:
+
+Use the "Simulate Multiple Draws" form to simulate multiple Powerball draws.
+
+Export Data:
+
+Click "Export Analysis Results" to save analysis data to a CSV file.
 
 # File Structure
+
+app.py: Main Flask application file.
+
+templates/index.html: HTML template for the web interface.
+
+static/styles.css: CSS file for styling the web interface.
+
+powerball_results_02.tsv: Historical Powerball data file (must be provided by the user).
 
 <img width="702" alt="image" src="https://github.com/user-attachments/assets/1093d73d-af5d-4ec6-bed1-700a754c92e0" />
 
@@ -205,6 +231,24 @@ Your Name Deepak Uppari
 Email: ukdeepak09@gmail.com
 
 GitHub:github.com/ukdeepak-33
+
+
+---
+
+### Key Changes in the Revised App:
+1. **Improved Functionality**:
+   - Added **last draw dates for individual numbers** to track when each number was last drawn.
+   - Enhanced **probability calculations** for partial matches.
+   - Added **export functionality** for analysis results.
+
+2. **User Interface**:
+   - Improved forms and results display in the web interface.
+   - Added flashed messages for user feedback.
+
+3. **Documentation**:
+   - Created a detailed `README.md` file for easy setup and usage.
+
+Let me know if you need further adjustments!
 
 Enjoy using the Powerball Simulator Flask Application! Good luck with your Powerball numbers! 🎱🍀
 
