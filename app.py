@@ -28,17 +28,8 @@ def check_exact_match(df, white_balls):
             return True
     return False
 
-# Function to check if a number is prime
-def is_prime(n):
-    if n < 2:
-        return False
-    for i in range(2, int(math.sqrt(n)) + 1):
-        if n % i == 0:
-            return False
-    return True
-
 # Generate random numbers for Powerball
-def generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, prime_count=None, multiple_of=None, high_low_balance=None):
+def generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, high_low_balance=None):
     while True:
         # Generate white balls (5 numbers from the specified range, excluding excluded numbers)
         available_numbers = [num for num in range(white_ball_range[0], white_ball_range[1] + 1) if num not in excluded_numbers]
@@ -91,18 +82,6 @@ def generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white
                 combos = list(combinations(white_balls, combo_size))
                 if not combos:
                     continue
-
-        # Check prime numbers condition
-        if prime_count is not None:
-            prime_numbers = [num for num in white_balls if is_prime(num)]
-            if len(prime_numbers) < prime_count:
-                continue
-
-        # Check multiples condition
-        if multiple_of is not None:
-            multiples = [num for num in white_balls if num % multiple_of == 0]
-            if not multiples:
-                continue
 
         # Check high/low balance condition
         if high_low_balance is not None:
@@ -248,6 +227,60 @@ def export_analysis_results(df, file_path="analysis_results.csv"):
     df.to_csv(file_path, index=False)
     print(f"Analysis results saved to {file_path}")
 
+# Find last draw dates for individual numbers
+def find_last_draw_dates_for_numbers(df, white_balls, powerball):
+    """
+    Find the last draw date for each individual number (white balls and Powerball).
+    Returns a dictionary with the last draw date for each number.
+    """
+    last_draw_dates = {}
+
+    # Check last draw date for each white ball
+    for number in white_balls:
+        # Iterate through the historical data in reverse order (most recent first)
+        for _, row in df[::-1].iterrows():
+            historical_white_balls = row[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].values
+            if number in historical_white_balls:
+                last_draw_dates[f"White Ball {number}"] = row['Draw Date']
+                break  # Stop searching after finding the most recent draw date
+
+    # Check last draw date for the Powerball
+    for _, row in df[::-1].iterrows():
+        if powerball == row['Powerball']:
+            last_draw_dates[f"Powerball {powerball}"] = row['Draw Date']
+            break  # Stop searching after finding the most recent draw date
+
+    return last_draw_dates
+
+# Modify 3 out of 5 white balls and the Powerball
+def modify_combination(df, white_balls, powerball, white_ball_range, powerball_range, excluded_numbers):
+    """
+    Modify 3 out of 5 white balls and the Powerball in a previously drawn combination.
+    """
+    # Randomly select 3 indices to modify
+    indices_to_modify = random.sample(range(5), 3)
+    
+    # Generate new numbers for the selected indices
+    for i in indices_to_modify:
+        while True:
+            new_number = random.randint(white_ball_range[0], white_ball_range[1])
+            if new_number not in excluded_numbers and new_number not in white_balls:
+                white_balls[i] = new_number
+                break
+    
+    # Generate a new Powerball
+    while True:
+        new_powerball = random.randint(powerball_range[0], powerball_range[1])
+        if new_powerball not in excluded_numbers and new_powerball != powerball:
+            powerball = new_powerball
+            break
+    
+    # Convert all numbers to native Python integers
+    white_balls = [int(num) for num in white_balls]
+    powerball = int(powerball)
+    
+    return white_balls, powerball
+
 # Default file path
 file_path = '/Users/bunny/Powerball_App/powerball_results_02.tsv'
 
@@ -287,21 +320,52 @@ def generate():
     powerball_max = int(request.form.get('powerball_max', 26))
     powerball_range = (powerball_min, powerball_max)
     excluded_numbers = [int(num.strip()) for num in request.form.get('excluded_numbers', '').split(",")] if request.form.get('excluded_numbers') else []
-    prime_count = int(request.form.get('prime_count', 0))
-    multiple_of = int(request.form.get('multiple_of', 0))
     high_low_balance = tuple(map(int, request.form.get('high_low_balance', '').split())) if request.form.get('high_low_balance') else None
 
-    white_balls, powerball = generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, prime_count, multiple_of, high_low_balance)
+    # Generate the numbers
+    white_balls, powerball = generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, high_low_balance)
 
-    match_date = check_historical_match(df, white_balls, powerball)
-    if match_date:
-        flash(f"These numbers were drawn on: {match_date}", 'info')
-    else:
-        flash("These numbers have never been drawn before.", 'info')
-        
-        last_draw = get_last_draw(df)  # Fetch the last draw result again
-    return render_template('index.html', white_balls=white_balls, powerball=powerball, last_draw=last_draw)
+    # Find the last draw date for each individual number
+    last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
 
+    # Fetch the last draw result and convert it to a dictionary
+    last_draw = get_last_draw(df)
+    last_draw_dict = last_draw.to_dict()
+
+    # Render the template with the generated numbers and last draw dates
+    return render_template('index.html', 
+                           white_balls=white_balls, 
+                           powerball=powerball, 
+                           last_draw=last_draw_dict, 
+                           last_draw_dates=last_draw_dates)
+
+@app.route('/generate_modified', methods=['POST'])
+def generate_modified():
+    # Randomly select a previously drawn combination
+    random_row = df.sample(1).iloc[0]
+    white_balls = random_row[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].values.tolist()
+    powerball = random_row['Powerball']
+
+    # Modify 3 out of 5 white balls and the Powerball
+    white_balls, powerball = modify_combination(df, white_balls, powerball, white_ball_range, powerball_range, excluded_numbers)
+
+    # Ensure the modified combination has never been drawn before
+    while check_exact_match(df, white_balls):
+        white_balls, powerball = modify_combination(df, white_balls, powerball, white_ball_range, powerball_range, excluded_numbers)
+
+    # Find the last draw date for each individual number
+    last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
+
+    # Fetch the last draw result and convert it to a dictionary
+    last_draw = get_last_draw(df)
+    last_draw_dict = last_draw.to_dict()
+
+    # Render the template with the generated numbers and last draw dates
+    return render_template('index.html', 
+                           white_balls=white_balls, 
+                           powerball=powerball, 
+                           last_draw=last_draw_dict, 
+                           last_draw_dates=last_draw_dates)
 
 @app.route('/frequency_analysis')
 def frequency_analysis_route():
@@ -371,3 +435,6 @@ def export_analysis_results_route():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+    if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
