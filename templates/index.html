@@ -50,16 +50,22 @@
         <label for="excluded_numbers">Excluded Numbers (comma-separated):</label>
         <input type="text" name="excluded_numbers" id="excluded_numbers"><br>
 
-        <label for="prime_count">Minimum Prime Numbers:</label>
-        <input type="number" name="prime_count" id="prime_count" value="0"><br>
-
-        <label for="multiple_of">Multiple Of:</label>
-        <input type="number" name="multiple_of" id="multiple_of" value="0"><br>
-
         <label for="high_low_balance">High/Low Balance (e.g., '3 2'):</label>
         <input type="text" name="high_low_balance" id="high_low_balance"><br>
 
         <button type="submit">Generate Numbers</button>
+    </form>
+
+    <!-- New Form for Modified Numbers -->
+    <form method="POST" action="{{ url_for('generate_modified') }}">
+        <!-- New fields for common pairs -->
+        <label for="use_common_pairs">Use Common Pairs:</label>
+        <input type="checkbox" name="use_common_pairs" id="use_common_pairs"><br>
+
+        <label for="num_range">Range for First Two Numbers (e.g., '1 10'):</label>
+        <input type="text" name="num_range" id="num_range"><br>
+
+        <button type="submit">Generate Modified Numbers</button>
     </form>
 
     <!-- Display Generated Numbers -->
@@ -67,6 +73,16 @@
     <h2>Generated Numbers</h2>
     <p>White Balls: {{ white_balls }}</p>
     <p>Powerball: {{ powerball }}</p>
+    {% endif %}
+
+    <!-- Display Last Drawn Dates for Individual Numbers -->
+    {% if last_draw_dates %}
+    <h2>Last Drawn Dates for Generated Numbers</h2>
+    <ul>
+        {% for number, date in last_draw_dates.items() %}
+        <li>{{ number }}: {{ date }}</li>
+        {% endfor %}
+    </ul>
     {% endif %}
 
     <!-- Display Flashed Messages -->
