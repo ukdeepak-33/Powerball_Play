@@ -1,3 +1,4 @@
 Flask==2.3.2
 pandas==2.0.3
-gunicorn==20.1.0 # Vercel often uses Gunicorn or similar WSGI servers internally
+gunicorn==20.1.0
+supabase-py==1.0.0 # Or the latest stable version
