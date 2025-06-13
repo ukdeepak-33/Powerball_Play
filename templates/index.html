@@ -253,7 +253,7 @@
         <!-- Last Draw Result -->
         <div class="card mb-8">
             <h2 class="text-2xl font-bold text-indigo-600 mb-4">Last Powerball Draw:</h2>
-            {% if last_draw %}
+            {% if last_draw and last_draw['Draw Date'] != 'N/A' %}
                 <p class="text-lg mb-2"><span class="font-semibold">Draw Date:</span> {{ last_draw['Draw Date'] }}</p>
                 <div class="number-display">
                     {% for i in range(1, 6) %}
@@ -262,7 +262,7 @@
                     <div class="ball powerball">{{ last_draw['Powerball'] }}</div>
                 </div>
             {% else %}
-                <p class="text-lg text-gray-600">No last draw data available.</p>
+                <p class="text-lg text-gray-600">No last draw data available (check data file).</p>
             {% endif %}
         </div>
 
@@ -565,7 +565,8 @@
                         </div>
                     {% endif %}
                     
-                    <!-- Hit and Miss Analysis -->
+                    <!-- Removed Hit and Miss Analysis Section -->
+                    {#
                     <h3 class="text-xl font-bold text-indigo-600 mt-8 mb-4">Hit and Miss Analysis:</h3>
                     <form action="/hit_and_miss_analysis" method="get" class="mb-4 text-center">
                         <button type="submit" class="btn">View Hit and Miss</button>
@@ -616,6 +617,7 @@
                             </div>
                         </div>
                     {% endif %}
+                    #}
 
                     <!-- NEW: Number Age Distribution Chart -->
                     <h3 class="text-xl font-bold text-indigo-600 mt-8 mb-4">Number Age Distribution:</h3>
@@ -1302,7 +1304,7 @@
                 (document.querySelector('#sum-distribution-chart') && (currentPath === '/sum_of_main_balls')) ||
                 (document.querySelector('.accordion-item:nth-child(4) table') && (currentPath === '/find_results_by_sum' || isPostRequest)) ||
                 (document.querySelector('.accordion-item:nth-child(4) table') && (currentPath === '/simulate_multiple_draws' || isPostRequest)) ||
-                (document.querySelector('.accordion-item:nth-child(4) table') && (currentPath === '/hit_and_miss_analysis')) ||
+                // Removed condition for hit_and_miss_analysis
                 (document.querySelector('#number-age-chart') && (currentPath === '/number_age_distribution')) ||
                 (document.querySelector('#co-occurrence-chart') && (currentPath === '/co_occurrence_analysis')) ||
                 (document.querySelector('#powerball-position-chart') && (currentPath === '/powerball_position_frequency'))
