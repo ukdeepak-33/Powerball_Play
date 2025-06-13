@@ -17,5 +17,11 @@
       "source": "/(.*)",
       "destination": "/api"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/update_powerball_data",
+      "schedule": "0 10 * * 1,3,6"
+    }
   ]
 }
