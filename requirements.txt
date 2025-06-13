@@ -1,4 +1,4 @@
 Flask==2.3.2
 pandas==2.0.3
 gunicorn==20.1.0
-supabase-py==0.11.0 # Pinned to a known stable version
+requests==2.32.3 # Adding requests for direct API calls
