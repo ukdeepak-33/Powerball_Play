@@ -6,52 +6,53 @@ import math
 import os
 from collections import defaultdict
 from datetime import datetime
-from supabase import create_client, Client
+import requests # NEW: Import requests for direct API calls
+import json # NEW: For handling JSON data
 
 # Initialize Flask app
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'
 
-# --- Supabase Configuration (IMPORTANT: Using provided credentials) ---
-# For Vercel, it's highly recommended to use Environment Variables for production.
-# These values are now hardcoded for demonstration based on your request.
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlrc3h6YmJjb2l0ZWhkbXN4cWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NzMwNjUsImV4cCI6MjA2NTM0OTA2NX0.AzUD7wjR7VbvtUH27NDqJ3AlvFW0nCWpiN9ADG8T_t4")
+# --- Supabase Configuration (IMPORTANT: Use Environment Variables for Production) ---
+# For Vercel, set these as Environment Variables: SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY
+# Using provided credentials for demonstration, but recommend env vars for actual deployment.
+SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlrc3h6YmJjb2l0ZWhkbXN4cWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NzMwNjUsImV4cCI6MjA2NTM0OTA2NX0.AzUD7wjR7VbvtUH27NDqJ3AlvFW0nCWpiN9ADG8T_t4")
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY") # <<< Set this in Vercel env vars for write access!
 
-supabase: Client = None # Initialize as None, will be created in try block
+SUPABASE_TABLE_NAME = 'powerball_draws' # Your table name in Supabase
 
-def get_supabase_client():
-    """Initializes and returns the Supabase client."""
-    global supabase
-    if supabase is None:
-        try:
-            supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-            print("Supabase client initialized successfully.")
-        except Exception as e:
-            print(f"Error initializing Supabase client: {e}")
-            supabase = None # Ensure it remains None if init fails
-    return supabase
+# --- Utility Functions (Modified for direct API calls) ---
 
-# --- Utility Functions (Modified for Supabase) ---
+def _get_supabase_headers(is_service_key=False):
+    """Helper to get common Supabase API headers."""
+    key = SUPABASE_SERVICE_KEY if is_service_key else SUPABASE_ANON_KEY
+    return {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json"
+    }
 
 def load_historical_data_from_supabase():
-    """Fetches all historical data from Supabase and returns it as a pandas DataFrame."""
-    client = get_supabase_client()
-    if client is None:
-        print("Supabase client not available, returning empty DataFrame.")
-        return pd.DataFrame() # Return empty DataFrame if client fails to initialize
-
+    """Fetches all historical data from Supabase using requests and returns as a pandas DataFrame."""
     try:
-        # Fetch data from your 'powerball_draws' table
-        # Order by draw_date to ensure consistent results, especially for 'last_draw'
-        response = client.table('powerball_draws').select('*').order('draw_date', desc=False).execute()
+        url = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
+        headers = _get_supabase_headers(is_service_key=False) # Use anon key for reads
         
-        data = response.data
+        # Add order by draw_date and select all columns
+        params = {
+            'select': '*',
+            'order': 'draw_date.asc' # Order by draw_date ascending
+        }
+
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status() # Raise an HTTPError for bad responses (4xx or 5xx)
+        
+        data = response.json()
         if not data:
             print("No data fetched from Supabase.")
             return pd.DataFrame()
 
-        # Convert fetched data to pandas DataFrame
         df = pd.DataFrame(data)
         
         # Rename columns to match existing code's expectations
@@ -72,10 +73,16 @@ def load_historical_data_from_supabase():
         print(f"Successfully loaded {len(df)} records from Supabase.")
         return df
 
-    except Exception as e:
-        print(f"Error fetching data from Supabase: {e}")
+    except requests.exceptions.RequestException as e:
+        print(f"Error during Supabase data fetch request: {e}")
         return pd.DataFrame()
-
+    except json.JSONDecodeError as e:
+        print(f"Error decoding JSON response from Supabase: {e}")
+        print(f"Response content: {response.text}")
+        return pd.DataFrame()
+    except Exception as e:
+        print(f"An unexpected error occurred in load_historical_data_from_supabase: {e}")
+        return pd.DataFrame()
 
 def get_last_draw(df):
     if df.empty:
@@ -112,7 +119,6 @@ def generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white
         powerball = random.randint(powerball_range[0], powerball_range[1])
 
         last_draw_data = df.iloc[-1]
-        # Check if last_draw_data exists before accessing its values
         if not last_draw_data.empty and last_draw_data.get('Number 1') != 'N/A':
             last_white_balls = last_draw_data[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].values
             if set(white_balls) == set(last_white_balls) and powerball == int(last_draw_data['Powerball']):
@@ -445,7 +451,8 @@ def get_co_occurrence_matrix(df):
     co_occurrence = defaultdict(int)
     
     for index, row in df.iterrows():
-        white_balls = sorted([row['Number 1'], 'Number 2', 'Number 3', 'Number 4', 'Number 5']) # Fixed a bug here: was string 'Number 2'
+        # Corrected: Accessing numbers correctly from the row
+        white_balls = sorted([row['Number 1'], row['Number 2'], row['Number 3'], row['Number 4'], row['Number 5']])
         for i in range(len(white_balls)):
             for j in range(i + 1, len(white_balls)):
                 pair = tuple(sorted((white_balls[i], white_balls[j])))
@@ -834,9 +841,6 @@ def export_analysis_results_route():
         flash("Cannot export results: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
 
-    # Note: On Vercel, this will write to the ephemeral filesystem of the serverless function.
-    # It won't persist across invocations or be downloadable by the user directly.
-    # For persistent storage/downloads, you'd need a cloud storage solution (e.g., S3).
     export_analysis_results(df) 
     flash("Analysis results exported to analysis_results.csv (this file is temporary on Vercel's serverless environment).", 'info')
     return redirect(url_for('index'))
@@ -928,25 +932,35 @@ def find_results_by_first_white_ball():
 # --- NEW: Route for updating data via scheduled job ---
 @app.route('/update_powerball_data', methods=['GET']) # Using GET for simplicity, POST is generally better for mutations
 def update_powerball_data():
-    client = get_supabase_client()
-    if client is None:
-        return "Error: Supabase client not initialized.", 500
+    # It's crucial to use the Service Role Key for inserts if RLS is enabled and restrictive.
+    # Otherwise, the Anon Key (public) might be sufficient if RLS allows anon inserts.
+    # For robust production, ensure SUPABASE_SERVICE_KEY is set as a Vercel environment variable.
+    service_headers = _get_supabase_headers(is_service_key=True)
+    anon_headers = _get_supabase_headers(is_service_key=False)
 
     try:
-        # 1. Fetch latest draw from an external source (THIS IS A PLACEHOLDER)
-        # You need to replace this with actual logic to get the latest Powerball draw.
-        # This could involve:
-        #   a) Calling a lottery API (e.g., Data.gov, if available for Powerball, requires API key usually)
-        #   b) Web scraping an official lottery website (more complex, prone to breaking)
-        #   c) A third-party data provider
-        #
-        # Example hypothetical function call:
-        # latest_draw_info = fetch_latest_powerball_draw_from_external_api()
-        # For demonstration, let's simulate a new draw
-        print("Attempting to fetch and update latest Powerball draw...")
+        # 1. Fetch latest draw date from Supabase to check if we need to update
+        url_check_latest = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
+        params_check_latest = {
+            'select': 'draw_date',
+            'order': 'draw_date.desc',
+            'limit': 1
+        }
+        response_check_latest = requests.get(url_check_latest, headers=anon_headers, params=params_check_latest)
+        response_check_latest.raise_for_status()
+        
+        latest_db_draw_data = response_check_latest.json()
+        last_db_draw_date = None
+        if latest_db_draw_data:
+            last_db_draw_date = latest_db_draw_data[0]['draw_date']
+        
+        print(f"Last draw date in Supabase: {last_db_draw_date}")
 
-        # Simulating a new draw for demonstration
-        simulated_draw_date = datetime.now().strftime('%Y-%m-%d')
+        # 2. Fetch latest actual Powerball draw from an external source
+        # This is the PRIMARY PLACEHOLDER you NEED to replace with actual data fetching logic.
+        # This simulation will insert a new draw every time it runs (unless the date matches).
+        simulated_draw_date_dt = datetime.now() # Use current datetime for distinctness
+        simulated_draw_date = simulated_draw_date_dt.strftime('%Y-%m-%d')
         simulated_numbers = sorted(random.sample(range(1, 70), 5))
         simulated_powerball = random.randint(1, 26)
 
@@ -959,30 +973,28 @@ def update_powerball_data():
             'number_5': simulated_numbers[4],
             'powerball': simulated_powerball
         }
+        
+        print(f"Simulated new draw data: {new_draw_data}")
 
-        # 2. Check if this draw already exists in Supabase
-        # Order by draw_date descending and limit to 1 to get the most recent draw in DB
-        last_db_draw_response = client.table('powerball_draws').select('draw_date').order('draw_date', desc=True).limit(1).execute()
-        last_db_draw_date = None
-        if last_db_draw_response.data:
-            last_db_draw_date = last_db_draw_response.data[0]['draw_date']
-
+        # Compare with the latest in DB
         if new_draw_data['draw_date'] == last_db_draw_date:
             print(f"Draw for {new_draw_data['draw_date']} already exists. No update needed.")
             return "No new draw data. Database is up-to-date.", 200
         
         # 3. Insert the new draw into Supabase
-        # IMPORTANT: For writes, you might need to use the `service_role` key if your RLS policies are strict.
-        # Ensure your Supabase table has appropriate Row Level Security (RLS) policies for inserts.
-        # If using `service_role` key, you'd initialize client with:
-        # SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
-        # client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-        
-        insert_response = client.table('powerball_draws').insert(new_draw_data).execute()
-        
-        if insert_response.data:
+        url_insert = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
+        insert_response = requests.post(url_insert, headers=service_headers, data=json.dumps(new_draw_data))
+        insert_response.raise_for_status() # Raise error for bad responses
+
+        if insert_response.status_code == 201: # 201 Created is typical for successful POST
             print(f"Successfully inserted new draw: {new_draw_data}")
-            # Re-load and re-precompute data after insertion
+            # IMPORTANT: After updating the DB, the global 'df' and precomputed data
+            # will only be updated on the *next cold start* of the Vercel function.
+            # For immediate reflection, you would need to trigger a new deployment or
+            # explicitly reload these global variables, which might be slow on every request.
+            # For cron jobs, this is usually acceptable, as the next user request will get updated data.
+            
+            # Re-load and re-precompute data after insertion to reflect immediately for next request
             global df, last_draw, precomputed_white_ball_freq, precomputed_powerball_freq, \
                    precomputed_last_draw_date_str, precomputed_hot_numbers, precomputed_cold_numbers, \
                    precomputed_monthly_balls, precomputed_number_age_data, precomputed_co_occurrence_data, \
@@ -1000,12 +1012,19 @@ def update_powerball_data():
                 precomputed_co_occurrence_data, precomputed_max_co_occurrence = get_co_occurrence_matrix(df)
                 precomputed_powerball_position_data = get_powerball_position_frequency(df)
 
+
             return f"Data updated successfully with draw for {simulated_draw_date}.", 200
         else:
-            print(f"Failed to insert data: {insert_response.error}")
-            return f"Error updating data: {insert_response.error}", 500
+            print(f"Failed to insert data. Status: {insert_response.status_code}, Response: {insert_response.text}")
+            return f"Error updating data: {insert_response.status_code} - {insert_response.text}", 500
 
+    except requests.exceptions.RequestException as e:
+        print(f"Network or HTTP error during update_powerball_data: {e}")
+        return f"Network or HTTP error: {e}", 500
+    except json.JSONDecodeError as e:
+        print(f"JSON decoding error in update_powerball_data: {e}")
+        return f"JSON parsing error: {e}", 500
     except Exception as e:
-        print(f"An error occurred during data update: {e}")
+        print(f"An unexpected error occurred during data update: {e}")
         return f"An internal error occurred: {e}", 500
 
