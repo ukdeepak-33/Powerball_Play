@@ -634,6 +634,26 @@ try:
         precomputed_number_age_data = get_number_age_distribution(df)
         precomputed_co_occurrence_data, precomputed_max_co_occurrence = get_co_occurrence_matrix(df)
         precomputed_powerball_position_data = get_powerball_position_frequency(df)
+        
+        # --- DEBUG PRINTS FOR ANALYSIS DATA ---
+        print("\n--- DEBUG: Precomputed Analysis Data Status ---")
+        print(f"precomputed_white_ball_freq is empty: {precomputed_white_ball_freq.empty}")
+        print(f"precomputed_white_ball_freq head:\n{precomputed_white_ball_freq.head()}")
+        print(f"precomputed_powerball_freq is empty: {precomputed_powerball_freq.empty}")
+        print(f"precomputed_powerball_freq head:\n{precomputed_powerball_freq.head()}")
+        print(f"precomputed_hot_numbers is empty: {precomputed_hot_numbers.empty}")
+        print(f"precomputed_hot_numbers head:\n{precomputed_hot_numbers.head()}")
+        print(f"precomputed_cold_numbers is empty: {precomputed_cold_numbers.empty}")
+        print(f"precomputed_cold_numbers head:\n{precomputed_cold_numbers.head()}")
+        print(f"precomputed_monthly_balls is empty: {not bool(precomputed_monthly_balls)}")
+        print(f"precomputed_monthly_balls sample: {list(precomputed_monthly_balls.keys())[:2] if precomputed_monthly_balls else 'N/A'}")
+        print(f"precomputed_number_age_data is empty: {not bool(precomputed_number_age_data)}")
+        print(f"precomputed_number_age_data sample: {precomputed_number_age_data[:2] if precomputed_number_age_data else 'N/A'}")
+        print(f"precomputed_co_occurrence_data is empty: {not bool(precomputed_co_occurrence_data)}")
+        print(f"precomputed_co_occurrence_data sample: {precomputed_co_occurrence_data[:2] if precomputed_co_occurrence_data else 'N/A'}")
+        print(f"precomputed_powerball_position_data is empty: {not bool(precomputed_powerball_position_data)}")
+        print(f"precomputed_powerball_position_data sample: {precomputed_powerball_position_data[:2] if precomputed_powerball_position_data else 'N/A'}")
+        print("--- END DEBUG ---")
 
 except Exception as e:
     print(f"An error occurred during initial data loading or pre-computation: {e}")
