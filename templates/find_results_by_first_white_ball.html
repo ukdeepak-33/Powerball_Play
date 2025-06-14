@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Find Results by First White Ball{% endblock %}
+
+{% block page_heading %}Find Results by First White Ball{% endblock %}
+
+{% block content %}
+    <div class="card mb-6">
+        <h2 class="text-xl font-semibold mb-4 text-gray-700">Search by First White Ball Number</h2>
+        <form action="/find_results_by_first_white_ball" method="post" class="flex flex-col space-y-2">
+            <label for="white_ball_number" class="form-label">Enter First White Ball Number:</label>
+            <input type="number" id="white_ball_number" name="white_ball_number" class="form-input" placeholder="e.g., 7" value="{{ white_ball_number | default('') }}">
+            <div class="flex items-center mt-2">
+                <input type="checkbox" id="sort_by_year" name="sort_by_year" class="rounded text-indigo-600 focus:ring-indigo-500" {% if sort_by_year %}checked{% endif %}>
+                <label for="sort_by_year" class="ml-2 text-gray-700 font-medium">Sort by Year</label>
+            </div>
+            <button type="submit" class="btn-primary mt-2">Find Results</button>
+        </form>
+    </div>
+
+    {% if results_by_first_white_ball %}
+        <div class="card mt-6">
+            <h3 class="text-lg font-semibold mb-2 text-gray-700">Draws where Number 1 is: {{ white_ball_number }}</h3>
+            <p class="text-sm text-gray-600">Sorted by year: {% if sort_by_year %}Yes{% else %}No{% endif %}</p>
+            <table class="table-auto">
+                <thead>
+                    <tr>
+                        <th>Draw Date</th>
+                        <th>Number 1</th>
+                        <th>Number 2</th>
+                        <th>Number 3</th>
+                        <th>Number 4</th>
+                        <th>Number 5</th>
+                        <th>Powerball</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in results_by_first_white_ball %}
+                        <tr>
+                            <td>{{ row['Draw Date'] }}</td>
+                            <td>{{ row['Number 1'] }}</td>
+                            <td>{{ row['Number 2'] }}</td>
+                            <td>{{ row['Number 3'] }}</td>
+                            <td>{{ row['Number 4'] }}</td>
+                            <td>{{ row['Number 5'] }}</td>
+                            <td>{{ row['Powerball'] }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% elif white_ball_number is not none %} {# Only show if a search was attempted but no results #}
+        <div class="card mt-6">
+            <p class="text-gray-500">No draws found where the first white ball is {{ white_ball_number }}.</p>
+        </div>
+    {% endif %}
+{% endblock %}
