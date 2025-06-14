@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Number Age Distribution{% endblock %}
+
+{% block page_heading %}Number Age Distribution{% endblock %}
+
+{% block content %}
+    {% if number_age_data %}
+        <div class="chart-container">
+            <h3 class="chart-title">Number Age Distribution (Draws Since Last Seen)</h3>
+            <div id="numberAgeChart"></div>
+        </div>
+    {% else %}
+        <div class="card"><p class="text-gray-500">No data available for Number Age Distribution. Please ensure historical data is loaded.</p></div>
+    {% endif %}
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            {% if number_age_data %}
+            drawBarChart({{ number_age_data | tojson }}, 'numberAgeChart', 'age', 'count', 'Number Age Distribution');
+            {% endif %}
+        });
+    </script>
+{% endblock %}
