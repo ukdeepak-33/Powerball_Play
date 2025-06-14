@@ -19,8 +19,12 @@
 {% block scripts %}
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            console.log("[Co-occurrence Analysis] Page loaded.");
             {% if co_occurrence_data %}
+            console.log("[Co-occurrence Analysis] co_occurrence_data data:", {{ co_occurrence_data | tojson }});
             drawHeatmap({{ co_occurrence_data | tojson }}, 'coOccurrenceHeatmap', 'x', 'y', 'count', 'Co-occurrence Matrix', {{ max_co_occurrence | default(0) }});
+            {% else %}
+            console.log("[Co-occurrence Analysis] co_occurrence_data is not available in template context.");
             {% endif %}
         });
     </script>
