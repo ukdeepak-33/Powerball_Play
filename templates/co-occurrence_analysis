@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Co-occurrence Analysis{% endblock %}
+
+{% block page_heading %}Co-occurrence Analysis{% endblock %}
+
+{% block content %}
+    {% if co_occurrence_data %}
+        <div class="chart-container">
+            <h3 class="chart-title">Co-occurrence Matrix (Top Pairs)</h3>
+            <p class="text-gray-700 text-sm">Max Co-occurrence: <span class="font-semibold">{{ max_co_occurrence | default(0) }}</span></p>
+            <div id="coOccurrenceHeatmap"></div>
+        </div>
+    {% else %}
+        <div class="card"><p class="text-gray-500">No data available for Co-occurrence Analysis. Please ensure historical data is loaded.</p></div>
+    {% endif %}
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            {% if co_occurrence_data %}
+            drawHeatmap({{ co_occurrence_data | tojson }}, 'coOccurrenceHeatmap', 'x', 'y', 'count', 'Co-occurrence Matrix', {{ max_co_occurrence | default(0) }});
+            {% endif %}
+        });
+    </script>
+{% endblock %}
