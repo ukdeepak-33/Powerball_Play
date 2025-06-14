@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Find Results by Sum{% endblock %}
+
+{% block page_heading %}Find Results by Sum{% endblock %}
+
+{% block content %}
+    <div class="card mb-6">
+        <h2 class="text-xl font-semibold mb-4 text-gray-700">Search by Sum</h2>
+        <form action="/find_results_by_sum" method="post" class="flex flex-col space-y-2">
+            <label for="target_sum" class="form-label">Enter Target Sum:</label>
+            <input type="number" id="target_sum" name="target_sum" class="form-input" placeholder="e.g., 100" value="{{ target_sum | default('') }}">
+            <button type="submit" class="btn-primary">Find Results</button>
+        </form>
+    </div>
+
+    {% if results %}
+        <div class="card mt-6">
+            <h3 class="text-lg font-semibold mb-2 text-gray-700">Draws with Sum: {{ target_sum }}</h3>
+            <table class="table-auto">
+                <thead>
+                    <tr>
+                        <th>Draw Date</th>
+                        <th>Number 1</th>
+                        <th>Number 2</th>
+                        <th>Number 3</th>
+                        <th>Number 4</th>
+                        <th>Number 5</th>
+                        <th>Sum</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in results %}
+                        <tr>
+                            <td>{{ row['Draw Date'] }}</td>
+                            <td>{{ row['Number 1'] }}</td>
+                            <td>{{ row['Number 2'] }}</td>
+                            <td>{{ row['Number 3'] }}</td>
+                            <td>{{ row['Number 4'] }}</td>
+                            <td>{{ row['Number 5'] }}</td>
+                            <td>{{ row['Sum'] }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% elif target_sum is not none %} {# Only show if a search was attempted but no results #}
+        <div class="card mt-6">
+            <p class="text-gray-500">No draws found with a sum of {{ target_sum }}.</p>
+        </div>
+    {% endif %}
+{% endblock %}
