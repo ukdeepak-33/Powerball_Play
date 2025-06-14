@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Winning Probability{% endblock %}
+
+{% block page_heading %}Overall Winning Probability{% endblock %}
+
+{% block content %}
+    {% if probability_1_in_x %}
+        <div class="card">
+            <h3 class="text-lg font-semibold mb-2 text-gray-700">Overall Winning Probability:</h3>
+            <p class="mb-2"><strong>1 in X:</strong> {{ probability_1_in_x }}</p>
+            <p><strong>Percentage:</strong> {{ probability_percentage }}</p>
+            <p class="text-sm text-gray-600 mt-4">This calculation is based on the full range of white balls (1-69) and Powerballs (1-26).</p>
+        </div>
+    {% else %}
+        <div class="card"><p class="text-gray-500">Probability data not available. Please ensure ranges are correctly set and calculations are possible.</p></div>
+    {% endif %}
+{% endblock %}
+
+{% block scripts %}
+    {# No D3 charts for this page #}
+{% endblock %}
