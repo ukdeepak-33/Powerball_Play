@@ -1,6 +1,2 @@
-Flask==2.3.2
-pandas==1.5.3
-gunicorn==20.1.0
-requests==2.32.3
-numpy==1.24.4 # Pinned numpy to a compatible version for pandas 1.5.3
+
 
