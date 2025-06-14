@@ -23,7 +23,7 @@ app.secret_key = 'supersecretkey'
 # For Vercel, set these as Environment Variables: SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY
 # Using provided credentials for demonstration, but recommend env vars for actual deployment.
 SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
-SUPABASE_ANON_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlrc3h6YmJjb2l0ZWhkbXN4cWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NzMwNjUsImexrCI6MjA2NTM0OTA2NX0.AzUD7wjR7VbvtUH27NDqJ3AlvFW0nCWpiN9ADG8T_t4")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlrc3h6YmJjb2l0ZWhkbXN4cWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NzMwNjUsImV4cCI6MjA2NTM0OTA2NX0.AzUD7wjR7VbvtUH27NDqJ3AlvFW0nCWpiN9ADG8T_t4")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY") # <<< Set this in Vercel env vars for write access!
 
 SUPABASE_TABLE_NAME = 'powerball_draws' # Your table name in Supabase
@@ -40,66 +40,73 @@ def _get_supabase_headers(is_service_key=False):
     }
 
 def load_historical_data_from_supabase():
-    """Fetches all historical data from Supabase using requests and returns as a pandas DataFrame."""
+    """
+    Fetches all historical data from Supabase using requests with pagination
+    and returns as a pandas DataFrame.
+    """
+    all_data = []
+    offset = 0
+    limit = 1000 # Supabase default limit, fetch in chunks
+
     try:
         url = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
-        headers = _get_supabase_headers(is_service_key=False) # Use anon key for reads
+        headers = _get_supabase_headers(is_service_key=False)
         
-        # Add order by Draw Date ascending
-        params = {
-            'select': '*',
-            'order': 'Draw Date.asc' # Order by the exact column name 'Draw Date'
-        }
+        while True:
+            params = {
+                'select': '*',
+                'order': 'Draw Date.asc', # Use the exact column name 'Draw Date' for ordering
+                'offset': offset,
+                'limit': limit
+            }
 
-        print(f"Attempting to fetch from Supabase URL: {url} with params: {params}")
-        print(f"Headers (anon): {headers}") # For debugging, remove in production
+            print(f"Fetching from Supabase URL: {url} with params: {params}")
 
-        response = requests.get(url, headers=headers, params=params)
-        response.raise_for_status() # Raise an HTTPError for bad responses (4xx or 5xx)
-        
-        data = response.json()
-        if not data:
-            print("No data fetched from Supabase.")
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status() # Raise an HTTPError for bad responses (4xx or 5xx)
+            
+            chunk = response.json()
+            if not chunk:
+                break # No more data to fetch
+
+            all_data.extend(chunk)
+            offset += limit
+            print(f"Fetched {len(chunk)} records. Total so far: {len(all_data)}")
+
+        if not all_data:
+            print("No data fetched from Supabase after pagination attempts.")
             return pd.DataFrame()
 
-        df = pd.DataFrame(data)
+        df = pd.DataFrame(all_data)
         
-        # NO RENAME NEEDED IF COLUMN NAMES MATCH DIRECTLY!
-        # Your Supabase table already uses 'Draw Date', 'Number 1', etc.
-        # df = df.rename(columns={
-        #     'draw_date': 'Draw Date',
-        #     'number_1': 'Number 1',
-        #     'number_2': 'Number 2',
-        #     'number_3': 'Number 3',
-        #     'number_4': 'Number 4',
-        #     'number_5': 'Number 5',
-        #     'powerball': 'Powerball'
-        # })
-        
-        # Convert 'Draw Date' (which is now directly accessed from Supabase response) to datetime objects and then to formatted string
-        # Handle potential NaT from invalid dates before dt accessor
-        df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'], errors='coerce') # 'coerce' turns invalid parsing into NaT
-        df = df.dropna(subset=['Draw Date_dt']) # Drop rows where date parsing failed
+        # Convert 'Draw Date' (which is now directly accessed from Supabase response) to datetime objects
+        # Use errors='coerce' to turn unparseable dates into NaT (Not a Time)
+        df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'], errors='coerce')
+        # Drop rows where 'Draw Date' could not be parsed to a valid date
+        df = df.dropna(subset=['Draw Date_dt'])
 
-        # Ensure numeric columns are integers
-        for col in ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Powerball']:
+        # Ensure numeric columns are integers. Handle potential errors by coercing to numeric, filling NaNs (e.g., from 'werb'), and then converting to int.
+        numeric_cols = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Powerball']
+        for col in numeric_cols:
             if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int) # Handle non-numeric, fill with 0, convert to int
+                df[col] = pd.to_numeric(df[col], errors='coerce') # Convert to numeric, non-numeric become NaN
+                df[col] = df[col].fillna(0).astype(int) # Fill NaNs (e.g., 'werb' converted to NaN) with 0, then convert to int
+            else:
+                print(f"Warning: Column '{col}' not found in fetched data. Skipping conversion for this column.")
 
+        # Reformat 'Draw Date' for display
         df['Draw Date'] = df['Draw Date_dt'].dt.strftime('%Y-%m-%d')
         
-        print(f"Successfully loaded {len(df)} records from Supabase.")
+        print(f"Successfully loaded and processed {len(df)} records from Supabase.")
         return df
 
     except requests.exceptions.RequestException as e:
         print(f"Error during Supabase data fetch request: {e}")
-        # Print response content for more detailed error from Supabase
         if hasattr(e, 'response') and e.response is not None:
             print(f"Supabase response content: {e.response.text}")
         return pd.DataFrame()
     except json.JSONDecodeError as e:
         print(f"Error decoding JSON response from Supabase: {e}")
-        # If response exists, print it for debugging
         if 'response' in locals() and response is not None:
             print(f"Response content that failed JSON decode: {response.text}")
         return pd.DataFrame()
@@ -876,6 +883,7 @@ def sum_of_main_balls_route():
     if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
         try:
             last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+            
         except ValueError:
             pass
 
