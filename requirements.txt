@@ -1,1 +1,5 @@
+Flask==2.3.2
+pandas==1.5.3 # Downgraded pandas to a more stable version
+gunicorn==20.1.0
+requests==2.32.3
 
