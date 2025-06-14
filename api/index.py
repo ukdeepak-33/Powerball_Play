@@ -300,7 +300,7 @@ def simulate_multiple_draws(df, group_a, odd_even_choice, combo_choice, white_ba
     for _ in range(num_draws):
         try:
             # Pass all necessary arguments to generate_powerball_numbers
-            white_balls, powerball = generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers)
+            white_balls, powerball = generate_powerball_numbers(df, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers) # Fixed: using "Any" and "No Combo" defaults
             results.append(white_balls + [powerball])
         except ValueError:
             pass # Skip combinations that don't meet criteria
@@ -826,17 +826,9 @@ def frequency_analysis_route():
     white_ball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in precomputed_white_ball_freq.items()]
     powerball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in precomputed_powerball_freq.items()]
     
-    last_draw_dict = last_draw.to_dict()
-    if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
-        try:
-            last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
-        except ValueError:
-            pass
-
-    return render_template('index.html', 
+    return render_template('frequency_analysis.html', 
                            white_ball_freq=white_ball_freq_list, 
-                           powerball_freq=powerball_freq_list, 
-                           last_draw=last_draw_dict)
+                           powerball_freq=powerball_freq_list)
 
 @app.route('/hot_cold_numbers')
 def hot_cold_numbers_route():
@@ -844,33 +836,17 @@ def hot_cold_numbers_route():
     hot_numbers_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in precomputed_hot_numbers.items()]
     cold_numbers_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in precomputed_cold_numbers.items()]
     
-    last_draw_dict = last_draw.to_dict()
-    if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
-        try:
-            last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
-        except ValueError:
-            pass
-
-    return render_template('index.html', 
+    return render_template('hot_cold_numbers.html', 
                            hot_numbers=hot_numbers_list, 
-                           cold_numbers=cold_numbers_list, 
-                           last_draw=last_draw_dict)
+                           cold_numbers=cold_numbers_list)
 
 @app.route('/monthly_white_ball_analysis')
 def monthly_white_ball_analysis_route():
     # Use pre-computed data
     monthly_balls = precomputed_monthly_balls
     
-    last_draw_dict = last_draw.to_dict()
-    if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
-        try:
-            last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
-        except ValueError:
-            pass
-
-    return render_template('index.html', 
-                           monthly_balls=monthly_balls, 
-                           last_draw=last_draw_dict)
+    return render_template('monthly_white_ball_analysis.html', 
+                           monthly_balls=monthly_balls)
 
 @app.route('/sum_of_main_balls')
 def sum_of_main_balls_route():
@@ -879,111 +855,76 @@ def sum_of_main_balls_route():
         return redirect(url_for('index'))
         
     sum_data_df, sum_freq_list, min_sum, max_sum, avg_sum = sum_of_main_balls(df)
-    last_draw_dict = last_draw.to_dict()
-    if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
-        try:
-            last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
-            
-        except ValueError:
-            pass
 
-    return render_template('index.html', 
+    return render_template('sum_of_main_balls.html', 
                            sum_data=sum_data_df.to_dict('records'), 
                            sum_freq_list=sum_freq_list, # Pass frequency data for D3 chart
                            min_sum=min_sum, 
                            max_sum=max_sum, 
-                           avg_sum=avg_sum,
-                           last_draw=last_draw_dict)
+                           avg_sum=avg_sum)
 
-@app.route('/find_results_by_sum', methods=['POST'])
+@app.route('/find_results_by_sum', methods=['GET', 'POST']) # Allow GET for direct link, POST for form submission
 def find_results_by_sum_route():
     if df.empty:
         flash("Cannot find results: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
 
-    target_sum_str = request.form.get('target_sum')
     results = []
     target_sum_display = None
 
-    if target_sum_str and target_sum_str.isdigit():
-        target_sum = int(target_sum_str)
-        target_sum_display = target_sum
-        results_df = find_results_by_sum(df, target_sum)
-        results = results_df.to_dict('records')
-    else:
-        flash("Please enter a valid number for Target Sum.", 'error')
-
-    last_draw_dict = last_draw.to_dict()
-    if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
-        try:
-            last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
-        except ValueError:
-            pass
-
-
-    return render_template('index.html', 
+    if request.method == 'POST':
+        target_sum_str = request.form.get('target_sum')
+        if target_sum_str and target_sum_str.isdigit():
+            target_sum = int(target_sum_str)
+            target_sum_display = target_sum
+            results_df = find_results_by_sum(df, target_sum)
+            results = results_df.to_dict('records')
+        else:
+            flash("Please enter a valid number for Target Sum.", 'error')
+    # If GET request or POST with invalid input, render the page with an empty results list
+    return render_template('find_results_by_sum.html', 
                            results=results,
-                           last_draw=last_draw_dict,
                            target_sum=target_sum_display)
 
-@app.route('/simulate_multiple_draws', methods=['POST'])
+@app.route('/simulate_multiple_draws', methods=['GET', 'POST']) # Allow GET for direct link, POST for form submission
 def simulate_multiple_draws_route():
     if df.empty:
         flash("Cannot run simulation: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
 
-    num_draws_str = request.form.get('num_draws')
-    if num_draws_str and num_draws_str.isdigit():
-        num_draws = int(num_draws_str)
-        # Pass all required args for generate_powerball_numbers, even if not directly from form here
-        simulated_freq = simulate_multiple_draws(df, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers, num_draws)
-        
-        last_draw_dict = last_draw.to_dict()
-        if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
-            try:
-                last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
-            except ValueError:
-                pass
+    simulated_freq_list = []
+    num_draws_display = None
 
-        simulated_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in simulated_freq.items()]
+    if request.method == 'POST':
+        num_draws_str = request.form.get('num_draws')
+        if num_draws_str and num_draws_str.isdigit():
+            num_draws = int(num_draws_str)
+            num_draws_display = num_draws
+            # Pass all required args for generate_powerball_numbers, even if not directly from form here
+            simulated_freq = simulate_multiple_draws(df, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers, num_draws)
+            simulated_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in simulated_freq.items()]
+        else:
+            flash("Please enter a valid number for Number of Simulations.", 'error')
 
-        return render_template('index.html', 
-                               simulated_freq=simulated_freq_list, 
-                               num_simulations=num_draws,
-                               last_draw=last_draw_dict)
-    else:
-        flash("Please enter a valid number for Number of Simulations.", 'error')
-        return redirect(url_for('index'))
+    return render_template('simulate_multiple_draws.html', 
+                           simulated_freq=simulated_freq_list, 
+                           num_simulations=num_draws_display)
 
 
 @app.route('/winning_probability')
 def winning_probability_route():
     probability_1_in_x, probability_percentage = winning_probability(white_ball_range, powerball_range)
-    last_draw_dict = last_draw.to_dict()
-    if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
-        try:
-            last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
-        except ValueError:
-            pass
 
-    return render_template('index.html', 
+    return render_template('winning_probability.html', 
                            probability_1_in_x=probability_1_in_x, 
-                           probability_percentage=probability_percentage, 
-                           last_draw=last_draw_dict)
+                           probability_percentage=probability_percentage)
 
 @app.route('/partial_match_probabilities')
 def partial_match_probabilities_route():
     probabilities = partial_match_probabilities(white_ball_range, powerball_range)
-    last_draw_dict = last_draw.to_dict()
-    if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
-        try:
-            last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
-        except ValueError:
-            pass
 
-    return render_template('index.html', 
-                           probabilities=probabilities, 
-                           last_draw=last_draw_dict)
+    return render_template('partial_match_probabilities.html', 
+                           probabilities=probabilities)
 
 @app.route('/export_analysis_results')
 def export_analysis_results_route():
@@ -998,87 +939,59 @@ def export_analysis_results_route():
 @app.route('/number_age_distribution')
 def number_age_distribution_route():
     number_age_data = precomputed_number_age_data
-    last_draw_dict = last_draw.to_dict()
-    if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
-        try:
-            last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
-        except ValueError:
-            pass
 
-    return render_template('index.html',
-                           number_age_data=number_age_data,
-                           last_draw=last_draw_dict)
+    return render_template('number_age_distribution.html',
+                           number_age_data=number_age_data)
 
 @app.route('/co_occurrence_analysis')
 def co_occurrence_analysis_route():
     co_occurrence_data = precomputed_co_occurrence_data
     max_co_occurrence = precomputed_max_co_occurrence
 
-    last_draw_dict = last_draw.to_dict()
-    if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
-        try:
-            last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
-        except ValueError:
-            pass
-
-    return render_template('index.html',
+    return render_template('co_occurrence_analysis.html',
                            co_occurrence_data=co_occurrence_data,
-                           max_co_occurrence=max_co_occurrence,
-                           last_draw=last_draw_dict)
+                           max_co_occurrence=max_co_occurrence)
 
 @app.route('/powerball_position_frequency')
 def powerball_position_frequency_route():
     powerball_position_data = precomputed_powerball_position_data
 
-    last_draw_dict = last_draw.to_dict()
-    if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
-        try:
-            last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
-        except ValueError:
-            pass
+    return render_template('powerball_position_frequency.html',
+                           powerball_position_data=powerball_position_data)
 
-    return render_template('index.html',
-                           powerball_position_data=powerball_position_data,
-                           last_draw=last_draw_dict)
-
-@app.route('/find_results_by_first_white_ball', methods=['POST'])
+@app.route('/find_results_by_first_white_ball', methods=['GET', 'POST']) # Allow GET for direct link, POST for form submission
 def find_results_by_first_white_ball():
     if df.empty:
         flash("Cannot find results: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
 
-    white_ball_number_str = request.form.get('white_ball_number')
     results_dict = []
     white_ball_number_display = None
-    sort_by_year_flag = request.form.get('sort_by_year') == 'on'
+    sort_by_year_flag = False
 
-    if white_ball_number_str and white_ball_number_str.isdigit():
-        white_ball_number = int(white_ball_number_str)
-        white_ball_number_display = white_ball_number
-        
-        # Ensure 'Number 1' column is treated as int for comparison if mixed types
-        # Added .copy() to avoid SettingWithCopyWarning
-        results = df[df['Number 1'].astype(int) == white_ball_number].copy()
+    if request.method == 'POST':
+        white_ball_number_str = request.form.get('white_ball_number')
+        sort_by_year_flag = request.form.get('sort_by_year') == 'on'
 
-        if sort_by_year_flag:
-            # Ensure 'Draw Date' is datetime before extracting year
-            results['Year'] = pd.to_datetime(results['Draw Date'], errors='coerce').dt.year
-            results = results.sort_values(by='Year')
-        
-        results_dict = results.to_dict('records')
-    else:
-        flash("Please enter a valid number for First White Ball Number.", 'error')
+        if white_ball_number_str and white_ball_number_str.isdigit():
+            white_ball_number = int(white_ball_number_str)
+            white_ball_number_display = white_ball_number
+            
+            # Ensure 'Number 1' column is treated as int for comparison if mixed types
+            # Added .copy() to avoid SettingWithCopyWarning
+            results = df[df['Number 1'].astype(int) == white_ball_number].copy()
 
-    last_draw_dict = last_draw.to_dict()
-    if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
-        try:
-            last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
-        except ValueError:
-            pass
+            if sort_by_year_flag:
+                # Ensure 'Draw Date' is datetime before extracting year
+                results['Year'] = pd.to_datetime(results['Draw Date'], errors='coerce').dt.year
+                results = results.sort_values(by='Year')
+            
+            results_dict = results.to_dict('records')
+        else:
+            flash("Please enter a valid number for First White Ball Number.", 'error')
 
-    return render_template('index.html', 
+    return render_template('find_results_by_first_white_ball.html', 
                            results_by_first_white_ball=results_dict, 
-                           last_draw=last_draw_dict,
                            white_ball_number=white_ball_number_display,
                            sort_by_year=sort_by_year_flag)
 
