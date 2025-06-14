@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Partial Match Probabilities{% endblock %}
+
+{% block page_heading %}Partial Match Probabilities{% endblock %}
+
+{% block content %}
+    {% if probabilities %}
+        <div class="card">
+            <h3 class="text-lg font-semibold mb-2 text-gray-700">Partial Match Probabilities:</h3>
+            <table class="table-auto">
+                <thead>
+                    <tr>
+                        <th>Scenario</th>
+                        <th>Odds</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for scenario, odds in probabilities.items() %}
+                        <tr>
+                            <td>{{ scenario }}</td>
+                            <td>{{ odds }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <p class="text-sm text-gray-600 mt-4">These odds represent the probability of matching a specific number of white balls and/or the Powerball in a single draw.</p>
+        </div>
+    {% else %}
+        <div class="card"><p class="text-gray-500">Partial match probability data not available. Please ensure calculations are possible.</p></div>
+    {% endif %}
+{% endblock %}
+
+{% block scripts %}
+    {# No D3 charts for this page #}
+{% endblock %}
