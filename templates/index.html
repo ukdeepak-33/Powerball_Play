@@ -36,133 +36,122 @@
             padding: 0.75rem;
             border: 1px solid #cbd5e1;
             border-radius: 0.5rem;
-            margin-bottom: 1rem;
-            box-sizing: border-box; /* Ensures padding doesn't increase total width */
+            font-size: 1rem;
+            color: #334155;
         }
-        .btn {
-            display: inline-block;
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+        }
+        .btn-primary {
+            background-color: #6366f1;
+            color: #ffffff;
             padding: 0.75rem 1.5rem;
             border-radius: 0.5rem;
-            background-color: #4f46e5;
-            color: white;
             font-weight: 600;
-            text-align: center;
-            cursor: pointer;
             transition: background-color 0.2s;
+            cursor: pointer;
             border: none;
         }
-        .btn:hover {
-            background-color: #4338ca;
+        .btn-primary:hover {
+            background-color: #4f46e5;
         }
-        .accordion-item {
-            margin-bottom: 1rem;
-            border: 1px solid #e2e8f0;
-            border-radius: 0.75rem;
-            overflow: hidden;
-        }
-        .accordion-header {
-            background-color: #f1f5f9;
-            padding: 1rem 1.5rem;
-            cursor: pointer;
-            font-weight: 700;
-            color: #1e293b;
-            display: flex;
-            justify-content: space-between;
+        .ball {
+            display: inline-flex;
+            justify-content: center;
             align-items: center;
-            transition: background-color 0.2s;
+            width: 3rem;
+            height: 3rem;
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 1.25rem;
+            margin: 0.25rem;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
-        .accordion-header:hover {
+        .white-ball {
             background-color: #e2e8f0;
+            color: #1a202c;
+            border: 1px solid #cbd5e1;
         }
-        .accordion-content {
-            padding: 1.5rem;
-            background-color: white;
-            display: none;
-            overflow: hidden;
-            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
-            max-height: 0;
+        .powerball {
+            background-color: #dc2626;
+            color: #ffffff;
+            border: 1px solid #b91c1c;
         }
-        .accordion-content.active {
-            display: block;
-            max-height: 1000px; /* Large enough to show content, adjust if needed */
-            padding: 1.5rem;
-        }
-        .accordion-icon {
-            transition: transform 0.2s;
-        }
-        .accordion-header.active .accordion-icon {
-            transform: rotate(180deg);
-        }
-        .flash-message {
+        .message {
             padding: 1rem;
             border-radius: 0.5rem;
-            margin-bottom: 1rem;
+            margin-top: 1rem;
             font-weight: 500;
         }
-        .flash-message.error {
+        .message.success {
+            background-color: #d1fae5;
+            color: #065f46;
+            border: 1px solid #10b981;
+        }
+        .message.error {
             background-color: #fee2e2;
-            color: #dc2626;
-            border: 1px solid #f87171;
+            color: #991b1b;
+            border: 1px solid #ef4444;
         }
-        .flash-message.info {
+        .message.info {
             background-color: #e0f2fe;
-            color: #0284c7;
-            border: 1px solid #38bdf8;
+            color: #0b72c4;
+            border: 1px solid #3b82f6;
         }
-        table {
+        .table-auto {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 1rem;
         }
-        th, td {
-            border: 1px solid #e2e8f0;
+        .table-auto th, .table-auto td {
             padding: 0.75rem;
             text-align: left;
+            border-bottom: 1px solid #e2e8f0;
         }
-        th {
+        .table-auto th {
             background-color: #f1f5f9;
             font-weight: 600;
             color: #475569;
         }
-        .result-numbers span {
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background-color: #4f46e5;
+        .accordion-item {
+            border-radius: 0.75rem;
+            overflow: hidden;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+        }
+        .accordion-header {
+            background-color: #6366f1;
             color: white;
-            font-weight: bold;
-            margin: 0.25rem;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            transition: background-color 0.2s;
         }
-        .result-numbers .powerball {
-            background-color: #ef4444; /* Red for Powerball */
+        .accordion-header:hover {
+            background-color: #4f46e5;
         }
-        /* D3 Chart Specific Styles */
-        .chart-container {
-            width: 100%;
-            overflow-x: auto;
-            margin-top: 1rem;
+        .accordion-content {
+            padding: 1.5rem;
+            background-color: #f8fafc;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            border-bottom-left-radius: 0.75rem;
+            border-bottom-right-radius: 0.75rem;
         }
-        .bar {
-            fill: #4f46e5;
+        .accordion-item.active .accordion-content {
+            max-height: 1000px; /* Adjust as needed for content length */
+            transition: max-height 0.5s ease-in;
         }
-        .bar:hover {
-            fill: #3e33c7;
+        .accordion-header .icon {
+            transition: transform 0.3s;
         }
-        .axis text {
-            font-size: 0.75rem;
-            fill: #64748b;
-        }
-        .axis path, .axis line {
-            stroke: #cbd5e1;
-            shape-rendering: crispEdges;
-        }
-        .label {
-            font-size: 0.875rem;
-            fill: #334155;
+        .accordion-item.active .accordion-header .icon {
+            transform: rotate(180deg);
         }
     </style>
 </head>
@@ -170,45 +159,41 @@
     <div class="container">
         <h1 class="text-3xl font-bold text-center mb-6 text-indigo-700">Powerball Simulator</h1>
 
-        <!-- Flash Messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="flash-messages mb-6">
                     {% for category, message in messages %}
-                        <div class="flash-message {{ category }}">{{ message }}</div>
+                        <div class="message {{ category }}">{{ message }}</div>
                     {% endfor %}
                 </div>
             {% endif %}
         {% endwith %}
 
-        <!-- Last Draw Result (Persistent) -->
+        <!-- Last Official Draw -->
         <div class="card mb-6">
             <h2 class="text-xl font-semibold mb-4 text-gray-700">Last Official Draw</h2>
-            {% if last_draw and last_draw['Draw Date'] != 'N/A' %}
-                <p class="text-lg mb-2">Draw Date: <span class="font-bold">{{ last_draw['Draw Date'] }}</span></p>
-                <div class="result-numbers flex items-center">
-                    <span class="mr-2">White Balls:</span>
-                    <span class="bg-blue-600">{{ last_draw['Number 1'] }}</span>
-                    <span class="bg-blue-600">{{ last_draw['Number 2'] }}</span>
-                    <span class="bg-blue-600">{{ last_draw['Number 3'] }}</span>
-                    <span class="bg-blue-600">{{ last_draw['Number 4'] }}</span>
-                    <span class="bg-blue-600">{{ last_draw['Number 5'] }}</span>
-                    <span class="ml-4 mr-2">Powerball:</span>
-                    <span class="powerball">{{ last_draw['Powerball'] }}</span>
+            <p class="mb-2"><span class="font-medium">Draw Date:</span> {{ last_draw['Draw Date'] | default('N/A') }}</p>
+            <div class="flex items-center">
+                <span class="font-medium mr-2">White Balls:</span>
+                {% for i in range(1, 6) %}
+                    <div class="ball white-ball">
+                        {{ last_draw['Number ' + i|string] | int | default('N/A') }}
+                    </div>
+                {% endfor %}
+                <span class="font-medium ml-4 mr-2">Powerball:</span>
+                <div class="ball powerball">
+                    {{ last_draw['Powerball'] | int | default('N/A') }}
                 </div>
-            {% else %}
-                <p class="text-md text-red-500">No historical data loaded. Please check Supabase connection and ensure data is available.</p>
-            {% endif %}
+            </div>
         </div>
 
-        <!-- Accordion Container -->
-        <div class="accordion-container">
-
+        <!-- Accordion Section -->
+        <div class="accordion">
             <!-- Generate Numbers Section -->
-            <div class="accordion-item">
+            <div class="accordion-item" id="generate-numbers-accordion">
                 <div class="accordion-header">
                     <span>Generate Powerball Numbers</span>
-                    <span class="accordion-icon">&#9660;</span>
+                    <span class="icon">&#9660;</span>
                 </div>
                 <div class="accordion-content">
                     <form action="/generate" method="post" class="space-y-4">
@@ -226,196 +211,134 @@
                         </div>
                         <div>
                             <label for="high_low_balance" class="form-label">High/Low Balance (e.g., "2 3" for 2 low, 3 high):</label>
-                            <input type="text" id="high_low_balance" name="high_low_balance" class="form-input" placeholder="e.g., 2 3 (Low <= 34, High >= 35)">
+                            <input type="text" id="high_low_balance" name="high_low_balance" class="form-input" placeholder="e.g., 2 3">
                         </div>
-                        <div>
-                            <label for="white_ball_min" class="form-label">White Ball Min (1-69):</label>
-                            <input type="number" id="white_ball_min" name="white_ball_min" class="form-input" value="1" min="1" max="69">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="white_ball_min" class="form-label">White Ball Min (1-69):</label>
+                                <input type="number" id="white_ball_min" name="white_ball_min" class="form-input" value="1" min="1" max="69">
+                            </div>
+                            <div>
+                                <label for="white_ball_max" class="form-label">White Ball Max (1-69):</label>
+                                <input type="number" id="white_ball_max" name="white_ball_max" class="form-input" value="69" min="1" max="69">
+                            </div>
                         </div>
-                        <div>
-                            <label for="white_ball_max" class="form-label">White Ball Max (1-69):</label>
-                            <input type="number" id="white_ball_max" name="white_ball_max" class="form-input" value="69" min="1" max="69">
-                        </div>
-                        <div>
-                            <label for="powerball_min" class="form-label">Powerball Min (1-26):</label>
-                            <input type="number" id="powerball_min" name="powerball_min" class="form-input" value="1" min="1" max="26">
-                        </div>
-                        <div>
-                            <label for="powerball_max" class="form-label">Powerball Max (1-26):</label>
-                            <input type="number" id="powerball_max" name="powerball_max" class="form-input" value="26" min="1" max="26">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="powerball_min" class="form-label">Powerball Min (1-26):</label>
+                                <input type="number" id="powerball_min" name="powerball_min" class="form-input" value="1" min="1" max="26">
+                            </div>
+                            <div>
+                                <label for="powerball_max" class="form-label">Powerball Max (1-26):</label>
+                                <input type="number" id="powerball_max" name="powerball_max" class="form-input" value="26" min="1" max="26">
+                            </div>
                         </div>
                         <div>
                             <label for="excluded_numbers" class="form-label">Excluded Numbers (comma-separated):</label>
-                            <input type="text" id="excluded_numbers" name="excluded_numbers" class="form-input" placeholder="e.g., 1,5,10">
+                            <input type="text" id="excluded_numbers" name="excluded_numbers" class="form-input" placeholder="e.g., 1, 13, 25">
                         </div>
-                        <button type="submit" class="btn">Generate Numbers</button>
+                        <button type="submit" class="btn-primary w-full">Generate Numbers</button>
                     </form>
 
-                    {% if white_balls and powerball %}
-                        <div class="mt-6 card">
+                    {% if white_balls %}
+                        <div class="card mt-6">
                             <h3 class="text-lg font-semibold mb-2 text-gray-700">Generated Numbers:</h3>
-                            <div class="result-numbers flex items-center">
-                                <span class="mr-2">White Balls:</span>
-                                {% for num in white_balls %}
-                                    <span class="bg-blue-600">{{ num }}</span>
+                            <div class="flex items-center justify-center mb-4">
+                                {% for ball in white_balls %}
+                                    <div class="ball white-ball">{{ ball }}</div>
                                 {% endfor %}
-                                <span class="ml-4 mr-2">Powerball:</span>
-                                <span class="powerball">{{ powerball }}</span>
+                                <div class="ball powerball ml-4">{{ powerball }}</div>
                             </div>
-                            {% if last_draw_dates %}
-                                <h4 class="text-md font-semibold mt-4 text-gray-600">Last Draw Dates for Generated Numbers:</h4>
-                                <ul class="list-disc list-inside">
-                                    {% for number, draw_date in last_draw_dates.items() %}
-                                        <li>{{ number }}: {{ draw_date }}</li>
-                                    {% endfor %}
-                                </ul>
-                            {% endif %}
+                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Last Drawn Date for Each Number:</h3>
+                            <ul class="list-disc list-inside">
+                                {% for num, date in last_draw_dates.items() %}
+                                    <li>{{ num }}: {{ date }}</li>
+                                {% endfor %}
+                            </ul>
                         </div>
                     {% endif %}
                 </div>
             </div>
 
             <!-- Generate Modified Combination Section -->
-            <div class="accordion-item">
+            <div class="accordion-item" id="generate-modified-accordion">
                 <div class="accordion-header">
                     <span>Generate Modified Combination</span>
-                    <span class="accordion-icon">&#9660;</span>
+                    <span class="icon">&#9660;</span>
                 </div>
                 <div class="accordion-content">
                     <form action="/generate_modified" method="post" class="space-y-4">
-                        <div class="flex items-center space-x-2">
-                            <input type="checkbox" id="use_common_pairs" name="use_common_pairs" class="form-checkbox">
-                            <label for="use_common_pairs" class="form-label mb-0">Use Common Pairs (Top 20)</label>
+                        <div>
+                            <input type="checkbox" id="use_common_pairs" name="use_common_pairs" class="rounded text-indigo-600 focus:ring-indigo-500">
+                            <label for="use_common_pairs" class="ml-2 text-gray-700 font-medium">Use Common Pairs (Top 20)</label>
                         </div>
                         <div>
                             <label for="num_range" class="form-label">Filter Common Pairs by Range (e.g., "1 20"):</label>
                             <input type="text" id="num_range" name="num_range" class="form-input" placeholder="e.g., 1 20">
                         </div>
-                        <button type="submit" class="btn">Generate Modified Combination</button>
+                        <button type="submit" class="btn-primary w-full">Generate Modified Combination</button>
                     </form>
-                    {% if white_balls and powerball and request.path == '/generate_modified' %}
-                        <div class="mt-6 card">
+                    {% if modified_white_balls %}
+                        <div class="card mt-6">
                             <h3 class="text-lg font-semibold mb-2 text-gray-700">Modified Generated Numbers:</h3>
-                            <div class="result-numbers flex items-center">
-                                <span class="mr-2">White Balls:</span>
-                                {% for num in white_balls %}
-                                    <span class="bg-blue-600">{{ num }}</span>
+                            <div class="flex items-center justify-center mb-4">
+                                {% for ball in modified_white_balls %}
+                                    <div class="ball white-ball">{{ ball }}</div>
                                 {% endfor %}
-                                <span class="ml-4 mr-2">Powerball:</span>
-                                <span class="powerball">{{ powerball }}</span>
+                                <div class="ball powerball ml-4">{{ modified_powerball }}</div>
                             </div>
-                            {% if last_draw_dates %}
-                                <h4 class="text-md font-semibold mt-4 text-gray-600">Last Draw Dates for Modified Numbers:</h4>
-                                <ul class="list-disc list-inside">
-                                    {% for number, draw_date in last_draw_dates.items() %}
-                                        <li>{{ number }}: {{ draw_date }}</li>
-                                    {% endfor %}
-                                </ul>
-                            {% endif %}
+                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Last Drawn Date for Each Number:</h3>
+                            <ul class="list-disc list-inside">
+                                {% for num, date in last_draw_dates.items() %}
+                                    <li>{{ num }}: {{ date }}</li>
+                                {% endfor %}
+                            </ul>
                         </div>
                     {% endif %}
                 </div>
             </div>
 
-            <!-- Find Results by First White Ball Section -->
-            <div class="accordion-item">
+            <!-- Analysis Section -->
+            <div class="accordion-item" id="analysis-accordion">
                 <div class="accordion-header">
-                    <span>Find Results by First White Ball</span>
-                    <span class="accordion-icon">&#9660;</span>
-                </div>
-                <div class="accordion-content">
-                    <form action="/find_results_by_first_white_ball" method="post" class="space-y-4">
-                        <div>
-                            <label for="white_ball_number" class="form-label">Enter First White Ball Number (1-69):</label>
-                            <input type="number" id="white_ball_number" name="white_ball_number" class="form-input" min="1" max="69" required value="{{ white_ball_number if white_ball_number is not none else '' }}">
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <input type="checkbox" id="sort_by_year" name="sort_by_year" class="form-checkbox" {% if sort_by_year %}checked{% endif %}>
-                            <label for="sort_by_year" class="form-label mb-0">Sort by Year</label>
-                        </div>
-                        <button type="submit" class="btn">Find Results</button>
-                    </form>
-
-                    {% if results_by_first_white_ball is not none %} {# Check if the variable exists and is not None #}
-                        <div class="mt-6 card">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Results for First White Ball {{ white_ball_number }}:</h3>
-                            {% if results_by_first_white_ball %}
-                                <table class="min-w-full bg-white">
-                                    <thead>
-                                        <tr>
-                                            <th>Draw Date</th>
-                                            <th>Number 1</th>
-                                            <th>Number 2</th>
-                                            <th>Number 3</th>
-                                            <th>Number 4</th>
-                                            <th>Number 5</th>
-                                            <th>Powerball</th>
-                                            {% if sort_by_year %}<th>Year</th>{% endif %}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for result in results_by_first_white_ball %}
-                                            <tr>
-                                                <td>{{ result['Draw Date'] }}</td>
-                                                <td>{{ result['Number 1'] }}</td>
-                                                <td>{{ result['Number 2'] }}</td>
-                                                <td>{{ result['Number 3'] }}</td>
-                                                <td>{{ result['Number 4'] }}</td>
-                                                <td>{{ result['Number 5'] }}</td>
-                                                <td>{{ result['Powerball'] }}</td>
-                                                {% if sort_by_year %}<td>{{ result['Year'] }}</td>{% endif %}
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            {% else %}
-                                <p>No results found for the given first white ball number.</p>
-                            {% endif %}
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Analysis Tools Section -->
-            <div class="accordion-item">
-                <div class="accordion-header">
-                    <span>Analysis Tools</span>
-                    <span class="accordion-icon">&#9660;</span>
+                    <span>Powerball Analysis</span>
+                    <span class="icon">&#9660;</span>
                 </div>
                 <div class="accordion-content">
                     <div class="space-y-4">
-                        <a href="/frequency_analysis" class="btn block">Frequency Analysis</a>
-                        <a href="/hot_cold_numbers" class="btn block">Hot/Cold Numbers</a>
-                        <a href="/monthly_white_ball_analysis" class="btn block">Monthly White Ball Analysis</a>
-                        <a href="/sum_of_main_balls" class="btn block">Sum of Main Balls Analysis</a>
-                        <a href="/number_age_distribution" class="btn block">Number Age Distribution</a>
-                        <a href="/co_occurrence_analysis" class="btn block">Co-occurrence Analysis</a>
-                        <a href="/powerball_position_frequency" class="btn block">Powerball Position Frequency</a>
-
-                        <form action="/find_results_by_sum" method="post" class="mt-6 space-y-4">
-                            <h4 class="text-md font-semibold text-gray-700">Find Results by Sum:</h4>
-                            <div>
-                                <label for="target_sum" class="form-label">Target Sum:</label>
-                                <input type="number" id="target_sum" name="target_sum" class="form-input" required value="{{ target_sum if target_sum is not none else '' }}">
-                            </div>
-                            <button type="submit" class="btn">Find Results by Sum</button>
+                        <a href="/frequency_analysis" class="btn-primary block text-center">Frequency Analysis</a>
+                        <a href="/hot_cold_numbers" class="btn-primary block text-center">Hot & Cold Numbers</a>
+                        <a href="/monthly_white_ball_analysis" class="btn-primary block text-center">Monthly White Ball Analysis</a>
+                        <a href="/sum_of_main_balls" class="btn-primary block text-center">Sum of Main Balls</a>
+                        <form action="/find_results_by_sum" method="post" class="flex flex-col space-y-2">
+                            <label for="target_sum" class="form-label">Find Results by Sum:</label>
+                            <input type="number" id="target_sum" name="target_sum" class="form-input" placeholder="Enter target sum">
+                            <button type="submit" class="btn-primary">Find Results</button>
                         </form>
-
-                        <form action="/simulate_multiple_draws" method="post" class="mt-6 space-y-4">
-                            <h4 class="text-md font-semibold text-gray-700">Simulate Multiple Draws:</h4>
-                            <div>
-                                <label for="num_draws" class="form-label">Number of Simulations:</label>
-                                <input type="number" id="num_draws" name="num_draws" class="form-input" value="100" min="1" required>
+                        <form action="/find_results_by_first_white_ball" method="post" class="flex flex-col space-y-2">
+                            <label for="white_ball_number" class="form-label">Find Results by First White Ball Number:</label>
+                            <input type="number" id="white_ball_number" name="white_ball_number" class="form-input" placeholder="Enter white ball number">
+                            <div class="flex items-center mt-2">
+                                <input type="checkbox" id="sort_by_year" name="sort_by_year" class="rounded text-indigo-600 focus:ring-indigo-500">
+                                <label for="sort_by_year" class="ml-2 text-gray-700 font-medium">Sort by Year</label>
                             </div>
-                            <button type="submit" class="btn">Run Simulation</button>
+                            <button type="submit" class="btn-primary mt-2">Find Results</button>
                         </form>
+                        <form action="/simulate_multiple_draws" method="post" class="flex flex-col space-y-2">
+                            <label for="num_draws" class="form-label">Simulate Multiple Draws:</label>
+                            <input type="number" id="num_draws" name="num_draws" class="form-input" value="100" min="1">
+                            <button type="submit" class="btn-primary">Run Simulation</button>
+                        </form>
+                        <a href="/number_age_distribution" class="btn-primary block text-center">Number Age Distribution</a>
+                        <a href="/co_occurrence_analysis" class="btn-primary block text-center">Co-occurrence Analysis</a>
+                        <a href="/powerball_position_frequency" class="btn-primary block text-center">Powerball Position Frequency</a>
+
                     </div>
 
-                    <!-- Display Frequency Analysis Results -->
-                    {% if white_ball_freq and powerball_freq %}
-                        <div class="mt-6 card">
+                    {% if white_ball_freq %}
+                        <div class="card mt-6">
                             <h3 class="text-lg font-semibold mb-2 text-gray-700">White Ball Frequency:</h3>
-                            <table class="min-w-full bg-white">
+                            <table class="table-auto">
                                 <thead>
                                     <tr>
                                         <th>Number</th>
@@ -425,14 +348,14 @@
                                 <tbody>
                                     {% for item in white_ball_freq %}
                                         <tr>
-                                            <td>{{ item['Number'] }}</td>
-                                            <td>{{ item['Frequency'] }}</td>
+                                            <td>{{ item.Number }}</td>
+                                            <td>{{ item.Frequency }}</td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
                             <h3 class="text-lg font-semibold mt-4 mb-2 text-gray-700">Powerball Frequency:</h3>
-                            <table class="min-w-full bg-white">
+                            <table class="table-auto">
                                 <thead>
                                     <tr>
                                         <th>Number</th>
@@ -442,8 +365,8 @@
                                 <tbody>
                                     {% for item in powerball_freq %}
                                         <tr>
-                                            <td>{{ item['Number'] }}</td>
-                                            <td>{{ item['Frequency'] }}</td>
+                                            <td>{{ item.Number }}</td>
+                                            <td>{{ item.Frequency }}</td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>
@@ -451,11 +374,10 @@
                         </div>
                     {% endif %}
 
-                    <!-- Display Hot/Cold Numbers -->
-                    {% if hot_numbers and cold_numbers %}
-                        <div class="mt-6 card">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Hot Numbers (Last Year):</h3>
-                            <table class="min-w-full bg-white">
+                    {% if hot_numbers %}
+                        <div class="card mt-6">
+                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Hot Numbers (Most Frequent):</h3>
+                            <table class="table-auto">
                                 <thead>
                                     <tr>
                                         <th>Number</th>
@@ -463,16 +385,16 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for num in hot_numbers %}
+                                    {% for item in hot_numbers %}
                                         <tr>
-                                            <td>{{ num['Number'] }}</td>
-                                            <td>{{ num['Frequency'] }}</td>
+                                            <td>{{ item.Number }}</td>
+                                            <td>{{ item.Frequency }}</td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
-                            <h3 class="text-lg font-semibold mt-4 mb-2 text-gray-700">Cold Numbers (Last Year):</h3>
-                            <table class="min-w-full bg-white">
+                            <h3 class="text-lg font-semibold mt-4 mb-2 text-gray-700">Cold Numbers (Least Frequent):</h3>
+                            <table class="table-auto">
                                 <thead>
                                     <tr>
                                         <th>Number</th>
@@ -480,10 +402,10 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for num in cold_numbers %}
+                                    {% for item in cold_numbers %}
                                         <tr>
-                                            <td>{{ num['Number'] }}</td>
-                                            <td>{{ num['Frequency'] }}</td>
+                                            <td>{{ item.Number }}</td>
+                                            <td>{{ item.Frequency }}</td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>
@@ -491,93 +413,53 @@
                         </div>
                     {% endif %}
 
-                    <!-- Display Monthly White Ball Analysis -->
                     {% if monthly_balls %}
-                        <div class="mt-6 card">
+                        <div class="card mt-6">
                             <h3 class="text-lg font-semibold mb-2 text-gray-700">Monthly White Ball Analysis (Last 6 Months):</h3>
                             {% for month, balls in monthly_balls.items() %}
-                                <p class="mb-1"><span class="font-semibold">{{ month }}:</span> {{ balls | join(', ') }}</p>
+                                <p class="font-medium mt-2">{{ month }}:</p>
+                                <div class="flex flex-wrap">
+                                    {% for ball in balls %}
+                                        <div class="ball white-ball-sm">{{ ball }}</div>
+                                    {% endfor %}
+                                </div>
                             {% endfor %}
                         </div>
                     {% endif %}
 
-                    <!-- Display Sum of Main Balls Analysis -->
                     {% if sum_data %}
-                        <div class="mt-6 card">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Sum of Main Balls:</h3>
-                            <p><strong>Min Sum:</strong> {{ min_sum }}</p>
-                            <p><strong>Max Sum:</strong> {{ max_sum }}</p>
-                            <p><strong>Average Sum:</strong> {{ avg_sum }}</p>
-                            <h4 class="text-md font-semibold mt-4 mb-2 text-gray-700">Sum Frequency Distribution:</h4>
-                            <div id="sum-frequency-chart" class="chart-container"></div>
-                            <script src="https://d3js.org/d3.v7.min.js"></script>
-                            <script>
-                                // Data from Flask
-                                const sumFreqData = {{ sum_freq_list | tojson }};
-
-                                const margin = { top: 20, right: 30, bottom: 60, left: 40 };
-                                const width = 800 - margin.left - margin.right;
-                                const height = 400 - margin.top - margin.bottom;
-
-                                const svg = d3.select("#sum-frequency-chart")
-                                    .append("svg")
-                                    .attr("width", width + margin.left + margin.right)
-                                    .attr("height", height + margin.top + margin.bottom)
-                                    .append("g")
-                                    .attr("transform", `translate(${margin.left},${margin.top})`);
-
-                                const x = d3.scaleBand()
-                                    .domain(sumFreqData.map(d => d.sum))
-                                    .range([0, width])
-                                    .padding(0.1);
-
-                                const y = d3.scaleLinear()
-                                    .domain([0, d3.max(sumFreqData, d => d.count)]).nice()
-                                    .range([height, 0]);
-
-                                svg.append("g")
-                                    .attr("class", "x-axis axis")
-                                    .attr("transform", `translate(0,${height})`)
-                                    .call(d3.axisBottom(x))
-                                    .selectAll("text")
-                                    .attr("transform", "rotate(-45)")
-                                    .style("text-anchor", "end");
-
-                                svg.append("g")
-                                    .attr("class", "y-axis axis")
-                                    .call(d3.axisLeft(y));
-
-                                svg.selectAll(".bar")
-                                    .data(sumFreqData)
-                                    .enter().append("rect")
-                                    .attr("class", "bar")
-                                    .attr("x", d => x(d.sum))
-                                    .attr("y", d => y(d.count))
-                                    .attr("width", x.bandwidth())
-                                    .attr("height", d => height - y(d.count));
-                                
-                                // X-axis label
-                                svg.append("text")
-                                    .attr("class", "label")
-                                    .attr("x", width / 2)
-                                    .attr("y", height + margin.bottom - 5)
-                                    .style("text-anchor", "middle")
-                                    .text("Sum of White Balls");
-
-                                // Y-axis label
-                                svg.append("text")
-                                    .attr("class", "label")
-                                    .attr("transform", "rotate(-90)")
-                                    .attr("y", -margin.left + 10)
-                                    .attr("x", -height / 2)
-                                    .style("text-anchor", "middle")
-                                    .text("Frequency");
-                            </script>
-                            <h4 class="text-md font-semibold mt-4 mb-2 text-gray-700">Recent Sums:</h4>
-                            <table class="min-w-full bg-white">
+                        <div class="card mt-6">
+                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Sum of Main Balls Analysis:</h3>
+                            <p>Min Sum: {{ min_sum }}</p>
+                            <p>Max Sum: {{ max_sum }}</p>
+                            <p>Average Sum: {{ avg_sum }}</p>
+                            <h4 class="font-semibold mt-4 mb-2">Sum Frequencies:</h4>
+                            <table class="table-auto">
+                                <thead>
+                                    <tr>
+                                        <th>Sum</th>
+                                        <th>Count</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in sum_freq_list %}
+                                        <tr>
+                                            <td>{{ item.sum }}</td>
+                                            <td>{{ item.count }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            <h4 class="font-semibold mt-4 mb-2">Individual Draws by Sum:</h4>
+                            <table class="table-auto">
                                 <thead>
                                     <tr>
                                         <th>Draw Date</th>
+                                        <th>Number 1</th>
+                                        <th>Number 2</th>
+                                        <th>Number 3</th>
+                                        <th>Number 4</th>
+                                        <th>Number 5</th>
                                         <th>Sum</th>
                                     </tr>
                                 </thead>
@@ -585,6 +467,11 @@
                                     {% for row in sum_data %}
                                         <tr>
                                             <td>{{ row['Draw Date'] }}</td>
+                                            <td>{{ row['Number 1'] }}</td>
+                                            <td>{{ row['Number 2'] }}</td>
+                                            <td>{{ row['Number 3'] }}</td>
+                                            <td>{{ row['Number 4'] }}</td>
+                                            <td>{{ row['Number 5'] }}</td>
                                             <td>{{ row['Sum'] }}</td>
                                         </tr>
                                     {% endfor %}
@@ -593,48 +480,75 @@
                         </div>
                     {% endif %}
 
-                    <!-- Display Results by Sum -->
-                    {% if results is not none and target_sum is not none %} {# Check if results variable is set and target_sum was provided #}
-                        <div class="mt-6 card">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Results for Sum {{ target_sum }}:</h3>
-                            {% if results %}
-                                <table class="min-w-full bg-white">
-                                    <thead>
+                    {% if results_by_first_white_ball %}
+                        <div class="card mt-6">
+                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Results for First White Ball Number: {{ white_ball_number }}</h3>
+                            <p class="text-sm text-gray-600">Sorted by year: {% if sort_by_year %}Yes{% else %}No{% endif %}</p>
+                            <table class="table-auto">
+                                <thead>
+                                    <tr>
+                                        <th>Draw Date</th>
+                                        <th>Number 1</th>
+                                        <th>Number 2</th>
+                                        <th>Number 3</th>
+                                        <th>Number 4</th>
+                                        <th>Number 5</th>
+                                        <th>Powerball</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in results_by_first_white_ball %}
                                         <tr>
-                                            <th>Draw Date</th>
-                                            <th>Number 1</th>
-                                            <th>Number 2</th>
-                                            <th>Number 3</th>
-                                            <th>Number 4</th>
-                                            <th>Number 5</th>
-                                            <th>Sum</th>
+                                            <td>{{ row['Draw Date'] }}</td>
+                                            <td>{{ row['Number 1'] }}</td>
+                                            <td>{{ row['Number 2'] }}</td>
+                                            <td>{{ row['Number 3'] }}</td>
+                                            <td>{{ row['Number 4'] }}</td>
+                                            <td>{{ row['Number 5'] }}</td>
+                                            <td>{{ row['Powerball'] }}</td>
                                         </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for result in results %}
-                                            <tr>
-                                                <td>{{ result['Draw Date'] }}</td>
-                                                <td>{{ result['Number 1'] }}</td>
-                                                <td>{{ result['Number 2'] }}</td>
-                                                <td>{{ result['Number 3'] }}</td>
-                                                <td>{{ result['Number 4'] }}</td>
-                                                <td>{{ result['Number 5'] }}</td>
-                                                <td>{{ result['Sum'] }}</td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            {% else %}
-                                <p>No results found for the target sum {{ target_sum }}.</p>
-                            {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
                         </div>
                     {% endif %}
 
-                    <!-- Display Simulated Draws Frequency -->
+                    {% if results %} {# For find_results_by_sum #}
+                        <div class="card mt-6">
+                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Draws with Sum: {{ target_sum }}</h3>
+                            <table class="table-auto">
+                                <thead>
+                                    <tr>
+                                        <th>Draw Date</th>
+                                        <th>Number 1</th>
+                                        <th>Number 2</th>
+                                        <th>Number 3</th>
+                                        <th>Number 4</th>
+                                        <th>Number 5</th>
+                                        <th>Sum</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in results %}
+                                        <tr>
+                                            <td>{{ row['Draw Date'] }}</td>
+                                            <td>{{ row['Number 1'] }}</td>
+                                            <td>{{ row['Number 2'] }}</td>
+                                            <td>{{ row['Number 3'] }}</td>
+                                            <td>{{ row['Number 4'] }}</td>
+                                            <td>{{ row['Number 5'] }}</td>
+                                            <td>{{ row['Sum'] }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endif %}
+
                     {% if simulated_freq %}
-                        <div class="mt-6 card">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Simulated Draw Frequency ({{ num_simulations }} Simulations):</h3>
-                            <table class="min-w-full bg-white">
+                        <div class="card mt-6">
+                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Simulated Draw Frequencies ({{ num_simulations }} simulations):</h3>
+                            <table class="table-auto">
                                 <thead>
                                     <tr>
                                         <th>Number</th>
@@ -644,8 +558,8 @@
                                 <tbody>
                                     {% for item in simulated_freq %}
                                         <tr>
-                                            <td>{{ item['Number'] }}</td>
-                                            <td>{{ item['Frequency'] }}</td>
+                                            <td>{{ item.Number }}</td>
+                                            <td>{{ item.Frequency }}</td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>
@@ -653,303 +567,102 @@
                         </div>
                     {% endif %}
 
-                    <!-- Display Number Age Distribution -->
                     {% if number_age_data %}
-                        <div class="mt-6 card">
+                        <div class="card mt-6">
                             <h3 class="text-lg font-semibold mb-2 text-gray-700">Number Age Distribution:</h3>
-                            <div id="number-age-chart" class="chart-container"></div>
-                            <script>
-                                const numberAgeData = {{ number_age_data | tojson }};
-
-                                const marginAge = { top: 20, right: 30, bottom: 60, left: 40 };
-                                const widthAge = 800 - marginAge.left - marginAge.right;
-                                const heightAge = 400 - marginAge.top - marginAge.bottom;
-
-                                const svgAge = d3.select("#number-age-chart")
-                                    .append("svg")
-                                    .attr("width", widthAge + marginAge.left + marginAge.right)
-                                    .attr("height", heightAge + marginAge.top + marginAge.bottom)
-                                    .append("g")
-                                    .attr("transform", `translate(${marginAge.left},${marginAge.top})`);
-
-                                const xAge = d3.scaleBand()
-                                    .domain(numberAgeData.map(d => d.age))
-                                    .range([0, widthAge])
-                                    .padding(0.1);
-
-                                const yAge = d3.scaleLinear()
-                                    .domain([0, d3.max(numberAgeData, d => d.count)]).nice()
-                                    .range([heightAge, 0]);
-
-                                svgAge.append("g")
-                                    .attr("class", "x-axis axis")
-                                    .attr("transform", `translate(0,${heightAge})`)
-                                    .call(d3.axisBottom(xAge))
-                                    .selectAll("text")
-                                    .attr("transform", "rotate(-45)")
-                                    .style("text-anchor", "end");
-
-                                svgAge.append("g")
-                                    .attr("class", "y-axis axis")
-                                    .call(d3.axisLeft(yAge));
-
-                                svgAge.selectAll(".bar")
-                                    .data(numberAgeData)
-                                    .enter().append("rect")
-                                    .attr("class", "bar")
-                                    .attr("x", d => xAge(d.age))
-                                    .attr("y", d => yAge(d.count))
-                                    .attr("width", xAge.bandwidth())
-                                    .attr("height", d => heightAge - yAge(d.count));
-
-                                // X-axis label
-                                svgAge.append("text")
-                                    .attr("class", "label")
-                                    .attr("x", widthAge / 2)
-                                    .attr("y", heightAge + marginAge.bottom - 5)
-                                    .style("text-anchor", "middle")
-                                    .text("Age (Draws Since Last Appearance)");
-
-                                // Y-axis label
-                                svgAge.append("text")
-                                    .attr("class", "label")
-                                    .attr("transform", "rotate(-90)")
-                                    .attr("y", -marginAge.left + 10)
-                                    .attr("x", -heightAge / 2)
-                                    .style("text-anchor", "middle")
-                                    .text("Number of Balls");
-                            </script>
+                            <table class="table-auto">
+                                <thead>
+                                    <tr>
+                                        <th>Draws Since Last Seen</th>
+                                        <th>Count of Numbers</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in number_age_data %}
+                                        <tr>
+                                            <td>{{ item.age }}</td>
+                                            <td>{{ item.count }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
                         </div>
                     {% endif %}
 
-                    <!-- Display Co-occurrence Analysis -->
                     {% if co_occurrence_data %}
-                        <div class="mt-6 card">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Co-occurrence Analysis (Top Pairs):</h3>
-                            <div id="co-occurrence-chart" class="chart-container"></div>
-                            <script>
-                                const coOccurrenceData = {{ co_occurrence_data | tojson }};
-                                const maxCoOccurrence = {{ max_co_occurrence | tojson }};
-
-                                const marginCo = { top: 20, right: 30, bottom: 60, left: 60 };
-                                const widthCo = 800 - marginCo.left - marginCo.right;
-                                const heightCo = 600 - marginCo.top - marginCo.bottom;
-
-                                const svgCo = d3.select("#co-occurrence-chart")
-                                    .append("svg")
-                                    .attr("width", widthCo + marginCo.left + marginCo.right)
-                                    .attr("height", heightCo + marginCo.top + marginCo.bottom)
-                                    .append("g")
-                                    .attr("transform", `translate(${marginCo.left},${marginCo.top})`);
-
-                                const xCo = d3.scaleLinear()
-                                    .domain([1, 69])
-                                    .range([0, widthCo]);
-
-                                const yCo = d3.scaleLinear()
-                                    .domain([1, 69])
-                                    .range([heightCo, 0]);
-
-                                const colorCo = d3.scaleSequential(d3.interpolateViridis)
-                                    .domain([0, maxCoOccurrence]);
-
-                                svgCo.append("g")
-                                    .attr("class", "x-axis axis")
-                                    .attr("transform", `translate(0,${heightCo})`)
-                                    .call(d3.axisBottom(xCo).ticks(10).tickFormat(d3.format("d")));
-
-                                svgCo.append("g")
-                                    .attr("class", "y-axis axis")
-                                    .call(d3.axisLeft(yCo).ticks(10).tickFormat(d3.format("d")));
-
-                                svgCo.selectAll("circle")
-                                    .data(coOccurrenceData)
-                                    .enter().append("circle")
-                                    .attr("cx", d => xCo(d.x))
-                                    .attr("cy", d => yCo(d.y))
-                                    .attr("r", 5)
-                                    .attr("fill", d => colorCo(d.count))
-                                    .on("mouseover", function(event, d) {
-                                        d3.select(this).attr("r", 8).attr("stroke", "black").attr("stroke-width", 2);
-                                        tooltipCo.style("visibility", "visible")
-                                                 .html(`Pair: (${d.x}, ${d.y})<br>Count: ${d.count}`)
-                                                 .style("left", (event.pageX + 10) + "px")
-                                                 .style("top", (event.pageY - 20) + "px");
-                                    })
-                                    .on("mouseout", function() {
-                                        d3.select(this).attr("r", 5).attr("stroke", "none");
-                                        tooltipCo.style("visibility", "hidden");
-                                    });
-
-                                const tooltipCo = d3.select("body").append("div")
-                                    .attr("class", "tooltip")
-                                    .style("position", "absolute")
-                                    .style("visibility", "hidden")
-                                    .style("background-color", "rgba(0,0,0,0.7)")
-                                    .style("color", "white")
-                                    .style("padding", "5px")
-                                    .style("border-radius", "3px");
-
-                                // X-axis label
-                                svgCo.append("text")
-                                    .attr("class", "label")
-                                    .attr("x", widthCo / 2)
-                                    .attr("y", heightCo + marginCo.bottom - 5)
-                                    .style("text-anchor", "middle")
-                                    .text("White Ball Number 1");
-
-                                // Y-axis label
-                                svgCo.append("text")
-                                    .attr("class", "label")
-                                    .attr("transform", "rotate(-90)")
-                                    .attr("y", -marginCo.left + 10)
-                                    .attr("x", -heightCo / 2)
-                                    .style("text-anchor", "middle")
-                                    .text("White Ball Number 2");
-                            </script>
+                        <div class="card mt-6">
+                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Co-occurrence Matrix Data:</h3>
+                            <p>Max Co-occurrence: {{ max_co_occurrence }}</p>
+                            <table class="table-auto">
+                                <thead>
+                                    <tr>
+                                        <th>Number X</th>
+                                        <th>Number Y</th>
+                                        <th>Co-occurrence Count</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in co_occurrence_data %}
+                                        <tr>
+                                            <td>{{ item.x }}</td>
+                                            <td>{{ item.y }}</td>
+                                            <td>{{ item.count }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
                         </div>
                     {% endif %}
 
-                    <!-- Display Powerball Position Frequency -->
                     {% if powerball_position_data %}
-                        <div class="mt-6 card">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Powerball Position Frequency:</h3>
-                            <div id="powerball-position-chart" class="chart-container"></div>
-                            <script>
-                                const powerballPositionData = {{ powerball_position_data | tojson }};
-
-                                const marginPb = { top: 20, right: 30, bottom: 60, left: 40 };
-                                const widthPb = 800 - marginPb.left - marginPb.right;
-                                const heightPb = 400 - marginPb.top - marginPb.bottom;
-
-                                const svgPb = d3.select("#powerball-position-chart")
-                                    .append("svg")
-                                    .attr("width", widthPb + marginPb.left + marginPb.right)
-                                    .attr("height", heightPb + marginPb.top + marginPb.bottom)
-                                    .append("g")
-                                    .attr("transform", `translate(${marginPb.left},${marginPb.top})`);
-
-                                // Group data by powerball_number and then by white_ball_position
-                                const nestedData = d3.group(powerballPositionData, d => d.powerball_number);
-                                
-                                // Create data for stacked bars
-                                const series = d3.stack()
-                                    .keys(Array.from({length: 5}, (_, i) => `pos_${i+1}`))
-                                    .value((d, key) => {
-                                        const pos = parseInt(key.split('_')[1]);
-                                        return d.positions[pos] || 0;
-                                    })(
-                                    Array.from(nestedData, ([key, value]) => {
-                                        const positions = d3.rollup(value, v => v.length, d => d.white_ball_position);
-                                        return { 
-                                            powerball: key, 
-                                            positions: positions 
-                                        };
-                                    }).sort((a,b) => a.powerball - b.powerball)
-                                );
-
-                                const xPb = d3.scaleBand()
-                                    .domain(series[0].map(d => d.data.powerball))
-                                    .range([0, widthPb])
-                                    .padding(0.1);
-
-                                const yPb = d3.scaleLinear()
-                                    .domain([0, d3.max(series, s => d3.max(s, d => d[1]))]).nice()
-                                    .range([heightPb, 0]);
-                                
-                                const colorPb = d3.scaleOrdinal(d3.schemeCategory10)
-                                    .domain(Array.from({length: 5}, (_, i) => `pos_${i+1}`));
-
-                                svgPb.append("g")
-                                    .attr("class", "x-axis axis")
-                                    .attr("transform", `translate(0,${heightPb})`)
-                                    .call(d3.axisBottom(xPb));
-
-                                svgPb.append("g")
-                                    .attr("class", "y-axis axis")
-                                    .call(d3.axisLeft(yPb));
-                                
-                                svgPb.selectAll(".serie")
-                                    .data(series)
-                                    .enter().append("g")
-                                    .attr("fill", d => colorPb(d.key))
-                                    .selectAll("rect")
-                                    .data(d => d)
-                                    .enter().append("rect")
-                                    .attr("x", d => xPb(d.data.powerball))
-                                    .attr("y", d => yPb(d[1]))
-                                    .attr("height", d => yPb(d[0]) - yPb(d[1]))
-                                    .attr("width", xPb.bandwidth());
-                                
-                                // X-axis label
-                                svgPb.append("text")
-                                    .attr("class", "label")
-                                    .attr("x", widthPb / 2)
-                                    .attr("y", heightPb + marginPb.bottom - 5)
-                                    .style("text-anchor", "middle")
-                                    .text("Powerball Number");
-
-                                // Y-axis label
-                                svgPb.append("text")
-                                    .attr("class", "label")
-                                    .attr("transform", "rotate(-90)")
-                                    .attr("y", -marginPb.left + 10)
-                                    .attr("x", -heightPb / 2)
-                                    .style("text-anchor", "middle")
-                                    .text("Frequency");
-
-                                // Legend
-                                const legendPb = svgPb.append("g")
-                                    .attr("font-family", "sans-serif")
-                                    .attr("font-size", 10)
-                                    .attr("text-anchor", "end")
-                                    .selectAll("g")
-                                    .data(Array.from({length: 5}, (_, i) => `pos_${i+1}`).reverse())
-                                    .enter().append("g")
-                                    .attr("transform", (d, i) => `translate(0,${i * 20})`);
-
-                                legendPb.append("rect")
-                                    .attr("x", widthPb - 19)
-                                    .attr("width", 19)
-                                    .attr("height", 19)
-                                    .attr("fill", colorPb);
-
-                                legendPb.append("text")
-                                    .attr("x", widthPb - 24)
-                                    .attr("y", 9.5)
-                                    .attr("dy", "0.32em")
-                                    .text(d => `White Ball Position ${d.split('_')[1]}`);
-                            </script>
+                        <div class="card mt-6">
+                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Powerball Position Frequency Data:</h3>
+                            <table class="table-auto">
+                                <thead>
+                                    <tr>
+                                        <th>Powerball Number</th>
+                                        <th>White Ball Value at Position</th>
+                                        <th>White Ball Position</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in powerball_position_data %}
+                                        <tr>
+                                            <td>{{ item.powerball_number }}</td>
+                                            <td>{{ item.white_ball_value_at_position }}</td>
+                                            <td>{{ item.white_ball_position }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
                         </div>
                     {% endif %}
 
                 </div>
             </div>
 
-            <!-- Probability Calculations Section -->
-            <div class="accordion-item">
+            <!-- Probabilities Section -->
+            <div class="accordion-item" id="probabilities-accordion">
                 <div class="accordion-header">
-                    <span>Probability Calculations</span>
-                    <span class="accordion-icon">&#9660;</span>
+                    <span>Probabilities</span>
+                    <span class="icon">&#9660;</span>
                 </div>
                 <div class="accordion-content">
                     <div class="space-y-4">
-                        <a href="/winning_probability" class="btn block">Winning Probability</a>
-                        <a href="/partial_match_probabilities" class="btn block">Partial Match Probabilities</a>
+                        <a href="/winning_probability" class="btn-primary block text-center">Winning Probability</a>
+                        <a href="/partial_match_probabilities" class="btn-primary block text-center">Partial Match Probabilities</a>
                     </div>
-
-                    {% if probability_1_in_x and probability_percentage %}
-                        <div class="mt-6 card">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Winning Probability:</h3>
-                            <p><strong>Odds:</strong> {{ probability_1_in_x }}</p>
+                    {% if probability_1_in_x %}
+                        <div class="card mt-6">
+                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Overall Winning Probability:</h3>
+                            <p class="mb-2"><strong>1 in X:</strong> {{ probability_1_in_x }}</p>
                             <p><strong>Percentage:</strong> {{ probability_percentage }}</p>
                         </div>
                     {% endif %}
-
                     {% if probabilities %}
-                        <div class="mt-6 card">
+                        <div class="card mt-6">
                             <h3 class="text-lg font-semibold mb-2 text-gray-700">Partial Match Probabilities:</h3>
-                            <table class="min-w-full bg-white">
+                            <table class="table-auto">
                                 <thead>
                                     <tr>
                                         <th>Scenario</th>
@@ -969,91 +682,92 @@
                     {% endif %}
                 </div>
             </div>
-
-            <!-- Export Results Section -->
-            <div class="accordion-item">
-                <div class="accordion-header">
-                    <span>Export Results</span>
-                    <span class="accordion-icon">&#9660;</span>
-                </div>
-                <div class="accordion-content">
-                    <a href="/export_analysis_results" class="btn">Export Current Analysis Results to CSV</a>
-                    <p class="mt-4 text-sm text-gray-600">Note: This exports data temporarily on the server. For local access, consider other methods for production.</p>
-                </div>
-            </div>
-
-            <!-- Manually Trigger Data Update (for testing cron job functionality) -->
-            <div class="accordion-item">
-                <div class="accordion-header">
-                    <span>Manually Trigger Supabase Data Update</span>
-                    <span class="accordion-icon">&#9660;</span>
-                </div>
-                <div class="accordion-content">
-                    <form action="/update_powerball_data" method="get">
-                        <button type="submit" class="btn bg-green-600 hover:bg-green-700">Fetch & Update Latest Draw</button>
-                    </form>
-                    <p class="mt-4 text-sm text-gray-600">This will attempt to fetch and insert a new simulated draw into Supabase. You'll need to refresh the page for changes to appear in "Last Official Draw".</p>
-                </div>
-            </div>
-
         </div>
     </div>
 
     <script>
         document.querySelectorAll('.accordion-header').forEach(header => {
             header.addEventListener('click', () => {
-                const item = header.parentElement;
+                const accordionItem = header.parentElement;
                 const content = header.nextElementSibling;
-
-                // Close other open accordions
-                document.querySelectorAll('.accordion-item').forEach(otherItem => {
-                    if (otherItem !== item) {
-                        const otherContent = otherItem.querySelector('.accordion-content');
-                        const otherHeader = otherItem.querySelector('.accordion-header');
-                        otherContent.classList.remove('active');
-                        otherHeader.classList.remove('active');
+                
+                // Close other open accordions, unless it's the current one
+                document.querySelectorAll('.accordion-item.active').forEach(openItem => {
+                    if (openItem !== accordionItem) {
+                        openItem.classList.remove('active');
+                        openItem.querySelector('.accordion-content').style.maxHeight = null;
                     }
                 });
 
                 // Toggle current accordion
-                content.classList.toggle('active');
-                header.classList.toggle('active');
+                accordionItem.classList.toggle('active');
+                if (accordionItem.classList.contains('active')) {
+                    content.style.maxHeight = content.scrollHeight + "px";
+                } else {
+                    content.style.maxHeight = null;
+                }
             });
         });
 
-        // Keep a section open if it contains results from a form submission
+        // Function to open specific accordion sections based on current URL path
         document.addEventListener('DOMContentLoaded', () => {
-            const currentPath = window.location.pathname;
-            // Map paths to accordion header indices (0-indexed)
-            const pathMap = {
-                '/generate': 0,
-                '/generate_modified': 1,
-                '/find_results_by_first_white_ball': 2,
-                '/frequency_analysis': 3,
-                '/hot_cold_numbers': 3, /* Grouped under Analysis Tools */
-                '/monthly_white_ball_analysis': 3,
-                '/sum_of_main_balls': 3,
-                '/find_results_by_sum': 3,
-                '/simulate_multiple_draws': 3,
-                '/number_age_distribution': 3,
-                '/co_occurrence_analysis': 3,
-                '/powerball_position_frequency': 3,
-                '/winning_probability': 4,
-                '/partial_match_probabilities': 4,
-                '/export_analysis_results': 5,
-                '/update_powerball_data': 6
-            };
+            const path = window.location.pathname;
+            let targetAccordionId = null;
 
-            const accordionIndexToOpen = pathMap[currentPath];
+            // Mapping paths to accordion IDs
+            if (path === '/generate' || path === '/generate_modified') {
+                targetAccordionId = 'generate-numbers-accordion'; // Covers both generate routes
+            } else if (path === '/frequency_analysis' || path === '/hot_cold_numbers' || 
+                       path === '/monthly_white_ball_analysis' || path === '/sum_of_main_balls' || 
+                       path === '/find_results_by_sum' || path === '/simulate_multiple_draws' ||
+                       path === '/number_age_distribution' || path === '/co_occurrence_analysis' ||
+                       path === '/powerball_position_frequency' || path === '/find_results_by_first_white_ball') {
+                targetAccordionId = 'analysis-accordion';
+            } else if (path === '/winning_probability' || path === '/partial_match_probabilities') {
+                targetAccordionId = 'probabilities-accordion';
+            }
 
-            if (accordionIndexToOpen !== undefined) {
-                const headerToClick = document.querySelectorAll('.accordion-header')[accordionIndexToOpen];
-                if (headerToClick && !headerToClick.classList.contains('active')) {
-                    // Simulate a click to open it, but prevent auto-closing others
-                    headerToClick.nextElementSibling.classList.add('active');
-                    headerToClick.classList.add('active');
+            if (targetAccordionId) {
+                const targetAccordion = document.getElementById(targetAccordionId);
+                if (targetAccordion && !targetAccordion.classList.contains('active')) {
+                    const header = targetAccordion.querySelector('.accordion-header');
+                    if (header) {
+                        // Directly trigger the click to open and animate
+                        header.click();
+                    }
                 }
             }
+
+            // Restore form values after submission for better UX
+            const formElements = document.querySelectorAll('form');
+            formElements.forEach(form => {
+                form.addEventListener('submit', function() {
+                    const formData = new FormData(this);
+                    for (let [key, value] of formData.entries()) {
+                        if (this.querySelector(`[name="${key}"]`)) {
+                            localStorage.setItem(key, value);
+                        }
+                    }
+                });
+
+                // Load saved values on page load
+                const savedValues = {};
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    savedValues[key] = localStorage.getItem(key);
+                }
+
+                for (let key in savedValues) {
+                    const input = form.querySelector(`[name="${key}"]`);
+                    if (input) {
+                        if (input.type === 'checkbox' || input.type === 'radio') {
+                            input.checked = (savedValues[key] === 'on');
+                        } else {
+                            input.value = savedValues[key];
+                        }
+                    }
+                }
+            });
         });
     </script>
 </body>
