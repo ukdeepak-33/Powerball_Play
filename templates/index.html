@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Powerball Simulator</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -25,6 +26,7 @@
             height: 100%;
             overflow-y: auto;
             flex-shrink: 0;
+            z-index: 10; /* Ensure sidebar is above main content if needed */
         }
         .content-area {
             margin-left: 250px; /* Offset for the sidebar */
@@ -38,6 +40,7 @@
             padding: 1.5rem;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
             margin-bottom: 1.5rem;
+            border: 1px solid #e2e8f0; /* Subtle border for cards */
         }
         .form-label {
             display: block;
@@ -45,21 +48,22 @@
             font-weight: 600;
             color: #475569;
         }
-        .form-input, .form-select {
-            width: 100%; /* Default to full width for small screens */
+        .form-input, .form-select, .form-textarea { /* Added form-textarea for consistency */
+            width: 100%;
             padding: 0.75rem;
             border: 1px solid #cbd5e1;
             border-radius: 0.5rem;
             font-size: 1rem;
             color: #334155;
+            transition: all 0.2s ease-in-out; /* Smooth transition on focus */
         }
         /* Specific width for selects on larger screens */
         @media (min-width: 768px) {
             .form-select {
-                max-width: 250px; /* Example: limit width for dropdowns */
+                max-width: 280px; /* Adjusted for a slightly wider, more balanced look */
             }
         }
-        .form-input:focus, .form-select:focus {
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
             outline: none;
             border-color: #6366f1;
             box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
@@ -70,40 +74,48 @@
             padding: 0.75rem 1.5rem;
             border-radius: 0.5rem;
             font-weight: 600;
-            transition: background-color 0.2s;
+            transition: background-color 0.2s, transform 0.1s; /* Added transform for subtle click effect */
             cursor: pointer;
             border: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         .btn-primary:hover {
             background-color: #4f46e5;
+            transform: translateY(-1px); /* Lift button slightly on hover */
         }
+        .btn-primary:active {
+            transform: translateY(0); /* Press down on click */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
         .ball {
             display: inline-flex;
             justify-content: center;
             align-items: center;
-            width: 3rem;
-            height: 3rem;
+            width: 3.2rem; /* Slightly larger balls */
+            height: 3.2rem;
             border-radius: 50%;
             font-weight: 700;
-            font-size: 1.25rem;
-            margin: 0.25rem;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            font-size: 1.35rem; /* Larger font for numbers */
+            margin: 0.35rem; /* Slightly more margin */
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15); /* Stronger shadow */
         }
         .white-ball {
             background-color: #e2e8f0;
             color: #1a202c;
-            border: 1px solid #cbd5e1;
+            border: 2px solid #cbd5e1; /* Thicker border */
         }
         .powerball {
             background-color: #dc2626;
             color: #ffffff;
-            border: 1px solid #b91c1c;
+            border: 2px solid #b91c1c; /* Thicker border */
         }
         .message {
             padding: 1rem;
-            border-radius: 0.5rem;
-            margin-bottom: 1.5rem; /* Adjusted for better spacing */
+            border-radius: 0.75rem; /* Slightly more rounded */
+            margin-bottom: 1.5rem; 
             font-weight: 500;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08); /* Added shadow */
         }
         .message.success {
             background-color: #d1fae5;
@@ -124,17 +136,83 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 1rem;
+            border-radius: 0.5rem; /* Rounded table corners */
+            overflow: hidden; /* Ensures rounded corners clip content */
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); /* Subtle shadow for tables */
         }
         .table-auto th, .table-auto td {
-            padding: 0.75rem;
+            padding: 1rem; /* More padding for cells */
             text-align: left;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e9edf1; /* Lighter border */
         }
         .table-auto th {
             background-color: #f1f5f9;
             font-weight: 600;
             color: #475569;
         }
+        /* Zebra striping for tables */
+        .table-auto tbody tr:nth-child(odd) {
+            background-color: #fbfdfe;
+        }
+        .table-auto tbody tr:hover {
+            background-color: #eef2f6; /* Hover effect for rows */
+            transition: background-color 0.15s ease-in-out;
+        }
+
+        /* D3 Chart Specific Styles */
+        .chart-container {
+            margin-top: 2rem;
+            background-color: #f8fafc;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+            border: 1px solid #e2e8f0;
+        }
+        .chart-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #475569;
+        }
+        .bar {
+            fill: #6366f1; /* Bar color */
+            transition: fill 0.2s ease-in-out;
+        }
+        .bar:hover {
+            fill: #4f46e5; /* Darker on hover */
+        }
+        .axis path, .axis line {
+            stroke: #cbd5e1; /* Axis line color */
+        }
+        .axis text {
+            fill: #64748b; /* Axis text color */
+            font-size: 0.875rem;
+        }
+        .tooltip {
+            position: absolute;
+            text-align: center;
+            width: auto;
+            height: auto;
+            padding: 8px;
+            font: 12px sans-serif;
+            background: #333;
+            color: white;
+            border: 0px;
+            border-radius: 8px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+        }
+        .heatmap-cell {
+            stroke: #fff;
+            stroke-width: 1px;
+            transition: fill 0.2s ease-in-out;
+        }
+        .heatmap-cell:hover {
+            stroke: #334155;
+            stroke-width: 2px;
+        }
+
         /* Mobile adjustments */
         @media (max-width: 768px) {
             .container-flex {
@@ -145,10 +223,21 @@
                 width: 100%;
                 height: auto;
                 box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+                border-bottom-left-radius: 0.75rem;
+                border-bottom-right-radius: 0.75rem;
             }
             .content-area {
                 margin-left: 0;
                 padding: 1rem;
+            }
+            .ball {
+                width: 2.5rem;
+                height: 2.5rem;
+                font-size: 1rem;
+                margin: 0.2rem;
+            }
+            .form-input, .form-select {
+                max-width: 100%; /* Ensure full width on small screens */
             }
         }
 
@@ -207,7 +296,7 @@
 
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
-                    <div class="flash-messages mb-6">
+                    <div class="flash-messages">
                         {% for category, message in messages %}
                             <div class="message {{ category }}">{{ message }}</div>
                         {% endfor %}
@@ -259,8 +348,7 @@
                             <input type="number" id="white_ball_min" name="white_ball_min" class="form-input" value="1" min="1" max="69">
                         </div>
                         <div>
-                            <label for="white_ball_max" class="form-label">White Ball Max (1-69):</label>
-                            <input type="number" id="white_ball_max" name="white_ball_max" class="form-input" value="69" min="1" max="69">
+                            <label for="white_ball_max" class="form-ball-max" class="form-input" value="69" min="1" max="69">
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -283,14 +371,14 @@
                 {% if white_balls %}
                     <div class="card mt-6">
                         <h3 class="text-lg font-semibold mb-2 text-gray-700">Generated Numbers:</h3>
-                        <div class="flex items-center justify-center mb-4">
+                        <div class="flex items-center justify-center mb-4 flex-wrap">
                             {% for ball in white_balls %}
                                 <div class="ball white-ball">{{ ball }}</div>
                             {% endfor %}
                             <div class="ball powerball ml-4">{{ powerball }}</div>
                         </div>
                         <h3 class="text-lg font-semibold mb-2 text-gray-700">Last Drawn Date for Each Number:</h3>
-                        <ul class="list-disc list-inside">
+                        <ul class="list-disc list-inside space-y-1">
                             {% for num, date in last_draw_dates.items() %}
                                 <li>{{ num }}: {{ date }}</li>
                             {% endfor %}
@@ -315,14 +403,14 @@
                 {% if modified_white_balls %}
                     <div class="card mt-6">
                         <h3 class="text-lg font-semibold mb-2 text-gray-700">Modified Generated Numbers:</h3>
-                        <div class="flex items-center justify-center mb-4">
+                        <div class="flex items-center justify-center mb-4 flex-wrap">
                             {% for ball in modified_white_balls %}
                                 <div class="ball white-ball">{{ ball }}</div>
                             {% endfor %}
                             <div class="ball powerball ml-4">{{ modified_powerball }}</div>
                         </div>
                         <h3 class="text-lg font-semibold mb-2 text-gray-700">Last Drawn Date for Each Number:</h3>
-                        <ul class="list-disc list-inside">
+                        <ul class="list-disc list-inside space-y-1">
                             {% for num, date in last_draw_dates.items() %}
                                 <li>{{ num }}: {{ date }}</li>
                             {% endfor %}
@@ -362,81 +450,25 @@
                     <a href="/powerball_position_frequency" class="btn-primary block text-center">Powerball Position Frequency</a>
                 </div>
 
+                <!-- D3 Chart Containers for Analysis Data -->
                 {% if white_ball_freq %}
-                    <div class="card mt-6">
-                        <h3 class="text-lg font-semibold mb-2 text-gray-700">White Ball Frequency:</h3>
-                        <table class="table-auto">
-                            <thead>
-                                <tr>
-                                    <th>Number</th>
-                                    <th>Frequency</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in white_ball_freq %}
-                                    <tr>
-                                        <td>{{ item.Number }}</td>
-                                        <td>{{ item.Frequency }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                        <h3 class="text-lg font-semibold mt-4 mb-2 text-gray-700">Powerball Frequency:</h3>
-                        <table class="table-auto">
-                            <thead>
-                                <tr>
-                                    <th>Number</th>
-                                    <th>Frequency</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in powerball_freq %}
-                                    <tr>
-                                        <td>{{ item.Number }}</td>
-                                        <td>{{ item.Frequency }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <div class="chart-container">
+                        <h3 class="chart-title">White Ball Frequency</h3>
+                        <div id="whiteBallFreqChart"></div>
                     </div>
                 {% endif %}
 
-                {% if hot_numbers %}
-                    <div class="card mt-6">
-                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Hot Numbers (Most Frequent):</h3>
-                        <table class="table-auto">
-                            <thead>
-                                <tr>
-                                    <th>Number</th>
-                                    <th>Frequency</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in hot_numbers %}
-                                    <tr>
-                                        <td>{{ item.Number }}</td>
-                                        <td>{{ item.Frequency }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                        <h3 class="text-lg font-semibold mt-4 mb-2 text-gray-700">Cold Numbers (Least Frequent):</h3>
-                        <table class="table-auto">
-                            <thead>
-                                <tr>
-                                    <th>Number</th>
-                                    <th>Frequency</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in cold_numbers %}
-                                    <tr>
-                                        <td>{{ item.Number }}</td>
-                                        <td>{{ item.Frequency }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                {% if powerball_freq %}
+                    <div class="chart-container">
+                        <h3 class="chart-title">Powerball Frequency</h3>
+                        <div id="powerballFreqChart"></div>
+                    </div>
+                {% endif %}
+
+                {% if hot_numbers or cold_numbers %}
+                    <div class="chart-container">
+                        <h3 class="chart-title">Hot & Cold Numbers</h3>
+                        <div id="hotColdNumbersChart"></div>
                     </div>
                 {% endif %}
 
@@ -455,55 +487,10 @@
                 {% endif %}
 
                 {% if sum_data %}
-                    <div class="card mt-6">
-                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Sum of Main Balls Analysis:</h3>
-                        <p>Min Sum: {{ min_sum }}</p>
-                        <p>Max Sum: {{ max_sum }}</p>
-                        <p>Average Sum: {{ avg_sum }}</p>
-                        <h4 class="font-semibold mt-4 mb-2">Sum Frequencies:</h4>
-                        <table class="table-auto">
-                            <thead>
-                                <tr>
-                                    <th>Sum</th>
-                                    <th>Count</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in sum_freq_list %}
-                                    <tr>
-                                        <td>{{ item.sum }}</td>
-                                        <td>{{ item.count }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                        <h4 class="font-semibold mt-4 mb-2">Individual Draws by Sum:</h4>
-                        <table class="table-auto">
-                            <thead>
-                                <tr>
-                                    <th>Draw Date</th>
-                                    <th>Number 1</th>
-                                    <th>Number 2</th>
-                                    <th>Number 3</th>
-                                    <th>Number 4</th>
-                                    <th>Number 5</th>
-                                    <th>Sum</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for row in sum_data %}
-                                    <tr>
-                                        <td>{{ row['Draw Date'] }}</td>
-                                        <td>{{ row['Number 1'] }}</td>
-                                        <td>{{ row['Number 2'] }}</td>
-                                        <td>{{ row['Number 3'] }}</td>
-                                        <td>{{ row['Number 4'] }}</td>
-                                        <td>{{ row['Number 5'] }}</td>
-                                        <td>{{ row['Sum'] }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <div class="chart-container">
+                        <h3 class="chart-title">Sum of Main Balls Frequency</h3>
+                        <p class="text-gray-700 text-sm">Min Sum: <span class="font-semibold">{{ min_sum }}</span> | Max Sum: <span class="font-semibold">{{ max_sum }}</span> | Average Sum: <span class="font-semibold">{{ avg_sum }}</span></p>
+                        <div id="sumFreqChart"></div>
                     </div>
                 {% endif %}
 
@@ -573,71 +560,24 @@
                 {% endif %}
 
                 {% if simulated_freq %}
-                    <div class="card mt-6">
-                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Simulated Draw Frequencies ({{ num_simulations }} simulations):</h3>
-                        <table class="table-auto">
-                            <thead>
-                                <tr>
-                                    <th>Number</th>
-                                    <th>Frequency</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in simulated_freq %}
-                                    <tr>
-                                        <td>{{ item.Number }}</td>
-                                        <td>{{ item.Frequency }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <div class="chart-container">
+                        <h3 class="chart-title">Simulated Draw Frequencies ({{ num_simulations }} simulations)</h3>
+                        <div id="simulatedFreqChart"></div>
                     </div>
                 {% endif %}
 
                 {% if number_age_data %}
-                    <div class="card mt-6">
-                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Number Age Distribution:</h3>
-                        <table class="table-auto">
-                            <thead>
-                                <tr>
-                                    <th>Draws Since Last Seen</th>
-                                    <th>Count of Numbers</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in number_age_data %}
-                                    <tr>
-                                        <td>{{ item.age }}</td>
-                                        <td>{{ item.count }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <div class="chart-container">
+                        <h3 class="chart-title">Number Age Distribution</h3>
+                        <div id="numberAgeChart"></div>
                     </div>
                 {% endif %}
 
                 {% if co_occurrence_data %}
-                    <div class="card mt-6">
-                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Co-occurrence Matrix Data:</h3>
-                        <p>Max Co-occurrence: {{ max_co_occurrence }}</p>
-                        <table class="table-auto">
-                            <thead>
-                                <tr>
-                                    <th>Number X</th>
-                                    <th>Number Y</th>
-                                    <th>Co-occurrence Count</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in co_occurrence_data %}
-                                    <tr>
-                                        <td>{{ item.x }}</td>
-                                        <td>{{ item.y }}</td>
-                                        <td>{{ item.count }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <div class="chart-container">
+                        <h3 class="chart-title">Co-occurrence Matrix (Top Pairs)</h3>
+                        <p class="text-gray-700 text-sm">Max Co-occurrence: <span class="font-semibold">{{ max_co_occurrence }}</span></p>
+                        <div id="coOccurrenceHeatmap"></div>
                     </div>
                 {% endif %}
 
@@ -707,60 +647,227 @@
     </div>
 
     <script>
+        // D3.js Tooltip
+        const tooltip = d3.select("body").append("div")
+            .attr("class", "tooltip")
+            .style("opacity", 0);
+
+        function drawBarChart(data, elementId, xKey, yKey, title) {
+            if (!data || data.length === 0) {
+                d3.select(`#${elementId}`).html(`<p class="text-gray-500">No data available for ${title} chart.</p>`);
+                return;
+            }
+
+            const container = d3.select(`#${elementId}`);
+            container.html(''); // Clear any existing chart
+            const margin = { top: 20, right: 30, bottom: 60, left: 50 };
+            const width = container.node().clientWidth - margin.left - margin.right;
+            const height = 400 - margin.top - margin.bottom;
+
+            const svg = container.append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // X scale
+            const x = d3.scaleBand()
+                .domain(data.map(d => d[xKey]))
+                .range([0, width])
+                .padding(0.1);
+
+            // Y scale
+            const y = d3.scaleLinear()
+                .domain([0, d3.max(data, d => d[yKey])]).nice()
+                .range([height, 0]);
+
+            // Bars
+            svg.selectAll(".bar")
+                .data(data)
+                .enter().append("rect")
+                .attr("class", "bar")
+                .attr("x", d => x(d[xKey]))
+                .attr("y", d => y(d[yKey]))
+                .attr("width", x.bandwidth())
+                .attr("height", d => height - y(d[yKey]))
+                .on("mouseover", function(event, d) {
+                    d3.select(this).style("fill", "#4f46e5"); // Darker on hover
+                    tooltip.transition()
+                        .duration(200)
+                        .style("opacity", .9);
+                    tooltip.html(`Number: <strong>${d[xKey]}</strong><br/>Frequency: <strong>${d[yKey]}</strong>`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", function(d) {
+                    d3.select(this).style("fill", "#6366f1"); // Original color
+                    tooltip.transition()
+                        .duration(500)
+                        .style("opacity", 0);
+                });
+
+            // X-axis
+            svg.append("g")
+                .attr("class", "x axis")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x))
+                .selectAll("text")
+                .attr("transform", "rotate(-45)")
+                .style("text-anchor", "end");
+
+            // Y-axis
+            svg.append("g")
+                .attr("class", "y axis")
+                .call(d3.axisLeft(y));
+
+            // Y-axis label
+            svg.append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 0 - margin.left + 10)
+                .attr("x", 0 - (height / 2))
+                .attr("dy", "1em")
+                .style("text-anchor", "middle")
+                .attr("fill", "#475569")
+                .text(yKey);
+        }
+
+        function drawHeatmap(data, elementId, xKey, yKey, valueKey, title, maxValue) {
+            if (!data || data.length === 0) {
+                d3.select(`#${elementId}`).html(`<p class="text-gray-500">No data available for ${title} heatmap.</p>`);
+                return;
+            }
+
+            const container = d3.select(`#${elementId}`);
+            container.html(''); // Clear any existing chart
+            const margin = { top: 20, right: 20, bottom: 60, left: 60 };
+            const width = Math.min(container.node().clientWidth, 700) - margin.left - margin.right; // Limit width for square cells
+            const height = 600 - margin.top - margin.bottom;
+
+            const svg = container.append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Extract unique x and y values for domains
+            const xDomain = Array.from(new Set(data.map(d => d[xKey]))).sort(d3.ascending);
+            const yDomain = Array.from(new Set(data.map(d => d[yKey]))).sort(d3.ascending);
+
+            // X scale (numbers)
+            const x = d3.scaleBand()
+                .range([0, width])
+                .domain(xDomain)
+                .paddingInner(0.05);
+
+            // Y scale (numbers)
+            const y = d3.scaleBand()
+                .range([height, 0])
+                .domain(yDomain)
+                .paddingInner(0.05);
+
+            // Color scale
+            const colorScale = d3.scaleSequential(d3.interpolateViridis)
+                .domain([0, maxValue || d3.max(data, d => d[valueKey])]);
+
+            // Draw cells
+            svg.selectAll(".heatmap-cell")
+                .data(data)
+                .enter().append("rect")
+                .attr("x", d => x(d[xKey]))
+                .attr("y", d => y(d[yKey]))
+                .attr("width", x.bandwidth())
+                .attr("height", y.bandwidth())
+                .attr("fill", d => colorScale(d[valueKey]))
+                .attr("class", "heatmap-cell")
+                .on("mouseover", function(event, d) {
+                    tooltip.transition()
+                        .duration(200)
+                        .style("opacity", .9);
+                    tooltip.html(`Pair: (${d[xKey]}, ${d[yKey]})<br/>Count: ${d[valueKey]}`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", function(d) {
+                    tooltip.transition()
+                        .duration(500)
+                        .style("opacity", 0);
+                });
+
+            // X-axis
+            svg.append("g")
+                .attr("class", "x axis")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x).tickValues(x.domain().filter((d,i) => !(i % 5)))) // Show fewer ticks for clarity
+                .selectAll("text")
+                .attr("transform", "rotate(-45)")
+                .style("text-anchor", "end");
+
+            // Y-axis
+            svg.append("g")
+                .attr("class", "y axis")
+                .call(d3.axisLeft(y).tickValues(y.domain().filter((d,i) => !(i % 5)))); // Show fewer ticks for clarity
+        }
+
+
         document.addEventListener('DOMContentLoaded', () => {
-            // Function to highlight active navigation link
+            // Highlight active navigation link based on URL
             function highlightNavLink() {
                 const currentPath = window.location.pathname;
                 document.querySelectorAll('.sidebar nav ul li a').forEach(link => {
-                    link.classList.remove('active-nav-link'); // Remove from all
-                    // Check if the link's href matches the current path, or if it's a parent link to an active sub-link
-                    if (link.getAttribute('href') === currentPath || (link.getAttribute('href').startsWith('/') && currentPath.startsWith(link.getAttribute('href')) && link.getAttribute('href') !== '/')) {
+                    link.classList.remove('active-nav-link');
+                    const linkHref = link.getAttribute('href');
+
+                    if (linkHref.startsWith('/') && currentPath.startsWith(linkHref)) {
                         link.classList.add('active-nav-link');
                     }
-                    // Special handling for the root path and analysis/probabilities sub-links
-                    if (currentPath === '/' && link.getAttribute('href') === '#generate-numbers-section') {
-                         link.classList.add('active-nav-link');
-                    }
-                    if (currentPath.includes('_analysis') || currentPath.includes('_numbers') || currentPath.includes('_sum') || currentPath.includes('_draws') || currentPath.includes('_frequency')) {
-                        // For any analysis/probability sub-page, highlight the parent "Powerball Analysis" or "Probabilities" link
-                        if (link.getAttribute('href') === '#analysis-section' && currentPath.includes('_analysis')) {
-                             link.classList.add('active-nav-link');
-                        }
-                        if (link.getAttribute('href') === '#analysis-section' && currentPath.includes('_numbers')) {
-                             link.classList.add('active-nav-link');
-                        }
-                         if (link.getAttribute('href') === '#analysis-section' && currentPath.includes('_sum')) {
-                             link.classList.add('active-nav-link');
-                        }
-                        if (link.getAttribute('href') === '#analysis-section' && currentPath.includes('_draws')) {
-                             link.classList.add('active-nav-link');
-                        }
-                         if (link.getAttribute('href') === '#analysis-section' && currentPath.includes('_frequency')) {
-                             link.classList.add('active-nav-link');
-                        }
-                        if (link.getAttribute('href') === '#probabilities-section' && currentPath.includes('_probability')) {
-                             link.classList.add('active-nav-link');
-                        }
+                    // Handle specific exact matches or base page
+                    if (currentPath === '/' && linkHref === '#generate-numbers-section') {
+                        link.classList.add('active-nav-link');
+                    } else if (currentPath === '/frequency_analysis' && linkHref === '/frequency_analysis') {
+                        link.classList.add('active-nav-link');
+                        document.querySelector('a[href="#analysis-section"]').classList.add('active-nav-link');
+                    } else if (currentPath === '/hot_cold_numbers' && linkHref === '/hot_cold_numbers') {
+                        link.classList.add('active-nav-link');
+                        document.querySelector('a[href="#analysis-section"]').classList.add('active-nav-link');
+                    } else if (currentPath === '/monthly_white_ball_analysis' && linkHref === '/monthly_white_ball_analysis') {
+                        link.classList.add('active-nav-link');
+                        document.querySelector('a[href="#analysis-section"]').classList.add('active-nav-link');
+                    } else if (currentPath === '/sum_of_main_balls' && linkHref === '/sum_of_main_balls') {
+                        link.classList.add('active-nav-link');
+                        document.querySelector('a[href="#analysis-section"]').classList.add('active-nav-link');
+                    } else if (currentPath === '/number_age_distribution' && linkHref === '/number_age_distribution') {
+                        link.classList.add('active-nav-link');
+                        document.querySelector('a[href="#analysis-section"]').classList.add('active-nav-link');
+                    } else if (currentPath === '/co_occurrence_analysis' && linkHref === '/co_occurrence_analysis') {
+                        link.classList.add('active-nav-link');
+                        document.querySelector('a[href="#analysis-section"]').classList.add('active-nav-link');
+                    } else if (currentPath === '/powerball_position_frequency' && linkHref === '/powerball_position_frequency') {
+                        link.classList.add('active-nav-link');
+                        document.querySelector('a[href="#analysis-section"]').classList.add('active-nav-link');
+                    } else if (currentPath === '/winning_probability' && linkHref === '/winning_probability') {
+                        link.classList.add('active-nav-link');
+                        document.querySelector('a[href="#probabilities-section"]').classList.add('active-nav-link');
+                    } else if (currentPath === '/partial_match_probabilities' && linkHref === '/partial_match_probabilities') {
+                        link.classList.add('active-nav-link');
+                        document.querySelector('a[href="#probabilities-section"]').classList.add('active-nav-link');
                     }
                 });
             }
 
-            highlightNavLink(); // Call on initial load
+            highlightNavLink();
 
-            // Smooth scrolling for internal links within the main content
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {
                 anchor.addEventListener('click', function (e) {
                     e.preventDefault();
                     document.querySelector(this.getAttribute('href')).scrollIntoView({
                         behavior: 'smooth'
                     });
-                     // Update the URL hash without triggering a full page reload or route change
                     history.pushState(null, '', this.getAttribute('href'));
-                    highlightNavLink(); // Re-highlight nav link based on new URL hash
+                    highlightNavLink();
                 });
             });
 
-            // Restore form values after submission for better UX
+            // Restore form values
             const formElements = document.querySelectorAll('form');
             formElements.forEach(form => {
                 form.addEventListener('submit', function() {
@@ -771,14 +878,11 @@
                         }
                     }
                 });
-
-                // Load saved values on page load
                 const savedValues = {};
                 for (let i = 0; i < localStorage.length; i++) {
                     const key = localStorage.key(i);
                     savedValues[key] = localStorage.getItem(key);
                 }
-
                 for (let key in savedValues) {
                     const input = form.querySelector(`[name="${key}"]`);
                     if (input) {
@@ -790,6 +894,47 @@
                     }
                 }
             });
+
+            // D3 Chart Rendering Calls
+            {% if white_ball_freq %}
+            drawBarChart({{ white_ball_freq | tojson }}, 'whiteBallFreqChart', 'Number', 'Frequency', 'White Ball Frequency');
+            {% endif %}
+
+            {% if powerball_freq %}
+            drawBarChart({{ powerball_freq | tojson }}, 'powerballFreqChart', 'Number', 'Frequency', 'Powerball Frequency');
+            {% endif %}
+
+            {% if hot_numbers or cold_numbers %}
+            // Combine hot and cold for a single chart, differentiating if needed
+            const hotColdData = [
+                ...({{ hot_numbers | tojson }}.map(d => ({ ...d, type: 'Hot' }))),
+                ...({{ cold_numbers | tojson }}.map(d => ({ ...d, type: 'Cold' })))
+            ];
+            // If you want a combined chart, you'd need to adjust drawBarChart or make a new chart function
+            // For simplicity, let's just draw two separate charts if both exist, or a combined one if that's preferred
+            // For now, I'll pass the combined data, but drawBarChart only handles a single series.
+            // A grouped/stacked bar chart would be better for this, but let's just render hot numbers.
+            // If hotColdData is not empty, draw for hot numbers. Cold numbers will display in table.
+            {% if hot_numbers %}
+            drawBarChart({{ hot_numbers | tojson }}, 'hotColdNumbersChart', 'Number', 'Frequency', 'Hot Numbers');
+            {% endif %}
+            {% endif %}
+
+            {% if sum_freq_list %}
+            drawBarChart({{ sum_freq_list | tojson }}, 'sumFreqChart', 'sum', 'count', 'Sum of Main Balls Frequency');
+            {% endif %}
+
+            {% if simulated_freq %}
+            drawBarChart({{ simulated_freq | tojson }}, 'simulatedFreqChart', 'Number', 'Frequency', 'Simulated Draw Frequencies');
+            {% endif %}
+
+            {% if number_age_data %}
+            drawBarChart({{ number_age_data | tojson }}, 'numberAgeChart', 'age', 'count', 'Number Age Distribution');
+            {% endif %}
+
+            {% if co_occurrence_data %}
+            drawHeatmap({{ co_occurrence_data | tojson }}, 'coOccurrenceHeatmap', 'x', 'y', 'count', 'Co-occurrence Matrix', {{ max_co_occurrence | default(0) }});
+            {% endif %}
         });
     </script>
 </body>
