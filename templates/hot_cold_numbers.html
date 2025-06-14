@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Hot & Cold Numbers{% endblock %}
+
+{% block page_heading %}Hot & Cold Numbers Analysis{% endblock %}
+
+{% block content %}
+    {% if hot_numbers %}
+        <div class="chart-container">
+            <h3 class="chart-title">Hot Numbers (Most Frequent)</h3>
+            <div id="hotNumbersChart"></div>
+        </div>
+    {% else %}
+        <div class="card"><p class="text-gray-500">No data available for Hot Numbers. Please ensure historical data is loaded.</p></div>
+    {% endif %}
+
+    {% if cold_numbers %}
+        <div class="chart-container mt-6">
+            <h3 class="chart-title">Cold Numbers (Least Frequent)</h3>
+            <div id="coldNumbersChart"></div>
+        </div>
+    {% else %}
+        <div class="card mt-6"><p class="text-gray-500">No data available for Cold Numbers. Please ensure historical data is loaded.</p></div>
+    {% endif %}
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            {% if hot_numbers %}
+            drawBarChart({{ hot_numbers | tojson }}, 'hotNumbersChart', 'Number', 'Frequency', 'Hot Numbers');
+            {% endif %}
+
+            {% if cold_numbers %}
+            drawBarChart({{ cold_numbers | tojson }}, 'coldNumbersChart', 'Number', 'Frequency', 'Cold Numbers');
+            {% endif %}
+        });
+    </script>
+{% endblock %}
