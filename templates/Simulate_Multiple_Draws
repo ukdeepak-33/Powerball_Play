@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Simulate Multiple Draws{% endblock %}
+
+{% block page_heading %}Simulate Multiple Draws{% endblock %}
+
+{% block content %}
+    <div class="card mb-6">
+        <h2 class="text-xl font-semibold mb-4 text-gray-700">Run Simulation</h2>
+        <form action="/simulate_multiple_draws" method="post" class="flex flex-col space-y-2">
+            <label for="num_draws" class="form-label">Number of Simulations:</label>
+            <input type="number" id="num_draws" name="num_draws" class="form-input" value="{{ num_simulations | default('100') }}" min="1">
+            <button type="submit" class="btn-primary">Run Simulation</button>
+        </form>
+    </div>
+
+    {% if simulated_freq %}
+        <div class="chart-container">
+            <h3 class="chart-title">Simulated Draw Frequencies ({{ num_simulations }} simulations)</h3>
+            <div id="simulatedFreqChart"></div>
+        </div>
+    {% elif num_simulations is not none %}
+        <div class="card mt-6">
+            <p class="text-gray-500">No data generated for {{ num_simulations }} simulations. This might occur if generated numbers consistently match historical data or no valid numbers can be generated.</p>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            {% if simulated_freq %}
+            drawBarChart({{ simulated_freq | tojson }}, 'simulatedFreqChart', 'Number', 'Frequency', 'Simulated Draw Frequencies');
+            {% endif %}
+        });
+    </script>
+{% endblock %}
