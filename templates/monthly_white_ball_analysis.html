@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Monthly White Ball Analysis{% endblock %}
+
+{% block page_heading %}Monthly White Ball Analysis{% endblock %}
+
+{% block content %}
+    {% if monthly_balls %}
+        <div class="card">
+            <h3 class="text-lg font-semibold mb-2 text-gray-700">Monthly White Ball Analysis (Last 6 Months):</h3>
+            {% for month, balls in monthly_balls.items() %}
+                <p class="font-medium mt-2">{{ month }}:</p>
+                <div class="flex flex-wrap mb-2">
+                    {% for ball in balls %}
+                        <div class="ball white-ball-sm">{{ ball }}</div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="card"><p class="text-gray-500">No data available for Monthly White Ball Analysis. Please ensure historical data is loaded.</p></div>
+    {% endif %}
+{% endblock %}
+
+{% block scripts %}
+    {# No D3 charts for this page, just structured text display #}
+{% endblock %}
