@@ -27,12 +27,19 @@
 {% block scripts %}
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            console.log("[Hot & Cold Numbers] Page loaded.");
             {% if hot_numbers %}
+            console.log("[Hot & Cold Numbers] hot_numbers data:", {{ hot_numbers | tojson }});
             drawBarChart({{ hot_numbers | tojson }}, 'hotNumbersChart', 'Number', 'Frequency', 'Hot Numbers');
+            {% else %}
+            console.log("[Hot & Cold Numbers] hot_numbers is not available in template context.");
             {% endif %}
 
             {% if cold_numbers %}
+            console.log("[Hot & Cold Numbers] cold_numbers data:", {{ cold_numbers | tojson }});
             drawBarChart({{ cold_numbers | tojson }}, 'coldNumbersChart', 'Number', 'Frequency', 'Cold Numbers');
+            {% else %}
+            console.log("[Hot & Cold Numbers] cold_numbers is not available in template context.");
             {% endif %}
         });
     </script>
