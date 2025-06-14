@@ -11,19 +11,33 @@
             background-color: #f0f4f8;
             color: #334155;
         }
-        .container {
-            max-width: 1200px;
-            margin: 2rem auto;
+        .container-flex {
+            display: flex;
+            min-height: 100vh;
+        }
+        .sidebar {
+            width: 250px;
+            background-color: #312e81; /* Darker indigo for sidebar */
             padding: 1.5rem;
-            background-color: #ffffff;
-            border-radius: 1rem;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+            color: #e0e7ff;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            position: fixed;
+            height: 100%;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+        .content-area {
+            margin-left: 250px; /* Offset for the sidebar */
+            flex-grow: 1;
+            padding: 2rem;
+            background-color: #f0f4f8;
         }
         .card {
-            background-color: #f8fafc;
+            background-color: #ffffff;
             border-radius: 0.75rem;
             padding: 1.5rem;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+            margin-bottom: 1.5rem;
         }
         .form-label {
             display: block;
@@ -32,12 +46,18 @@
             color: #475569;
         }
         .form-input, .form-select {
-            width: 100%;
+            width: 100%; /* Default to full width for small screens */
             padding: 0.75rem;
             border: 1px solid #cbd5e1;
             border-radius: 0.5rem;
             font-size: 1rem;
             color: #334155;
+        }
+        /* Specific width for selects on larger screens */
+        @media (min-width: 768px) {
+            .form-select {
+                max-width: 250px; /* Example: limit width for dropdowns */
+            }
         }
         .form-input:focus, .form-select:focus {
             outline: none;
@@ -82,7 +102,7 @@
         .message {
             padding: 1rem;
             border-radius: 0.5rem;
-            margin-top: 1rem;
+            margin-bottom: 1.5rem; /* Adjusted for better spacing */
             font-weight: 500;
         }
         .message.success {
@@ -103,6 +123,7 @@
         .table-auto {
             width: 100%;
             border-collapse: collapse;
+            margin-top: 1rem;
         }
         .table-auto th, .table-auto td {
             padding: 0.75rem;
@@ -114,629 +135,630 @@
             font-weight: 600;
             color: #475569;
         }
-        .accordion-item {
-            border-radius: 0.75rem;
-            overflow: hidden;
-            margin-bottom: 1rem;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            .container-flex {
+                flex-direction: column;
+            }
+            .sidebar {
+                position: relative;
+                width: 100%;
+                height: auto;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            }
+            .content-area {
+                margin-left: 0;
+                padding: 1rem;
+            }
         }
-        .accordion-header {
-            background-color: #6366f1;
+
+        /* Specific styles for active navigation link */
+        .sidebar nav ul li a.active-nav-link {
+            background-color: #4f46e5; /* A slightly lighter indigo */
             color: white;
-            padding: 1rem 1.5rem;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: 600;
-            transition: background-color 0.2s;
-        }
-        .accordion-header:hover {
-            background-color: #4f46e5;
-        }
-        .accordion-content {
-            padding: 1.5rem;
-            background-color: #f8fafc;
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease-out;
-            border-bottom-left-radius: 0.75rem;
-            border-bottom-right-radius: 0.75rem;
-        }
-        .accordion-item.active .accordion-content {
-            max-height: 1000px; /* Adjust as needed for content length */
-            transition: max-height 0.5s ease-in;
-        }
-        .accordion-header .icon {
-            transition: transform 0.3s;
-        }
-        .accordion-item.active .accordion-header .icon {
-            transform: rotate(180deg);
+            font-weight: 700;
+            border-radius: 0.5rem;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1 class="text-3xl font-bold text-center mb-6 text-indigo-700">Powerball Simulator</h1>
+    <div class="container-flex">
+        <!-- Left Sidebar Navigation -->
+        <aside class="sidebar">
+            <h2 class="text-2xl font-bold mb-6 text-white text-center">Powerball Nav</h2>
+            <nav>
+                <ul>
+                    <li class="mb-3">
+                        <a href="#generate-numbers-section" class="block py-2 px-3 hover:bg-indigo-700 rounded transition-colors duration-200 text-white font-medium">Generate Numbers</a>
+                    </li>
+                    <li class="mb-3">
+                        <a href="#generate-modified-section" class="block py-2 px-3 hover:bg-indigo-700 rounded transition-colors duration-200 text-white font-medium">Generate Modified</a>
+                    </li>
+                    <li class="mb-3">
+                        <a href="#analysis-section" class="block py-2 px-3 hover:bg-indigo-700 rounded transition-colors duration-200 text-white font-medium">Powerball Analysis</a>
+                        <ul class="ml-4 mt-2 space-y-1">
+                            <li><a href="/frequency_analysis" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Frequency Analysis</a></li>
+                            <li><a href="/hot_cold_numbers" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Hot & Cold Numbers</a></li>
+                            <li><a href="/monthly_white_ball_analysis" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Monthly White Ball Analysis</a></li>
+                            <li><a href="/sum_of_main_balls" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Sum of Main Balls</a></li>
+                            <li><a href="#find-results-by-sum-form" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Find Results by Sum</a></li>
+                            <li><a href="#find-results-by-first-white-ball-form" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Find Results by First White Ball</a></li>
+                            <li><a href="#simulate-multiple-draws-form" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Simulate Multiple Draws</a></li>
+                            <li><a href="/number_age_distribution" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Number Age Distribution</a></li>
+                            <li><a href="/co_occurrence_analysis" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Co-occurrence Analysis</a></li>
+                            <li><a href="/powerball_position_frequency" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Powerball Position Frequency</a></li>
+                        </ul>
+                    </li>
+                    <li class="mb-3">
+                        <a href="#probabilities-section" class="block py-2 px-3 hover:bg-indigo-700 rounded transition-colors duration-200 text-white font-medium">Probabilities</a>
+                        <ul class="ml-4 mt-2 space-y-1">
+                            <li><a href="/winning_probability" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Winning Probability</a></li>
+                            <li><a href="/partial_match_probabilities" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Partial Match Probabilities</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="flash-messages mb-6">
-                    {% for category, message in messages %}
-                        <div class="message {{ category }}">{{ message }}</div>
+        <!-- Main Content Area -->
+        <main class="content-area">
+            <h1 class="text-3xl font-bold text-center mb-6 text-indigo-700">Powerball Simulator</h1>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages mb-6">
+                        {% for category, message in messages %}
+                            <div class="message {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <!-- Last Official Draw -->
+            <div class="card mb-6">
+                <h2 class="text-xl font-semibold mb-4 text-gray-700">Last Official Draw</h2>
+                <p class="mb-2"><span class="font-medium">Draw Date:</span> {{ last_draw['Draw Date'] | default('N/A') }}</p>
+                <div class="flex items-center flex-wrap"> {# Use flex-wrap for responsiveness #}
+                    <span class="font-medium mr-2">White Balls:</span>
+                    {% for i in range(1, 6) %}
+                        <div class="ball white-ball">
+                            {{ last_draw['Number ' + i|string] | int | default('N/A') }}
+                        </div>
                     {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
-
-        <!-- Last Official Draw -->
-        <div class="card mb-6">
-            <h2 class="text-xl font-semibold mb-4 text-gray-700">Last Official Draw</h2>
-            <p class="mb-2"><span class="font-medium">Draw Date:</span> {{ last_draw['Draw Date'] | default('N/A') }}</p>
-            <div class="flex items-center">
-                <span class="font-medium mr-2">White Balls:</span>
-                {% for i in range(1, 6) %}
-                    <div class="ball white-ball">
-                        {{ last_draw['Number ' + i|string] | int | default('N/A') }}
+                    <span class="font-medium ml-4 mr-2">Powerball:</span>
+                    <div class="ball powerball">
+                        {{ last_draw['Powerball'] | int | default('N/A') }}
                     </div>
-                {% endfor %}
-                <span class="font-medium ml-4 mr-2">Powerball:</span>
-                <div class="ball powerball">
-                    {{ last_draw['Powerball'] | int | default('N/A') }}
-                </div>
-            </div>
-        </div>
-
-        <!-- Accordion Section -->
-        <div class="accordion">
-            <!-- Generate Numbers Section -->
-            <div class="accordion-item" id="generate-numbers-accordion">
-                <div class="accordion-header">
-                    <span>Generate Powerball Numbers</span>
-                    <span class="icon">&#9660;</span>
-                </div>
-                <div class="accordion-content">
-                    <form action="/generate" method="post" class="space-y-4">
-                        <div>
-                            <label for="odd_even_choice" class="form-label">Odd/Even Balance:</label>
-                            <select id="odd_even_choice" name="odd_even_choice" class="form-select">
-                                <option value="Any">Any</option>
-                                <option value="All Even">All Even</option>
-                                <option value="All Odd">All Odd</option>
-                                <option value="3 Even / 2 Odd">3 Even / 2 Odd</option>
-                                <option value="3 Odd / 2 Even">3 Odd / 2 Even</option>
-                                <option value="1 Even / 4 Odd">1 Even / 4 Odd</option>
-                                <option value="1 Odd / 4 Even">1 Odd / 4 Even</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="high_low_balance" class="form-label">High/Low Balance (e.g., "2 3" for 2 low, 3 high):</label>
-                            <input type="text" id="high_low_balance" name="high_low_balance" class="form-input" placeholder="e.g., 2 3">
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="white_ball_min" class="form-label">White Ball Min (1-69):</label>
-                                <input type="number" id="white_ball_min" name="white_ball_min" class="form-input" value="1" min="1" max="69">
-                            </div>
-                            <div>
-                                <label for="white_ball_max" class="form-label">White Ball Max (1-69):</label>
-                                <input type="number" id="white_ball_max" name="white_ball_max" class="form-input" value="69" min="1" max="69">
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="powerball_min" class="form-label">Powerball Min (1-26):</label>
-                                <input type="number" id="powerball_min" name="powerball_min" class="form-input" value="1" min="1" max="26">
-                            </div>
-                            <div>
-                                <label for="powerball_max" class="form-label">Powerball Max (1-26):</label>
-                                <input type="number" id="powerball_max" name="powerball_max" class="form-input" value="26" min="1" max="26">
-                            </div>
-                        </div>
-                        <div>
-                            <label for="excluded_numbers" class="form-label">Excluded Numbers (comma-separated):</label>
-                            <input type="text" id="excluded_numbers" name="excluded_numbers" class="form-input" placeholder="e.g., 1, 13, 25">
-                        </div>
-                        <button type="submit" class="btn-primary w-full">Generate Numbers</button>
-                    </form>
-
-                    {% if white_balls %}
-                        <div class="card mt-6">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Generated Numbers:</h3>
-                            <div class="flex items-center justify-center mb-4">
-                                {% for ball in white_balls %}
-                                    <div class="ball white-ball">{{ ball }}</div>
-                                {% endfor %}
-                                <div class="ball powerball ml-4">{{ powerball }}</div>
-                            </div>
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Last Drawn Date for Each Number:</h3>
-                            <ul class="list-disc list-inside">
-                                {% for num, date in last_draw_dates.items() %}
-                                    <li>{{ num }}: {{ date }}</li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                    {% endif %}
                 </div>
             </div>
 
-            <!-- Generate Modified Combination Section -->
-            <div class="accordion-item" id="generate-modified-accordion">
-                <div class="accordion-header">
-                    <span>Generate Modified Combination</span>
-                    <span class="icon">&#9660;</span>
-                </div>
-                <div class="accordion-content">
-                    <form action="/generate_modified" method="post" class="space-y-4">
-                        <div>
-                            <input type="checkbox" id="use_common_pairs" name="use_common_pairs" class="rounded text-indigo-600 focus:ring-indigo-500">
-                            <label for="use_common_pairs" class="ml-2 text-gray-700 font-medium">Use Common Pairs (Top 20)</label>
-                        </div>
-                        <div>
-                            <label for="num_range" class="form-label">Filter Common Pairs by Range (e.g., "1 20"):</label>
-                            <input type="text" id="num_range" name="num_range" class="form-input" placeholder="e.g., 1 20">
-                        </div>
-                        <button type="submit" class="btn-primary w-full">Generate Modified Combination</button>
-                    </form>
-                    {% if modified_white_balls %}
-                        <div class="card mt-6">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Modified Generated Numbers:</h3>
-                            <div class="flex items-center justify-center mb-4">
-                                {% for ball in modified_white_balls %}
-                                    <div class="ball white-ball">{{ ball }}</div>
-                                {% endfor %}
-                                <div class="ball powerball ml-4">{{ modified_powerball }}</div>
-                            </div>
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Last Drawn Date for Each Number:</h3>
-                            <ul class="list-disc list-inside">
-                                {% for num, date in last_draw_dates.items() %}
-                                    <li>{{ num }}: {{ date }}</li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Analysis Section -->
-            <div class="accordion-item" id="analysis-accordion">
-                <div class="accordion-header">
-                    <span>Powerball Analysis</span>
-                    <span class="icon">&#9660;</span>
-                </div>
-                <div class="accordion-content">
-                    <div class="space-y-4">
-                        <a href="/frequency_analysis" class="btn-primary block text-center">Frequency Analysis</a>
-                        <a href="/hot_cold_numbers" class="btn-primary block text-center">Hot & Cold Numbers</a>
-                        <a href="/monthly_white_ball_analysis" class="btn-primary block text-center">Monthly White Ball Analysis</a>
-                        <a href="/sum_of_main_balls" class="btn-primary block text-center">Sum of Main Balls</a>
-                        <form action="/find_results_by_sum" method="post" class="flex flex-col space-y-2">
-                            <label for="target_sum" class="form-label">Find Results by Sum:</label>
-                            <input type="number" id="target_sum" name="target_sum" class="form-input" placeholder="Enter target sum">
-                            <button type="submit" class="btn-primary">Find Results</button>
-                        </form>
-                        <form action="/find_results_by_first_white_ball" method="post" class="flex flex-col space-y-2">
-                            <label for="white_ball_number" class="form-label">Find Results by First White Ball Number:</label>
-                            <input type="number" id="white_ball_number" name="white_ball_number" class="form-input" placeholder="Enter white ball number">
-                            <div class="flex items-center mt-2">
-                                <input type="checkbox" id="sort_by_year" name="sort_by_year" class="rounded text-indigo-600 focus:ring-indigo-500">
-                                <label for="sort_by_year" class="ml-2 text-gray-700 font-medium">Sort by Year</label>
-                            </div>
-                            <button type="submit" class="btn-primary mt-2">Find Results</button>
-                        </form>
-                        <form action="/simulate_multiple_draws" method="post" class="flex flex-col space-y-2">
-                            <label for="num_draws" class="form-label">Simulate Multiple Draws:</label>
-                            <input type="number" id="num_draws" name="num_draws" class="form-input" value="100" min="1">
-                            <button type="submit" class="btn-primary">Run Simulation</button>
-                        </form>
-                        <a href="/number_age_distribution" class="btn-primary block text-center">Number Age Distribution</a>
-                        <a href="/co_occurrence_analysis" class="btn-primary block text-center">Co-occurrence Analysis</a>
-                        <a href="/powerball_position_frequency" class="btn-primary block text-center">Powerball Position Frequency</a>
-
+            <!-- Content Sections (formerly accordion items) -->
+            <div id="generate-numbers-section" class="card">
+                <h2 class="text-xl font-semibold mb-4 text-gray-700">Generate Powerball Numbers</h2>
+                <form action="/generate" method="post" class="space-y-4">
+                    <div>
+                        <label for="odd_even_choice" class="form-label">Odd/Even Balance:</label>
+                        <select id="odd_even_choice" name="odd_even_choice" class="form-select">
+                            <option value="Any">Any</option>
+                            <option value="All Even">All Even</option>
+                            <option value="All Odd">All Odd</option>
+                            <option value="3 Even / 2 Odd">3 Even / 2 Odd</option>
+                            <option value="3 Odd / 2 Even">3 Odd / 2 Even</option>
+                            <option value="1 Even / 4 Odd">1 Even / 4 Odd</option>
+                            <option value="1 Odd / 4 Even">1 Odd / 4 Even</option>
+                        </select>
                     </div>
-
-                    {% if white_ball_freq %}
-                        <div class="card mt-6">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">White Ball Frequency:</h3>
-                            <table class="table-auto">
-                                <thead>
-                                    <tr>
-                                        <th>Number</th>
-                                        <th>Frequency</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for item in white_ball_freq %}
-                                        <tr>
-                                            <td>{{ item.Number }}</td>
-                                            <td>{{ item.Frequency }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                            <h3 class="text-lg font-semibold mt-4 mb-2 text-gray-700">Powerball Frequency:</h3>
-                            <table class="table-auto">
-                                <thead>
-                                    <tr>
-                                        <th>Number</th>
-                                        <th>Frequency</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for item in powerball_freq %}
-                                        <tr>
-                                            <td>{{ item.Number }}</td>
-                                            <td>{{ item.Frequency }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                    <div>
+                        <label for="high_low_balance" class="form-label">High/Low Balance (e.g., "2 3" for 2 low, 3 high):</label>
+                        <input type="text" id="high_low_balance" name="high_low_balance" class="form-input" placeholder="e.g., 2 3">
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="white_ball_min" class="form-label">White Ball Min (1-69):</label>
+                            <input type="number" id="white_ball_min" name="white_ball_min" class="form-input" value="1" min="1" max="69">
                         </div>
-                    {% endif %}
-
-                    {% if hot_numbers %}
-                        <div class="card mt-6">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Hot Numbers (Most Frequent):</h3>
-                            <table class="table-auto">
-                                <thead>
-                                    <tr>
-                                        <th>Number</th>
-                                        <th>Frequency</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for item in hot_numbers %}
-                                        <tr>
-                                            <td>{{ item.Number }}</td>
-                                            <td>{{ item.Frequency }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                            <h3 class="text-lg font-semibold mt-4 mb-2 text-gray-700">Cold Numbers (Least Frequent):</h3>
-                            <table class="table-auto">
-                                <thead>
-                                    <tr>
-                                        <th>Number</th>
-                                        <th>Frequency</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for item in cold_numbers %}
-                                        <tr>
-                                            <td>{{ item.Number }}</td>
-                                            <td>{{ item.Frequency }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                        <div>
+                            <label for="white_ball_max" class="form-label">White Ball Max (1-69):</label>
+                            <input type="number" id="white_ball_max" name="white_ball_max" class="form-input" value="69" min="1" max="69">
                         </div>
-                    {% endif %}
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="powerball_min" class="form-label">Powerball Min (1-26):</label>
+                            <input type="number" id="powerball_min" name="powerball_min" class="form-input" value="1" min="1" max="26">
+                        </div>
+                        <div>
+                            <label for="powerball_max" class="form-label">Powerball Max (1-26):</label>
+                            <input type="number" id="powerball_max" name="powerball_max" class="form-input" value="26" min="1" max="26">
+                        </div>
+                    </div>
+                    <div>
+                        <label for="excluded_numbers" class="form-label">Excluded Numbers (comma-separated):</label>
+                        <input type="text" id="excluded_numbers" name="excluded_numbers" class="form-input" placeholder="e.g., 1, 13, 25">
+                    </div>
+                    <button type="submit" class="btn-primary w-full">Generate Numbers</button>
+                </form>
 
-                    {% if monthly_balls %}
-                        <div class="card mt-6">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Monthly White Ball Analysis (Last 6 Months):</h3>
-                            {% for month, balls in monthly_balls.items() %}
-                                <p class="font-medium mt-2">{{ month }}:</p>
-                                <div class="flex flex-wrap">
-                                    {% for ball in balls %}
-                                        <div class="ball white-ball-sm">{{ ball }}</div>
-                                    {% endfor %}
-                                </div>
+                {% if white_balls %}
+                    <div class="card mt-6">
+                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Generated Numbers:</h3>
+                        <div class="flex items-center justify-center mb-4">
+                            {% for ball in white_balls %}
+                                <div class="ball white-ball">{{ ball }}</div>
                             {% endfor %}
+                            <div class="ball powerball ml-4">{{ powerball }}</div>
                         </div>
-                    {% endif %}
-
-                    {% if sum_data %}
-                        <div class="card mt-6">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Sum of Main Balls Analysis:</h3>
-                            <p>Min Sum: {{ min_sum }}</p>
-                            <p>Max Sum: {{ max_sum }}</p>
-                            <p>Average Sum: {{ avg_sum }}</p>
-                            <h4 class="font-semibold mt-4 mb-2">Sum Frequencies:</h4>
-                            <table class="table-auto">
-                                <thead>
-                                    <tr>
-                                        <th>Sum</th>
-                                        <th>Count</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for item in sum_freq_list %}
-                                        <tr>
-                                            <td>{{ item.sum }}</td>
-                                            <td>{{ item.count }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                            <h4 class="font-semibold mt-4 mb-2">Individual Draws by Sum:</h4>
-                            <table class="table-auto">
-                                <thead>
-                                    <tr>
-                                        <th>Draw Date</th>
-                                        <th>Number 1</th>
-                                        <th>Number 2</th>
-                                        <th>Number 3</th>
-                                        <th>Number 4</th>
-                                        <th>Number 5</th>
-                                        <th>Sum</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for row in sum_data %}
-                                        <tr>
-                                            <td>{{ row['Draw Date'] }}</td>
-                                            <td>{{ row['Number 1'] }}</td>
-                                            <td>{{ row['Number 2'] }}</td>
-                                            <td>{{ row['Number 3'] }}</td>
-                                            <td>{{ row['Number 4'] }}</td>
-                                            <td>{{ row['Number 5'] }}</td>
-                                            <td>{{ row['Sum'] }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% endif %}
-
-                    {% if results_by_first_white_ball %}
-                        <div class="card mt-6">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Results for First White Ball Number: {{ white_ball_number }}</h3>
-                            <p class="text-sm text-gray-600">Sorted by year: {% if sort_by_year %}Yes{% else %}No{% endif %}</p>
-                            <table class="table-auto">
-                                <thead>
-                                    <tr>
-                                        <th>Draw Date</th>
-                                        <th>Number 1</th>
-                                        <th>Number 2</th>
-                                        <th>Number 3</th>
-                                        <th>Number 4</th>
-                                        <th>Number 5</th>
-                                        <th>Powerball</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for row in results_by_first_white_ball %}
-                                        <tr>
-                                            <td>{{ row['Draw Date'] }}</td>
-                                            <td>{{ row['Number 1'] }}</td>
-                                            <td>{{ row['Number 2'] }}</td>
-                                            <td>{{ row['Number 3'] }}</td>
-                                            <td>{{ row['Number 4'] }}</td>
-                                            <td>{{ row['Number 5'] }}</td>
-                                            <td>{{ row['Powerball'] }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% endif %}
-
-                    {% if results %} {# For find_results_by_sum #}
-                        <div class="card mt-6">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Draws with Sum: {{ target_sum }}</h3>
-                            <table class="table-auto">
-                                <thead>
-                                    <tr>
-                                        <th>Draw Date</th>
-                                        <th>Number 1</th>
-                                        <th>Number 2</th>
-                                        <th>Number 3</th>
-                                        <th>Number 4</th>
-                                        <th>Number 5</th>
-                                        <th>Sum</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for row in results %}
-                                        <tr>
-                                            <td>{{ row['Draw Date'] }}</td>
-                                            <td>{{ row['Number 1'] }}</td>
-                                            <td>{{ row['Number 2'] }}</td>
-                                            <td>{{ row['Number 3'] }}</td>
-                                            <td>{{ row['Number 4'] }}</td>
-                                            <td>{{ row['Number 5'] }}</td>
-                                            <td>{{ row['Sum'] }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% endif %}
-
-                    {% if simulated_freq %}
-                        <div class="card mt-6">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Simulated Draw Frequencies ({{ num_simulations }} simulations):</h3>
-                            <table class="table-auto">
-                                <thead>
-                                    <tr>
-                                        <th>Number</th>
-                                        <th>Frequency</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for item in simulated_freq %}
-                                        <tr>
-                                            <td>{{ item.Number }}</td>
-                                            <td>{{ item.Frequency }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% endif %}
-
-                    {% if number_age_data %}
-                        <div class="card mt-6">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Number Age Distribution:</h3>
-                            <table class="table-auto">
-                                <thead>
-                                    <tr>
-                                        <th>Draws Since Last Seen</th>
-                                        <th>Count of Numbers</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for item in number_age_data %}
-                                        <tr>
-                                            <td>{{ item.age }}</td>
-                                            <td>{{ item.count }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% endif %}
-
-                    {% if co_occurrence_data %}
-                        <div class="card mt-6">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Co-occurrence Matrix Data:</h3>
-                            <p>Max Co-occurrence: {{ max_co_occurrence }}</p>
-                            <table class="table-auto">
-                                <thead>
-                                    <tr>
-                                        <th>Number X</th>
-                                        <th>Number Y</th>
-                                        <th>Co-occurrence Count</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for item in co_occurrence_data %}
-                                        <tr>
-                                            <td>{{ item.x }}</td>
-                                            <td>{{ item.y }}</td>
-                                            <td>{{ item.count }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% endif %}
-
-                    {% if powerball_position_data %}
-                        <div class="card mt-6">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Powerball Position Frequency Data:</h3>
-                            <table class="table-auto">
-                                <thead>
-                                    <tr>
-                                        <th>Powerball Number</th>
-                                        <th>White Ball Value at Position</th>
-                                        <th>White Ball Position</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for item in powerball_position_data %}
-                                        <tr>
-                                            <td>{{ item.powerball_number }}</td>
-                                            <td>{{ item.white_ball_value_at_position }}</td>
-                                            <td>{{ item.white_ball_position }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% endif %}
-
-                </div>
-            </div>
-
-            <!-- Probabilities Section -->
-            <div class="accordion-item" id="probabilities-accordion">
-                <div class="accordion-header">
-                    <span>Probabilities</span>
-                    <span class="icon">&#9660;</span>
-                </div>
-                <div class="accordion-content">
-                    <div class="space-y-4">
-                        <a href="/winning_probability" class="btn-primary block text-center">Winning Probability</a>
-                        <a href="/partial_match_probabilities" class="btn-primary block text-center">Partial Match Probabilities</a>
+                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Last Drawn Date for Each Number:</h3>
+                        <ul class="list-disc list-inside">
+                            {% for num, date in last_draw_dates.items() %}
+                                <li>{{ num }}: {{ date }}</li>
+                            {% endfor %}
+                        </ul>
                     </div>
-                    {% if probability_1_in_x %}
-                        <div class="card mt-6">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Overall Winning Probability:</h3>
-                            <p class="mb-2"><strong>1 in X:</strong> {{ probability_1_in_x }}</p>
-                            <p><strong>Percentage:</strong> {{ probability_percentage }}</p>
-                        </div>
-                    {% endif %}
-                    {% if probabilities %}
-                        <div class="card mt-6">
-                            <h3 class="text-lg font-semibold mb-2 text-gray-700">Partial Match Probabilities:</h3>
-                            <table class="table-auto">
-                                <thead>
-                                    <tr>
-                                        <th>Scenario</th>
-                                        <th>Odds</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for scenario, odds in probabilities.items() %}
-                                        <tr>
-                                            <td>{{ scenario }}</td>
-                                            <td>{{ odds }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% endif %}
-                </div>
+                {% endif %}
             </div>
-        </div>
+
+            <div id="generate-modified-section" class="card mt-8">
+                <h2 class="text-xl font-semibold mb-4 text-gray-700">Generate Modified Combination</h2>
+                <form action="/generate_modified" method="post" class="space-y-4">
+                    <div>
+                        <input type="checkbox" id="use_common_pairs" name="use_common_pairs" class="rounded text-indigo-600 focus:ring-indigo-500">
+                        <label for="use_common_pairs" class="ml-2 text-gray-700 font-medium">Use Common Pairs (Top 20)</label>
+                    </div>
+                    <div>
+                        <label for="num_range" class="form-label">Filter Common Pairs by Range (e.g., "1 20"):</label>
+                        <input type="text" id="num_range" name="num_range" class="form-input" placeholder="e.g., 1 20">
+                    </div>
+                    <button type="submit" class="btn-primary w-full">Generate Modified Combination</button>
+                </form>
+                {% if modified_white_balls %}
+                    <div class="card mt-6">
+                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Modified Generated Numbers:</h3>
+                        <div class="flex items-center justify-center mb-4">
+                            {% for ball in modified_white_balls %}
+                                <div class="ball white-ball">{{ ball }}</div>
+                            {% endfor %}
+                            <div class="ball powerball ml-4">{{ modified_powerball }}</div>
+                        </div>
+                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Last Drawn Date for Each Number:</h3>
+                        <ul class="list-disc list-inside">
+                            {% for num, date in last_draw_dates.items() %}
+                                <li>{{ num }}: {{ date }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div id="analysis-section" class="card mt-8">
+                <h2 class="text-xl font-semibold mb-4 text-gray-700">Powerball Analysis</h2>
+                <div class="space-y-4">
+                    <a href="/frequency_analysis" class="btn-primary block text-center">Frequency Analysis</a>
+                    <a href="/hot_cold_numbers" class="btn-primary block text-center">Hot & Cold Numbers</a>
+                    <a href="/monthly_white_ball_analysis" class="btn-primary block text-center">Monthly White Ball Analysis</a>
+                    <a href="/sum_of_main_balls" class="btn-primary block text-center">Sum of Main Balls</a>
+                    <form id="find-results-by-sum-form" action="/find_results_by_sum" method="post" class="flex flex-col space-y-2">
+                        <label for="target_sum" class="form-label">Find Results by Sum:</label>
+                        <input type="number" id="target_sum" name="target_sum" class="form-input" placeholder="Enter target sum">
+                        <button type="submit" class="btn-primary">Find Results</button>
+                    </form>
+                    <form id="find-results-by-first-white-ball-form" action="/find_results_by_first_white_ball" method="post" class="flex flex-col space-y-2">
+                        <label for="white_ball_number" class="form-label">Find Results by First White Ball Number:</label>
+                        <input type="number" id="white_ball_number" name="white_ball_number" class="form-input" placeholder="Enter white ball number">
+                        <div class="flex items-center mt-2">
+                            <input type="checkbox" id="sort_by_year" name="sort_by_year" class="rounded text-indigo-600 focus:ring-indigo-500">
+                            <label for="sort_by_year" class="ml-2 text-gray-700 font-medium">Sort by Year</label>
+                        </div>
+                        <button type="submit" class="btn-primary mt-2">Find Results</button>
+                    </form>
+                    <form id="simulate-multiple-draws-form" action="/simulate_multiple_draws" method="post" class="flex flex-col space-y-2">
+                        <label for="num_draws" class="form-label">Simulate Multiple Draws:</label>
+                        <input type="number" id="num_draws" name="num_draws" class="form-input" value="100" min="1">
+                        <button type="submit" class="btn-primary">Run Simulation</button>
+                    </form>
+                    <a href="/number_age_distribution" class="btn-primary block text-center">Number Age Distribution</a>
+                    <a href="/co_occurrence_analysis" class="btn-primary block text-center">Co-occurrence Analysis</a>
+                    <a href="/powerball_position_frequency" class="btn-primary block text-center">Powerball Position Frequency</a>
+                </div>
+
+                {% if white_ball_freq %}
+                    <div class="card mt-6">
+                        <h3 class="text-lg font-semibold mb-2 text-gray-700">White Ball Frequency:</h3>
+                        <table class="table-auto">
+                            <thead>
+                                <tr>
+                                    <th>Number</th>
+                                    <th>Frequency</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in white_ball_freq %}
+                                    <tr>
+                                        <td>{{ item.Number }}</td>
+                                        <td>{{ item.Frequency }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        <h3 class="text-lg font-semibold mt-4 mb-2 text-gray-700">Powerball Frequency:</h3>
+                        <table class="table-auto">
+                            <thead>
+                                <tr>
+                                    <th>Number</th>
+                                    <th>Frequency</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in powerball_freq %}
+                                    <tr>
+                                        <td>{{ item.Number }}</td>
+                                        <td>{{ item.Frequency }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+
+                {% if hot_numbers %}
+                    <div class="card mt-6">
+                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Hot Numbers (Most Frequent):</h3>
+                        <table class="table-auto">
+                            <thead>
+                                <tr>
+                                    <th>Number</th>
+                                    <th>Frequency</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in hot_numbers %}
+                                    <tr>
+                                        <td>{{ item.Number }}</td>
+                                        <td>{{ item.Frequency }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        <h3 class="text-lg font-semibold mt-4 mb-2 text-gray-700">Cold Numbers (Least Frequent):</h3>
+                        <table class="table-auto">
+                            <thead>
+                                <tr>
+                                    <th>Number</th>
+                                    <th>Frequency</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in cold_numbers %}
+                                    <tr>
+                                        <td>{{ item.Number }}</td>
+                                        <td>{{ item.Frequency }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+
+                {% if monthly_balls %}
+                    <div class="card mt-6">
+                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Monthly White Ball Analysis (Last 6 Months):</h3>
+                        {% for month, balls in monthly_balls.items() %}
+                            <p class="font-medium mt-2">{{ month }}:</p>
+                            <div class="flex flex-wrap">
+                                {% for ball in balls %}
+                                    <div class="ball white-ball-sm">{{ ball }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                {% if sum_data %}
+                    <div class="card mt-6">
+                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Sum of Main Balls Analysis:</h3>
+                        <p>Min Sum: {{ min_sum }}</p>
+                        <p>Max Sum: {{ max_sum }}</p>
+                        <p>Average Sum: {{ avg_sum }}</p>
+                        <h4 class="font-semibold mt-4 mb-2">Sum Frequencies:</h4>
+                        <table class="table-auto">
+                            <thead>
+                                <tr>
+                                    <th>Sum</th>
+                                    <th>Count</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in sum_freq_list %}
+                                    <tr>
+                                        <td>{{ item.sum }}</td>
+                                        <td>{{ item.count }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        <h4 class="font-semibold mt-4 mb-2">Individual Draws by Sum:</h4>
+                        <table class="table-auto">
+                            <thead>
+                                <tr>
+                                    <th>Draw Date</th>
+                                    <th>Number 1</th>
+                                    <th>Number 2</th>
+                                    <th>Number 3</th>
+                                    <th>Number 4</th>
+                                    <th>Number 5</th>
+                                    <th>Sum</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in sum_data %}
+                                    <tr>
+                                        <td>{{ row['Draw Date'] }}</td>
+                                        <td>{{ row['Number 1'] }}</td>
+                                        <td>{{ row['Number 2'] }}</td>
+                                        <td>{{ row['Number 3'] }}</td>
+                                        <td>{{ row['Number 4'] }}</td>
+                                        <td>{{ row['Number 5'] }}</td>
+                                        <td>{{ row['Sum'] }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+
+                {% if results_by_first_white_ball %}
+                    <div class="card mt-6">
+                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Results for First White Ball Number: {{ white_ball_number }}</h3>
+                        <p class="text-sm text-gray-600">Sorted by year: {% if sort_by_year %}Yes{% else %}No{% endif %}</p>
+                        <table class="table-auto">
+                            <thead>
+                                <tr>
+                                    <th>Draw Date</th>
+                                    <th>Number 1</th>
+                                    <th>Number 2</th>
+                                    <th>Number 3</th>
+                                    <th>Number 4</th>
+                                    <th>Number 5</th>
+                                    <th>Powerball</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in results_by_first_white_ball %}
+                                    <tr>
+                                        <td>{{ row['Draw Date'] }}</td>
+                                        <td>{{ row['Number 1'] }}</td>
+                                        <td>{{ row['Number 2'] }}</td>
+                                        <td>{{ row['Number 3'] }}</td>
+                                        <td>{{ row['Number 4'] }}</td>
+                                        <td>{{ row['Number 5'] }}</td>
+                                        <td>{{ row['Powerball'] }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+
+                {% if results %} {# For find_results_by_sum #}
+                    <div class="card mt-6">
+                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Draws with Sum: {{ target_sum }}</h3>
+                        <table class="table-auto">
+                            <thead>
+                                <tr>
+                                    <th>Draw Date</th>
+                                    <th>Number 1</th>
+                                    <th>Number 2</th>
+                                    <th>Number 3</th>
+                                    <th>Number 4</th>
+                                    <th>Number 5</th>
+                                    <th>Sum</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in results %}
+                                    <tr>
+                                        <td>{{ row['Draw Date'] }}</td>
+                                        <td>{{ row['Number 1'] }}</td>
+                                        <td>{{ row['Number 2'] }}</td>
+                                        <td>{{ row['Number 3'] }}</td>
+                                        <td>{{ row['Number 4'] }}</td>
+                                        <td>{{ row['Number 5'] }}</td>
+                                        <td>{{ row['Sum'] }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+
+                {% if simulated_freq %}
+                    <div class="card mt-6">
+                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Simulated Draw Frequencies ({{ num_simulations }} simulations):</h3>
+                        <table class="table-auto">
+                            <thead>
+                                <tr>
+                                    <th>Number</th>
+                                    <th>Frequency</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in simulated_freq %}
+                                    <tr>
+                                        <td>{{ item.Number }}</td>
+                                        <td>{{ item.Frequency }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+
+                {% if number_age_data %}
+                    <div class="card mt-6">
+                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Number Age Distribution:</h3>
+                        <table class="table-auto">
+                            <thead>
+                                <tr>
+                                    <th>Draws Since Last Seen</th>
+                                    <th>Count of Numbers</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in number_age_data %}
+                                    <tr>
+                                        <td>{{ item.age }}</td>
+                                        <td>{{ item.count }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+
+                {% if co_occurrence_data %}
+                    <div class="card mt-6">
+                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Co-occurrence Matrix Data:</h3>
+                        <p>Max Co-occurrence: {{ max_co_occurrence }}</p>
+                        <table class="table-auto">
+                            <thead>
+                                <tr>
+                                    <th>Number X</th>
+                                    <th>Number Y</th>
+                                    <th>Co-occurrence Count</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in co_occurrence_data %}
+                                    <tr>
+                                        <td>{{ item.x }}</td>
+                                        <td>{{ item.y }}</td>
+                                        <td>{{ item.count }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+
+                {% if powerball_position_data %}
+                    <div class="card mt-6">
+                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Powerball Position Frequency Data:</h3>
+                        <table class="table-auto">
+                            <thead>
+                                <tr>
+                                    <th>Powerball Number</th>
+                                    <th>White Ball Value at Position</th>
+                                    <th>White Ball Position</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in powerball_position_data %}
+                                    <tr>
+                                        <td>{{ item.powerball_number }}</td>
+                                        <td>{{ item.white_ball_value_at_position }}</td>
+                                        <td>{{ item.white_ball_position }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+
+            </div>
+
+            <div id="probabilities-section" class="card mt-8">
+                <h2 class="text-xl font-semibold mb-4 text-gray-700">Probabilities</h2>
+                <div class="space-y-4">
+                    <a href="/winning_probability" class="btn-primary block text-center">Winning Probability</a>
+                    <a href="/partial_match_probabilities" class="btn-primary block text-center">Partial Match Probabilities</a>
+                </div>
+                {% if probability_1_in_x %}
+                    <div class="card mt-6">
+                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Overall Winning Probability:</h3>
+                        <p class="mb-2"><strong>1 in X:</strong> {{ probability_1_in_x }}</p>
+                        <p><strong>Percentage:</strong> {{ probability_percentage }}</p>
+                    </div>
+                {% endif %}
+                {% if probabilities %}
+                    <div class="card mt-6">
+                        <h3 class="text-lg font-semibold mb-2 text-gray-700">Partial Match Probabilities:</h3>
+                        <table class="table-auto">
+                            <thead>
+                                <tr>
+                                    <th>Scenario</th>
+                                    <th>Odds</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for scenario, odds in probabilities.items() %}
+                                    <tr>
+                                        <td>{{ scenario }}</td>
+                                        <td>{{ odds }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            </div>
+
+        </main>
     </div>
 
     <script>
-        document.querySelectorAll('.accordion-header').forEach(header => {
-            header.addEventListener('click', () => {
-                const accordionItem = header.parentElement;
-                const content = header.nextElementSibling;
-                
-                // Close other open accordions, unless it's the current one
-                document.querySelectorAll('.accordion-item.active').forEach(openItem => {
-                    if (openItem !== accordionItem) {
-                        openItem.classList.remove('active');
-                        openItem.querySelector('.accordion-content').style.maxHeight = null;
+        document.addEventListener('DOMContentLoaded', () => {
+            // Function to highlight active navigation link
+            function highlightNavLink() {
+                const currentPath = window.location.pathname;
+                document.querySelectorAll('.sidebar nav ul li a').forEach(link => {
+                    link.classList.remove('active-nav-link'); // Remove from all
+                    // Check if the link's href matches the current path, or if it's a parent link to an active sub-link
+                    if (link.getAttribute('href') === currentPath || (link.getAttribute('href').startsWith('/') && currentPath.startsWith(link.getAttribute('href')) && link.getAttribute('href') !== '/')) {
+                        link.classList.add('active-nav-link');
+                    }
+                    // Special handling for the root path and analysis/probabilities sub-links
+                    if (currentPath === '/' && link.getAttribute('href') === '#generate-numbers-section') {
+                         link.classList.add('active-nav-link');
+                    }
+                    if (currentPath.includes('_analysis') || currentPath.includes('_numbers') || currentPath.includes('_sum') || currentPath.includes('_draws') || currentPath.includes('_frequency')) {
+                        // For any analysis/probability sub-page, highlight the parent "Powerball Analysis" or "Probabilities" link
+                        if (link.getAttribute('href') === '#analysis-section' && currentPath.includes('_analysis')) {
+                             link.classList.add('active-nav-link');
+                        }
+                        if (link.getAttribute('href') === '#analysis-section' && currentPath.includes('_numbers')) {
+                             link.classList.add('active-nav-link');
+                        }
+                         if (link.getAttribute('href') === '#analysis-section' && currentPath.includes('_sum')) {
+                             link.classList.add('active-nav-link');
+                        }
+                        if (link.getAttribute('href') === '#analysis-section' && currentPath.includes('_draws')) {
+                             link.classList.add('active-nav-link');
+                        }
+                         if (link.getAttribute('href') === '#analysis-section' && currentPath.includes('_frequency')) {
+                             link.classList.add('active-nav-link');
+                        }
+                        if (link.getAttribute('href') === '#probabilities-section' && currentPath.includes('_probability')) {
+                             link.classList.add('active-nav-link');
+                        }
                     }
                 });
+            }
 
-                // Toggle current accordion
-                accordionItem.classList.toggle('active');
-                if (accordionItem.classList.contains('active')) {
-                    content.style.maxHeight = content.scrollHeight + "px";
-                } else {
-                    content.style.maxHeight = null;
-                }
+            highlightNavLink(); // Call on initial load
+
+            // Smooth scrolling for internal links within the main content
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    document.querySelector(this.getAttribute('href')).scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                     // Update the URL hash without triggering a full page reload or route change
+                    history.pushState(null, '', this.getAttribute('href'));
+                    highlightNavLink(); // Re-highlight nav link based on new URL hash
+                });
             });
-        });
-
-        // Function to open specific accordion sections based on current URL path
-        document.addEventListener('DOMContentLoaded', () => {
-            const path = window.location.pathname;
-            let targetAccordionId = null;
-
-            // Mapping paths to accordion IDs
-            if (path === '/generate' || path === '/generate_modified') {
-                targetAccordionId = 'generate-numbers-accordion'; // Covers both generate routes
-            } else if (path === '/frequency_analysis' || path === '/hot_cold_numbers' || 
-                       path === '/monthly_white_ball_analysis' || path === '/sum_of_main_balls' || 
-                       path === '/find_results_by_sum' || path === '/simulate_multiple_draws' ||
-                       path === '/number_age_distribution' || path === '/co_occurrence_analysis' ||
-                       path === '/powerball_position_frequency' || path === '/find_results_by_first_white_ball') {
-                targetAccordionId = 'analysis-accordion';
-            } else if (path === '/winning_probability' || path === '/partial_match_probabilities') {
-                targetAccordionId = 'probabilities-accordion';
-            }
-
-            if (targetAccordionId) {
-                const targetAccordion = document.getElementById(targetAccordionId);
-                if (targetAccordion && !targetAccordion.classList.contains('active')) {
-                    const header = targetAccordion.querySelector('.accordion-header');
-                    if (header) {
-                        // Directly trigger the click to open and animate
-                        header.click();
-                    }
-                }
-            }
 
             // Restore form values after submission for better UX
             const formElements = document.querySelectorAll('form');
