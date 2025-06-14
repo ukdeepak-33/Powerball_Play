@@ -18,8 +18,12 @@
 {% block scripts %}
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            console.log("[Number Age Distribution] Page loaded.");
             {% if number_age_data %}
+            console.log("[Number Age Distribution] number_age_data data:", {{ number_age_data | tojson }});
             drawBarChart({{ number_age_data | tojson }}, 'numberAgeChart', 'age', 'count', 'Number Age Distribution');
+            {% else %}
+            console.log("[Number Age Distribution] number_age_data is not available in template context.");
             {% endif %}
         });
     </script>
