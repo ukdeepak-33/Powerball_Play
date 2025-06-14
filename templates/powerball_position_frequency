@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Powerball Position Frequency{% endblock %}
+
+{% block page_heading %}Powerball Position Frequency{% endblock %}
+
+{% block content %}
+    {% if powerball_position_data %}
+        <div class="card">
+            <h3 class="text-lg font-semibold mb-2 text-gray-700">Raw Powerball Position Frequency Data:</h3>
+            <table class="table-auto">
+                <thead>
+                    <tr>
+                        <th>Powerball Number</th>
+                        <th>White Ball Value at Position</th>
+                        <th>White Ball Position</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in powerball_position_data %}
+                        <tr>
+                            <td>{{ item.powerball_number }}</td>
+                            <td>{{ item.white_ball_value_at_position }}</td>
+                            <td>{{ item.white_ball_position }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <p class="text-sm text-gray-600 mt-4">This table lists each white ball number that appeared at a specific position, alongside the Powerball drawn in that same lottery draw. For deeper statistical insights from this data, further analysis (e.g., pivot tables) would be needed.</p>
+        </div>
+    {% else %}
+        <div class="card"><p class="text-gray-500">No data available for Powerball Position Frequency. Please ensure historical data is loaded.</p></div>
+    {% endif %}
+{% endblock %}
+
+{% block scripts %}
+    {# No D3 charts for this page, as it's a table display for now #}
+{% endblock %}
