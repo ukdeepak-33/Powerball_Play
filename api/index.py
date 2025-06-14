@@ -22,7 +22,7 @@ app.secret_key = 'supersecretkey'
 # --- Supabase Configuration (IMPORTANT: Use Environment Variables for Production) ---
 # For Vercel, set these as Environment Variables: SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY
 # Using provided credentials for demonstration, but recommend env vars for actual deployment.
-SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
+SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.com")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlrc3h6YmJjb2l0ZWhkbXN4cWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NzMwNjUsImV4cCI6MjA2NTM0OTA2NX0.AzUD7wjR7VbvtUH27NDqJ3AlvFW0nCWpiN9ADG8T_t4")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY") # <<< Set this in Vercel env vars for write access!
 
