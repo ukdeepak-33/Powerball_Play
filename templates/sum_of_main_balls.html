@@ -1,27 +1,61 @@
 {% extends "base.html" %}
 
-{% block title %}Monthly White Ball Analysis{% endblock %}
+{% block title %}Sum of Main Balls Analysis{% endblock %}
 
-{% block page_heading %}Monthly White Ball Analysis{% endblock %}
+{% block page_heading %}Sum of Main Balls Analysis{% endblock %}
 
 {% block content %}
-    {% if monthly_balls %}
-        <div class="card">
-            <h3 class="text-lg font-semibold mb-2 text-gray-700">Monthly White Ball Analysis (Last 6 Months):</h3>
-            {% for month, balls in monthly_balls.items() %}
-                <p class="font-medium mt-2">{{ month }}:</p>
-                <div class="flex flex-wrap mb-2">
-                    {% for ball in balls %}
-                        <div class="ball white-ball-sm">{{ ball }}</div>
+    {% if sum_data %}
+        <div class="chart-container">
+            <h3 class="chart-title">Sum of Main Balls Frequency</h3>
+            <p class="text-gray-700 text-sm">Min Sum: <span class="font-semibold">{{ min_sum }}</span> | Max Sum: <span class="font-semibold">{{ max_sum }}</span> | Average Sum: <span class="font-semibold">{{ avg_sum }}</span></p>
+            <div id="sumFreqChart"></div>
+        </div>
+
+        <div class="card mt-6">
+            <h4 class="font-semibold mt-4 mb-2">Individual Draws by Sum:</h4>
+            <table class="table-auto">
+                <thead>
+                    <tr>
+                        <th>Draw Date</th>
+                        <th>Number 1</th>
+                        <th>Number 2</th>
+                        <th>Number 3</th>
+                        <th>Number 4</th>
+                        <th>Number 5</th>
+                        <th>Sum</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in sum_data %}
+                        <tr>
+                            <td>{{ row['Draw Date'] }}</td>
+                            <td>{{ row['Number 1'] }}</td>
+                            <td>{{ row['Number 2'] }}</td>
+                            <td>{{ row['Number 3'] }}</td>
+                            <td>{{ row['Number 4'] }}</td>
+                            <td>{{ row['Number 5'] }}</td>
+                            <td>{{ row['Sum'] }}</td>
+                        </tr>
                     {% endfor %}
-                </div>
-            {% endfor %}
+                </tbody>
+            </table>
         </div>
     {% else %}
-        <div class="card"><p class="text-gray-500">No data available for Monthly White Ball Analysis. Please ensure historical data is loaded.</p></div>
+        <div class="card"><p class="text-gray-500">No data available for Sum of Main Balls analysis. Please ensure historical data is loaded.</p></div>
     {% endif %}
 {% endblock %}
 
 {% block scripts %}
-    {# No D3 charts for this page, just structured text display #}
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("[Sum of Main Balls] Page loaded.");
+            {% if sum_freq_list %}
+            console.log("[Sum of Main Balls] sum_freq_list data:", {{ sum_freq_list | tojson }});
+            drawBarChart({{ sum_freq_list | tojson }}, 'sumFreqChart', 'sum', 'count', 'Sum of Main Balls Frequency');
+            {% else %}
+            console.log("[Sum of Main Balls] sum_freq_list is not available in template context.");
+            {% endif %}
+        });
+    </script>
 {% endblock %}
