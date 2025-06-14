@@ -29,8 +29,12 @@
 {% block scripts %}
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            console.log("[Simulate Multiple Draws] Page loaded.");
             {% if simulated_freq %}
+            console.log("[Simulate Multiple Draws] simulated_freq data:", {{ simulated_freq | tojson }});
             drawBarChart({{ simulated_freq | tojson }}, 'simulatedFreqChart', 'Number', 'Frequency', 'Simulated Draw Frequencies');
+            {% else %}
+            console.log("[Simulate Multiple Draws] simulated_freq is not available in template context.");
             {% endif %}
         });
     </script>
