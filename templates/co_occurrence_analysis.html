@@ -1,31 +1,25 @@
 {% extends "base.html" %}
 
-{% block title %}Co-occurrence Analysis{% endblock %}
-
-{% block page_heading %}Co-occurrence Analysis{% endblock %}
-
 {% block content %}
-    {% if co_occurrence_data %}
-        <div class="chart-container">
-            <h3 class="chart-title">Co-occurrence Matrix (Top Pairs)</h3>
-            <p class="text-gray-700 text-sm">Max Co-occurrence: <span class="font-semibold">{{ max_co_occurrence | default(0) }}</span></p>
-            <div id="coOccurrenceHeatmap"></div>
-        </div>
-    {% else %}
-        <div class="card"><p class="text-gray-500">No data available for Co-occurrence Analysis. Please ensure historical data is loaded.</p></div>
-    {% endif %}
-{% endblock %}
+<h1 class="text-3xl font-bold mb-6">Co-occurrence Analysis (Heatmap)</h1>
 
-{% block scripts %}
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log("[Co-occurrence Analysis] Page loaded.");
-            {% if co_occurrence_data %}
-            console.log("[Co-occurrence Analysis] co_occurrence_data data:", {{ co_occurrence_data | tojson }});
-            drawHeatmap({{ co_occurrence_data | tojson }}, 'coOccurrenceHeatmap', 'x', 'y', 'count', 'Co-occurrence Matrix', {{ max_co_occurrence | default(0) }});
-            {% else %}
-            console.log("[Co-occurrence Analysis] co_occurrence_data is not available in template context.");
-            {% endif %}
-        });
-    </script>
+<p class="mb-4 text-gray-700">This heatmap visualizes how often pairs of white balls have been drawn together. Darker colors indicate higher co-occurrence frequencies.</p>
+
+<div class="chart-container">
+    <h2 class="text-xl font-semibold mb-4">White Ball Co-occurrence</h2>
+    <div id="coOccurrenceHeatmap"></div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Ensure data is an empty array if not provided or empty
+        var coOccurrenceData = {% if co_occurrence_data %}{{ co_occurrence_data | tojson }}{% else %}[]{% endif %};
+        var maxCoOccurrence = {% if max_co_occurrence %}{{ max_co_occurrence }}{% else %}0{% endif %};
+        
+        console.log("[D3 Debug] co_occurrence_analysis.html - coOccurrenceData:", coOccurrenceData);
+        console.log("[D3 Debug] co_occurrence_analysis.html - maxCoOccurrence:", maxCoOccurrence);
+
+        drawHeatmap(coOccurrenceData, "coOccurrenceHeatmap", "x", "y", "count", "White Ball Co-occurrence Heatmap", "Ball 1", "Ball 2", maxCoOccurrence);
+    });
+</script>
 {% endblock %}
