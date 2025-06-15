@@ -345,7 +345,7 @@
             const xDomain = data.map(d => d[xKey]);
             const yMax = d3.max(data, d => d[yKey]);
 
-            if (xDomain.includes(undefined) || yMax === undefined) {
+            if (xDomain.includes(undefined) || yMax === undefined || xDomain.length === 0) { // Added xDomain.length check
                  d3.select(`#${elementId}`).html(`<p class="text-gray-500">Data structure issue for ${chartTitle} chart. Check xKey/yKey. Expected keys: ${xKey}, ${yKey}. First data item: ${JSON.stringify(data[0])}</p>`);
                  console.error(`[D3 Error] Data structure mismatch for ${chartTitle}. xKey: ${xKey}, yKey: ${yKey}. First data item:`, data[0]);
                  return;
@@ -452,7 +452,7 @@
             const xDomain = Array.from(new Set(data.map(d => d[xKey]))).sort(d3.ascending);
             const yDomain = Array.from(new Set(data.map(d => d[yKey]))).sort(d3.ascending);
 
-            if (xDomain.includes(undefined) || yDomain.includes(undefined)) {
+            if (xDomain.includes(undefined) || yDomain.includes(undefined) || xDomain.length === 0 || yDomain.length === 0) { // Added length checks
                  d3.select(`#${elementId}`).html(`<p class="text-gray-500">Data structure issue for ${chartTitle} heatmap. Check xKey/yKey. Expected keys: ${xKey}, ${yKey}. First data item: ${JSON.stringify(data[0])}</p>`);
                  console.error(`[D3 Error] Data structure mismatch for ${chartTitle}. xKey: ${xKey}, yKey: ${yKey}. First data item:`, data[0]);
                  return;
@@ -554,7 +554,7 @@
             const y = d3.scaleLinear()
                 .range([height, 0]);
 
-            const positionKeys = Object.keys(data[0]).filter(key => key !== "Powerball");
+            const positionKeys = Object.keys(data[0]).filter(key => key.startsWith("Pos")); // Filter for position keys
             const allValues = data.flatMap(d => positionKeys.map(key => d[key]));
             y.domain([d3.min(allValues) * 0.9, d3.max(allValues) * 1.1]); // Add 10% padding
 
@@ -566,6 +566,7 @@
                 .call(d3.axisBottom(x).tickFormat(d3.format("d")));
 
             svg.append("g")
+                .attr("class", "y axis")
                 .call(d3.axisLeft(y));
 
             svg.append("text")
@@ -587,7 +588,7 @@
                 .text(chartTitle);
 
             const line = d3.line()
-                .defined(d => !isNaN(d.value))
+                .defined(d => !isNaN(d.value) && d.value !== null) // Only draw line where data is defined and not null
                 .x(d => x(d.Powerball))
                 .y(d => y(d.value));
 
@@ -596,7 +597,7 @@
                     name: name,
                     values: data.map(function(d) {
                         return {Powerball: d.Powerball, value: d[name]};
-                    }).filter(d => !isNaN(d.value)) // Filter out undefined/NaN values
+                    }).filter(d => !isNaN(d.value) && d.value !== null) // Filter out undefined/NaN/null values
                 };
             });
 
@@ -618,7 +619,7 @@
                     return {name: d.name, value: lastValue};
                 })
                 .attr("transform", function(d) {
-                    if (d.value && !isNaN(d.value.Powerball) && !isNaN(d.value.value)) {
+                    if (d.value && !isNaN(d.value.Powerball) && !isNaN(d.value.value) && d.value.value !== null) {
                         return `translate(${x(d.value.Powerball)},${y(d.value.value)})`;
                     }
                     return null; // Don't show label if data is missing
