@@ -1,27 +1,33 @@
 {% extends "base.html" %}
 
-{% block title %}Monthly White Ball Analysis{% endblock %}
-
-{% block page_heading %}Monthly White Ball Analysis{% endblock %}
-
 {% block content %}
-    {% if monthly_balls %}
-        <div class="card">
-            <h3 class="text-lg font-semibold mb-2 text-gray-700">Monthly White Ball Analysis (Last 6 Months):</h3>
+<h1 class="text-3xl font-bold mb-6">Monthly White Ball Analysis (Last 6 Months)</h1>
+
+<div class="chart-container">
+    <h2 class="text-xl font-semibold mb-4">Balls Drawn Per Month</h2>
+    <div id="monthlyBallsList" class="flex flex-wrap gap-4">
+        {% if monthly_balls %}
             {% for month, balls in monthly_balls.items() %}
-                <p class="font-medium mt-2">{{ month }}:</p>
-                <div class="flex flex-wrap mb-2">
-                    {% for ball in balls %}
-                        <div class="ball white-ball-sm">{{ ball }}</div>
-                    {% endfor %}
+                <div class="border rounded-lg p-4 bg-gray-50 shadow-sm flex-1 min-w-[200px] max-w-[300px]">
+                    <h3 class="font-bold text-lg mb-2">{{ month }}</h3>
+                    <div class="flex flex-wrap gap-1">
+                        {% for ball in balls %}
+                            <span class="bg-blue-200 text-blue-800 px-2 py-1 rounded-full text-sm">{{ ball }}</span>
+                        {% endfor %}
+                    </div>
                 </div>
             {% endfor %}
-        </div>
-    {% else %}
-        <div class="card"><p class="text-gray-500">No data available for Monthly White Ball Analysis. Please ensure historical data is loaded.</p></div>
-    {% endif %}
-{% endblock %}
+        {% else %}
+            <p>No monthly ball data available.</p>
+        {% endif %}
+    </div>
+</div>
 
-{% block scripts %}
-    {# No D3 charts for this page, just structured text display #}
+<script>
+    // No D3 chart for this page, but keeping script block for consistency
+    document.addEventListener('DOMContentLoaded', function() {
+        var monthlyBallsData = {% if monthly_balls %}{{ monthly_balls | tojson }}{% else %}{}{% endif %};
+        console.log("[D3 Debug] monthly_white_ball_analysis.html - monthlyBallsData:", monthlyBallsData);
+    });
+</script>
 {% endblock %}
