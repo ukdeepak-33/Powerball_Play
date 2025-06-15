@@ -1,30 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}Number Age Distribution{% endblock %}
-
-{% block page_heading %}Number Age Distribution{% endblock %}
-
 {% block content %}
-    {% if number_age_data %}
-        <div class="chart-container">
-            <h3 class="chart-title">Number Age Distribution (Draws Since Last Seen)</h3>
-            <div id="numberAgeChart"></div>
-        </div>
-    {% else %}
-        <div class="card"><p class="text-gray-500">No data available for Number Age Distribution. Please ensure historical data is loaded.</p></div>
-    {% endif %}
-{% endblock %}
+<h1 class="text-3xl font-bold mb-6">Number Age Distribution</h1>
 
-{% block scripts %}
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log("[Number Age Distribution] Page loaded.");
-            {% if number_age_data %}
-            console.log("[Number Age Distribution] number_age_data data:", {{ number_age_data | tojson }});
-            drawBarChart({{ number_age_data | tojson }}, 'numberAgeChart', 'age', 'count', 'Number Age Distribution');
-            {% else %}
-            console.log("[Number Age Distribution] number_age_data is not available in template context.");
-            {% endif %}
-        });
-    </script>
+<p class="mb-4 text-gray-700">This chart shows the distribution of "ages" for all Powerball numbers (white balls and Powerball). The "age" of a number is the number of draws since its last appearance.</p>
+
+<div class="chart-container">
+    <h2 class="text-xl font-semibold mb-4">Draws Since Last Appearance</h2>
+    <div id="numberAgeChart"></div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Ensure data is an empty array if not provided or empty
+        var numberAgeData = {% if number_age_data %}{{ number_age_data | tojson }}{% else %}[]{% endif %};
+        console.log("[D3 Debug] number_age_distribution.html - numberAgeData:", numberAgeData);
+
+        drawBarChart(numberAgeData, "numberAgeChart", "age", "count", "Number Age Distribution", "Draws Since Last Appearance", "Number of Balls", "#5a67d8"); // A shade of indigo
+    });
+</script>
 {% endblock %}
