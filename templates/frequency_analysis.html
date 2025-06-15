@@ -1,46 +1,31 @@
 {% extends "base.html" %}
 
-{% block title %}Frequency Analysis{% endblock %}
-
-{% block page_heading %}White Ball and Powerball Frequencies{% endblock %}
-
 {% block content %}
-    {% if white_ball_freq %}
-        <div class="chart-container">
-            <h3 class="chart-title">White Ball Frequency</h3>
-            <div id="whiteBallFreqChart"></div>
-        </div>
-    {% else %}
-        <div class="card"><p class="text-gray-500">No data available for White Ball Frequency. Please ensure historical data is loaded.</p></div>
-    {% endif %}
+<h1 class="text-3xl font-bold mb-6">Frequency Analysis</h1>
 
-    {% if powerball_freq %}
-        <div class="chart-container mt-6">
-            <h3 class="chart-title">Powerball Frequency</h3>
-            <div id="powerballFreqChart"></div>
-        </div>
-    {% else %}
-        <div class="card mt-6"><p class="text-gray-500">No data available for Powerball Frequency. Please ensure historical data is loaded.</p></div>
-    {% endif %}
-{% endblock %}
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="chart-container">
+        <h2 class="text-xl font-semibold mb-4">White Ball Frequency (1-69)</h2>
+        <div id="whiteBallFreqChart"></div>
+    </div>
 
-{% block scripts %}
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log("[Frequency Analysis] Page loaded.");
-            {% if white_ball_freq %}
-            console.log("[Frequency Analysis] white_ball_freq data:", {{ white_ball_freq | tojson }});
-            drawBarChart({{ white_ball_freq | tojson }}, 'whiteBallFreqChart', 'Number', 'Frequency', 'White Ball Frequency');
-            {% else %}
-            console.log("[Frequency Analysis] white_ball_freq is not available in template context.");
-            {% endif %}
+    <div class="chart-container">
+        <h2 class="text-xl font-semibold mb-4">Powerball Frequency (1-26)</h2>
+        <div id="powerballFreqChart"></div>
+    </div>
+</div>
 
-            {% if powerball_freq %}
-            console.log("[Frequency Analysis] powerball_freq data:", {{ powerball_freq | tojson }});
-            drawBarChart({{ powerball_freq | tojson }}, 'powerballFreqChart', 'Number', 'Frequency', 'Powerball Frequency');
-            {% else %}
-            console.log("[Frequency Analysis] powerball_freq is not available in template context.");
-            {% endif %}
-        });
-    </script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Ensure data is an empty array if not provided or empty
+        var whiteBallFreqData = {% if white_ball_freq %}{{ white_ball_freq | tojson }}{% else %}[]{% endif %};
+        var powerballFreqData = {% if powerball_freq %}{{ powerball_freq | tojson }}{% else %}[]{% endif %};
+
+        console.log("[D3 Debug] frequency_analysis.html - whiteBallFreqData:", whiteBallFreqData);
+        console.log("[D3 Debug] frequency_analysis.html - powerballFreqData:", powerballFreqData);
+
+        drawBarChart(whiteBallFreqData, "whiteBallFreqChart", "Number", "Frequency", "White Ball Frequency (1-69)", "Ball Number", "Frequency");
+        drawBarChart(powerballFreqData, "powerballFreqChart", "Number", "Frequency", "Powerball Frequency (1-26)", "Powerball Number", "Frequency", "orange");
+    });
+</script>
 {% endblock %}
