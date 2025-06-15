@@ -461,7 +461,6 @@ def find_common_pairs(df, top_n=10):
     for _, row in df.iterrows():
         # Ensure numbers are converted to integers before sorting/pairing
         nums = sorted([int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])])
-        # Generate all unique pairs from the 5 white balls
         for i in range(len(nums)):
             for j in range(i + 1, len(nums)):
                 pair = tuple(sorted((nums[i], nums[j])))
@@ -571,7 +570,7 @@ def get_co_occurrence_matrix(df):
         white_balls = sorted([int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])])
         for i in range(len(white_balls)):
             for j in range(i + 1, len(white_balls)):
-                pair = tuple(sorted((white_balls[i], white_balls[j])))
+                pair = tuple(sorted((nums[i], nums[j])))
                 co_occurrence[pair] += 1
     
     co_occurrence_data = []
@@ -610,11 +609,11 @@ df = pd.DataFrame()
 # Fixed: Explicitly specify dtype for global last_draw initialization
 last_draw = pd.Series(dtype='object') 
 
-precomputed_white_ball_freq = pd.Series([], dtype=int)
-precomputed_powerball_freq = pd.Series([], dtype=int)
+precomputed_white_ball_freq_list = []
+precomputed_powerball_freq_list = []
 precomputed_last_draw_date_str = "N/A"
-precomputed_hot_numbers = pd.Series([], dtype=int)
-precomputed_cold_numbers = pd.Series([], dtype=int)
+precomputed_hot_numbers_list = []
+precomputed_cold_numbers_list = []
 precomputed_monthly_balls = {}
 precomputed_number_age_data = []
 precomputed_co_occurrence_data = []
@@ -626,9 +625,16 @@ try:
     last_draw = get_last_draw(df)
 
     if not df.empty: # Only pre-compute if data was successfully loaded
-        precomputed_white_ball_freq, precomputed_powerball_freq = frequency_analysis(df)
+        white_ball_freq, powerball_freq = frequency_analysis(df)
+        precomputed_white_ball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in white_ball_freq.items()]
+        precomputed_powerball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in powerball_freq.items()]
+
         precomputed_last_draw_date_str = last_draw['Draw Date']
-        precomputed_hot_numbers, precomputed_cold_numbers = hot_cold_numbers(df, precomputed_last_draw_date_str)
+        
+        hot_numbers, cold_numbers = hot_cold_numbers(df, precomputed_last_draw_date_str)
+        precomputed_hot_numbers_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in hot_numbers.items()]
+        precomputed_cold_numbers_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in cold_numbers.items()]
+
         precomputed_monthly_balls = monthly_white_ball_analysis(df, precomputed_last_draw_date_str)
         
         precomputed_number_age_data = get_number_age_distribution(df)
@@ -637,14 +643,14 @@ try:
         
         # --- DEBUG PRINTS FOR ANALYSIS DATA ---
         print("\n--- DEBUG: Precomputed Analysis Data Status ---")
-        print(f"precomputed_white_ball_freq is empty: {precomputed_white_ball_freq.empty}")
-        print(f"precomputed_white_ball_freq head:\n{precomputed_white_ball_freq.head()}")
-        print(f"precomputed_powerball_freq is empty: {precomputed_powerball_freq.empty}")
-        print(f"precomputed_powerball_freq head:\n{precomputed_powerball_freq.head()}")
-        print(f"precomputed_hot_numbers is empty: {precomputed_hot_numbers.empty}")
-        print(f"precomputed_hot_numbers head:\n{precomputed_hot_numbers.head()}")
-        print(f"precomputed_cold_numbers is empty: {precomputed_cold_numbers.empty}")
-        print(f"precomputed_cold_numbers head:\n{precomputed_cold_numbers.head()}")
+        print(f"precomputed_white_ball_freq_list is empty: {not bool(precomputed_white_ball_freq_list)}")
+        print(f"precomputed_white_ball_freq_list sample: {precomputed_white_ball_freq_list[:5]}")
+        print(f"precomputed_powerball_freq_list is empty: {not bool(precomputed_powerball_freq_list)}")
+        print(f"precomputed_powerball_freq_list sample: {precomputed_powerball_freq_list[:5]}")
+        print(f"precomputed_hot_numbers_list is empty: {not bool(precomputed_hot_numbers_list)}")
+        print(f"precomputed_hot_numbers_list sample: {precomputed_hot_numbers_list[:5]}")
+        print(f"precomputed_cold_numbers_list is empty: {not bool(precomputed_cold_numbers_list)}")
+        print(f"precomputed_cold_numbers_list sample: {precomputed_cold_numbers_list[:5]}")
         print(f"precomputed_monthly_balls is empty: {not bool(precomputed_monthly_balls)}")
         print(f"precomputed_monthly_balls sample: {list(precomputed_monthly_balls.keys())[:2] if precomputed_monthly_balls else 'N/A'}")
         print(f"precomputed_number_age_data is empty: {not bool(precomputed_number_age_data)}")
@@ -842,23 +848,17 @@ def generate_modified():
 
 @app.route('/frequency_analysis')
 def frequency_analysis_route():
-    # Use pre-computed data
-    white_ball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in precomputed_white_ball_freq.items()]
-    powerball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in precomputed_powerball_freq.items()]
-    
+    # Use pre-computed data (already lists of dicts from global pre-computation block)
     return render_template('frequency_analysis.html', 
-                           white_ball_freq=white_ball_freq_list, 
-                           powerball_freq=powerball_freq_list)
+                           white_ball_freq=precomputed_white_ball_freq_list, 
+                           powerball_freq=precomputed_powerball_freq_list)
 
 @app.route('/hot_cold_numbers')
 def hot_cold_numbers_route():
-    # Use pre-computed data
-    hot_numbers_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in precomputed_hot_numbers.items()]
-    cold_numbers_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in precomputed_cold_numbers.items()]
-    
+    # Use pre-computed data (already lists of dicts)
     return render_template('hot_cold_numbers.html', 
-                           hot_numbers=hot_numbers_list, 
-                           cold_numbers=cold_numbers_list)
+                           hot_numbers=precomputed_hot_numbers_list, 
+                           cold_numbers=precomputed_cold_numbers_list)
 
 @app.route('/monthly_white_ball_analysis')
 def monthly_white_ball_analysis_route():
@@ -1081,8 +1081,8 @@ def update_powerball_data():
             # For cron jobs, this is usually acceptable, as the next user request will get updated data.
             
             # Re-load and re-compute data after insertion to reflect immediately for next request
-            global df, last_draw, precomputed_white_ball_freq, precomputed_powerball_freq, \
-                   precomputed_last_draw_date_str, precomputed_hot_numbers, precomputed_cold_numbers, \
+            global df, last_draw, precomputed_white_ball_freq_list, precomputed_powerball_freq_list, \
+                   precomputed_last_draw_date_str, precomputed_hot_numbers_list, precomputed_cold_numbers_list, \
                    precomputed_monthly_balls, precomputed_number_age_data, precomputed_co_occurrence_data, \
                    precomputed_max_co_occurrence, precomputed_powerball_position_data
 
@@ -1090,9 +1090,13 @@ def update_powerball_data():
             last_draw = get_last_draw(df)
 
             if not df.empty:
-                precomputed_white_ball_freq, precomputed_powerball_freq = frequency_analysis(df)
+                white_ball_freq, powerball_freq = frequency_analysis(df)
+                precomputed_white_ball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in white_ball_freq.items()]
+                precomputed_powerball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in powerball_freq.items()]
                 precomputed_last_draw_date_str = last_draw['Draw Date']
-                precomputed_hot_numbers, precomputed_cold_numbers = hot_cold_numbers(df, precomputed_last_draw_date_str)
+                hot_numbers, cold_numbers = hot_cold_numbers(df, precomputed_last_draw_date_str)
+                precomputed_hot_numbers_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in hot_numbers.items()]
+                precomputed_cold_numbers_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in cold_numbers.items()]
                 precomputed_monthly_balls = monthly_white_ball_analysis(df, precomputed_last_draw_date_str)
                 precomputed_number_age_data = get_number_age_distribution(df)
                 precomputed_co_occurrence_data, precomputed_max_co_occurrence = get_co_occurrence_matrix(df)
