@@ -21,18 +21,15 @@ app = Flask(__name__, template_folder=TEMPLATE_DIR)
 app.secret_key = 'supersecretkey'
 
 # --- Supabase Configuration (IMPORTANT: Use Environment Variables for Production) ---
-# For Vercel, set these as Environment Variables: SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY
-# Using provided credentials for demonstration, but recommend env vars for actual deployment.
 SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlrc3h6YmJjb2l0ZWhkbXN4cWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NzMwNjUsImV4cCI6MjA2NTM0OTA2NX0.AzUD7wjR7VbvtUH27NDqJ3AlvFW0nCWpiN9ADG8T_t4")
-SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY") # <<< Set this in Vercel env vars for write access!
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY")
 
-SUPABASE_TABLE_NAME = 'powerball_draws' # Your table name in Supabase
+SUPABASE_TABLE_NAME = 'powerball_draws'
 
-# --- Utility Functions (Modified for direct API calls) ---
+# --- Utility Functions ---
 
 def _get_supabase_headers(is_service_key=False):
-    """Helper to get common Supabase API headers."""
     key = SUPABASE_SERVICE_KEY if is_service_key else SUPABASE_ANON_KEY
     return {
         "apikey": key,
@@ -41,13 +38,9 @@ def _get_supabase_headers(is_service_key=False):
     }
 
 def load_historical_data_from_supabase():
-    """
-    Fetches all historical data from Supabase using requests with pagination
-    and returns as a pandas DataFrame.
-    """
     all_data = []
     offset = 0
-    limit = 1000 # Supabase default limit, fetch in chunks
+    limit = 1000
 
     try:
         url = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
@@ -56,7 +49,7 @@ def load_historical_data_from_supabase():
         while True:
             params = {
                 'select': '*',
-                'order': 'Draw Date.asc', # Use the exact column name 'Draw Date' for ordering
+                'order': 'Draw Date.asc',
                 'offset': offset,
                 'limit': limit
             }
@@ -64,11 +57,11 @@ def load_historical_data_from_supabase():
             print(f"Fetching from Supabase URL: {url} with params: {params}")
 
             response = requests.get(url, headers=headers, params=params)
-            response.raise_for_status() # Raise an HTTPError for bad responses (4xx or 5xx)
+            response.raise_for_status()
             
             chunk = response.json()
             if not chunk:
-                break # No more data to fetch
+                break
 
             all_data.extend(chunk)
             offset += limit
@@ -80,22 +73,17 @@ def load_historical_data_from_supabase():
 
         df = pd.DataFrame(all_data)
         
-        # Convert 'Draw Date' (which is now directly accessed from Supabase response) to datetime objects
-        # Use errors='coerce' to turn unparseable dates into NaT (Not a Time)
         df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'], errors='coerce')
-        # Drop rows where 'Draw Date' could not be parsed to a valid date
         df = df.dropna(subset=['Draw Date_dt'])
 
-        # Ensure numeric columns are integers. Handle potential errors by coercing to numeric, filling NaNs (e.g., from 'werb'), and then converting to int.
         numeric_cols = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Powerball']
         for col in numeric_cols:
             if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce') # Convert to numeric, non-numeric become NaN
-                df[col] = df[col].fillna(0).astype(int) # Fill NaNs (e.g., 'werb' converted to NaN) with 0, then convert to int
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+                df[col] = df[col].fillna(0).astype(int)
             else:
                 print(f"Warning: Column '{col}' not found in fetched data. Skipping conversion for this column.")
 
-        # Reformat 'Draw Date' for display
         df['Draw Date'] = df['Draw Date_dt'].dt.strftime('%Y-%m-%d')
         
         print(f"Successfully loaded and processed {len(df)} records from Supabase.")
@@ -117,7 +105,6 @@ def load_historical_data_from_supabase():
 
 def get_last_draw(df):
     if df.empty:
-        # Fixed: Explicitly specify dtype to silence FutureWarning
         return pd.Series({
             'Draw Date': 'N/A', 'Number 1': 'N/A', 'Number 2': 'N/A',
             'Number 3': 'N/A', 'Number 4': 'N/A', 'Number 5': 'N/A', 'Powerball': 'N/A'
@@ -127,7 +114,6 @@ def get_last_draw(df):
 def check_exact_match(df, white_balls):
     if df.empty: return False
     for _, row in df.iterrows():
-        # Ensure numbers are treated as integers for comparison
         historical_white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])]
         if set(white_balls) == set(historical_white_balls):
             return True
@@ -137,7 +123,7 @@ def generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white
     if df.empty:
         raise ValueError("Cannot generate numbers: Historical data is empty.")
 
-    max_attempts = 1000 # Limit attempts to prevent infinite loops
+    max_attempts = 1000
     attempts = 0
     while attempts < max_attempts:
         available_numbers = [num for num in range(white_ball_range[0], white_ball_range[1] + 1) if num not in excluded_numbers]
@@ -145,22 +131,17 @@ def generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white
         if len(available_numbers) < 5:
             raise ValueError("Not enough available numbers for white balls after exclusions and range constraints.")
             
-        white_balls = sorted(random.sample(available_numbers, 5)) # Sort for consistency
+        white_balls = sorted(random.sample(available_numbers, 5))
 
-        # Group A constraint
         group_a_numbers = [num for num in white_balls if num in group_a]
-        # This original logic was "less than 2", meaning 0 or 1. If it needs to be *at least* 2, then >= 2.
-        # Assuming the intent is "at least 2 numbers from Group A must be present"
         if len(group_a_numbers) < 2:
             attempts += 1
             continue
 
         powerball = random.randint(powerball_range[0], powerball_range[1])
 
-        last_draw_data = df.iloc[-1]
-        # Ensure 'Number 1' is not 'N/A' from initial empty series
+        last_draw_data = get_last_draw(df) # Use the helper function here
         if not last_draw_data.empty and last_draw_data.get('Number 1') != 'N/A':
-            # Convert to list of ints before set comparison
             last_white_balls = [int(last_draw_data['Number 1']), int(last_draw_data['Number 2']), int(last_draw_data['Number 3']), int(last_draw_data['Number 4']), int(last_draw_data['Number 5'])]
             if set(white_balls) == set(last_white_balls) and powerball == int(last_draw_data['Powerball']):
                 attempts += 1
@@ -192,16 +173,14 @@ def generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white
             continue
 
         if high_low_balance is not None:
-            # Assuming low <= 34, high >= 35 based on common Powerball splits
             low_numbers_count = sum(1 for num in white_balls if num <= 34)
             high_numbers_count = sum(1 for num in white_balls if num >= 35)
             if low_numbers_count != high_low_balance[0] or high_numbers_count != high_low_balance[1]:
                 attempts += 1
                 continue
         
-        # If all conditions met, break loop
         break
-    else: # This else block executes if the while loop completes without a 'break' (i.e., max_attempts reached)
+    else:
         raise ValueError("Could not generate a unique combination meeting all criteria after many attempts.")
 
     return white_balls, powerball
@@ -236,7 +215,6 @@ def hot_cold_numbers(df, last_draw_date_str):
     hot_numbers = white_ball_freq.nlargest(14).sort_values(ascending=False)
     cold_numbers = white_ball_freq.nsmallest(14).sort_values(ascending=True)
 
-    # Ensure consistent return types if no hot/cold numbers (re-checked and corrected if they were empty initially)
     if hot_numbers.empty:
         hot_numbers = pd.Series([], dtype=int)
     if cold_numbers.empty:
@@ -254,13 +232,12 @@ def monthly_white_ball_analysis(df, last_draw_date_str):
         last_draw_date = pd.to_datetime(last_draw_date_str)
         print(f"[DEBUG] monthly_white_ball_analysis: last_draw_date: {last_draw_date}")
     except Exception as e:
-        print(f"[ERROR] monthly_white_ball_analysis: Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}")
+        print(f"[ERROR] monthly_white_ball_analysis: Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty dict.")
         return {}
 
     six_months_ago = last_draw_date - pd.DateOffset(months=6)
     print(f"[DEBUG] monthly_white_ball_analysis: six_months_ago: {six_months_ago}")
 
-    # Ensure 'Draw Date_dt' exists and is datetime type, and filter
     if 'Draw Date_dt' not in df.columns or not pd.api.types.is_datetime64_any_dtype(df['Draw Date_dt']):
         print("[ERROR] monthly_white_ball_analysis: 'Draw Date_dt' column missing or not datetime type in df. Returning empty dict.")
         return {}
@@ -280,7 +257,6 @@ def monthly_white_ball_analysis(df, last_draw_date_str):
     
     monthly_balls = {}
     try:
-        # Corrected line: Use np.isnan to filter out NaN from the numpy array directly
         monthly_balls = recent_data.groupby('Month')[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].apply(
             lambda x: sorted(list(set(x.values.flatten()[~np.isnan(x.values.flatten())].astype(int))))
         ).to_dict()
@@ -297,7 +273,6 @@ def monthly_white_ball_analysis(df, last_draw_date_str):
 def sum_of_main_balls(df):
     if df.empty: return pd.DataFrame(), [], 0, 0, 0.0
     temp_df = df.copy()
-    # Convert relevant columns to integers if they aren't already
     for col in ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']:
         if col in temp_df.columns:
             temp_df[col] = pd.to_numeric(temp_df[col], errors='coerce').fillna(0).astype(int)
@@ -316,7 +291,6 @@ def sum_of_main_balls(df):
 def find_results_by_sum(df, target_sum):
     if df.empty: return pd.DataFrame()
     temp_df = df.copy()
-    # Ensure relevant columns are integers before calculating sum
     for col in ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']:
         if col in temp_df.columns:
             temp_df[col] = pd.to_numeric(temp_df[col], errors='coerce').fillna(0).astype(int)
@@ -332,11 +306,10 @@ def simulate_multiple_draws(df, group_a, odd_even_choice, combo_choice, white_ba
     results = []
     for _ in range(num_draws):
         try:
-            # Pass all necessary arguments to generate_powerball_numbers
-            white_balls, powerball = generate_powerball_numbers(df, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers) # Fixed: using "Any" and "No Combo" defaults
+            white_balls, powerball = generate_powerball_numbers(df, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers)
             results.append(white_balls + [powerball])
         except ValueError:
-            pass # Skip combinations that don't meet criteria
+            pass
     
     if not results: return pd.Series([], dtype=int)
     all_numbers = [num for draw in results for num in draw]
@@ -365,7 +338,7 @@ def partial_match_probabilities(white_ball_range, powerball_range):
     total_white_balls_in_range = white_ball_range[1] - white_ball_range[0] + 1
     total_powerballs_in_range = powerball_range[1] - powerball_range[0] + 1
 
-    total_winning_white_comb = calculate_combinations(total_white_balls_in_range, 5) # C(69, 5)
+    total_winning_white_comb = calculate_combinations(total_white_balls_in_range, 5)
 
     probabilities = {}
 
@@ -382,19 +355,14 @@ def partial_match_probabilities(white_ball_range, powerball_range):
     }
 
     for scenario, data in prizes.items():
-        # Combinations for matching white balls
-        comb_matched_w = calculate_combinations(5, data["matched_w"]) # Choose 'matched_w' from the 5 winning balls
-        
-        # Combinations for unmatched white balls
-        # (total_white_balls_in_range - 5) is the pool of non-winning white balls
+        comb_matched_w = calculate_combinations(5, data["matched_w"])
         comb_unmatched_w = calculate_combinations(total_white_balls_in_range - 5, data["unmatched_w"])
 
-        # Combinations for Powerball
         if data["matched_p"] == 1:
-            comb_p = calculate_combinations(1, 1) # Choose the single winning Powerball
-        else: # Powerball does not match
-            comb_p = calculate_combinations(total_powerballs_in_range - 1, 1) # Choose 1 from (total - 1) non-winning Powerballs
-            if total_powerballs_in_range == 1: # Edge case: if only 1 powerball possible, can't not match it
+            comb_p = calculate_combinations(1, 1)
+        else:
+            comb_p = calculate_combinations(total_powerballs_in_range - 1, 1)
+            if total_powerballs_in_range == 1:
                 comb_p = 0
         
         numerator = comb_matched_w * comb_unmatched_w * comb_p
@@ -402,10 +370,7 @@ def partial_match_probabilities(white_ball_range, powerball_range):
         if numerator == 0:
             probabilities[scenario] = "N/A"
         else:
-            # Total ways to choose 5 white balls and 1 powerball
             total_possible_combinations = total_winning_white_comb * total_powerballs_in_range
-            
-            # The odds are Total Possible Combinations / Favorable Combinations
             probability = total_possible_combinations / numerator
             probabilities[scenario] = f"{probability:,.0f} to 1"
 
@@ -425,14 +390,13 @@ def find_last_draw_dates_for_numbers(df, white_balls, powerball):
     for number in white_balls:
         found = False
         for _, row in sorted_df.iterrows():
-            # Convert numbers in row to list of integers for proper comparison
             historical_white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])]
             if number in historical_white_balls:
                 last_draw_dates[f"White Ball {number}"] = row['Draw Date']
                 found = True
                 break
         if not found:
-            last_draw_dates[f"White Ball {number}"] = "N/A (Never Drawn)" # Add if not found
+            last_draw_dates[f"White Ball {number}"] = "N/A (Never Drawn)"
 
     found_pb = False
     for _, row in sorted_df.iterrows():
@@ -441,7 +405,7 @@ def find_last_draw_dates_for_numbers(df, white_balls, powerball):
             found_pb = True
             break
     if not found_pb:
-        last_draw_dates[f"Powerball {powerball}"] = "N/A (Never Drawn)" # Add if not found
+        last_draw_dates[f"Powerball {powerball}"] = "N/A (Never Drawn)"
 
     return last_draw_dates
 
@@ -451,31 +415,27 @@ def modify_combination(df, white_balls, powerball, white_ball_range, powerball_r
 
     white_balls = list(white_balls)
     
-    # Ensure there are enough unique elements to sample from before modifying
-    if len(white_balls) < 5: # Should always be 5, but as a safeguard
+    if len(white_balls) < 5:
         raise ValueError("Initial white balls list is too short for modification.")
 
-    indices_to_modify = random.sample(range(5), 3) # Select 3 random indices to modify
+    indices_to_modify = random.sample(range(5), 3)
     
     for i in indices_to_modify:
         attempts = 0
-        max_attempts_single_num = 100 # Prevent infinite loop for one number
+        max_attempts_single_num = 100
         while attempts < max_attempts_single_num:
             new_number = random.randint(white_ball_range[0], white_ball_range[1])
-            # Check if new number is not excluded and not already in current white_balls list (before modification)
             if new_number not in excluded_numbers and new_number not in white_balls:
                 white_balls[i] = new_number
-                break # Found a valid number for this position
+                break
             attempts += 1
         else:
-            # Fallback if a number can't be found after many attempts for a specific position
             print(f"Warning: Could not find unique replacement for white ball at index {i}. Proceeding without replacement for this slot.")
 
     attempts_pb = 0
     max_attempts_pb = 100
     while attempts_pb < max_attempts_pb:
         new_powerball = random.randint(powerball_range[0], powerball_range[1])
-        # Ensure new powerball is not excluded and is different from the original
         if new_powerball not in excluded_numbers and new_powerball != powerball:
             powerball = new_powerball
             break
@@ -483,7 +443,7 @@ def modify_combination(df, white_balls, powerball, white_ball_range, powerball_r
     else:
         print("Warning: Could not find a unique replacement for powerball. Keeping original.")
 
-    white_balls = sorted([int(num) for num in white_balls]) # Ensure integers and sorted
+    white_balls = sorted([int(num) for num in white_balls])
     powerball = int(powerball)
     
     return white_balls, powerball
@@ -492,7 +452,6 @@ def find_common_pairs(df, top_n=10):
     if df.empty: return []
     pair_count = defaultdict(int)
     for _, row in df.iterrows():
-        # Ensure numbers are converted to integers before sorting/pairing
         nums = sorted([int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])])
         for i in range(len(nums)):
             for j in range(i + 1, len(nums)):
@@ -518,41 +477,35 @@ def generate_with_common_pairs(df, common_pairs, white_ball_range, excluded_numb
         raise ValueError("Cannot generate numbers with common pairs: Historical data is empty.")
 
     if not common_pairs:
-        # Fallback to general generation if no common pairs or filters exclude all
         available_numbers = [num for num in range(white_ball_range[0], white_ball_range[1] + 1) if num not in excluded_numbers]
         if len(available_numbers) < 5:
              raise ValueError("Not enough numbers to generate 5 white balls after exclusions.")
-        return sorted(random.sample(available_numbers, 5)) # Return sorted
+        return sorted(random.sample(available_numbers, 5))
 
-    num1, num2 = random.choice(common_pairs) # Pick a common pair
+    num1, num2 = random.choice(common_pairs)
     
     available_numbers = [num for num in range(white_ball_range[0], white_ball_range[1] + 1) 
                          if num not in excluded_numbers and num not in [num1, num2]]
     
-    if len(available_numbers) < 3: # Need 3 more unique numbers
-        # If not enough unique numbers for the remaining 3, try to generate 5 completely new ones
-        # from the general available pool. This is a robust fallback.
+    if len(available_numbers) < 3:
         available_numbers_fallback = [n for n in range(white_ball_range[0], white_ball_range[1] + 1) if n not in excluded_numbers]
         if len(available_numbers_fallback) < 5:
             raise ValueError("Not enough numbers to generate 5 white balls even with fallback after exclusions.")
         return sorted(random.sample(available_numbers_fallback, 5))
 
     remaining_numbers = random.sample(available_numbers, 3)
-    white_balls = sorted([num1, num2] + remaining_numbers) # Ensure all 5 are sorted
+    white_balls = sorted([num1, num2] + remaining_numbers)
     return white_balls
 
 def get_number_age_distribution(df):
     if df.empty: return []
-    # Ensure Draw Date is datetime for sorting and comparisons
     df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'])
     all_draw_dates = sorted(df['Draw Date_dt'].drop_duplicates().tolist())
     
     all_miss_streaks = []
 
-    for i in range(1, 70): # White balls range
+    for i in range(1, 70):
         last_appearance_date = None
-        # Efficiently check if 'i' is in any of the white ball columns for each row
-        # Convert columns to integers first to ensure proper comparison if mixed types
         temp_df_filtered = df[(df['Number 1'].astype(int) == i) | (df['Number 2'].astype(int) == i) |
                               (df['Number 3'].astype(int) == i) | (df['Number 4'].astype(int) == i) |
                               (df['Number 5'].astype(int) == i)]
@@ -562,19 +515,18 @@ def get_number_age_distribution(df):
 
         miss_streak_count = 0
         if last_appearance_date is not None:
-            # Count draws since last appearance
             for d_date in reversed(all_draw_dates):
                 if d_date > last_appearance_date:
                     miss_streak_count += 1
-                else: # d_date <= last_appearance_date, so we've reached or passed it
+                else:
                     break
             all_miss_streaks.append(miss_streak_count)
         else:
-            all_miss_streaks.append(len(all_draw_dates)) # If never appeared, age is total draws
+            all_miss_streaks.append(len(all_draw_dates))
 
-    for i in range(1, 27): # Powerballs range
+    for i in range(1, 27):
         last_appearance_date = None
-        temp_df_filtered = df[df['Powerball'].astype(int) == i] # Convert to int
+        temp_df_filtered = df[df['Powerball'].astype(int) == i]
         if not temp_df_filtered.empty:
             last_appearance_date = temp_df_filtered['Draw Date_dt'].max()
 
@@ -599,7 +551,6 @@ def get_co_occurrence_matrix(df):
     co_occurrence = defaultdict(int)
     
     for index, row in df.iterrows():
-        # Corrected: Accessing numbers correctly and converting to int
         white_balls = sorted([int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])])
         for i in range(len(white_balls)):
             for j in range(i + 1, len(white_balls)):
@@ -619,27 +570,19 @@ def get_powerball_position_frequency(df):
     position_frequency_data = []
     
     for index, row in df.iterrows():
-        powerball = int(row['Powerball']) # Ensure Powerball is an integer
-        # Iterate through white ball "positions" (columns)
-        for i in range(1, 6): # Positions 1 to 5
+        powerball = int(row['Powerball'])
+        for i in range(1, 6):
             col_name = f'Number {i}'
             if col_name in row and pd.notna(row[col_name]):
                 position_frequency_data.append({
                     'powerball_number': powerball,
-                    # This captures the white ball's *actual value* at that position,
-                    # which is what the D3 chart uses for a complex rollup.
-                    # If the intention was just to count how many times ANY number appeared at a position
-                    # when a certain Powerball was drawn, the current structure is fine.
-                    'white_ball_value_at_position': int(row[col_name]), # Actual white ball number at this column
-                    'white_ball_position': i # The column number (1-5)
+                    'white_ball_value_at_position': int(row[col_name]),
+                    'white_ball_position': i
                 })
     return position_frequency_data
 
 # --- Global Data Loading and Pre-computation ---
-# This block runs once when the Vercel serverless function container is initialized (cold start).
-# It's crucial that this part initializes correctly, as other routes depend on 'df'.
 df = pd.DataFrame()
-# Fixed: Explicitly specify dtype for global last_draw initialization
 last_draw = pd.Series(dtype='object') 
 
 precomputed_white_ball_freq_list = []
@@ -647,57 +590,66 @@ precomputed_powerball_freq_list = []
 precomputed_last_draw_date_str = "N/A"
 precomputed_hot_numbers_list = []
 precomputed_cold_numbers_list = []
-precomputed_monthly_balls = {} # This is the variable that caused the error
+precomputed_monthly_balls = {}
 precomputed_number_age_data = []
 precomputed_co_occurrence_data = []
 precomputed_max_co_occurrence = 0
 precomputed_powerball_position_data = []
 
-try:
-    df = load_historical_data_from_supabase() # Load from Supabase
-    last_draw = get_last_draw(df)
+# Perform initial data loading and pre-computation
+def initialize_app_data():
+    global df, last_draw, precomputed_white_ball_freq_list, precomputed_powerball_freq_list, \
+           precomputed_last_draw_date_str, precomputed_hot_numbers_list, precomputed_cold_numbers_list, \
+           precomputed_monthly_balls, precomputed_number_age_data, precomputed_co_occurrence_data, \
+           precomputed_max_co_occurrence, precomputed_powerball_position_data
+    
+    try:
+        df = load_historical_data_from_supabase()
+        last_draw = get_last_draw(df)
 
-    if not df.empty: # Only pre-compute if data was successfully loaded
-        white_ball_freq, powerball_freq = frequency_analysis(df)
-        precomputed_white_ball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in white_ball_freq.items()]
-        precomputed_powerball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in powerball_freq.items()]
+        if not df.empty:
+            white_ball_freq, powerball_freq = frequency_analysis(df)
+            precomputed_white_ball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in white_ball_freq.items()]
+            precomputed_powerball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in powerball_freq.items()]
 
-        precomputed_last_draw_date_str = last_draw['Draw Date']
-        
-        hot_numbers, cold_numbers = hot_cold_numbers(df, precomputed_last_draw_date_str)
-        precomputed_hot_numbers_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in hot_numbers.items()]
-        precomputed_cold_numbers_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in cold_numbers.items()]
+            precomputed_last_draw_date_str = last_draw['Draw Date']
+            
+            hot_numbers, cold_numbers = hot_cold_numbers(df, precomputed_last_draw_date_str)
+            precomputed_hot_numbers_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in hot_numbers.items()]
+            precomputed_cold_numbers_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in cold_numbers.items()]
 
-        # This is the call that was potentially failing
-        precomputed_monthly_balls = monthly_white_ball_analysis(df, precomputed_last_draw_date_str)
-        
-        precomputed_number_age_data = get_number_age_distribution(df)
-        precomputed_co_occurrence_data, precomputed_max_co_occurrence = get_co_occurrence_matrix(df)
-        precomputed_powerball_position_data = get_powerball_position_frequency(df)
-        
-        # --- DEBUG PRINTS FOR ANALYSIS DATA ---
-        print("\n--- DEBUG: Precomputed Analysis Data Status ---")
-        print(f"precomputed_white_ball_freq_list is empty: {not bool(precomputed_white_ball_freq_list)}")
-        print(f"precomputed_white_ball_freq_list sample: {precomputed_white_ball_freq_list[:5]}")
-        print(f"precomputed_powerball_freq_list is empty: {not bool(precomputed_powerball_freq_list)}")
-        print(f"precomputed_powerball_freq_list sample: {precomputed_powerball_freq_list[:5]}")
-        print(f"precomputed_hot_numbers_list is empty: {not bool(precomputed_hot_numbers_list)}")
-        print(f"precomputed_hot_numbers_list sample: {precomputed_hot_numbers_list[:5]}")
-        print(f"precomputed_cold_numbers_list is empty: {not bool(precomputed_cold_numbers_list)}")
-        print(f"precomputed_cold_numbers_list sample: {precomputed_cold_numbers_list[:5]}")
-        print(f"precomputed_monthly_balls is empty: {not bool(precomputed_monthly_balls)}")
-        print(f"precomputed_monthly_balls sample: {list(precomputed_monthly_balls.keys())[:2] if precomputed_monthly_balls else 'N/A'}")
-        print(f"precomputed_number_age_data is empty: {not bool(precomputed_number_age_data)}")
-        print(f"precomputed_number_age_data sample: {precomputed_number_age_data[:2] if precomputed_number_age_data else 'N/A'}")
-        print(f"precomputed_co_occurrence_data is empty: {not bool(precomputed_co_occurrence_data)}")
-        print(f"precomputed_co_occurrence_data sample: {precomputed_co_occurrence_data[:2] if precomputed_co_occurrence_data else 'N/A'}")
-        print(f"precomputed_powerball_position_data is empty: {not bool(precomputed_powerball_position_data)}")
-        print(f"precomputed_powerball_position_data sample: {precomputed_powerball_position_data[:2] if precomputed_powerball_position_data else 'N/A'}")
-        print("--- END DEBUG ---")
+            precomputed_monthly_balls = monthly_white_ball_analysis(df, precomputed_last_draw_date_str)
+            
+            precomputed_number_age_data = get_number_age_distribution(df)
+            precomputed_co_occurrence_data, precomputed_max_co_occurrence = get_co_occurrence_matrix(df)
+            precomputed_powerball_position_data = get_powerball_position_frequency(df)
+            
+            print("\n--- DEBUG: Precomputed Analysis Data Status ---")
+            print(f"precomputed_white_ball_freq_list is empty: {not bool(precomputed_white_ball_freq_list)}")
+            print(f"precomputed_white_ball_freq_list sample: {precomputed_white_ball_freq_list[:5]}")
+            print(f"precomputed_powerball_freq_list is empty: {not bool(precomputed_powerball_freq_list)}")
+            print(f"precomputed_powerball_freq_list sample: {precomputed_powerball_freq_list[:5]}")
+            print(f"precomputed_hot_numbers_list is empty: {not bool(precomputed_hot_numbers_list)}")
+            print(f"precomputed_hot_numbers_list sample: {precomputed_hot_numbers_list[:5]}")
+            print(f"precomputed_cold_numbers_list is empty: {not bool(precomputed_cold_numbers_list)}")
+            print(f"precomputed_cold_numbers_list sample: {precomputed_cold_numbers_list[:5]}")
+            print(f"precomputed_monthly_balls is empty: {not bool(precomputed_monthly_balls)}")
+            print(f"precomputed_monthly_balls sample: {list(precomputed_monthly_balls.keys())[:2] if precomputed_monthly_balls else 'N/A'}")
+            print(f"precomputed_number_age_data is empty: {not bool(precomputed_number_age_data)}")
+            print(f"precomputed_number_age_data sample: {precomputed_number_age_data[:2] if precomputed_number_age_data else 'N/A'}")
+            print(f"precomputed_co_occurrence_data is empty: {not bool(precomputed_co_occurrence_data)}")
+            print(f"precomputed_co_occurrence_data sample: {precomputed_co_occurrence_data[:2] if precomputed_co_occurrence_data else 'N/A'}")
+            print(f"precomputed_powerball_position_data is empty: {not bool(precomputed_powerball_position_data)}")
+            print(f"precomputed_powerball_position_data sample: {precomputed_powerball_position_data[:2] if precomputed_powerball_position_data else 'N/A'}")
+            print("--- END DEBUG ---")
+        else:
+            print("DataFrame is empty after loading. Skipping pre-computation.")
 
-except Exception as e:
-    print(f"An error occurred during initial data loading or pre-computation: {e}")
-    # Flash messages for frontend will handle UI feedback based on empty df
+    except Exception as e:
+        print(f"An error occurred during initial data loading or pre-computation: {e}")
+
+# Call the initialization function once when the module is loaded
+initialize_app_data()
 
 
 # Group A numbers (constants)
@@ -713,10 +665,9 @@ def index():
     last_draw_dict = last_draw.to_dict()
     if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
         try:
-            # Ensure the date is formatted correctly for display, even if it's already a string
             last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
         except ValueError:
-            pass # Keep as is if conversion fails
+            pass
     return render_template('index.html', last_draw=last_draw_dict)
 
 @app.route('/generate', methods=['POST'])
@@ -726,7 +677,7 @@ def generate():
         return redirect(url_for('index'))
 
     odd_even_choice = request.form.get('odd_even_choice', 'Any')
-    combo_choice = request.form.get('combo_choice', 'No Combo') # This parameter is not currently used in generate_powerball_numbers, consider removing or implementing.
+    combo_choice = request.form.get('combo_choice', 'No Combo')
     white_ball_min = int(request.form.get('white_ball_min', 1))
     white_ball_max = int(request.form.get('white_ball_max', 69))
     white_ball_range_local = (white_ball_min, white_ball_max)
@@ -756,7 +707,6 @@ def generate():
         last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
     except ValueError as e:
         flash(str(e), 'error')
-        # Re-render the index page without generated numbers
         last_draw_dict = last_draw.to_dict()
         if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
             try:
@@ -803,13 +753,11 @@ def generate_modified():
     last_draw_dates = {}
 
     try:
-        # Initial draw to potentially modify, or for fallback
         if not df.empty:
             random_row = df.sample(1).iloc[0]
             white_balls_base = [int(random_row['Number 1']), int(random_row['Number 2']), int(random_row['Number 3']), int(random_row['Number 4']), int(random_row['Number 5'])]
             powerball_base = int(random_row['Powerball'])
         else:
-            # Fallback for empty df, though it should be caught earlier
             flash("Historical data is empty, cannot generate or modify numbers.", 'error')
             return redirect(url_for('index'))
 
@@ -824,13 +772,12 @@ def generate_modified():
                 white_balls, powerball = generate_powerball_numbers(df, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers)
             else:
                 white_balls = generate_with_common_pairs(df, common_pairs, white_ball_range, excluded_numbers)
-                powerball = random.randint(powerball_range[0], powerball_range[1]) # Powerball is still random
+                powerball = random.randint(powerball_range[0], powerball_range[1])
         else:
             white_balls, powerball = modify_combination(df, white_balls_base, powerball_base, white_ball_range, powerball_range, excluded_numbers)
             
         max_attempts_unique = 100
         attempts_unique = 0
-        # Ensure the generated combination is not an exact historical match
         while check_exact_match(df, white_balls) and attempts_unique < max_attempts_unique:
             if use_common_pairs:
                 common_pairs_recheck = find_common_pairs(df, top_n=20)
@@ -838,9 +785,9 @@ def generate_modified():
                     common_pairs_recheck = filter_common_pairs_by_range(common_pairs_recheck, num_range)
                 if common_pairs_recheck:
                     white_balls = generate_with_common_pairs(df, common_pairs_recheck, white_ball_range, excluded_numbers)
-                else: # If common pairs failed, resort to general generation
+                else:
                     white_balls, powerball = generate_powerball_numbers(df, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers)
-            else: # For non-common pair modification
+            else:
                 random_row = df.sample(1).iloc[0]
                 white_balls_base = [int(random_row['Number 1']), int(random_row['Number 2']), int(random_row['Number 3']), int(random_row['Number 4']), int(random_row['Number 5'])]
                 powerball_base = int(random_row['Powerball'])
@@ -870,7 +817,6 @@ def generate_modified():
                             last_draw_dates=last_draw_dates)
     except ValueError as e:
         flash(str(e), 'error')
-        # Re-render the index page without generated numbers
         last_draw_dict = last_draw.to_dict()
         if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
             try:
@@ -882,33 +828,27 @@ def generate_modified():
 
 @app.route('/frequency_analysis')
 def frequency_analysis_route():
-    # Use pre-computed data (already lists of dicts from global pre-computation block)
     return render_template('frequency_analysis.html', 
                            white_ball_freq=precomputed_white_ball_freq_list, 
                            powerball_freq=precomputed_powerball_freq_list)
 
 @app.route('/hot_cold_numbers')
 def hot_cold_numbers_route():
-    # Use pre-computed data (already lists of dicts)
     return render_template('hot_cold_numbers.html', 
                            hot_numbers=precomputed_hot_numbers_list, 
                            cold_numbers=precomputed_cold_numbers_list)
 
 @app.route('/monthly_white_ball_analysis')
 def monthly_white_ball_analysis_route():
-    # Use pre-computed data
-    # The precomputed_monthly_balls variable should now be more robustly handled in the pre-computation phase
-    # Convert the precomputed_monthly_balls dictionary to a JSON string for safer passing to JavaScript
     monthly_balls_json = json.dumps(precomputed_monthly_balls)
     return render_template('monthly_white_ball_analysis.html', 
-                           monthly_balls=precomputed_monthly_balls, # Keep this for the Jinja2 loop
-                           monthly_balls_json=monthly_balls_json) # Pass JSON string for JavaScript
+                           monthly_balls=precomputed_monthly_balls,
+                           monthly_balls_json=monthly_balls_json)
 
 
 def sum_of_main_balls(df):
     if df.empty: return pd.DataFrame(), [], 0, 0, 0.0
     temp_df = df.copy()
-    # Convert relevant columns to integers if they aren't already
     for col in ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']:
         if col in temp_df.columns:
             temp_df[col] = pd.to_numeric(temp_df[col], errors='coerce').fillna(0).astype(int)
@@ -924,7 +864,7 @@ def sum_of_main_balls(df):
 
     return temp_df[['Draw Date', 'Sum']], sum_freq_list, min_sum, max_sum, avg_sum
 
-@app.route('/find_results_by_sum', methods=['GET', 'POST']) # Allow GET for direct link, POST for form submission
+@app.route('/find_results_by_sum', methods=['GET', 'POST'])
 def find_results_by_sum_route():
     if df.empty:
         flash("Cannot find results: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
@@ -942,12 +882,11 @@ def find_results_by_sum_route():
             results = results_df.to_dict('records')
         else:
             flash("Please enter a valid number for Target Sum.", 'error')
-    # If GET request or POST with invalid input, render the page with an empty results list
     return render_template('find_results_by_sum.html', 
                            results=results,
                            target_sum=target_sum_display)
 
-@app.route('/simulate_multiple_draws', methods=['GET', 'POST']) # Allow GET for direct link, POST for form submission
+@app.route('/simulate_multiple_draws', methods=['GET', 'POST'])
 def simulate_multiple_draws_route():
     if df.empty:
         flash("Cannot run simulation: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
@@ -961,7 +900,6 @@ def simulate_multiple_draws_route():
         if num_draws_str and num_draws_str.isdigit():
             num_draws = int(num_draws_str)
             num_draws_display = num_draws
-            # Pass all required args for generate_powerball_numbers, even if not directly from form here
             simulated_freq = simulate_multiple_draws(df, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers, num_draws)
             simulated_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in simulated_freq.items()]
         else:
@@ -999,28 +937,21 @@ def export_analysis_results_route():
 
 @app.route('/number_age_distribution')
 def number_age_distribution_route():
-    number_age_data = precomputed_number_age_data
-
     return render_template('number_age_distribution.html',
-                           number_age_data=precomputed_number_age_data) # Use precomputed variable
+                           number_age_data=precomputed_number_age_data)
 
 @app.route('/co_occurrence_analysis')
 def co_occurrence_analysis_route():
-    co_occurrence_data = precomputed_co_occurrence_data
-    max_co_occurrence = precomputed_max_co_occurrence
-
     return render_template('co_occurrence_analysis.html',
-                           co_occurrence_data=precomputed_co_occurrence_data, # Use precomputed variable
-                           max_co_occurrence=precomputed_max_co_occurrence) # Use precomputed variable
+                           co_occurrence_data=precomputed_co_occurrence_data,
+                           max_co_occurrence=precomputed_max_co_occurrence)
 
 @app.route('/powerball_position_frequency')
 def powerball_position_frequency_route():
-    powerball_position_data = precomputed_powerball_position_data
-
     return render_template('powerball_position_frequency.html',
-                           powerball_position_data=precomputed_powerball_position_data) # Use precomputed variable
+                           powerball_position_data=precomputed_powerball_position_data)
 
-@app.route('/find_results_by_first_white_ball', methods=['GET', 'POST']) # Allow GET for direct link, POST for form submission
+@app.route('/find_results_by_first_white_ball', methods=['GET', 'POST'])
 def find_results_by_first_white_ball():
     if df.empty:
         flash("Cannot find results: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
@@ -1032,18 +963,13 @@ def find_results_by_first_white_ball():
 
     if request.method == 'POST':
         white_ball_number_str = request.form.get('white_ball_number')
-        sort_by_year_flag = request.form.get('sort_by_year') == 'on'
-
         if white_ball_number_str and white_ball_number_str.isdigit():
             white_ball_number = int(white_ball_number_str)
             white_ball_number_display = white_ball_number
             
-            # Ensure 'Number 1' column is treated as int for comparison if mixed types
-            # Added .copy() to avoid SettingWithCopyWarning
             results = df[df['Number 1'].astype(int) == white_ball_number].copy()
 
             if sort_by_year_flag:
-                # Ensure 'Draw Date' is datetime before extracting year
                 results['Year'] = pd.to_datetime(results['Draw Date'], errors='coerce').dt.year
                 results = results.sort_values(by='Year')
             
@@ -1056,21 +982,16 @@ def find_results_by_first_white_ball():
                            white_ball_number=white_ball_number_display,
                            sort_by_year=sort_by_year_flag)
 
-# --- NEW: Route for updating data via scheduled job ---
-@app.route('/update_powerball_data', methods=['GET']) # Using GET for simplicity, POST is generally better for mutations
+@app.route('/update_powerball_data', methods=['GET'])
 def update_powerball_data():
-    # It's crucial to use the Service Role Key for inserts if RLS is enabled and restrictive.
-    # Otherwise, the Anon Key (public) might be sufficient if RLS allows anon inserts.
-    # For robust production, ensure SUPABASE_SERVICE_KEY is set as a Vercel environment variable.
     service_headers = _get_supabase_headers(is_service_key=True)
     anon_headers = _get_supabase_headers(is_service_key=False)
 
     try:
-        # 1. Fetch latest draw date from Supabase to check if we need to update
         url_check_latest = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
         params_check_latest = {
-            'select': 'Draw Date', # Use exact column name
-            'order': 'Draw Date.desc', # Use exact column name
+            'select': 'Draw Date',
+            'order': 'Draw Date.desc',
             'limit': 1
         }
         response_check_latest = requests.get(url_check_latest, headers=anon_headers, params=params_check_latest)
@@ -1079,49 +1000,38 @@ def update_powerball_data():
         latest_db_draw_data = response_check_latest.json()
         last_db_draw_date = None
         if latest_db_draw_data:
-            last_db_draw_date = latest_db_draw_data[0]['Draw Date'] # Access by exact column name
+            last_db_draw_date = latest_db_draw_data[0]['Draw Date']
         
         print(f"Last draw date in Supabase: {last_db_draw_date}")
 
-        # 2. Fetch latest actual Powerball draw from an external source
-        # This is the PRIMARY PLACEHOLDER you NEED to replace with actual data fetching logic.
-        # This simulation will insert a new draw every time it runs (unless the date matches).
-        simulated_draw_date_dt = datetime.now() # Use current datetime for distinctness
+        simulated_draw_date_dt = datetime.now()
         simulated_draw_date = simulated_draw_date_dt.strftime('%Y-%m-%d')
         simulated_numbers = sorted(random.sample(range(1, 70), 5))
         simulated_powerball = random.randint(1, 26)
 
         new_draw_data = {
-            'Draw Date': simulated_draw_date, # Use exact column name
-            'Number 1': simulated_numbers[0], # Use exact column name
+            'Draw Date': simulated_draw_date,
+            'Number 1': simulated_numbers[0],
             'Number 2': simulated_numbers[1],
             'Number 3': simulated_numbers[2],
             'Number 4': simulated_numbers[3],
             'Number 5': simulated_numbers[4],
-            'Powerball': simulated_powerball # Use exact column name
+            'Powerball': simulated_powerball
         }
         
         print(f"Simulated new draw data: {new_draw_data}")
 
-        # Compare with the latest in DB
         if new_draw_data['Draw Date'] == last_db_draw_date:
             print(f"Draw for {new_draw_data['Draw Date']} already exists. No update needed.")
             return "No new draw data. Database is up-to-date.", 200
         
-        # 3. Insert the new draw into Supabase
         url_insert = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
         insert_response = requests.post(url_insert, headers=service_headers, data=json.dumps(new_draw_data))
-        insert_response.raise_for_status() # Raise error for bad responses
+        insert_response.raise_for_status()
 
-        if insert_response.status_code == 201: # 201 Created is typical for successful POST
+        if insert_response.status_code == 201:
             print(f"Successfully inserted new draw: {new_draw_data}")
-            # IMPORTANT: After updating the DB, the global 'df' and precomputed data
-            # will only be updated on the *next cold start* of the Vercel function.
-            # For immediate reflection, you would need to trigger a new deployment or
-            # explicitly reload these global variables, which might be slow on every request.
-            # For cron jobs, this is usually acceptable, as the next user request will get updated data.
             
-            # Re-load and re-compute data after insertion to reflect immediately for next request
             global df, last_draw, precomputed_white_ball_freq_list, precomputed_powerball_freq_list, \
                    precomputed_last_draw_date_str, precomputed_hot_numbers_list, precomputed_cold_numbers_list, \
                    precomputed_monthly_balls, precomputed_number_age_data, precomputed_co_occurrence_data, \
@@ -1151,7 +1061,6 @@ def update_powerball_data():
 
     except requests.exceptions.RequestException as e:
         print(f"Network or HTTP error during update_powerball_data: {e}")
-        # Print response content for more detailed error from Supabase
         if hasattr(e, 'response') and e.response is not None:
             print(f"Supabase response content: {e.response.text}")
         return f"Network or HTTP error: {e}", 500
@@ -1163,4 +1072,3 @@ def update_powerball_data():
     except Exception as e:
         print(f"An unexpected error occurred during data update: {e}")
         return f"An internal error occurred: {e}", 500
-
