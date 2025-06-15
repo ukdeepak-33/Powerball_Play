@@ -3,357 +3,247 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Powerball Simulator{% endblock %}</title>
+    <title>Powerball Predictor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: Arial, sans-serif;
             background-color: #f0f4f8;
-            color: #334155;
+            color: #333;
         }
-        .container-flex {
-            display: flex;
-            min-height: 100vh;
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
         }
         .sidebar {
             width: 250px;
-            background-color: #312e81; /* Darker indigo for sidebar */
-            padding: 1.5rem;
-            color: #e0e7ff;
-            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.2);
             position: fixed;
             height: 100%;
             overflow-y: auto;
-            flex-shrink: 0;
-            z-index: 10; /* Ensure sidebar is above main content if needed */
         }
-        .content-area {
-            margin-left: 250px; /* Offset for the sidebar */
-            flex-grow: 1;
-            padding: 2rem;
-            background-color: #f0f4f8;
+        .content {
+            margin-left: 270px; /* Adjust based on sidebar width + padding */
+            padding: 20px;
         }
-        .card {
-            background-color: #ffffff;
-            border-radius: 0.75rem;
-            padding: 1.5rem;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
-            margin-bottom: 1.5rem;
-            border: 1px solid #e2e8f0; /* Subtle border for cards */
-        }
-        .form-label {
+        .sidebar a {
             display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            color: #475569;
+            padding: 10px 15px;
+            color: #ecf0f1;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            transition: background-color 0.3s ease;
         }
-        .form-input, .form-select, .form-textarea {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #cbd5e1;
-            border-radius: 0.5rem;
-            font-size: 1rem;
-            color: #334155;
-            transition: all 0.2s ease-in-out;
+        .sidebar a:hover {
+            background-color: #34495e;
         }
-        @media (min-width: 768px) {
-            .form-select {
-                max-width: 280px;
-            }
+        .sidebar .current-page {
+            background-color: #1abc9c;
+            font-weight: bold;
         }
-        .form-input:focus, .form-select:focus, .form-textarea:focus {
-            outline: none;
-            border-color: #6366f1;
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+        .flash-message {
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            font-weight: bold;
         }
-        .btn-primary {
-            background-color: #6366f1;
-            color: #ffffff;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            transition: background-color 0.2s, transform 0.1s;
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        .flash-message.error {
+            background-color: #e74c3c;
+            color: white;
         }
-        .btn-primary:hover {
-            background-color: #4f46e5;
-            transform: translateY(-1px);
+        .flash-message.info {
+            background-color: #3498db;
+            color: white;
         }
-        .btn-primary:active {
-            transform: translateY(0);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .ball {
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-            width: 3.2rem;
-            height: 3.2rem;
-            border-radius: 50%;
-            font-weight: 700;
-            font-size: 1.35rem;
-            margin: 0.35rem;
-            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
-        }
-        .white-ball {
-            background-color: #e2e8f0;
-            color: #1a202c;
-            border: 2px solid #cbd5e1;
-        }
-        .powerball {
-            background-color: #dc2626;
-            color: #ffffff;
-            border: 2px solid #b91c1c;
-        }
-        .message {
-            padding: 1rem;
-            border-radius: 0.75rem;
-            margin-bottom: 1.5rem;
-            font-weight: 500;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
-        }
-        .message.success {
-            background-color: #d1fae5;
-            color: #065f46;
-            border: 1px solid #10b981;
-        }
-        .message.error {
-            background-color: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #ef4444;
-        }
-        .message.info {
-            background-color: #e0f2fe;
-            color: #0b72c4;
-            border: 1px solid #3b82f6;
-        }
-        .table-auto {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1rem;
-            border-radius: 0.5rem;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-        }
-        .table-auto th, .table-auto td {
-            padding: 1rem;
-            text-align: left;
-            border-bottom: 1px solid #e9edf1;
-        }
-        .table-auto th {
-            background-color: #f1f5f9;
-            font-weight: 600;
-            color: #475569;
-        }
-        .table-auto tbody tr:nth-child(odd) {
-            background-color: #fbfdfe;
-        }
-        .table-auto tbody tr:hover {
-            background-color: #eef2f6;
-            transition: background-color 0.15s ease-in-out;
-        }
-
-        /* D3 Chart Specific Styles */
+        /* Chart specific styles */
         .chart-container {
-            margin-top: 2rem;
-            background-color: #f8fafc;
-            border-radius: 0.75rem;
-            padding: 1.5rem;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
-            border: 1px solid #e2e8f0;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
         }
-        .chart-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            color: #475569;
-        }
-        .bar {
-            fill: #6366f1;
-            transition: fill 0.2s ease-in-out;
-        }
-        .bar:hover {
-            fill: #4f46e5;
-        }
-        .axis path, .axis line {
-            stroke: #cbd5e1;
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: #ddd;
+            shape-rendering: crispEdges;
         }
         .axis text {
-            fill: #64748b;
-            font-size: 0.875rem;
+            font-family: sans-serif;
+            font-size: 10px;
+        }
+        .x-axis-label, .y-axis-label {
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .bar {
+            fill: steelblue;
+        }
+        .bar:hover {
+            fill: lightblue;
+        }
+        .label {
+            font-size: 10px;
+            fill: #333;
         }
         .tooltip {
             position: absolute;
             text-align: center;
-            width: auto;
-            height: auto;
-            padding: 8px;
+            width: 120px;
+            height: 28px;
+            padding: 2px;
             font: 12px sans-serif;
-            background: #333;
-            color: white;
+            background: lightsteelblue;
             border: 0px;
             border-radius: 8px;
             pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s ease-in-out;
         }
         .heatmap-cell {
-            stroke: #fff;
-            stroke-width: 1px;
-            transition: fill 0.2s ease-in-out;
+            stroke: #ccc;
+            stroke-width: 0.5px;
         }
-        .heatmap-cell:hover {
-            stroke: #334155;
-            stroke-width: 2px;
-        }
-
-        /* Mobile adjustments */
-        @media (max-width: 768px) {
-            .container-flex {
-                flex-direction: column;
-            }
-            .sidebar {
-                position: relative;
-                width: 100%;
-                height: auto;
-                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-                border-bottom-left-radius: 0.75rem;
-                border-bottom-right-radius: 0.75rem;
-            }
-            .content-area {
-                margin-left: 0;
-                padding: 1rem;
-            }
-            .ball {
-                width: 2.5rem;
-                height: 2.5rem;
-                font-size: 1rem;
-                margin: 0.2rem;
-            }
-            .form-input, .form-select {
-                max-width: 100%;
-            }
-        }
-
-        /* Specific styles for active navigation link */
-        .sidebar nav ul li a.active-nav-link {
-            background-color: #4f46e5;
+        .heatmap-tooltip {
+            position: absolute;
+            text-align: center;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.7);
             color: white;
-            font-weight: 700;
-            border-radius: 0.5rem;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 4px;
+            pointer-events: none;
+            font-family: sans-serif;
+            font-size: 12px;
         }
     </style>
 </head>
-<body>
-    <div class="container-flex">
-        <!-- Left Sidebar Navigation -->
-        <aside class="sidebar">
-            <h2 class="text-2xl font-bold mb-6 text-white text-center">Powerball Nav</h2>
-            <nav>
-                <ul>
-                    <li class="mb-3">
-                        <a href="/" class="block py-2 px-3 hover:bg-indigo-700 rounded transition-colors duration-200 text-white font-medium">Home (Generate)</a>
-                    </li>
-                    <li class="mb-3">
-                        <a href="#analysis-section" class="block py-2 px-3 hover:bg-indigo-700 rounded transition-colors duration-200 text-white font-medium">Powerball Analysis</a>
-                        <ul class="ml-4 mt-2 space-y-1">
-                            <li><a href="/frequency_analysis" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Frequency Analysis</a></li>
-                            <li><a href="/hot_cold_numbers" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Hot & Cold Numbers</a></li>
-                            <li><a href="/monthly_white_ball_analysis" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Monthly White Ball Analysis</a></li>
-                            <li><a href="/sum_of_main_balls" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Sum of Main Balls</a></li>
-                            <li><a href="/find_results_by_sum" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Find Results by Sum</a></li>
-                            <li><a href="/find_results_by_first_white_ball" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Find Results by First White Ball</a></li>
-                            <li><a href="/simulate_multiple_draws" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Simulate Multiple Draws</a></li>
-                            <li><a href="/number_age_distribution" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Number Age Distribution</a></li>
-                            <li><a href="/co_occurrence_analysis" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Co-occurrence Analysis</a></li>
-                            <li><a href="/powerball_position_frequency" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Powerball Position Frequency</a></li>
-                        </ul>
-                    </li>
-                    <li class="mb-3">
-                        <a href="#probabilities-section" class="block py-2 px-3 hover:bg-indigo-700 rounded transition-colors duration-200 text-white font-medium">Probabilities</a>
-                        <ul class="ml-4 mt-2 space-y-1">
-                            <li><a href="/winning_probability" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Winning Probability</a></li>
-                            <li><a href="/partial_match_probabilities" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Partial Match Probabilities</a></li>
-                        </ul>
-                    </li>
-                </ul>
-            </nav>
-        </aside>
+<body class="flex">
+    <div class="sidebar">
+        <h2 class="text-2xl font-bold mb-6 text-center">Powerball Analyzer</h2>
+        <nav>
+            <ul>
+                <li><a href="{{ url_for('index') }}" class="{% if request.path == '/' %}current-page{% endif %}">Home</a></li>
+                <li><a href="{{ url_for('frequency_analysis_route') }}" class="{% if request.path == '/frequency_analysis' %}current-page{% endif %}">Frequency Analysis</a></li>
+                <li><a href="{{ url_for('hot_cold_numbers_route') }}" class="{% if request.path == '/hot_cold_numbers' %}current-page{% endif %}">Hot & Cold Numbers</a></li>
+                <li><a href="{{ url_for('monthly_white_ball_analysis_route') }}" class="{% if request.path == '/monthly_white_ball_analysis' %}current-page{% endif %}">Monthly Ball Analysis</a></li>
+                <li><a href="{{ url_for('sum_of_main_balls_route') }}" class="{% if request.path == '/sum_of_main_balls' %}current-page{% endif %}">Sum of Main Balls</a></li>
+                <li><a href="{{ url_for('find_results_by_sum_route') }}" class="{% if request.path == '/find_results_by_sum' %}current-page{% endif %}">Find by Sum</a></li>
+                <li><a href="{{ url_for('simulate_multiple_draws_route') }}" class="{% if request.path == '/simulate_multiple_draws' %}current-page{% endif %}">Simulate Draws</a></li>
+                <li><a href="{{ url_for('winning_probability_route') }}" class="{% if request.path == '/winning_probability' %}current-page{% endif %}">Winning Probability</a></li>
+                <li><a href="{{ url_for('partial_match_probabilities_route') }}" class="{% if request.path == '/partial_match_probabilities' %}current-page{% endif %}">Partial Match Probabilities</a></li>
+                <li><a href="{{ url_for('number_age_distribution_route') }}" class="{% if request.path == '/number_age_distribution' %}current-page{% endif %}">Number Age Distribution</a></li>
+                <li><a href="{{ url_for('co_occurrence_analysis_route') }}" class="{% if request.path == '/co_occurrence_analysis' %}current-page{% endif %}">Co-occurrence Analysis</a></li>
+                <li><a href="{{ url_for('powerball_position_frequency_route') }}" class="{% if request.path == '/powerball_position_frequency' %}current-page{% endif %}">Powerball Position Freq</a></li>
+                <li><a href="{{ url_for('find_results_by_first_white_ball') }}" class="{% if request.path == '/find_results_by_first_white_ball' %}current-page{% endif %}">Find by First Ball</a></li>
+            </ul>
+        </nav>
+    </div>
 
-        <!-- Main Content Area -->
-        <main class="content-area">
-            <h1 class="text-3xl font-bold text-center mb-6 text-indigo-700">{% block page_heading %}Powerball Simulator{% endblock %}</h1>
-
+    <div class="content flex-1">
+        <div class="container">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
-                    <div class="flash-messages">
+                    <ul class="not-prose">
                         {% for category, message in messages %}
-                            <div class="message {{ category }}">{{ message }}</div>
+                            <li class="flash-message {{ category }}">{{ message }}</li>
                         {% endfor %}
-                    </div>
+                    </ul>
                 {% endif %}
             {% endwith %}
 
             {% block content %}{% endblock %}
-
-        </main>
+        </div>
     </div>
 
     <script>
-        // D3.js Tooltip - Shared across all pages
-        const tooltip = d3.select("body").append("div")
-            .attr("class", "tooltip")
-            .style("opacity", 0);
+        // Global D3 functions for reusability
+        function drawBarChart(data, elementId, xKey, yKey, chartTitle, xLabel, yLabel, barColor = "steelblue", tooltipPrefix = "") {
+            console.log(`[D3 Debug] drawBarChart called for ${elementId}`);
+            console.log("[D3 Debug] Data received for bar chart:", data);
 
-        // Function to draw Bar Charts - Shared across all pages
-        function drawBarChart(data, elementId, xKey, yKey, title) {
-            console.log(`[D3 Debug] drawBarChart called for ${title} (${elementId}) with data:`, data);
             if (!data || data.length === 0) {
-                d3.select(`#${elementId}`).html(`<p class="text-gray-500">No data available for ${title} chart.</p>`);
-                console.log(`[D3 Debug] No data for ${title}, displaying placeholder.`);
+                console.warn(`[D3 Warn] No data provided for bar chart: ${elementId}`);
+                d3.select(`#${elementId}`).html("<p>No data available for this chart.</p>");
                 return;
             }
 
-            const container = d3.select(`#${elementId}`);
-            container.html(''); // Clear any existing chart
-            const margin = { top: 20, right: 30, bottom: 60, left: 50 };
-            const width = container.node().clientWidth - margin.left - margin.right;
-            const height = 400 - margin.top - margin.bottom;
+            // Clear previous chart
+            d3.select(`#${elementId}`).html("");
 
-            const svg = container.append("svg")
+            const margin = { top: 40, right: 30, bottom: 60, left: 50 },
+                  width = 700 - margin.left - margin.right,
+                  height = 400 - margin.top - margin.bottom;
+
+            const svg = d3.select(`#${elementId}`)
+                .append("svg")
                 .attr("width", width + margin.left + margin.right)
                 .attr("height", height + margin.top + margin.bottom)
                 .append("g")
                 .attr("transform", `translate(${margin.left},${margin.top})`);
 
-            // Check if xKey and yKey exist in data objects
-            const xDomain = data.map(d => d[xKey]);
-            const yMax = d3.max(data, d => d[yKey]);
-
-            if (xDomain.includes(undefined) || yMax === undefined) {
-                 d3.select(`#${elementId}`).html(`<p class="text-gray-500">Data structure issue for ${title} chart. Check xKey/yKey.</p>`);
-                 console.error(`[D3 Error] Data structure mismatch for ${title}. xKey: ${xKey}, yKey: ${yKey}. First data item:`, data[0]);
-                 return;
-            }
-
-
-            // X scale
             const x = d3.scaleBand()
-                .domain(xDomain) // Use the extracted domain
                 .range([0, width])
                 .padding(0.1);
 
-            // Y scale
             const y = d3.scaleLinear()
-                .domain([0, yMax]).nice() // Use the extracted max
                 .range([height, 0]);
 
-            // Bars
+            x.domain(data.map(d => d[xKey]));
+            y.domain([0, d3.max(data, d => d[yKey])]);
+
+            svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x))
+                .selectAll("text")
+                .attr("transform", "translate(-10,0)rotate(-45)")
+                .style("text-anchor", "end");
+
+            svg.append("g")
+                .call(d3.axisLeft(y));
+
+            // X-axis label
+            svg.append("text")
+                .attr("class", "x-axis-label")
+                .attr("x", width / 2)
+                .attr("y", height + margin.bottom - 10)
+                .style("text-anchor", "middle")
+                .text(xLabel);
+
+            // Y-axis label
+            svg.append("text")
+                .attr("class", "y-axis-label")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 0 - margin.left + 10)
+                .attr("x", 0 - (height / 2))
+                .attr("dy", "1em")
+                .style("text-anchor", "middle")
+                .text(yLabel);
+
+            // Title
+            svg.append("text")
+                .attr("x", (width / 2))
+                .attr("y", 0 - (margin.top / 2))
+                .attr("text-anchor", "middle")
+                .style("font-size", "16px")
+                .style("font-weight", "bold")
+                .text(chartTitle);
+
+            // Tooltip
+            const tooltip = d3.select("body").append("div")
+                .attr("class", "tooltip")
+                .style("opacity", 0)
+                .style("position", "absolute")
+                .style("background-color", "white")
+                .style("border", "solid")
+                .style("border-width", "1px")
+                .style("border-radius", "5px")
+                .style("padding", "10px");
+
             svg.selectAll(".bar")
                 .data(data)
                 .enter().append("rect")
@@ -362,198 +252,128 @@
                 .attr("y", d => y(d[yKey]))
                 .attr("width", x.bandwidth())
                 .attr("height", d => height - y(d[yKey]))
-                .on("mouseover", function(event, d) {
-                    d3.select(this).style("fill", "#4f46e5");
+                .attr("fill", barColor)
+                .on("mouseover", (event, d) => {
                     tooltip.transition()
                         .duration(200)
                         .style("opacity", .9);
-                    tooltip.html(`Number: <strong>${d[xKey]}</strong><br/>Frequency: <strong>${d[yKey]}</strong>`)
+                    tooltip.html(`${tooltipPrefix}${d[xKey]}: ${d[yKey]}`)
                         .style("left", (event.pageX + 10) + "px")
                         .style("top", (event.pageY - 28) + "px");
                 })
-                .on("mouseout", function(d) {
-                    d3.select(this).style("fill", "#6366f1");
+                .on("mouseout", () => {
                     tooltip.transition()
                         .duration(500)
                         .style("opacity", 0);
                 });
-
-            // X-axis
-            svg.append("g")
-                .attr("class", "x axis")
-                .attr("transform", `translate(0,${height})`)
-                .call(d3.axisBottom(x))
-                .selectAll("text")
-                .attr("transform", "rotate(-45)")
-                .style("text-anchor", "end");
-
-            // Y-axis
-            svg.append("g")
-                .attr("class", "y axis")
-                .call(d3.axisLeft(y));
-
-            // Y-axis label
-            svg.append("text")
-                .attr("transform", "rotate(-90)")
-                .attr("y", 0 - margin.left + 10)
-                .attr("x", 0 - (height / 2))
-                .attr("dy", "1em")
-                .style("text-anchor", "middle")
-                .attr("fill", "#475569")
-                .text(yKey);
         }
 
-        // Function to draw Heatmap - Shared across all pages
-        function drawHeatmap(data, elementId, xKey, yKey, valueKey, title, maxValue) {
-            console.log(`[D3 Debug] drawHeatmap called for ${title} (${elementId}) with data:`, data);
+
+        function drawHeatmap(data, elementId, xKey, yKey, countKey, chartTitle, xLabel, yLabel, maxCount = 0) {
+            console.log(`[D3 Debug] drawHeatmap called for ${elementId}`);
+            console.log("[D3 Debug] Data received for heatmap:", data);
+
             if (!data || data.length === 0) {
-                d3.select(`#${elementId}`).html(`<p class="text-gray-500">No data available for ${title} heatmap.</p>`);
-                console.log(`[D3 Debug] No data for ${title}, displaying placeholder.`);
+                console.warn(`[D3 Warn] No data provided for heatmap: ${elementId}`);
+                d3.select(`#${elementId}`).html("<p>No data available for this chart.</p>");
                 return;
             }
 
-            const container = d3.select(`#${elementId}`);
-            container.html(''); // Clear any existing chart
-            const margin = { top: 20, right: 20, bottom: 60, left: 60 };
-            const width = Math.min(container.node().clientWidth, 700) - margin.left - margin.right;
-            const height = 600 - margin.top - margin.bottom;
+            // Clear previous chart
+            d3.select(`#${elementId}`).html("");
 
-            const svg = container.append("svg")
+            const margin = { top: 50, right: 30, bottom: 50, left: 50 },
+                  width = 800 - margin.left - margin.right,
+                  height = 600 - margin.top - margin.bottom;
+
+            const svg = d3.select(`#${elementId}`)
+                .append("svg")
                 .attr("width", width + margin.left + margin.right)
                 .attr("height", height + margin.top + margin.bottom)
                 .append("g")
                 .attr("transform", `translate(${margin.left},${margin.top})`);
 
-            const xDomain = Array.from(new Set(data.map(d => d[xKey]))).sort(d3.ascending);
-            const yDomain = Array.from(new Set(data.map(d => d[yKey]))).sort(d3.ascending);
-
-            if (xDomain.includes(undefined) || yDomain.includes(undefined)) {
-                 d3.select(`#${elementId}`).html(`<p class="text-gray-500">Data structure issue for ${title} heatmap. Check xKey/yKey.</p>`);
-                 console.error(`[D3 Error] Data structure mismatch for ${title}. xKey: ${xKey}, yKey: ${yKey}. First data item:`, data[0]);
-                 return;
-            }
+            // Extract unique x and y values for domains
+            const xDomain = Array.from(new Set(data.map(d => d[xKey]))).sort((a, b) => a - b);
+            const yDomain = Array.from(new Set(data.map(d => d[yKey]))).sort((a, b) => a - b);
 
             const x = d3.scaleBand()
                 .range([0, width])
                 .domain(xDomain)
-                .paddingInner(0.05);
+                .padding(0.01);
 
             const y = d3.scaleBand()
                 .range([height, 0])
                 .domain(yDomain)
-                .paddingInner(0.05);
+                .padding(0.01);
 
+            svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x));
+
+            svg.append("g")
+                .call(d3.axisLeft(y));
+
+            // X-axis label
+            svg.append("text")
+                .attr("class", "x-axis-label")
+                .attr("x", width / 2)
+                .attr("y", height + margin.bottom - 10)
+                .style("text-anchor", "middle")
+                .text(xLabel);
+
+            // Y-axis label
+            svg.append("text")
+                .attr("class", "y-axis-label")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 0 - margin.left + 10)
+                .attr("x", 0 - (height / 2))
+                .attr("dy", "1em")
+                .style("text-anchor", "middle")
+                .text(yLabel);
+
+            // Title
+            svg.append("text")
+                .attr("x", (width / 2))
+                .attr("y", 0 - (margin.top / 2))
+                .attr("text-anchor", "middle")
+                .style("font-size", "16px")
+                .style("font-weight", "bold")
+                .text(chartTitle);
+
+            // Color scale
+            const colorMax = maxCount > 0 ? maxCount : d3.max(data, d => d[countKey]);
             const colorScale = d3.scaleSequential(d3.interpolateViridis)
-                .domain([0, maxValue || d3.max(data, d => d[valueKey])]);
+                                 .domain([0, colorMax]);
+
+            // Tooltip
+            const tooltip = d3.select("body").append("div")
+                .attr("class", "heatmap-tooltip")
+                .style("opacity", 0);
 
             svg.selectAll(".heatmap-cell")
                 .data(data)
                 .enter().append("rect")
+                .attr("class", "heatmap-cell")
                 .attr("x", d => x(d[xKey]))
                 .attr("y", d => y(d[yKey]))
                 .attr("width", x.bandwidth())
                 .attr("height", y.bandwidth())
-                .attr("fill", d => colorScale(d[valueKey]))
-                .attr("class", "heatmap-cell")
-                .on("mouseover", function(event, d) {
+                .style("fill", d => colorScale(d[countKey]))
+                .on("mouseover", (event, d) => {
                     tooltip.transition()
                         .duration(200)
                         .style("opacity", .9);
-                    tooltip.html(`Pair: (${d[xKey]}, ${d[yKey]})<br/>Count: ${d[valueKey]}`)
+                    tooltip.html(`(${d[xKey]}, ${d[yKey]}): ${d[countKey]} occurrences`)
                         .style("left", (event.pageX + 10) + "px")
                         .style("top", (event.pageY - 28) + "px");
                 })
-                .on("mouseout", function(d) {
+                .on("mouseout", () => {
                     tooltip.transition()
                         .duration(500)
                         .style("opacity", 0);
                 });
-
-            svg.append("g")
-                .attr("class", "x axis")
-                .attr("transform", `translate(0,${height})`)
-                .call(d3.axisBottom(x).tickValues(x.domain().filter((d,i) => !(i % 5))))
-                .selectAll("text")
-                .attr("transform", "rotate(-45)")
-                .style("text-anchor", "end");
-
-            svg.append("g")
-                .attr("class", "y axis")
-                .call(d3.axisLeft(y).tickValues(y.domain().filter((d,i) => !(i % 5))));
         }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            // Highlight active navigation link based on URL
-            function highlightNavLink() {
-                const currentPath = window.location.pathname;
-                document.querySelectorAll('.sidebar nav ul li a').forEach(link => {
-                    link.classList.remove('active-nav-link');
-                    const linkHref = link.getAttribute('href');
-
-                    if (linkHref === currentPath || (currentPath === '/' && linkHref === '/')) {
-                        link.classList.add('active-nav-link');
-                    }
-                    // Handle parent analysis/probability section active state if any sub-link is active
-                    if (currentPath.startsWith('/frequency_analysis') || currentPath.startsWith('/hot_cold_numbers') ||
-                        currentPath.startsWith('/monthly_white_ball_analysis') || currentPath.startsWith('/sum_of_main_balls') ||
-                        currentPath.startsWith('/find_results_by_sum') || currentPath.startsWith('/find_results_by_first_white_ball') ||
-                        currentPath.startsWith('/simulate_multiple_draws') || currentPath.startsWith('/number_age_distribution') ||
-                        currentPath.startsWith('/co_occurrence_analysis') || currentPath.startsWith('/powerball_position_frequency')) {
-                        document.querySelector('a[href="#analysis-section"]').classList.add('active-nav-link');
-                    } else if (currentPath.startsWith('/winning_probability') || currentPath.startsWith('/partial_match_probabilities')) {
-                        document.querySelector('a[href="#probabilities-section"]').classList.add('active-nav-link');
-                    }
-                });
-            }
-
-            highlightNavLink();
-
-            // Smooth scrolling for internal links within the sidebar (for #analysis-section, #probabilities-section)
-            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-                anchor.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    // For the main sections, just ensure the main content scrolls to the top
-                    document.querySelector('.content-area').scrollTo({top: 0, behavior: 'smooth'});
-                    history.pushState(null, '', this.getAttribute('href')); // Update URL hash if desired
-                    highlightNavLink();
-                });
-            });
-
-            // Restore form values after submission for better UX (only for forms that stay on the same page)
-            const formElements = document.querySelectorAll('form');
-            formElements.forEach(form => {
-                form.addEventListener('submit', function() {
-                    const formData = new FormData(this);
-                    for (let [key, value] of formData.entries()) {
-                        if (this.querySelector(`[name="${key}"]`)) {
-                            localStorage.setItem(key, value);
-                        }
-                    }
-                });
-
-                // Load saved values on page load
-                const savedValues = {};
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    savedValues[key] = localStorage.getItem(key);
-                }
-
-                for (let key in savedValues) {
-                    const input = form.querySelector(`[name="${key}"]`);
-                    if (input) {
-                        if (input.type === 'checkbox' || input.type === 'radio') {
-                            input.checked = (savedValues[key] === 'on');
-                        } else {
-                            input.value = savedValues[key];
-                        }
-                    }
-                }
-            });
-
-            // This block is for page-specific scripts. Each extended template will define its own
-            // block 'scripts' and put its D3 calls there.
-            {% block scripts %}{% endblock %}
-        });
     </script>
 </body>
 </html>
