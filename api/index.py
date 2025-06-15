@@ -8,6 +8,7 @@ from collections import defaultdict
 from datetime import datetime
 import requests # Import requests for direct API calls
 import json # For handling JSON data
+import numpy as np # Import numpy for array operations
 
 # --- Flask App Initialization with Template Path ---
 # Get the directory of the current script (api/index.py)
@@ -279,9 +280,9 @@ def monthly_white_ball_analysis(df, last_draw_date_str):
     
     monthly_balls = {}
     try:
-        # More robust conversion within apply: handle potential non-numeric values
+        # Corrected line: Use np.isnan to filter out NaN from the numpy array directly
         monthly_balls = recent_data.groupby('Month')[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].apply(
-            lambda x: sorted(list(set(pd.to_numeric(x.values.flatten(), errors='coerce').dropna().astype(int))))
+            lambda x: sorted(list(set(x.values.flatten()[~np.isnan(x.values.flatten())].astype(int))))
         ).to_dict()
         print(f"[DEBUG] monthly_white_ball_analysis: Groupby and apply successful. First item in monthly_balls: {next(iter(monthly_balls.items())) if monthly_balls else 'N/A'}")
     except Exception as e:
