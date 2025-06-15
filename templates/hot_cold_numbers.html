@@ -1,46 +1,35 @@
 {% extends "base.html" %}
 
-{% block title %}Hot & Cold Numbers{% endblock %}
-
-{% block page_heading %}Hot & Cold Numbers Analysis{% endblock %}
-
 {% block content %}
-    {% if hot_numbers %}
-        <div class="chart-container">
-            <h3 class="chart-title">Hot Numbers (Most Frequent)</h3>
-            <div id="hotNumbersChart"></div>
-        </div>
-    {% else %}
-        <div class="card"><p class="text-gray-500">No data available for Hot Numbers. Please ensure historical data is loaded.</p></div>
-    {% endif %}
+<h1 class="text-3xl font-bold mb-6">Hot & Cold Numbers (Last 12 Months)</h1>
 
-    {% if cold_numbers %}
-        <div class="chart-container mt-6">
-            <h3 class="chart-title">Cold Numbers (Least Frequent)</h3>
-            <div id="coldNumbersChart"></div>
-        </div>
-    {% else %}
-        <div class="card mt-6"><p class="text-gray-500">No data available for Cold Numbers. Please ensure historical data is loaded.</p></div>
-    {% endif %}
-{% endblock %}
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="chart-container">
+        <h2 class="text-xl font-semibold mb-4">Hot Numbers</h2>
+        <div id="hotNumbersChart"></div>
+    </div>
 
-{% block scripts %}
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log("[Hot & Cold Numbers] Page loaded.");
-            {% if hot_numbers %}
-            console.log("[Hot & Cold Numbers] hot_numbers data:", {{ hot_numbers | tojson }});
-            drawBarChart({{ hot_numbers | tojson }}, 'hotNumbersChart', 'Number', 'Frequency', 'Hot Numbers');
-            {% else %}
-            console.log("[Hot & Cold Numbers] hot_numbers is not available in template context.");
-            {% endif %}
+    <div class="chart-container">
+        <h2 class="text-xl font-semibold mb-4">Cold Numbers</h2>
+        <div id="coldNumbersChart"></div>
+    </div>
+</div>
 
-            {% if cold_numbers %}
-            console.log("[Hot & Cold Numbers] cold_numbers data:", {{ cold_numbers | tojson }});
-            drawBarChart({{ cold_numbers | tojson }}, 'coldNumbersChart', 'Number', 'Frequency', 'Cold Numbers');
-            {% else %}
-            console.log("[Hot & Cold Numbers] cold_numbers is not available in template context.");
-            {% endif %}
-        });
-    </script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Ensure data is an empty array if not provided or empty
+        var hotNumbersData = {% if hot_numbers %}{{ hot_numbers | tojson }}{% else %}[]{% endif %};
+        var coldNumbersData = {% if cold_numbers %}{{ cold_numbers | tojson }}{% else %}[]{% endif %};
+
+        console.log("[D3 Debug] hot_cold_numbers.html - hotNumbersData:", hotNumbersData);
+        console.log("[D3 Debug] hot_cold_numbers.html - coldNumbersData:", coldNumbersData);
+
+        // Sort data by number for consistent chart display if necessary
+        hotNumbersData.sort((a, b) => a.Number - b.Number);
+        coldNumbersData.sort((a, b) => a.Number - b.Number);
+
+        drawBarChart(hotNumbersData, "hotNumbersChart", "Number", "Frequency", "Hot Numbers", "Ball Number", "Frequency", "red");
+        drawBarChart(coldNumbersData, "coldNumbersChart", "Number", "Frequency", "Cold Numbers", "Ball Number", "Frequency", "lightblue");
+    });
+</script>
 {% endblock %}
