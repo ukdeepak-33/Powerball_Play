@@ -244,22 +244,54 @@ def hot_cold_numbers(df, last_draw_date_str):
     return hot_numbers, cold_numbers
 
 def monthly_white_ball_analysis(df, last_draw_date_str):
-    if df.empty or last_draw_date_str == 'N/A': return {}
-    last_draw_date = pd.to_datetime(last_draw_date_str)
-    six_months_ago = last_draw_date - pd.DateOffset(months=6)
-    
-    recent_data = df[df['Draw Date_dt'] >= six_months_ago].copy()
-    if recent_data.empty: return {}
+    print("[DEBUG] Inside monthly_white_ball_analysis function.")
+    if df.empty or last_draw_date_str == 'N/A':
+        print("[DEBUG] monthly_white_ball_analysis: df is empty or last_draw_date_str is N/A. Returning empty dict.")
+        return {}
 
-    recent_data['Month'] = recent_data['Draw Date_dt'].dt.to_period('M')
+    try:
+        last_draw_date = pd.to_datetime(last_draw_date_str)
+        print(f"[DEBUG] monthly_white_ball_analysis: last_draw_date: {last_draw_date}")
+    except Exception as e:
+        print(f"[ERROR] monthly_white_ball_analysis: Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}")
+        return {}
+
+    six_months_ago = last_draw_date - pd.DateOffset(months=6)
+    print(f"[DEBUG] monthly_white_ball_analysis: six_months_ago: {six_months_ago}")
+
+    # Ensure 'Draw Date_dt' exists and is datetime type, and filter
+    if 'Draw Date_dt' not in df.columns or not pd.api.types.is_datetime64_any_dtype(df['Draw Date_dt']):
+        print("[ERROR] monthly_white_ball_analysis: 'Draw Date_dt' column missing or not datetime type in df. Returning empty dict.")
+        return {}
+
+    recent_data = df[df['Draw Date_dt'] >= six_months_ago].copy()
+    print(f"[DEBUG] monthly_white_ball_analysis: recent_data shape after filtering: {recent_data.shape}")
+    if recent_data.empty:
+        print("[DEBUG] monthly_white_ball_analysis: recent_data is empty after filtering. Returning empty dict.")
+        return {}
+
+    try:
+        recent_data['Month'] = recent_data['Draw Date_dt'].dt.to_period('M')
+        print(f"[DEBUG] monthly_white_ball_analysis: 'Month' column added to recent_data. First 2 months: {recent_data['Month'].head(2).tolist()}")
+    except Exception as e:
+        print(f"[ERROR] monthly_white_ball_analysis: Failed to create 'Month' column: {e}. Returning empty dict.")
+        return {}
     
-    monthly_balls = recent_data.groupby('Month')[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].apply(
-        lambda x: sorted(list(set(x.values.flatten().astype(int)))) # Ensure integers and sorted
-    ).to_dict()
+    monthly_balls = {}
+    try:
+        # More robust conversion within apply: handle potential non-numeric values
+        monthly_balls = recent_data.groupby('Month')[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].apply(
+            lambda x: sorted(list(set(pd.to_numeric(x.values.flatten(), errors='coerce').dropna().astype(int))))
+        ).to_dict()
+        print(f"[DEBUG] monthly_white_ball_analysis: Groupby and apply successful. First item in monthly_balls: {next(iter(monthly_balls.items())) if monthly_balls else 'N/A'}")
+    except Exception as e:
+        print(f"[ERROR] monthly_white_ball_analysis: Error during groupby/apply operation: {e}. Returning empty dict.")
+        return {}
     
     monthly_balls_str_keys = {str(k): v for k, v in monthly_balls.items()}
-
+    print("[DEBUG] monthly_white_ball_analysis: Successfully computed monthly_balls_str_keys.")
     return monthly_balls_str_keys
+
 
 def sum_of_main_balls(df):
     if df.empty: return pd.DataFrame(), [], 0, 0, 0.0
@@ -570,7 +602,7 @@ def get_co_occurrence_matrix(df):
         white_balls = sorted([int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])])
         for i in range(len(white_balls)):
             for j in range(i + 1, len(white_balls)):
-                pair = tuple(sorted((nums[i], nums[j])))
+                pair = tuple(sorted((white_balls[i], white_balls[j])))
                 co_occurrence[pair] += 1
     
     co_occurrence_data = []
@@ -614,7 +646,7 @@ precomputed_powerball_freq_list = []
 precomputed_last_draw_date_str = "N/A"
 precomputed_hot_numbers_list = []
 precomputed_cold_numbers_list = []
-precomputed_monthly_balls = {}
+precomputed_monthly_balls = {} # This is the variable that caused the error
 precomputed_number_age_data = []
 precomputed_co_occurrence_data = []
 precomputed_max_co_occurrence = 0
@@ -635,6 +667,7 @@ try:
         precomputed_hot_numbers_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in hot_numbers.items()]
         precomputed_cold_numbers_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in cold_numbers.items()]
 
+        # This is the call that was potentially failing
         precomputed_monthly_balls = monthly_white_ball_analysis(df, precomputed_last_draw_date_str)
         
         precomputed_number_age_data = get_number_age_distribution(df)
@@ -863,10 +896,9 @@ def hot_cold_numbers_route():
 @app.route('/monthly_white_ball_analysis')
 def monthly_white_ball_analysis_route():
     # Use pre-computed data
-    monthly_balls = precomputed_monthly_balls
-    
+    # The precomputed_monthly_balls variable should now be more robustly handled in the pre-computation phase
     return render_template('monthly_white_ball_analysis.html', 
-                           monthly_balls=monthly_balls)
+                           monthly_balls=precomputed_monthly_balls)
 
 @app.route('/sum_of_main_balls')
 def sum_of_main_balls_route():
@@ -961,7 +993,7 @@ def number_age_distribution_route():
     number_age_data = precomputed_number_age_data
 
     return render_template('number_age_distribution.html',
-                           number_age_data=number_age_data)
+                           number_age_data=precomputed_number_age_data) # Use precomputed variable
 
 @app.route('/co_occurrence_analysis')
 def co_occurrence_analysis_route():
@@ -969,15 +1001,15 @@ def co_occurrence_analysis_route():
     max_co_occurrence = precomputed_max_co_occurrence
 
     return render_template('co_occurrence_analysis.html',
-                           co_occurrence_data=co_occurrence_data,
-                           max_co_occurrence=max_co_occurrence)
+                           co_occurrence_data=precomputed_co_occurrence_data, # Use precomputed variable
+                           max_co_occurrence=precomputed_max_co_occurrence) # Use precomputed variable
 
 @app.route('/powerball_position_frequency')
 def powerball_position_frequency_route():
     powerball_position_data = precomputed_powerball_position_data
 
     return render_template('powerball_position_frequency.html',
-                           powerball_position_data=powerball_position_data)
+                           powerball_position_data=precomputed_powerball_position_data) # Use precomputed variable
 
 @app.route('/find_results_by_first_white_ball', methods=['GET', 'POST']) # Allow GET for direct link, POST for form submission
 def find_results_by_first_white_ball():
