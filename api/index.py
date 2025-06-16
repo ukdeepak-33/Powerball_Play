@@ -19,7 +19,7 @@ app.secret_key = 'supersecretkey'
 
 # --- Supabase Configuration ---
 SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
-SUPABASE_ANON_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlrc3h6YmJjb2l0ZWhkbXN4cWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NzMwNjUsImexcpIjoMjA2NTM0OTA2NX0.AzUD7wjR7VbvtUH27NDqJ3AlvFW0nCWpiN9ADG8T_t4")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlrc3h6YmJjb2l0ZWhkbXN4cWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NzMwNjUsImV4cCI6MjA2NTM0OTA2NX0.AzUD7wjR7VbvtUH27NDqJ3AlvFW0nCWpiN9ADG8T_t4")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY")
 
 SUPABASE_TABLE_NAME = 'powerball_draws'
@@ -230,8 +230,7 @@ def monthly_white_ball_analysis(df, last_draw_date_str):
     print(f"[DEBUG-Monthly] six_months_ago: {six_months_ago}")
 
     if 'Draw Date_dt' not in df.columns or not pd.api.types.is_datetime64_any_dtype(df['Draw Date_dt']):
-        print("[ERROR-Monthly] 'Draw Date_dt' column missing or not datetime type in df. Returning empty dict.")
-        # Attempt to re-create it if possible from 'Draw Date'
+        print("[ERROR-Monthly] 'Draw Date_dt' column missing or not datetime type in df. Attempting to re-create it.")
         try:
             df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'], errors='coerce')
             df = df.dropna(subset=['Draw Date_dt'])
@@ -272,17 +271,25 @@ def monthly_white_ball_analysis(df, last_draw_date_str):
             print("[DEBUG-Monthly] recent_data is empty after dropping NaN in ball columns. Returning empty dict.")
             return {}
 
-        monthly_balls = recent_data.groupby('Month')[required_cols].apply(
-            lambda x: sorted(list(set(x.values.flatten().astype(int)))) # Flatten, convert to int, then unique and sort
+        # The core change: Ensure all numbers are converted to Python native int
+        # after flattening and before being added to the list for the dictionary value.
+        monthly_balls_raw = recent_data.groupby('Month')[required_cols].apply(
+            lambda x: sorted([int(num) for num in x.values.flatten() if not pd.isna(num)])
         ).to_dict()
-        print(f"[DEBUG-Monthly] Groupby and apply successful. First item in monthly_balls: {next(iter(monthly_balls.items())) if monthly_balls else 'N/A'}")
+
+        # Convert Period keys to string keys, and ensure values are lists of native ints
+        monthly_balls_str_keys = {}
+        for period_key, ball_list in monthly_balls_raw.items():
+            monthly_balls_str_keys[str(period_key)] = [int(ball) for ball in ball_list] # Explicitly convert to Python int again
+        
+        print(f"[DEBUG-Monthly] Groupby and apply successful. First item in monthly_balls_str_keys: {next(iter(monthly_balls_str_keys.items())) if monthly_balls_str_keys else 'N/A'}")
+
     except Exception as e:
-        print(f"[ERROR-Monthly] Error during groupby/apply operation: {e}. Returning empty dict.")
+        print(f"[ERROR-Monthly] Error during groupby/apply operation or conversion: {e}. Returning empty dict.")
         import traceback
         traceback.print_exc() # Print full traceback to logs for detailed error
         return {}
     
-    monthly_balls_str_keys = {str(k): v for k, v in monthly_balls.items()}
     print("[DEBUG-Monthly] Successfully computed monthly_balls_str_keys.")
     return monthly_balls_str_keys
 
