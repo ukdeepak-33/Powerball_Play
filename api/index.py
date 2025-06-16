@@ -525,12 +525,13 @@ def generate_with_common_pairs(df, common_pairs, white_ball_range, excluded_numb
     return white_balls
 
 def get_number_age_distribution(df):
-    if df.empty: return []
+    if df.empty: return [], [] # Return both lists
     df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'])
     all_draw_dates = sorted(df['Draw Date_dt'].drop_duplicates().tolist())
     
-    all_miss_streaks = []
-
+    detailed_ages = []
+    
+    # Process White Balls
     for i in range(1, 70):
         last_appearance_date = None
         temp_df_filtered = df[(df['Number 1'].astype(int) == i) | (df['Number 2'].astype(int) == i) |
@@ -542,15 +543,18 @@ def get_number_age_distribution(df):
 
         miss_streak_count = 0
         if last_appearance_date is not None:
+            # Count draws AFTER the last appearance date
             for d_date in reversed(all_draw_dates):
                 if d_date > last_appearance_date:
                     miss_streak_count += 1
                 else:
-                    break
-            all_miss_streaks.append(miss_streak_count)
+                    break # Stop when we reach or pass the last appearance date
+            detailed_ages.append({'number': int(i), 'type': 'White Ball', 'age': miss_streak_count})
         else:
-            all_miss_streaks.append(len(all_draw_dates))
+            # If never drawn, age is total number of draws
+            detailed_ages.append({'number': int(i), 'type': 'White Ball', 'age': len(all_draw_dates)})
 
+    # Process Powerballs
     for i in range(1, 27):
         last_appearance_date = None
         temp_df_filtered = df[df['Powerball'].astype(int) == i]
@@ -559,19 +563,23 @@ def get_number_age_distribution(df):
 
         miss_streak_count = 0
         if last_appearance_date is not None:
+            # Count draws AFTER the last appearance date
             for d_date in reversed(all_draw_dates):
                 if d_date > last_appearance_date:
                     miss_streak_count += 1
                 else:
-                    break
-            all_miss_streaks.append(miss_streak_count)
+                    break # Stop when we reach or pass the last appearance date
+            detailed_ages.append({'number': int(i), 'type': 'Powerball', 'age': miss_streak_count})
         else:
-            all_miss_streaks.append(len(all_draw_dates))
+            # If never drawn, age is total number of draws
+            detailed_ages.append({'number': int(i), 'type': 'Powerball', 'age': len(all_draw_dates)})
 
-    age_counts = pd.Series(all_miss_streaks).value_counts().sort_index()
-    number_age_data = [{'age': int(age), 'count': int(count)} for age, count in age_counts.items()]
+    # Aggregate for the bar chart (same as before)
+    all_miss_streaks_only = [item['age'] for item in detailed_ages]
+    age_counts = pd.Series(all_miss_streaks_only).value_counts().sort_index()
+    age_counts_list = [{'age': int(age), 'count': int(count)} for age, count in age_counts.items()]
     
-    return number_age_data
+    return age_counts_list, detailed_ages # Return both
 
 def get_co_occurrence_matrix(df):
     if df.empty: return [], 0
@@ -618,7 +626,8 @@ precomputed_last_draw_date_str = "N/A"
 precomputed_hot_numbers_list = []
 precomputed_cold_numbers_list = []
 precomputed_monthly_balls = {}
-precomputed_number_age_data = []
+precomputed_number_age_counts = [] # Renamed for clarity (for the chart)
+precomputed_detailed_number_ages = [] # New global for detailed age data
 precomputed_co_occurrence_data = []
 precomputed_max_co_occurrence = 0
 precomputed_powerball_position_data = []
@@ -627,8 +636,8 @@ precomputed_powerball_position_data = []
 def initialize_app_data():
     global df, last_draw, precomputed_white_ball_freq_list, precomputed_powerball_freq_list, \
            precomputed_last_draw_date_str, precomputed_hot_numbers_list, precomputed_cold_numbers_list, \
-           precomputed_monthly_balls, precomputed_number_age_data, precomputed_co_occurrence_data, \
-           precomputed_max_co_occurrence, precomputed_powerball_position_data
+           precomputed_monthly_balls, precomputed_number_age_counts, precomputed_detailed_number_ages, \
+           precomputed_co_occurrence_data, precomputed_max_co_occurrence, precomputed_powerball_position_data
     
     print("Attempting to load and pre-compute data...")
     try:
@@ -657,8 +666,12 @@ def initialize_app_data():
             # --- IMPORTANT: Call monthly_white_ball_analysis during pre-computation ---
             precomputed_monthly_balls = monthly_white_ball_analysis(df, precomputed_last_draw_date_str)
             
-            precomputed_number_age_data.clear() # Clear before extending
-            precomputed_number_age_data.extend(get_number_age_distribution(df))
+            # Update number age data to get both counts and detailed list
+            age_counts_data, detailed_ages_data = get_number_age_distribution(df)
+            precomputed_number_age_counts.clear() # For the chart
+            precomputed_number_age_counts.extend(age_counts_data)
+            precomputed_detailed_number_ages.clear() # For the table
+            precomputed_detailed_number_ages.extend(detailed_ages_data)
             
             co_occurrence_data, max_co_occurrence = get_co_occurrence_matrix(df)
             precomputed_co_occurrence_data.clear() # Clear before extending
@@ -680,8 +693,10 @@ def initialize_app_data():
             print(f"precomputed_cold_numbers_list sample: {precomputed_cold_numbers_list[:5]}")
             print(f"precomputed_monthly_balls is empty: {not bool(precomputed_monthly_balls)}")
             print(f"precomputed_monthly_balls sample: {list(precomputed_monthly_balls.keys())[:2] if precomputed_monthly_balls else 'N/A'}")
-            print(f"precomputed_number_age_data is empty: {not bool(precomputed_number_age_data)}")
-            print(f"precomputed_number_age_data sample: {precomputed_number_age_data[:2] if precomputed_number_age_data else 'N/A'}")
+            print(f"precomputed_number_age_counts is empty: {not bool(precomputed_number_age_counts)}")
+            print(f"precomputed_number_age_counts sample: {precomputed_number_age_counts[:2] if precomputed_number_age_counts else 'N/A'}")
+            print(f"precomputed_detailed_number_ages is empty: {not bool(precomputed_detailed_number_ages)}")
+            print(f"precomputed_detailed_number_ages sample: {precomputed_detailed_number_ages[:2] if precomputed_detailed_number_ages else 'N/A'}")
             print(f"precomputed_co_occurrence_data is empty: {not bool(precomputed_co_occurrence_data)}")
             print(f"precomputed_co_occurrence_data sample: {precomputed_co_occurrence_data[:2] if precomputed_co_occurrence_data else 'N/A'}")
             print(f"precomputed_powerball_position_data is empty: {not bool(precomputed_powerball_position_data)}")
@@ -987,8 +1002,10 @@ def export_analysis_results_route():
 
 @app.route('/number_age_distribution')
 def number_age_distribution_route():
+    # Pass both the aggregated data (for the chart) and the detailed data (for the table)
     return render_template('number_age_distribution.html',
-                           number_age_data=precomputed_number_age_data)
+                           number_age_data=precomputed_number_age_counts, # For the chart (renamed for clarity)
+                           detailed_number_ages=precomputed_detailed_number_ages) # For the new table
 
 @app.route('/co_occurrence_analysis')
 def co_occurrence_analysis_route():
@@ -1084,8 +1101,8 @@ def update_powerball_data():
             
             global df, last_draw, precomputed_white_ball_freq_list, precomputed_powerball_freq_list, \
                    precomputed_last_draw_date_str, precomputed_hot_numbers_list, precomputed_cold_numbers_list, \
-                   precomputed_monthly_balls, precomputed_number_age_data, precomputed_co_occurrence_data, \
-                   precomputed_max_co_occurrence, precomputed_powerball_position_data
+                   precomputed_monthly_balls, precomputed_number_age_counts, precomputed_detailed_number_ages, \
+                   precomputed_co_occurrence_data, precomputed_max_co_occurrence, precomputed_powerball_position_data
 
             df = load_historical_data_from_supabase()
             last_draw = get_last_draw(df)
@@ -1110,8 +1127,12 @@ def update_powerball_data():
                 # Update precomputed_monthly_balls after new data
                 precomputed_monthly_balls = monthly_white_ball_analysis(df, precomputed_last_draw_date_str)
                 
-                precomputed_number_age_data.clear()
-                precomputed_number_age_data.extend(get_number_age_distribution(df))
+                # Update number age data to get both counts and detailed list
+                age_counts_data, detailed_ages_data = get_number_age_distribution(df)
+                precomputed_number_age_counts.clear() # For the chart
+                precomputed_number_age_counts.extend(age_counts_data)
+                precomputed_detailed_number_ages.clear() # For the table
+                precomputed_detailed_number_ages.extend(detailed_ages_data)
                 
                 co_occurrence_data, max_co_occurrence = get_co_occurrence_matrix(df)
                 precomputed_co_occurrence_data.clear()
