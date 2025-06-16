@@ -1,15 +1,17 @@
 {% extends "base.html" %}
 
-{% block content %}
-<h1 class="text-3xl font-bold mb-6">Hot & Cold Numbers (Last 12 Months)</h1>
+{% block title %}Hot & Cold Numbers Analysis{% endblock %}
 
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-    <div class="chart-container">
+{% block page_heading %}Hot & Cold Numbers (Last 12 Months){% endblock %}
+
+{% block content %}
+<div class="flex flex-col space-y-6"> {# Changed from grid to flex-col to stack charts always #}
+    <div class="chart-container w-full">
         <h2 class="text-xl font-semibold mb-4">Hot Numbers</h2>
         <div id="hotNumbersChart"></div>
     </div>
 
-    <div class="chart-container">
+    <div class="chart-container w-full">
         <h2 class="text-xl font-semibold mb-4">Cold Numbers</h2>
         <div id="coldNumbersChart"></div>
     </div>
