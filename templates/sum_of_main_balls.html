@@ -1,53 +1,76 @@
 {% extends "base.html" %}
 
+{% block title %}Sum of Main Balls Analysis{% endblock %}
+
+{% block page_heading %}Sum of Main Balls Analysis{% endblock %}
+
 {% block content %}
-<h1 class="text-3xl font-bold mb-6">Sum of Main Balls Analysis</h1>
-
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-    <div class="chart-container">
-        <h2 class="text-xl font-semibold mb-4">Sum Frequency</h2>
-        <div id="sumFreqChart"></div>
-    </div>
-
-    <div class="chart-container p-6 bg-white rounded-lg shadow-md">
-        <h2 class="text-xl font-semibold mb-4">Sum Statistics</h2>
-        <p class="text-lg mb-2"><strong>Minimum Sum:</strong> {{ min_sum }}</p>
-        <p class="text-lg mb-2"><strong>Maximum Sum:</strong> {{ max_sum }}</p>
-        <p class="text-lg mb-2"><strong>Average Sum:</strong> {{ avg_sum }}</p>
-
-        <h2 class="text-xl font-semibold mt-6 mb-4">Recent Draws and Their Sums</h2>
-        {% if sum_data %}
-        <div class="overflow-x-auto">
-            <table class="min-w-full bg-white border border-gray-200">
-                <thead>
-                    <tr>
-                        <th class="py-2 px-4 border-b">Draw Date</th>
-                        <th class="py-2 px-4 border-b">Sum</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for draw in sum_data|reverse %} {# Display latest draws first #}
-                    <tr>
-                        <td class="py-2 px-4 border-b">{{ draw['Draw Date'] }}</td>
-                        <td class="py-2 px-4 border-b">{{ draw['Sum'] }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+<div class="card">
+    <h3 class="text-xl font-semibold mb-4 text-gray-700">Summary Statistics</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="p-4 bg-blue-50 rounded-lg shadow-sm">
+            <p class="text-sm font-medium text-blue-700">Minimum Sum:</p>
+            <p class="text-2xl font-bold text-blue-900">{{ min_sum }}</p>
         </div>
-        {% else %}
-        <p>No sum data available.</p>
-        {% endif %}
+        <div class="p-4 bg-green-50 rounded-lg shadow-sm">
+            <p class="text-sm font-medium text-green-700">Maximum Sum:</p>
+            <p class="text-2xl font-bold text-green-900">{{ max_sum }}</p>
+        </div>
+        <div class="p-4 bg-purple-50 rounded-lg shadow-sm">
+            <p class="text-sm font-medium text-purple-700">Average Sum:</p>
+            <p class="text-2xl font-bold text-purple-900">{{ avg_sum }}</p>
+        </div>
     </div>
 </div>
 
+<div class="chart-container">
+    <h2 class="text-xl font-semibold mb-4">Sum Frequency Distribution</h2>
+    <div id="sumFrequencyChart"></div>
+</div>
+
+<div class="card">
+    <h3 class="text-xl font-semibold mb-4 text-gray-700">Historical Sums</h3>
+    {% if sums_data %}
+    <div class="overflow-x-auto">
+        <table class="table-auto">
+            <thead>
+                <tr>
+                    <th>Draw Date</th>
+                    <th>Sum</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in sums_data %}
+                <tr>
+                    <td>{{ row['Draw Date'] }}</td>
+                    <td>{{ row['Sum'] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-gray-500">No historical sums data available.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Ensure data is an empty array if not provided or empty
-        var sumFreqData = {% if sum_freq_list %}{{ sum_freq_list | tojson }}{% else %}[]{% endif %};
+        var sumFreqData = [];
+        {% if sum_freq_json %}
+            try {
+                sumFreqData = JSON.parse('{{ sum_freq_json | safe }}');
+            } catch (e) {
+                console.error("Error parsing sumFreqData JSON:", e);
+                sumFreqData = []; // Fallback to empty array on error
+            }
+        {% endif %}
         console.log("[D3 Debug] sum_of_main_balls.html - sumFreqData:", sumFreqData);
 
-        drawBarChart(sumFreqData, "sumFreqChart", "sum", "count", "Sum of White Balls Frequency", "Sum", "Frequency", "purple");
+        // Call the shared bar chart function from base.html
+        drawBarChart(sumFreqData, "sumFrequencyChart", "sum", "count", "Sum of Main Balls Frequency", "Sum Value", "Frequency");
     });
 </script>
 {% endblock %}
