@@ -6,21 +6,18 @@ import math
 import os
 from collections import defaultdict
 from datetime import datetime
-import requests # Import requests for direct API calls
-import json # For handling JSON data
-import numpy as np # Import numpy for array operations
+import requests
+import json
+import numpy as np
 
 # --- Flask App Initialization with Template Path ---
-# Get the directory of the current script (api/index.py)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Construct the path to the templates directory, assuming it's one level up from 'api'
 TEMPLATE_DIR = os.path.join(BASE_DIR, '..', 'templates')
 
-# Initialize Flask app, specifying the template folder
 app = Flask(__name__, template_folder=TEMPLATE_DIR)
 app.secret_key = 'supersecretkey'
 
-# --- Supabase Configuration (IMPORTANT: Use Environment Variables for Production) ---
+# --- Supabase Configuration ---
 SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlrc3h6YmJjb2l0ZWhkbXN4cWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NzMwNjUsImV4cCI6MjA2NTM0OTA2NX0.AzUD7wjR7VbvtUH27NDqJ3AlvFW0nCWpiN9ADG8T_t4")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY")
@@ -53,26 +50,20 @@ def load_historical_data_from_supabase():
                 'offset': offset,
                 'limit': limit
             }
-
-            print(f"Fetching from Supabase URL: {url} with params: {params}")
-
             response = requests.get(url, headers=headers, params=params)
             response.raise_for_status()
             
             chunk = response.json()
             if not chunk:
                 break
-
             all_data.extend(chunk)
             offset += limit
-            print(f"Fetched {len(chunk)} records. Total so far: {len(all_data)}")
 
         if not all_data:
             print("No data fetched from Supabase after pagination attempts.")
             return pd.DataFrame()
 
         df = pd.DataFrame(all_data)
-        
         df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'], errors='coerce')
         df = df.dropna(subset=['Draw Date_dt'])
 
@@ -140,7 +131,7 @@ def generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white
 
         powerball = random.randint(powerball_range[0], powerball_range[1])
 
-        last_draw_data = get_last_draw(df) # Use the helper function here
+        last_draw_data = get_last_draw(df)
         if not last_draw_data.empty and last_draw_data.get('Number 1') != 'N/A':
             last_white_balls = [int(last_draw_data['Number 1']), int(last_draw_data['Number 2']), int(last_draw_data['Number 3']), int(last_draw_data['Number 4']), int(last_draw_data['Number 5'])]
             if set(white_balls) == set(last_white_balls) and powerball == int(last_draw_data['Powerball']):
@@ -596,34 +587,51 @@ precomputed_co_occurrence_data = []
 precomputed_max_co_occurrence = 0
 precomputed_powerball_position_data = []
 
-# Perform initial data loading and pre-computation
+# This function will be called once after app initialization to load data
 def initialize_app_data():
     global df, last_draw, precomputed_white_ball_freq_list, precomputed_powerball_freq_list, \
            precomputed_last_draw_date_str, precomputed_hot_numbers_list, precomputed_cold_numbers_list, \
            precomputed_monthly_balls, precomputed_number_age_data, precomputed_co_occurrence_data, \
            precomputed_max_co_occurrence, precomputed_powerball_position_data
     
+    print("Attempting to load and pre-compute data...")
     try:
-        df = load_historical_data_from_supabase()
-        last_draw = get_last_draw(df)
+        df_temp = load_historical_data_from_supabase() # Load data into a temp DataFrame
+        
+        if not df_temp.empty: # Only update global df if data was successfully loaded
+            df = df_temp # Assign to global df
+            last_draw = get_last_draw(df)
 
-        if not df.empty:
             white_ball_freq, powerball_freq = frequency_analysis(df)
-            precomputed_white_ball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in white_ball_freq.items()]
-            precomputed_powerball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in powerball_freq.items()]
-
+            precomputed_white_ball_freq_list.clear() # Clear before extending
+            precomputed_white_ball_freq_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in white_ball_freq.items()])
+            
+            precomputed_powerball_freq_list.clear() # Clear before extending
+            precomputed_powerball_freq_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in powerball_freq.items()])
+            
             precomputed_last_draw_date_str = last_draw['Draw Date']
             
             hot_numbers, cold_numbers = hot_cold_numbers(df, precomputed_last_draw_date_str)
-            precomputed_hot_numbers_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in hot_numbers.items()]
-            precomputed_cold_numbers_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in cold_numbers.items()]
-
+            precomputed_hot_numbers_list.clear() # Clear before extending
+            precomputed_hot_numbers_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in hot_numbers.items()])
+            
+            precomputed_cold_numbers_list.clear() # Clear before extending
+            precomputed_cold_numbers_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in cold_numbers.items()])
+            
             precomputed_monthly_balls = monthly_white_ball_analysis(df, precomputed_last_draw_date_str)
             
-            precomputed_number_age_data = get_number_age_distribution(df)
-            precomputed_co_occurrence_data, precomputed_max_co_occurrence = get_co_occurrence_matrix(df)
-            precomputed_powerball_position_data = get_powerball_position_frequency(df)
+            precomputed_number_age_data.clear() # Clear before extending
+            precomputed_number_age_data.extend(get_number_age_distribution(df))
             
+            co_occurrence_data, max_co_occurrence = get_co_occurrence_matrix(df)
+            precomputed_co_occurrence_data.clear() # Clear before extending
+            precomputed_co_occurrence_data.extend(co_occurrence_data)
+            precomputed_max_co_occurrence = max_co_occurrence
+
+            precomputed_powerball_position_data.clear() # Clear before extending
+            precomputed_powerball_position_data.extend(get_powerball_position_frequency(df))
+
+
             print("\n--- DEBUG: Precomputed Analysis Data Status ---")
             print(f"precomputed_white_ball_freq_list is empty: {not bool(precomputed_white_ball_freq_list)}")
             print(f"precomputed_white_ball_freq_list sample: {precomputed_white_ball_freq_list[:5]}")
@@ -643,7 +651,7 @@ def initialize_app_data():
             print(f"precomputed_powerball_position_data sample: {precomputed_powerball_position_data[:2] if precomputed_powerball_position_data else 'N/A'}")
             print("--- END DEBUG ---")
         else:
-            print("DataFrame is empty after loading. Skipping pre-computation.")
+            print("DataFrame is empty after loading. Skipping pre-computation and leaving precomputed lists/dicts empty.")
 
     except Exception as e:
         print(f"An error occurred during initial data loading or pre-computation: {e}")
@@ -719,8 +727,8 @@ def generate():
     if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
         try:
             last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
-        except ValueError:
-            pass
+            except ValueError:
+                pass
 
     return render_template('index.html', 
                            white_balls=white_balls, 
@@ -1042,16 +1050,33 @@ def update_powerball_data():
 
             if not df.empty:
                 white_ball_freq, powerball_freq = frequency_analysis(df)
-                precomputed_white_ball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in white_ball_freq.items()]
-                precomputed_powerball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in powerball_freq.items()]
+                precomputed_white_ball_freq_list.clear()
+                precomputed_white_ball_freq_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in white_ball_freq.items()])
+                
+                precomputed_powerball_freq_list.clear()
+                precomputed_powerball_freq_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in powerball_freq.items()])
+                
                 precomputed_last_draw_date_str = last_draw['Draw Date']
+                
                 hot_numbers, cold_numbers = hot_cold_numbers(df, precomputed_last_draw_date_str)
-                precomputed_hot_numbers_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in hot_numbers.items()]
-                precomputed_cold_numbers_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in cold_numbers.items()]
+                precomputed_hot_numbers_list.clear()
+                precomputed_hot_numbers_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in hot_numbers.items()])
+                
+                precomputed_cold_numbers_list.clear()
+                precomputed_cold_numbers_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in cold_numbers.items()])
+                
                 precomputed_monthly_balls = monthly_white_ball_analysis(df, precomputed_last_draw_date_str)
-                precomputed_number_age_data = get_number_age_distribution(df)
-                precomputed_co_occurrence_data, precomputed_max_co_occurrence = get_co_occurrence_matrix(df)
-                precomputed_powerball_position_data = get_powerball_position_frequency(df)
+                
+                precomputed_number_age_data.clear()
+                precomputed_number_age_data.extend(get_number_age_distribution(df))
+                
+                co_occurrence_data, max_co_occurrence = get_co_occurrence_matrix(df)
+                precomputed_co_occurrence_data.clear()
+                precomputed_co_occurrence_data.extend(co_occurrence_data)
+                precomputed_max_co_occurrence = max_co_occurrence
+
+                precomputed_powerball_position_data.clear()
+                precomputed_powerball_position_data.extend(get_powerball_position_frequency(df))
 
 
             return f"Data updated successfully with draw for {simulated_draw_date}.", 200
