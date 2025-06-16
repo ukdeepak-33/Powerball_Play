@@ -990,12 +990,14 @@ def find_results_by_first_white_ball():
                            white_ball_number=white_ball_number_display,
                            sort_by_year=sort_by_year_flag)
 
+# --- NEW: Route for updating data via scheduled job ---
 @app.route('/update_powerball_data', methods=['GET'])
 def update_powerball_data():
     service_headers = _get_supabase_headers(is_service_key=True)
     anon_headers = _get_supabase_headers(is_service_key=False)
 
-    try:
+    try: # Ensure this 'try' block is present and correctly indented
+        # 1. Fetch latest draw date from Supabase to check if we need to update
         url_check_latest = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
         params_check_latest = {
             'select': 'Draw Date',
@@ -1012,6 +1014,7 @@ def update_powerball_data():
         
         print(f"Last draw date in Supabase: {last_db_draw_date}")
 
+        # 2. Simulate or fetch latest actual Powerball draw from an external source
         simulated_draw_date_dt = datetime.now()
         simulated_draw_date = simulated_draw_date_dt.strftime('%Y-%m-%d')
         simulated_numbers = sorted(random.sample(range(1, 70), 5))
@@ -1033,6 +1036,7 @@ def update_powerball_data():
             print(f"Draw for {new_draw_data['Draw Date']} already exists. No update needed.")
             return "No new draw data. Database is up-to-date.", 200
         
+        # 3. Insert the new draw into Supabase
         url_insert = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
         insert_response = requests.post(url_insert, headers=service_headers, data=json.dumps(new_draw_data))
         insert_response.raise_for_status()
@@ -1040,6 +1044,7 @@ def update_powerball_data():
         if insert_response.status_code == 201:
             print(f"Successfully inserted new draw: {new_draw_data}")
             
+            # Re-load and re-compute data after insertion to reflect immediately for next request
             global df, last_draw, precomputed_white_ball_freq_list, precomputed_powerball_freq_list, \
                    precomputed_last_draw_date_str, precomputed_hot_numbers_list, precomputed_cold_numbers_list, \
                    precomputed_monthly_balls, precomputed_number_age_data, precomputed_co_occurrence_data, \
@@ -1084,7 +1089,7 @@ def update_powerball_data():
             print(f"Failed to insert data. Status: {insert_response.status_code}, Response: {insert_response.text}")
             return f"Error updating data: {insert_response.status_code} - {insert_response.text}", 500
 
-    except requests.exceptions.RequestException as e:
+    except requests.exceptions.RequestException as e: # This is the line indicated as error 730 in your logs
         print(f"Network or HTTP error during update_powerball_data: {e}")
         if hasattr(e, 'response') and e.response is not None:
             print(f"Supabase response content: {e.response.text}")
