@@ -19,7 +19,7 @@ app.secret_key = 'supersecretkey'
 
 # --- Supabase Configuration ---
 SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
-SUPABASE_ANON_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlrc3h6YmJjb2l0ZWhkbXN4cWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NzMwNjUsImV4cCI6MjA2NTM0OTA2NX0.AzUD7wjR7VbvtUH27NDqJ3AlvFW0nCWpiN9ADG8T_t4")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlrc3h6YmJjb2l0ZWhkbXN4cWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NzMwNjUsImexcpIjoMjA2NTM0OTA2NX0.AzUD7wjR7VbvtUH27NDqJ3AlvFW0nCWpiN9ADG8T_t4")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY")
 
 SUPABASE_TABLE_NAME = 'powerball_draws'
@@ -214,50 +214,76 @@ def hot_cold_numbers(df, last_draw_date_str):
     return hot_numbers, cold_numbers
 
 def monthly_white_ball_analysis(df, last_draw_date_str):
-    print("[DEBUG] Inside monthly_white_ball_analysis function.")
+    print("[DEBUG-Monthly] Inside monthly_white_ball_analysis function.")
     if df.empty or last_draw_date_str == 'N/A':
-        print("[DEBUG] monthly_white_ball_analysis: df is empty or last_draw_date_str is N/A. Returning empty dict.")
+        print("[DEBUG-Monthly] df is empty or last_draw_date_str is N/A. Returning empty dict.")
         return {}
 
     try:
         last_draw_date = pd.to_datetime(last_draw_date_str)
-        print(f"[DEBUG] monthly_white_ball_analysis: last_draw_date: {last_draw_date}")
+        print(f"[DEBUG-Monthly] last_draw_date: {last_draw_date}")
     except Exception as e:
-        print(f"[ERROR] monthly_white_ball_analysis: Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty dict.")
+        print(f"[ERROR-Monthly] Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty dict.")
         return {}
 
     six_months_ago = last_draw_date - pd.DateOffset(months=6)
-    print(f"[DEBUG] monthly_white_ball_analysis: six_months_ago: {six_months_ago}")
+    print(f"[DEBUG-Monthly] six_months_ago: {six_months_ago}")
 
     if 'Draw Date_dt' not in df.columns or not pd.api.types.is_datetime64_any_dtype(df['Draw Date_dt']):
-        print("[ERROR] monthly_white_ball_analysis: 'Draw Date_dt' column missing or not datetime type in df. Returning empty dict.")
-        return {}
+        print("[ERROR-Monthly] 'Draw Date_dt' column missing or not datetime type in df. Returning empty dict.")
+        # Attempt to re-create it if possible from 'Draw Date'
+        try:
+            df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'], errors='coerce')
+            df = df.dropna(subset=['Draw Date_dt'])
+            if df.empty:
+                print("[ERROR-Monthly] Re-creating 'Draw Date_dt' resulted in empty DataFrame. Returning empty dict.")
+                return {}
+            print("[DEBUG-Monthly] Successfully re-created 'Draw Date_dt' column.")
+        except Exception as e_recreate:
+            print(f"[ERROR-Monthly] Failed to re-create 'Draw Date_dt' column: {e_recreate}. Returning empty dict.")
+            return {}
+
 
     recent_data = df[df['Draw Date_dt'] >= six_months_ago].copy()
-    print(f"[DEBUG] monthly_white_ball_analysis: recent_data shape after filtering: {recent_data.shape}")
+    print(f"[DEBUG-Monthly] recent_data shape after filtering: {recent_data.shape}")
     if recent_data.empty:
-        print("[DEBUG] monthly_white_ball_analysis: recent_data is empty after filtering. Returning empty dict.")
+        print("[DEBUG-Monthly] recent_data is empty after filtering. Returning empty dict.")
         return {}
 
-    try:
-        recent_data['Month'] = recent_data['Draw Date_dt'].dt.to_period('M')
-        print(f"[DEBUG] monthly_white_ball_analysis: 'Month' column added to recent_data. First 2 months: {recent_data['Month'].head(2).tolist()}")
-    except Exception as e:
-        print(f"[ERROR] monthly_white_ball_analysis: Failed to create 'Month' column: {e}. Returning empty dict.")
-        return {}
-    
     monthly_balls = {}
     try:
-        monthly_balls = recent_data.groupby('Month')[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].apply(
-            lambda x: sorted(list(set(x.values.flatten()[~np.isnan(x.values.flatten())].astype(int))))
+        # Check if 'Month' column exists before creating
+        if 'Month' not in recent_data.columns:
+            recent_data['Month'] = recent_data['Draw Date_dt'].dt.to_period('M')
+            print(f"[DEBUG-Monthly] 'Month' column added to recent_data. First 2 months: {recent_data['Month'].head(2).tolist()}")
+        
+        # Ensure all necessary numeric columns exist and are numeric
+        required_cols = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']
+        for col in required_cols:
+            if col not in recent_data.columns:
+                print(f"[ERROR-Monthly] Missing required column '{col}' in recent_data. Cannot perform analysis.")
+                return {}
+            # Ensure they are numeric, coerce errors to NaN
+            recent_data[col] = pd.to_numeric(recent_data[col], errors='coerce')
+
+        # Drop rows where any of the numeric ball columns are NaN, before flattening
+        recent_data = recent_data.dropna(subset=required_cols)
+        if recent_data.empty:
+            print("[DEBUG-Monthly] recent_data is empty after dropping NaN in ball columns. Returning empty dict.")
+            return {}
+
+        monthly_balls = recent_data.groupby('Month')[required_cols].apply(
+            lambda x: sorted(list(set(x.values.flatten().astype(int)))) # Flatten, convert to int, then unique and sort
         ).to_dict()
-        print(f"[DEBUG] monthly_white_ball_analysis: Groupby and apply successful. First item in monthly_balls: {next(iter(monthly_balls.items())) if monthly_balls else 'N/A'}")
+        print(f"[DEBUG-Monthly] Groupby and apply successful. First item in monthly_balls: {next(iter(monthly_balls.items())) if monthly_balls else 'N/A'}")
     except Exception as e:
-        print(f"[ERROR] monthly_white_ball_analysis: Error during groupby/apply operation: {e}. Returning empty dict.")
+        print(f"[ERROR-Monthly] Error during groupby/apply operation: {e}. Returning empty dict.")
+        import traceback
+        traceback.print_exc() # Print full traceback to logs for detailed error
         return {}
     
     monthly_balls_str_keys = {str(k): v for k, v in monthly_balls.items()}
-    print("[DEBUG] monthly_white_ball_analysis: Successfully computed monthly_balls_str_keys.")
+    print("[DEBUG-Monthly] Successfully computed monthly_balls_str_keys.")
     return monthly_balls_str_keys
 
 
@@ -621,6 +647,7 @@ def initialize_app_data():
             precomputed_cold_numbers_list.clear() # Clear before extending
             precomputed_cold_numbers_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in cold_numbers.items()])
             
+            # --- IMPORTANT: Call monthly_white_ball_analysis during pre-computation ---
             precomputed_monthly_balls = monthly_white_ball_analysis(df, precomputed_last_draw_date_str)
             
             precomputed_number_age_data.clear() # Clear before extending
@@ -658,6 +685,8 @@ def initialize_app_data():
 
     except Exception as e:
         print(f"An error occurred during initial data loading or pre-computation: {e}")
+        import traceback
+        traceback.print_exc() # Print full traceback for initialization errors
 
 # Call the initialization function once when the module is loaded
 initialize_app_data()
@@ -851,31 +880,29 @@ def hot_cold_numbers_route():
 
 @app.route('/monthly_white_ball_analysis')
 def monthly_white_ball_analysis_route():
+    # The precomputed data is already available from initialize_app_data
     monthly_balls_json = json.dumps(precomputed_monthly_balls)
     return render_template('monthly_white_ball_analysis.html', 
                            monthly_balls=precomputed_monthly_balls,
                            monthly_balls_json=monthly_balls_json)
 
-# NEW ROUTE ADDED HERE FOR "SUM OF MAIN BALLS"
+
 @app.route('/sum_of_main_balls')
 def sum_of_main_balls_route():
     if df.empty:
         flash("Cannot display Sum of Main Balls: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
-    # Call the utility function
     sums_data_df, sum_freq_list, min_sum, max_sum, avg_sum = sum_of_main_balls(df)
     
-    # Convert DataFrame to list of dictionaries for Jinja2
     sums_data = sums_data_df.to_dict('records')
 
-    # Convert sum_freq_list to JSON string for D3.js chart
     sum_freq_json = json.dumps(sum_freq_list)
 
     return render_template('sum_of_main_balls.html', 
                            sums_data=sums_data,
-                           sum_freq=sum_freq_list, # Passed for direct display if needed
-                           sum_freq_json=sum_freq_json, # Passed as JSON string for D3.js
+                           sum_freq=sum_freq_list,
+                           sum_freq_json=sum_freq_json,
                            min_sum=min_sum,
                            max_sum=max_sum,
                            avg_sum=avg_sum)
@@ -1073,6 +1100,7 @@ def update_powerball_data():
                 precomputed_cold_numbers_list.clear()
                 precomputed_cold_numbers_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in cold_numbers.items()])
                 
+                # Update precomputed_monthly_balls after new data
                 precomputed_monthly_balls = monthly_white_ball_analysis(df, precomputed_last_draw_date_str)
                 
                 precomputed_number_age_data.clear()
@@ -1104,4 +1132,6 @@ def update_powerball_data():
         return f"JSON parsing error: {e}", 500
     except Exception as e:
         print(f"An unexpected error occurred during data update: {e}")
+        import traceback
+        traceback.print_exc() # Print full traceback for update errors
         return f"An internal error occurred: {e}", 500
