@@ -262,7 +262,10 @@ def monthly_white_ball_analysis(df, last_draw_date_str):
 
 
 def sum_of_main_balls(df):
-    if df.empty: return pd.DataFrame(), [], 0, 0, 0.0
+    """Calculates the sum of the five main white balls for each draw."""
+    if df.empty:
+        return pd.DataFrame(), [], 0, 0, 0.0
+    
     temp_df = df.copy()
     for col in ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']:
         if col in temp_df.columns:
@@ -853,24 +856,29 @@ def monthly_white_ball_analysis_route():
                            monthly_balls=precomputed_monthly_balls,
                            monthly_balls_json=monthly_balls_json)
 
-
-def sum_of_main_balls(df):
-    if df.empty: return pd.DataFrame(), [], 0, 0, 0.0
-    temp_df = df.copy()
-    for col in ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']:
-        if col in temp_df.columns:
-            temp_df[col] = pd.to_numeric(temp_df[col], errors='coerce').fillna(0).astype(int)
+# NEW ROUTE ADDED HERE FOR "SUM OF MAIN BALLS"
+@app.route('/sum_of_main_balls')
+def sum_of_main_balls_route():
+    if df.empty:
+        flash("Cannot display Sum of Main Balls: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
     
-    temp_df['Sum'] = temp_df[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].sum(axis=1)
+    # Call the utility function
+    sums_data_df, sum_freq_list, min_sum, max_sum, avg_sum = sum_of_main_balls(df)
     
-    sum_freq = temp_df['Sum'].value_counts().sort_index()
-    sum_freq_list = [{'sum': int(s), 'count': int(c)} for s, c in sum_freq.items()]
+    # Convert DataFrame to list of dictionaries for Jinja2
+    sums_data = sums_data_df.to_dict('records')
 
-    min_sum = int(temp_df['Sum'].min()) if not temp_df['Sum'].empty else 0
-    max_sum = int(temp_df['Sum'].max()) if not temp_df['Sum'].empty else 0
-    avg_sum = round(temp_df['Sum'].mean(), 2) if not temp_df['Sum'].empty else 0.0
+    # Convert sum_freq_list to JSON string for D3.js chart
+    sum_freq_json = json.dumps(sum_freq_list)
 
-    return temp_df[['Draw Date', 'Sum']], sum_freq_list, min_sum, max_sum, avg_sum
+    return render_template('sum_of_main_balls.html', 
+                           sums_data=sums_data,
+                           sum_freq=sum_freq_list, # Passed for direct display if needed
+                           sum_freq_json=sum_freq_json, # Passed as JSON string for D3.js
+                           min_sum=min_sum,
+                           max_sum=max_sum,
+                           avg_sum=avg_sum)
 
 @app.route('/find_results_by_sum', methods=['GET', 'POST'])
 def find_results_by_sum_route():
