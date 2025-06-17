@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Generated Numbers History{% endblock %}
+
+{% block page_heading %}Your Saved Generated Powerball Picks{% endblock %}
+
+{% block content %}
+<div class="card p-6 bg-white rounded-lg shadow-lg">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">History of Saved Picks</h2>
+    
+    {% if generated_history %}
+        {% for date, picks_on_date in generated_history.items() %}
+            <div class="mb-4 border-b pb-4">
+                <button class="toggle-button w-full text-left py-2 px-4 bg-gray-100 rounded-md font-semibold text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 flex justify-between items-center">
+                    <span>{{ date }} ({{ picks_on_date | length }} picks)</span>
+                    <span class="toggle-icon">+</span>
+                </button>
+                <div class="content-toggle hidden pl-4 pt-2">
+                    {% for pick in picks_on_date %}
+                        <div class="flex items-center space-x-2 py-1">
+                            <span class="text-gray-600 font-mono">{{ pick.time }}</span>
+                            <div class="flex space-x-1 ml-2">
+                                {% for ball in pick.white_balls %}
+                                    <span class="ball small-ball">{{ ball }}</span>
+                                {% endfor %}
+                                <span class="ball powerball small-ball">{{ pick.powerball }}</span>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p class="text-gray-500">No generated Powerball picks saved yet.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    /* Additional styling for small balls in history view */
+    .small-ball {
+        width: 30px; /* Smaller width */
+        height: 30px; /* Smaller height */
+        font-size: 0.875rem; /* Smaller font size */
+        border-width: 1px; /* Thinner border */
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Lighter shadow */
+    }
+    .toggle-icon {
+        transition: transform 0.3s ease-in-out;
+    }
+    .toggle-button.expanded .toggle-icon {
+        transform: rotate(45deg); /* Rotates X to a plus sign */
+    }
+</style>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const toggleButtons = document.querySelectorAll('.toggle-button');
+
+        toggleButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const content = this.nextElementSibling; // The div immediately after the button
+                const icon = this.querySelector('.toggle-icon');
+
+                content.classList.toggle('hidden');
+                this.classList.toggle('expanded'); // Add/remove 'expanded' class to button
+                
+                if (content.classList.contains('hidden')) {
+                    icon.textContent = '+'; // Change to plus when collapsed
+                } else {
+                    icon.textContent = 'x'; // Change to 'x' when expanded (for close)
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}
