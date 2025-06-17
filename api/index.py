@@ -6,6 +6,10 @@ import math
 import os
 from collections import defaultdict
 from datetime import datetime, timedelta # Import timedelta
+import requests # Make sure this line is present and not commented out
+import json
+import numpy as np # Ensure numpy is imported if used (it is in frequency_analysis, etc.)
+
 
 # --- Supabase Configuration ---
 SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
@@ -13,7 +17,7 @@ SUPABASE_ANON_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY")
 
 SUPABASE_TABLE_NAME = 'powerball_draws'
-GENERATED_NUMBERS_TABLE_NAME = 'generated_powerball_numbers'
+GENERATED_NUMBERS_TABLE_NAME = 'generated_powerball_numbers' # New table name for generated picks
 
 # --- Flask App Initialization with Template Path ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1712,8 +1716,8 @@ def analyze_generated_historical_matches_route():
         historical_match_results = check_generated_against_history(generated_white_balls, generated_powerball, df)
         
         return render_template('historical_match_analysis_results.html', 
-                               generated_numbers_for_analysis=historical_match_results['generated_balls'],
-                               generated_powerball_for_analysis=historical_match_results['generated_powerball'],
+                               generated_numbers_for_analysis=generated_white_balls,
+                               generated_powerball_for_analysis=generated_powerball,
                                match_summary=historical_match_results['summary'])
 
     except ValueError:
