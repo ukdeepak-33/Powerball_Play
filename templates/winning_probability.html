@@ -2,21 +2,36 @@
 
 {% block title %}Winning Probability{% endblock %}
 
-{% block page_heading %}Overall Winning Probability{% endblock %}
+{% block page_heading %}Winning Probability{% endblock %}
 
 {% block content %}
-    {% if probability_1_in_x %}
-        <div class="card">
-            <h3 class="text-lg font-semibold mb-2 text-gray-700">Overall Winning Probability:</h3>
-            <p class="mb-2"><strong>1 in X:</strong> {{ probability_1_in_x }}</p>
-            <p><strong>Percentage:</strong> {{ probability_percentage }}</p>
-            <p class="text-sm text-gray-600 mt-4">This calculation is based on the full range of white balls (1-69) and Powerballs (1-26).</p>
-        </div>
-    {% else %}
-        <div class="card"><p class="text-gray-500">Probability data not available. Please ensure ranges are correctly set and calculations are possible.</p></div>
-    {% endif %}
-{% endblock %}
+<div class="card p-6 bg-white rounded-lg shadow-lg text-center">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">Powerball Winning Probability</h2>
 
-{% block scripts %}
-    {# No D3 charts for this page #}
+    {% if white_ball_range and powerball_range %}
+        <p class="text-lg text-gray-700 mb-4">
+            Calculated for White Balls from <span class="font-semibold">{{ white_ball_range[0] }}</span> to <span class="font-semibold">{{ white_ball_range[1] }}</span>
+            and Powerball from <span class="font-semibold">{{ powerball_range[0] }}</span> to <span class="font-semibold">{{ powerball_range[1] }}</span>.
+        </p>
+    {% else %}
+        <p class="text-lg text-gray-700 mb-4">Calculated for standard Powerball ranges (White Balls 1-69, Powerball 1-26).</p>
+    {% endif %}
+
+    <div class="space-y-4">
+        <div>
+            <h3 class="text-xl font-semibold text-blue-700 mb-2">Odds:</h3>
+            <p class="text-3xl font-extrabold text-blue-900">{{ probability_1_in_x }}</p>
+            <p class="text-sm text-gray-600">(This means you have 1 chance in X of winning the jackpot)</p>
+        </div>
+        <div>
+            <h3 class="text-xl font-semibold text-green-700 mb-2">Percentage Probability:</h3>
+            <p class="text-3xl font-extrabold text-green-900">{{ probability_percentage }}</p>
+            <p class="text-sm text-gray-600">(A very small chance!)</p>
+        </div>
+    </div>
+
+    <div class="mt-8">
+        <a href="{{ url_for('index') }}" class="btn-primary inline-block">Go Back to Generator</a>
+    </div>
+</div>
 {% endblock %}
