@@ -55,7 +55,8 @@
         }
         .form-group input[type="number"],
         .form-group input[type="text"],
-        .form-group select {
+        .form-group select,
+        .form-group input[type="date"] { /* Added date input styling */
             width: 100%;
             padding: 0.75rem;
             border: 1px solid #cbd5e0;
@@ -207,6 +208,7 @@
             <nav class="flex-grow">
                 <ul class="space-y-2">
                     <li><a href="{{ url_for('index') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Home / Generate Numbers</a></li>
+                    <li><a href="{{ url_for('generated_numbers_history_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">View Generated Numbers History</a></li> {# NEW LINK #}
                     <li><a href="{{ url_for('frequency_analysis_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Frequency Analysis</a></li>
                     <li><a href="{{ url_for('hot_cold_numbers_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Hot & Cold Numbers</a></li>
                     <li><a href="{{ url_for('monthly_white_ball_analysis_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Monthly White Ball Analysis</a></li>
@@ -225,7 +227,7 @@
                 </ul>
             </nav>
             <div class="mt-8 text-center">
-                <a href="{{ url_for('update_powerball_data') }}" class="btn-primary inline-block text-sm">Update Daily Data</a>
+                <a href="{{ url_for('update_powerball_data') }}" class="btn-primary inline-block text-sm">Update Daily Data (Simulated)</a>
             </div>
         </aside>
 
