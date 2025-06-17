@@ -3,732 +3,340 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Powerball Simulator{% endblock %}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>{% block title %}Powerball Play{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f0f4f8;
-            color: #334155;
+            background-color: #f0f2f5;
+            color: #333;
         }
-        .container-flex {
+        .header {
+            background-color: #1a202c; /* Darker header */
+            color: #fff;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             display: flex;
-            min-height: 100vh;
+            justify-content: space-between;
+            align-items: center;
         }
         .sidebar {
+            background-color: #2d3748; /* Dark blue-gray */
+            color: #e2e8f0;
             width: 250px;
-            background-color: #312e81; /* Darker indigo for sidebar */
-            padding: 1.5rem;
-            color: #e0e7ff;
-            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem 1rem;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
             position: fixed;
             height: 100%;
             overflow-y: auto;
-            flex-shrink: 0;
-            z-index: 10; /* Ensure sidebar is above main content if needed */
+            display: flex;
+            flex-direction: column;
         }
-        .content-area {
-            margin-left: 250px; /* Offset for the sidebar */
-            flex-grow: 1;
+        .content {
+            margin-left: 250px; /* Adjust content to start after sidebar */
             padding: 2rem;
-            background-color: #f0f4f8;
+            flex-grow: 1;
         }
         .card {
             background-color: #ffffff;
-            border-radius: 0.75rem;
+            border-radius: 0.75rem; /* More rounded corners */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Softer, larger shadow */
             padding: 1.5rem;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
             margin-bottom: 1.5rem;
-            border: 1px solid #e2e8f0; /* Subtle border for cards */
+            border: 1px solid #e2e8f0; /* Subtle border */
         }
-        .form-label {
+        .form-group label {
             display: block;
             margin-bottom: 0.5rem;
             font-weight: 600;
-            color: #475569;
+            color: #4a5568;
         }
-        .form-input, .form-select, .form-textarea {
+        .form-group input[type="number"],
+        .form-group input[type="text"],
+        .form-group select {
             width: 100%;
             padding: 0.75rem;
-            border: 1px solid #cbd5e1;
-            border-radius: 0.5rem;
-            font-size: 1rem;
-            color: #334155;
-            transition: all 0.2s ease-in-out;
-        }
-        @media (min-width: 768px) {
-            .form-select {
-                max-width: 280px;
-            }
-        }
-        .form-input:focus, .form-select:focus, .form-textarea:focus {
-            outline: none;
-            border-color: #6366f1;
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+            border: 1px solid #cbd5e0;
+            border-radius: 0.5rem; /* Rounded input fields */
+            margin-bottom: 1rem;
+            box-sizing: border-box;
         }
         .btn-primary {
-            background-color: #6366f1;
-            color: #ffffff;
+            background-color: #4c51bf; /* Deeper indigo */
+            color: white;
             padding: 0.75rem 1.5rem;
             border-radius: 0.5rem;
-            font-weight: 600;
-            transition: background-color 0.2s, transform 0.1s;
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            font-weight: 700;
+            transition: background-color 0.2s ease;
         }
         .btn-primary:hover {
-            background-color: #4f46e5;
-            transform: translateY(-1px);
+            background-color: #5a62c9; /* Lighter indigo on hover */
         }
-        .btn-primary:active {
-            transform: translateY(0);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        .flash-message {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
         }
-
+        .flash-message.error {
+            background-color: #fed7d7;
+            color: #c53030;
+            border: 1px solid #fc8181;
+        }
+        .flash-message.info {
+            background-color: #bee3f8;
+            color: #2b6cb0;
+            border: 1px solid #63b3ed;
+        }
+        .draw-numbers {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
         .ball {
-            display: inline-flex;
+            width: 50px; /* Larger balls */
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
             justify-content: center;
             align-items: center;
-            width: 3.2rem;
-            height: 3.2rem;
-            border-radius: 50%;
-            font-weight: 700;
-            font-size: 1.35rem;
-            margin: 0.35rem;
-            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
-        }
-        .white-ball {
-            background-color: #e2e8f0;
-            color: #1a202c;
-            border: 2px solid #cbd5e1;
+            font-size: 1.5rem; /* Larger font */
+            font-weight: bold;
+            color: white;
+            background-color: #4299e1; /* Blue for white balls */
+            border: 2px solid #3182ce;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
         .powerball {
-            background-color: #dc2626;
-            color: #ffffff;
-            border: 2px solid #b91c1c;
+            background-color: #e53e3e; /* Red for powerball */
+            border: 2px solid #c53030;
         }
-        .message {
-            padding: 1rem;
+
+        .chart-container {
+            background-color: #ffffff;
             border-radius: 0.75rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            padding: 1.5rem;
             margin-bottom: 1.5rem;
-            font-weight: 500;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e2e8f0;
+            overflow-x: auto; /* For horizontal scrolling if content is too wide */
         }
-        .message.success {
-            background-color: #d1fae5;
-            color: #065f46;
-            border: 1px solid #10b981;
+
+        .chart-container svg {
+            font-family: 'Inter', sans-serif;
+            width: 100%; /* Make SVG responsive */
+            height: auto; /* Maintain aspect ratio */
+            min-height: 400px; /* Minimum height for readability */
         }
-        .message.error {
-            background-color: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #ef4444;
+        
+        .axis text {
+            font-size: 10px;
+            fill: #666;
         }
-        .message.info {
-            background-color: #e0f2fe;
-            color: #0b72c4;
-            border: 1px solid #3b82f6;
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: #dcdcdc;
+            shape-rendering: crispEdges;
         }
+        .bar {
+            fill: steelblue;
+        }
+        .bar.red {
+            fill: #e53e3e; /* Red for Powerball */
+        }
+        .bar.lightblue {
+            fill: #90cdf4; /* Lightblue for cold numbers */
+        }
+        .bar.orange {
+            fill: #f6ad55; /* Orange for specific charts */
+        }
+
+        /* Table styles */
         .table-auto {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 1rem;
-            border-radius: 0.5rem;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
         .table-auto th, .table-auto td {
-            padding: 1rem;
+            padding: 0.75rem;
             text-align: left;
-            border-bottom: 1px solid #e9edf1;
+            border-bottom: 1px solid #e2e8f0;
         }
         .table-auto th {
-            background-color: #f1f5f9;
+            background-color: #edf2f7;
             font-weight: 600;
-            color: #475569;
+            color: #2d3748;
+            text-transform: uppercase;
+            font-size: 0.75rem;
         }
         .table-auto tbody tr:nth-child(odd) {
-            background-color: #fbfdfe;
+            background-color: #ffffff;
+        }
+        .table-auto tbody tr:nth-child(even) {
+            background-color: #f7fafc;
         }
         .table-auto tbody tr:hover {
-            background-color: #eef2f6;
-            transition: background-color 0.15s ease-in-out;
+            background-color: #ebf8ff;
         }
 
-        /* D3 Chart Specific Styles */
-        .chart-container {
-            margin-top: 2rem;
-            background-color: #f8fafc;
-            border-radius: 0.75rem;
-            padding: 1.5rem;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
-            border: 1px solid #e2e8f0;
-        }
-        .chart-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            color: #475569;
-        }
-        .bar {
-            fill: #6366f1;
-            transition: fill 0.2s ease-in-out;
-        }
-        .bar:hover {
-            fill: #4f46e5;
-        }
-        .axis path, .axis line {
-            stroke: #cbd5e1;
-        }
-        .axis text {
-            fill: #64748b;
-            font-size: 0.875rem;
-        }
-        .tooltip {
-            position: absolute;
-            text-align: center;
-            width: auto;
-            height: auto;
-            padding: 8px;
-            font: 12px sans-serif;
-            background: #333;
-            color: white;
-            border: 0px;
-            border-radius: 8px;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s ease-in-out;
-            z-index: 999; /* Ensure tooltip is on top */
-        }
-        .heatmap-cell {
-            stroke: #fff;
-            stroke-width: 1px;
-            transition: fill 0.2s ease-in-out;
-        }
-        .heatmap-cell:hover {
-            stroke: #334155;
-            stroke-width: 2px;
-        }
-        /* New style for multi-line chart */
-        .line {
-            fill: none;
-            stroke-width: 2px;
-        }
-        .white-ball-sm {
-            display: inline-flex;
-            justify-content: center;
+        /* D3 Line Chart specific styles for legend */
+        .legend-item {
+            display: flex;
             align-items: center;
-            width: 2rem; /* Smaller size */
-            height: 2rem; /* Smaller size */
-            border-radius: 50%;
-            font-weight: 600; /* Slightly less bold */
-            font-size: 0.875rem; /* Smaller font */
-            margin: 0.2rem;
-            background-color: #e2e8f0;
-            color: #1a202c;
-            border: 1px solid #cbd5e1; /* Thinner border */
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08); /* Lighter shadow */
+            margin-bottom: 5px;
         }
 
-
-        /* Mobile adjustments */
-        @media (max-width: 768px) {
-            .container-flex {
-                flex-direction: column;
-            }
-            .sidebar {
-                position: relative;
-                width: 100%;
-                height: auto;
-                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-                border-bottom-left-radius: 0.75rem;
-                border-bottom-right-radius: 0.75rem;
-            }
-            .content-area {
-                margin-left: 0;
-                padding: 1rem;
-            }
-            .ball {
-                width: 2.5rem;
-                height: 2.5rem;
-                font-size: 1rem;
-                margin: 0.2rem;
-            }
-            .form-input, .form-select {
-                max-width: 100%;
-            }
-        }
-
-        /* Specific styles for active navigation link */
-        .sidebar nav ul li a.active-nav-link {
-            background-color: #4f46e5;
-            color: white;
-            font-weight: 700;
-            border-radius: 0.5rem;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        .legend-color-box {
+            width: 18px;
+            height: 18px;
+            margin-right: 8px;
+            border-radius: 3px;
         }
     </style>
 </head>
-<body>
-    <div class="container-flex">
-        <!-- Left Sidebar Navigation -->
+<body class="flex flex-col min-h-screen">
+    <header class="header">
+        <div class="text-2xl font-bold flex-grow text-left md:text-center">Powerball Play</div>
+    </header>
+
+    <div class="flex flex-grow">
         <aside class="sidebar">
-            <h2 class="text-2xl font-bold mb-6 text-white text-center">Powerball Nav</h2>
-            <nav>
-                <ul>
-                    <li class="mb-3">
-                        <a href="{{ url_for('index') }}" class="block py-2 px-3 hover:bg-indigo-700 rounded transition-colors duration-200 text-white font-medium">Home (Generate)</a>
-                    </li>
-                    <li class="mb-3">
-                        <a href="#analysis-section" class="block py-2 px-3 hover:bg-indigo-700 rounded transition-colors duration-200 text-white font-medium">Powerball Analysis</a>
-                        <ul class="ml-4 mt-2 space-y-1">
-                            <li><a href="{{ url_for('frequency_analysis_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Frequency Analysis</a></li>
-                            <li><a href="{{ url_for('hot_cold_numbers_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Hot & Cold Numbers</a></li>
-                            <li><a href="{{ url_for('monthly_white_ball_analysis_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Monthly White Ball Analysis</a></li>
-                            <li><a href="{{ url_for('sum_of_main_balls_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Sum of Main Balls</a></li>
-                            <li><a href="{{ url_for('find_results_by_sum_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Find Results by Sum</a></li>
-                            <li><a href="{{ url_for('find_results_by_first_white_ball') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Find Results by First White Ball</a></li>
-                            <li><a href="{{ url_for('simulate_multiple_draws_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Simulate Multiple Draws</a></li>
-                            <li><a href="{{ url_for('number_age_distribution_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Number Age Distribution</a></li>
-                            <li><a href="{{ url_for('co_occurrence_analysis_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Co-occurrence Analysis</a></li>
-                            <li><a href="{{ url_for('powerball_position_frequency_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Powerball Position Frequency</a></li>
-                        </ul>
-                    </li>
-                    <li class="mb-3">
-                        <a href="#probabilities-section" class="block py-2 px-3 hover:bg-indigo-700 rounded transition-colors duration-200 text-white font-medium">Probabilities</a>
-                        <ul class="ml-4 mt-2 space-y-1">
-                            <li><a href="{{ url_for('winning_probability_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Winning Probability</a></li>
-                            <li><a href="{{ url_for('partial_match_probabilities_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Partial Match Probabilities</a></li>
-                        </ul>
-                    </li>
+            <nav class="flex-grow">
+                <ul class="space-y-2">
+                    <li><a href="{{ url_for('index') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Home / Generate Numbers</a></li>
+                    <li><a href="{{ url_for('frequency_analysis_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Frequency Analysis</a></li>
+                    <li><a href="{{ url_for('hot_cold_numbers_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Hot & Cold Numbers</a></li>
+                    <li><a href="{{ url_for('monthly_white_ball_analysis_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Monthly White Ball Analysis</a></li>
+                    <li><a href="{{ url_for('sum_of_main_balls_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Sum of Main Balls</a></li>
+                    <li><a href="{{ url_for('find_results_by_sum_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Find Results by Sum</a></li>
+                    <li><a href="{{ url_for('simulate_multiple_draws_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Simulate Multiple Draws</a></li>
+                    <li><a href="{{ url_for('winning_probability_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Winning Probability</a></li>
+                    <li><a href="{{ url_for('partial_match_probabilities_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Partial Match Probabilities</a></li>
+                    <li><a href="{{ url_for('number_age_distribution_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Number Age Distribution</a></li>
+                    <li><a href="{{ url_for('co_occurrence_analysis_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Co-Occurrence Analysis</a></li>
+                    <li><a href="{{ url_for('powerball_position_frequency_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Powerball Position Frequency</a></li>
+                    <li><a href="{{ url_for('find_results_by_first_white_ball') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Find by First White Ball</a></li>
+                    <li><a href="{{ url_for('odd_even_trends_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Odd/Even Split Trends</a></li>
+                    <li><a href="{{ url_for('consecutive_trends_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Consecutive Numbers Trends</a></li>
+                    <li><a href="{{ url_for('triplets_analysis_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Triplets Analysis</a></li>
                 </ul>
             </nav>
+            <div class="mt-8 text-center">
+                <a href="{{ url_for('update_powerball_data') }}" class="btn-primary inline-block text-sm">Update Daily Data</a>
+            </div>
         </aside>
 
-        <!-- Main Content Area -->
-        <main class="content-area">
-            <h1 class="text-3xl font-bold text-center mb-6 text-indigo-700">{% block page_heading %}Powerball Simulator{% endblock %}</h1>
-
+        <main class="content">
+            <h1 class="text-3xl font-bold mb-6 text-gray-800">{% block page_heading %}{% endblock %}</h1>
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     <div class="flash-messages">
                         {% for category, message in messages %}
-                            <div class="message {{ category }}">{{ message }}</div>
+                            <div class="flash-message {{ category }}">{{ message }}</div>
                         {% endfor %}
                     </div>
                 {% endif %}
             {% endwith %}
-
             {% block content %}{% endblock %}
-
         </main>
     </div>
 
     <script>
-        // D3.js Tooltip - Shared across all pages
-        const tooltip = d3.select("body").append("div")
-            .attr("class", "tooltip")
-            .style("opacity", 0);
+        // Universal D3 Bar Chart Function for Reusability
+        // Data: [{ Number: X, Frequency: Y }, ...]
+        // ChartId: ID of the div to render into
+        // xValueKey: Key for the X-axis value (e.g., "Number", "sum", "age")
+        // yValueKey: Key for the Y-axis value (e.g., "Frequency", "count")
+        // title: Chart title
+        // xLabel: X-axis label
+        // yLabel: Y-axis label
+        // barColor: CSS color string for bars (optional, defaults to steelblue)
+        // prefix: Optional prefix for X-axis labels (e.g., "Ball ")
+        function drawBarChart(data, chartId, xValueKey, yValueKey, title, xLabel, yLabel, barColor = "steelblue", prefix = "") {
+            d3.select(`#${chartId}`).selectAll("*").remove(); // Clear previous chart
 
-        // Function to draw Bar Charts - Shared across all pages
-        function drawBarChart(data, elementId, xKey, yKey, chartTitle, xLabel, yLabel, barColor = "#6366f1", tooltipPrefix = "") {
-            console.log(`[D3 Debug] drawBarChart called for ${elementId}`);
-            console.log("[D3 Debug] Data received for bar chart:", data);
-
-            if (!Array.isArray(data) || data.length === 0) {
-                console.warn(`[D3 Warn] No data (or invalid data format) provided for bar chart: ${elementId}`);
-                d3.select(`#${elementId}`).html("<p class='text-gray-500'>No data available for this chart.</p>");
+            if (!data || data.length === 0) {
+                console.warn(`No data provided for bar chart '${chartId}'.`);
+                d3.select(`#${chartId}`).append("p").text("No data available for this chart.");
                 return;
             }
 
-            // Clear previous chart
-            d3.select(`#${elementId}`).html("");
-
-            const container = d3.select(`#${elementId}`);
-            const margin = { top: 40, right: 30, bottom: 60, left: 50 };
-            const width = Math.max(0, container.node().clientWidth - margin.left - margin.right); // Ensure non-negative width
+            const margin = { top: 30, right: 30, bottom: 60, left: 50 };
+            // Adjust width to be responsive up to a max, and maintain padding
+            const width = Math.min(800, document.getElementById(chartId).offsetWidth) - margin.left - margin.right;
             const height = 400 - margin.top - margin.bottom;
 
-            const svg = container.append("svg")
+            const svg = d3.select(`#${chartId}`)
+                .append("svg")
                 .attr("width", width + margin.left + margin.right)
                 .attr("height", height + margin.top + margin.bottom)
                 .append("g")
                 .attr("transform", `translate(${margin.left},${margin.top})`);
 
-            // Check if xKey and yKey exist in data objects
-            const xDomain = data.map(d => d[xKey]);
-            const yMax = d3.max(data, d => d[yKey]);
-
-            if (xDomain.includes(undefined) || yMax === undefined || xDomain.length === 0) { // Added xDomain.length check
-                 d3.select(`#${elementId}`).html(`<p class="text-gray-500">Data structure issue for ${chartTitle} chart. Check xKey/yKey. Expected keys: ${xKey}, ${yKey}. First data item: ${JSON.stringify(data[0])}</p>`);
-                 console.error(`[D3 Error] Data structure mismatch for ${chartTitle}. xKey: ${xKey}, yKey: ${yKey}. First data item:`, data[0]);
-                 return;
-            }
-
-            // X scale
-            const x = d3.scaleBand()
-                .domain(xDomain) // Use the extracted domain
+            // X scale (band for discrete categories)
+            const xScale = d3.scaleBand()
                 .range([0, width])
-                .padding(0.1);
+                .padding(0.1)
+                .domain(data.map(d => d[xValueKey]));
 
-            // Y scale
-            const y = d3.scaleLinear()
-                .domain([0, yMax]).nice() // Use the extracted max
-                .range([height, 0]);
+            // Y scale (linear for frequency)
+            const yScale = d3.scaleLinear()
+                .range([height, 0])
+                .domain([0, d3.max(data, d => d[yValueKey]) * 1.1]); // 10% padding on top
 
-            // Bars
+            // Add X axis
+            svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(xScale))
+                .selectAll("text")
+                .attr("transform", "rotate(-45)")
+                .style("text-anchor", "end")
+                .text(d => prefix + d); // Apply prefix to tick labels
+
+            // Add Y axis
+            svg.append("g")
+                .call(d3.axisLeft(yScale).tickFormat(d3.format("d"))); // Ensure integer ticks for frequency
+
+            // Add bars
             svg.selectAll(".bar")
                 .data(data)
                 .enter().append("rect")
                 .attr("class", "bar")
-                .attr("x", d => x(d[xKey]))
-                .attr("y", d => y(d[yKey]))
-                .attr("width", x.bandwidth())
-                .attr("height", d => height - y(d[yKey]))
-                .attr("fill", barColor) // Use dynamic barColor
-                .on("mouseover", function(event, d) {
-                    d3.select(this).style("fill", d3.rgb(barColor).darker(0.5)); // Darker on hover
-                    tooltip.transition()
-                        .duration(200)
-                        .style("opacity", .9);
-                    tooltip.html(`<strong>${tooltipPrefix}${d[xKey]}</strong><br/>Frequency: <strong>${d[yKey]}</strong>`)
-                        .style("left", (event.pageX + 10) + "px")
-                        .style("top", (event.pageY - 28) + "px");
-                })
-                .on("mouseout", function(d) {
-                    d3.select(this).style("fill", barColor); // Original color
-                    tooltip.transition()
-                        .duration(500)
-                        .style("opacity", 0);
-                });
+                .attr("x", d => xScale(d[xValueKey]))
+                .attr("y", d => yScale(d[yValueKey]))
+                .attr("width", xScale.bandwidth())
+                .attr("height", d => height - yScale(d[yValueKey]))
+                .attr("fill", barColor); // Use dynamic bar color
 
-            // X-axis
-            svg.append("g")
-                .attr("class", "x axis")
-                .attr("transform", `translate(0,${height})`)
-                .call(d3.axisBottom(x))
-                .selectAll("text")
-                .attr("transform", "rotate(-45)")
-                .style("text-anchor", "end");
+            // Add title
+            svg.append("text")
+                .attr("x", (width / 2))
+                .attr("y", 0 - (margin.top / 2))
+                .attr("text-anchor", "middle")
+                .style("font-size", "16px")
+                .style("font-weight", "bold")
+                .text(title);
 
-            // Y-axis
-            svg.append("g")
-                .attr("class", "y axis")
-                .call(d3.axisLeft(y));
+            // Add X-axis label
+            svg.append("text")
+                .attr("transform", `translate(${width / 2}, ${height + margin.bottom - 10})`)
+                .style("text-anchor", "middle")
+                .text(xLabel);
 
-            // Y-axis label
+            // Add Y-axis label
             svg.append("text")
                 .attr("transform", "rotate(-90)")
-                .attr("y", 0 - margin.left + 10)
+                .attr("y", 0 - margin.left + 15)
                 .attr("x", 0 - (height / 2))
                 .attr("dy", "1em")
                 .style("text-anchor", "middle")
-                .attr("fill", "#475569")
                 .text(yLabel);
-            
-            // Chart Title
-            svg.append("text")
-                .attr("x", (width / 2))
-                .attr("y", 0 - (margin.top / 2))
-                .attr("text-anchor", "middle")
-                .style("font-size", "1.1rem")
-                .style("font-weight", "600")
-                .attr("fill", "#334155")
-                .text(chartTitle);
         }
 
-        // Function to draw Heatmap - Shared across all pages
-        function drawHeatmap(data, elementId, xKey, yKey, valueKey, chartTitle, xLabel, yLabel, maxValue = 0) {
-            console.log(`[D3 Debug] drawHeatmap called for ${elementId}`);
-            console.log("[D3 Debug] Data received for heatmap:", data);
-
-            if (!Array.isArray(data) || data.length === 0) {
-                console.warn(`[D3 Warn] No data (or invalid data format) provided for heatmap: ${elementId}`);
-                d3.select(`#${elementId}`).html("<p class='text-gray-500'>No data available for this chart.</p>");
-                return;
-            }
-
-            // Clear previous chart
-            d3.select(`#${elementId}`).html("");
-
-            const container = d3.select(`#${elementId}`);
-            const margin = { top: 50, right: 20, bottom: 60, left: 60 };
-            const width = Math.max(0, Math.min(container.node().clientWidth, 700) - margin.left - margin.right);
-            const height = 600 - margin.top - margin.bottom;
-
-            const svg = container.append("svg")
-                .attr("width", width + margin.left + margin.right)
-                .attr("height", height + margin.top + margin.bottom)
-                .append("g")
-                .attr("transform", `translate(${margin.left},${margin.top})`);
-
-            // Extract unique x and y values for domains
-            const xDomain = Array.from(new Set(data.map(d => d[xKey]))).sort(d3.ascending);
-            const yDomain = Array.from(new Set(data.map(d => d[yKey]))).sort(d3.ascending);
-
-            if (xDomain.includes(undefined) || yDomain.includes(undefined) || xDomain.length === 0 || yDomain.length === 0) {
-                 d3.select(`#${elementId}`).html(`<p class="text-gray-500">Data structure issue for ${chartTitle} heatmap. Check xKey/yKey. Expected keys: ${xKey}, ${yKey}. First data item: ${JSON.stringify(data[0])}</p>`);
-                 console.error(`[D3 Error] Data structure mismatch for ${chartTitle}. xKey: ${xKey}, yKey: ${yKey}. First data item:`, data[0]);
-                 return;
-            }
-
-            const x = d3.scaleBand()
-                .range([0, width])
-                .domain(xDomain)
-                .paddingInner(0.05);
-
-            const y = d3.scaleBand()
-                .range([height, 0])
-                .domain(yDomain)
-                .paddingInner(0.05);
-
-            const colorMax = maxValue > 0 ? maxValue : d3.max(data, d => d[valueKey]);
-            const colorScale = d3.scaleSequential(d3.interpolateViridis)
-                                 .domain([0, colorMax]);
-
-            // Tooltip
-            const heatmapTooltip = d3.select("body").append("div")
-                .attr("class", "tooltip")
-                .style("opacity", 0);
-
-            svg.selectAll(".heatmap-cell")
-                .data(data)
-                .enter().append("rect")
-                .attr("class", "heatmap-cell")
-                .attr("x", d => x(d[xKey]))
-                .attr("y", d => y(d[yKey]))
-                .attr("width", x.bandwidth())
-                .attr("height", y.bandwidth())
-                .style("fill", d => colorScale(d[valueKey]))
-                .on("mouseover", (event, d) => {
-                    heatmapTooltip.transition()
-                        .duration(200)
-                        .style("opacity", .9);
-                    heatmapTooltip.html(`Pair: (${d[xKey]}, ${d[yKey]})<br/>Count: ${d[valueKey]}`)
-                        .style("left", (event.pageX + 10) + "px")
-                        .style("top", (event.pageY - 28) + "px");
-                })
-                .on("mouseout", () => {
-                    heatmapTooltip.transition()
-                        .duration(500)
-                        .style("opacity", 0);
-                });
-
-            svg.append("g")
-                .attr("class", "x axis")
-                .attr("transform", `translate(0,${height})`)
-                .call(d3.axisBottom(x).tickValues(x.domain().filter((d,i) => !(i % Math.ceil(x.domain().length / 10)))))
-                .selectAll("text")
-                .attr("transform", "rotate(-45)")
-                .style("text-anchor", "end");
-
-            svg.append("g")
-                .attr("class", "y axis")
-                .call(d3.axisLeft(y).tickValues(y.domain().filter((d,i) => !(i % Math.ceil(y.domain().length / 10)))));
-            
-            // Chart Title
-            svg.append("text")
-                .attr("x", (width / 2))
-                .attr("y", 0 - (margin.top / 2))
-                .attr("text-anchor", "middle")
-                .style("font-size", "1.1rem")
-                .style("font-weight", "600")
-                .attr("fill", "#334155")
-                .text(chartTitle);
-        }
-
-        // Function to draw Multi-line Chart (for Powerball Position Frequency)
-        function drawMultiLineChart(data, elementId, chartTitle, xLabel, yLabel) {
-            console.log(`[D3 Debug] drawMultiLineChart called for ${elementId}`);
-            console.log("[D3 Debug] Multi-line data received:", data);
-
-            if (!Array.isArray(data) || data.length === 0) {
-                console.warn(`[D3 Warn] No data (or invalid data format) provided for multi-line chart: ${elementId}`);
-                d3.select(`#${elementId}`).html("<p class='text-gray-500'>No data available for this chart.</p>");
-                return;
-            }
-            
-            d3.select(`#${elementId}`).html("");
-
-            const container = d3.select(`#${elementId}`);
-            const margin = { top: 50, right: 80, bottom: 60, left: 60 },
-                  width = Math.max(0, container.node().clientWidth - margin.left - margin.right);
-            const height = 500 - margin.top - margin.bottom;
-
-            const svg = container.append("svg")
-                .attr("width", width + margin.left + margin.right)
-                .attr("height", height + margin.top + margin.bottom)
-                .append("g")
-                .attr("transform", `translate(${margin.left},${margin.top})`);
-
-            const x = d3.scaleLinear()
-                .domain(d3.extent(data, d => d.powerball_number))
-                .range([0, width]);
-
-            const y = d3.scaleLinear()
-                .range([height, 0]);
-
-            const positionKeys = Object.keys(data[0]).filter(key => key.startsWith("white_ball_value_at_position") || key.startsWith("white_ball_position"));
-            // Correct mapping for multi-line chart data based on Powerball Position Frequency data structure
-            const positions = Array.from(d3.group(data, d => d.white_ball_position), ([key, value]) => ({
-                name: `Position ${key}`,
-                values: value.map(d => ({ Powerball: d.powerball_number, value: d.white_ball_value_at_position }))
-                            .filter(d => d.value !== undefined && d.value !== null && !isNaN(d.value))
-            }));
-            
-            // Adjust y domain based on actual data values
-            const allYValues = positions.flatMap(p => p.values.map(v => v.value));
-            y.domain([d3.min(allYValues) * 0.9, d3.max(allYValues) * 1.1]);
-
-            const color = d3.scaleOrdinal(d3.schemeCategory10)
-                            .domain(positions.map(p => p.name));
-
-            svg.append("g")
-                .attr("transform", `translate(0,${height})`)
-                .call(d3.axisBottom(x).tickFormat(d3.format("d")));
-
-            svg.append("g")
-                .attr("class", "y axis")
-                .call(d3.axisLeft(y));
-
-            svg.append("text")
-                .attr("transform", "rotate(-90)")
-                .attr("y", 0 - margin.left + 10)
-                .attr("x", 0 - (height / 2))
-                .attr("dy", "1em")
-                .style("text-anchor", "middle")
-                .attr("fill", "#475569")
-                .text(yLabel);
-            
-            svg.append("text")
-                .attr("x", (width / 2))
-                .attr("y", 0 - (margin.top / 2))
-                .attr("text-anchor", "middle")
-                .style("font-size", "1.1rem")
-                .style("font-weight", "600")
-                .attr("fill", "#334155")
-                .text(chartTitle);
-
-            const line = d3.line()
-                .defined(d => !isNaN(d.value) && d.value !== null)
-                .x(d => x(d.Powerball))
-                .y(d => y(d.value));
-
-            const serie = svg.selectAll(".serie")
-                .data(positions)
-                .enter().append("g")
-                .attr("class", "serie");
-
-            serie.append("path")
-                .attr("class", "line")
-                .attr("d", d => line(d.values))
-                .style("stroke", d => color(d.name))
-                .style("fill", "none")
-                .style("stroke-width", 2);
-
-            serie.append("text")
-                .datum(function(d) {
-                    const lastValue = d.values[d.values.length - 1];
-                    return {name: d.name, value: lastValue};
-                })
-                .attr("transform", function(d) {
-                    if (d.value && !isNaN(d.value.Powerball) && !isNaN(d.value.value) && d.value.value !== null) {
-                        return `translate(${x(d.value.Powerball)},${y(d.value.value)})`;
-                    }
-                    return null;
-                })
-                .attr("x", 3)
-                .attr("dy", "0.35em")
-                .style("font-size", "10px")
-                .style("fill", d => color(d.name))
-                .text(d => d.name);
-        }
-
-
-        document.addEventListener('DOMContentLoaded', () => {
-            // Highlight active navigation link based on URL
-            function highlightNavLink() {
-                const currentPath = window.location.pathname;
-                document.querySelectorAll('.sidebar nav ul li a').forEach(link => {
-                    link.classList.remove('active-nav-link');
-                    const linkHref = link.getAttribute('href');
-
-                    // Handle exact matches for primary links
-                    if (linkHref === currentPath || (currentPath === '/' && linkHref === "{{ url_for('index') }}")) {
-                        link.classList.add('active-nav-link');
-                    }
-                    // Handle parent analysis/probability section active state if any sub-link is active
-                    // This uses startsWith for sub-paths
-                    if (currentPath.startsWith('/frequency_analysis') || currentPath.startsWith('/hot_cold_numbers') ||
-                        currentPath.startsWith('/monthly_white_ball_analysis') || currentPath.startsWith('/sum_of_main_balls') ||
-                        currentPath.startsWith('/find_results_by_sum') || currentPath.startsWith('/find_results_by_first_white_ball') ||
-                        currentPath.startsWith('/simulate_multiple_draws') || currentPath.startsWith('/number_age_distribution') ||
-                        currentPath.startsWith('/co_occurrence_analysis') || currentPath.startsWith('/powerball_position_frequency')) {
-                        const analysisSectionLink = document.querySelector('.sidebar nav ul li a[href="#analysis-section"]');
-                        if (analysisSectionLink) {
-                            analysisSectionLink.classList.add('active-nav-link');
-                        }
-                    } else if (currentPath.startsWith('/winning_probability') || currentPath.startsWith('/partial_match_probabilities')) {
-                        const probabilitiesSectionLink = document.querySelector('.sidebar nav ul li a[href="#probabilities-section"]');
-                        if (probabilitiesSectionLink) {
-                            probabilitiesSectionLink.classList.add('active-nav-link');
-                        }
-                    }
-                });
-            }
-
-            highlightNavLink();
-
-            // Smooth scrolling for internal links within the sidebar (for #analysis-section, #probabilities-section)
-            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-                anchor.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    const targetId = this.getAttribute('href').substring(1);
-                    const targetElement = document.getElementById(targetId);
-
-                    if (targetElement) {
-                         targetElement.scrollIntoView({ behavior: 'smooth' });
-                         history.pushState(null, '', this.getAttribute('href'));
-                         highlightNavLink();
-                    }
-                });
-            });
-
-            // Restore form values after submission for better UX (only for forms that stay on the same page)
-            const formElements = document.querySelectorAll('form');
-            formElements.forEach(form => {
-                form.addEventListener('submit', function() {
-                    const formData = new FormData(this);
-                    for (let [key, value] of formData.entries()) {
-                        if (this.querySelector(`[name="${key}"]`)) {
-                            localStorage.setItem(key, value);
-                        }
-                    }
-                });
-
-                // Load saved values on page load
-                const savedValues = {};
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    savedValues[key] = localStorage.getItem(key);
-                }
-
-                for (let key in savedValues) {
-                    const input = form.querySelector(`[name="${key}"]`);
-                    if (input) {
-                        if (input.type === 'checkbox' || input.type === 'radio') {
-                            input.checked = (savedValues[key] === 'on');
-                        } else {
-                            input.value = savedValues[key];
-                        }
-                    }
-                }
-            });
-
-            {% block scripts %}{% endblock %}
-        });
     </script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>
