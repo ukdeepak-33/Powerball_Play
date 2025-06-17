@@ -202,30 +202,35 @@ def check_historical_match(df_source, white_balls, powerball): # Renamed df to d
     return None
 
 def frequency_analysis(df_source): # Renamed df to df_source to avoid conflict with global df
-    if df_source.empty: return pd.Series([], dtype=int), pd.Series([], dtype=int)
+    if df_source.empty: 
+        return [], [] # Return empty lists directly
     white_balls = df_source[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].values.flatten()
     white_ball_freq = pd.Series(white_balls).value_counts().reindex(range(1, 70), fill_value=0)
     powerball_freq = df_source['Powerball'].astype(int).value_counts().reindex(range(1, 27), fill_value=0)
-    return white_ball_freq, powerball_freq
+    
+    # Convert Pandas Series to list of dictionaries for Jinja2
+    white_ball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in white_ball_freq.items()]
+    powerball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in powerball_freq.items()]
+
+    return white_ball_freq_list, powerball_freq_list
 
 def hot_cold_numbers(df_source, last_draw_date_str): # Renamed df to df_source
-    if df_source.empty or last_draw_date_str == 'N/A': return pd.Series([], dtype=int), pd.Series([], dtype=int)
+    if df_source.empty or last_draw_date_str == 'N/A': 
+        return [], [] # Return empty lists for hot and cold
+    
     last_draw_date = pd.to_datetime(last_draw_date_str)
     one_year_ago = last_draw_date - pd.DateOffset(years=1)
     
     recent_data = df_source[df_source['Draw Date_dt'] >= one_year_ago].copy()
-    if recent_data.empty: return pd.Series([], dtype=int), pd.Series([], dtype=int)
+    if recent_data.empty: 
+        return [], [] # Return empty lists if no recent data
 
     white_balls = recent_data[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].values.flatten()
     white_ball_freq = pd.Series(white_balls).value_counts()
 
-    hot_numbers = white_ball_freq.nlargest(14).sort_values(ascending=False)
-    cold_numbers = white_ball_freq.nsmallest(14).sort_values(ascending=True)
-
-    if hot_numbers.empty:
-        hot_numbers = pd.Series([], dtype=int)
-    if cold_numbers.empty:
-        cold_numbers = pd.Series([], dtype=int)
+    # Convert to lists of dictionaries directly here
+    hot_numbers = [{'Number': int(k), 'Frequency': int(v)} for k, v in white_ball_freq.nlargest(14).sort_values(ascending=False).items()]
+    cold_numbers = [{'Number': int(k), 'Frequency': int(v)} for k, v in white_ball_freq.nsmallest(14).sort_values(ascending=True).items()]
 
     return hot_numbers, cold_numbers
 
@@ -364,11 +369,11 @@ def calculate_combinations(n, k):
         return 0
     return math.comb(n, k)
 
-def winning_probability(white_ball_range, powerball_range):
-    total_white_balls_in_range = white_ball_range[1] - white_ball_range[0] + 1
+def winning_probability(white_ball_range_tuple, powerball_range_tuple):
+    total_white_balls_in_range = white_ball_range_tuple[1] - white_ball_range_tuple[0] + 1
     white_ball_combinations = calculate_combinations(total_white_balls_in_range, 5)
 
-    total_powerballs_in_range = powerball_range[1] - powerball_range[0] + 1
+    total_powerballs_in_range = powerball_range_tuple[1] - powerball_range_tuple[0] + 1
 
     total_combinations = white_ball_combinations * total_powerballs_in_range
 
@@ -377,9 +382,9 @@ def winning_probability(white_ball_range, powerball_range):
 
     return probability_1_in_x, probability_percentage
 
-def partial_match_probabilities(white_ball_range, powerball_range):
-    total_white_balls_in_range = white_ball_range[1] - white_ball_range[0] + 1
-    total_powerballs_in_range = powerball_range[1] - powerball_range[0] + 1
+def partial_match_probabilities(white_ball_range_tuple, powerball_range_tuple):
+    total_white_balls_in_range = white_ball_range_tuple[1] - white_ball_range_tuple[0] + 1
+    total_powerballs_in_range = powerball_range_tuple[1] - powerball_range_tuple[0] + 1
 
     # Total possible combinations for 5 white balls from the range
     total_white_ball_combinations_possible = calculate_combinations(total_white_balls_in_range, 5)
@@ -663,7 +668,7 @@ def get_consecutive_numbers_trends(df_source, last_draw_date_str): # Renamed df 
         print(f"[DEBUG-ConsecutiveTrends] last_draw_date: {last_draw_date}")
     except Exception as e:
         print(f"[ERROR-ConsecutiveTrends] Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty list.")
-        return []
+        return {}
 
     six_months_ago = last_draw_date - pd.DateOffset(months=6)
     print(f"[DEBUG-ConsecutiveTrends] six_months_ago: {six_months_ago}")
@@ -736,7 +741,7 @@ def get_odd_even_split_trends(df_source, last_draw_date_str): # Renamed df to df
         print(f"[DEBUG-OddEvenTrends] last_draw_date: {last_draw_date}")
     except Exception as e:
         print(f"[ERROR-OddEvenTrends] Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty list.")
-        return {}
+        return []
 
     six_months_ago = last_draw_date - pd.DateOffset(months=6)
     print(f"[DEBUG-OddEvenTrends] six_months_ago: {six_months_ago}")
@@ -1114,8 +1119,9 @@ def invalidate_analysis_cache():
 
 # Group A numbers (constants)
 group_a = [3, 5, 6, 7, 9, 11, 15, 16, 18, 21, 23, 24, 27, 31, 32, 33, 36, 42, 44, 45, 48, 50, 51, 54, 55, 60, 66, 69]
-white_ball_range = (1, 69)
-powerball_range = (1, 26)
+# Global default ranges - used if no specific range is provided by the user
+GLOBAL_WHITE_BALL_RANGE = (1, 69)
+GLOBAL_POWERBALL_RANGE = (1, 26)
 excluded_numbers = [] # Global excluded numbers, can be extended by user input
 
 # --- Flask Routes ---
@@ -1249,12 +1255,12 @@ def generate_modified():
             
             if not common_pairs:
                 flash("No common pairs found with the specified filter. Generating a random combination instead.", 'info')
-                white_balls, powerball = generate_powerball_numbers(df, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers)
+                white_balls, powerball = generate_powerball_numbers(df, group_a, "Any", "No Combo", GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers)
             else:
-                white_balls = generate_with_common_pairs(df, common_pairs, white_ball_range, excluded_numbers)
-                powerball = random.randint(powerball_range[0], powerball_range[1])
+                white_balls = generate_with_common_pairs(df, common_pairs, GLOBAL_WHITE_BALL_RANGE, excluded_numbers)
+                powerball = random.randint(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1])
         else:
-            white_balls, powerball = modify_combination(df, white_balls_base, powerball_base, white_ball_range, powerball_range, excluded_numbers)
+            white_balls, powerball = modify_combination(df, white_balls_base, powerball_base, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers)
             
         max_attempts_unique = 100
         attempts_unique = 0
@@ -1265,14 +1271,14 @@ def generate_modified():
                 if num_range:
                     common_pairs_recheck = filter_common_pairs_by_range(common_pairs_recheck, num_range)
                 if common_pairs_recheck:
-                    white_balls = generate_with_common_pairs(df, common_pairs_recheck, white_ball_range, excluded_numbers)
+                    white_balls = generate_with_common_pairs(df, common_pairs_recheck, GLOBAL_WHITE_BALL_RANGE, excluded_numbers)
                 else:
-                    white_balls, powerball = generate_powerball_numbers(df, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers)
+                    white_balls, powerball = generate_powerball_numbers(df, group_a, "Any", "No Combo", GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers)
             else:
                 random_row = df.sample(1).iloc[0]
                 white_balls_base = [int(random_row['Number 1']), int(random_row['Number 2']), int(random_row['Number 3']), int(random_row['Number 4']), int(random_row['Number 5'])]
                 powerball_base = int(random_row['Powerball'])
-                white_balls, powerball = modify_combination(df, white_balls_base, powerball_base, white_ball_range, powerball_range, excluded_numbers)
+                white_balls, powerball = modify_combination(df, white_balls_base, powerball_base, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers)
             attempts_unique += 1
         
         if attempts_unique == max_attempts_unique:
@@ -1322,14 +1328,20 @@ def frequency_analysis_route():
 
 @app.route('/hot_cold_numbers')
 def hot_cold_numbers_route():
-    hot_numbers_list, cold_numbers_list = get_cached_analysis('hot_cold_numbers', hot_cold_numbers, df, last_draw['Draw Date'])
+    # Safely get last_draw_date for caching key and function call
+    last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
+    # The hot_cold_numbers function now directly returns lists of dictionaries.
+    hot_numbers_list, cold_numbers_list = get_cached_analysis('hot_cold_numbers', hot_cold_numbers, df, last_draw_date_str_for_cache)
+    
     return render_template('hot_cold_numbers.html', 
                            hot_numbers=hot_numbers_list, 
                            cold_numbers=cold_numbers_list)
 
 @app.route('/monthly_white_ball_analysis')
 def monthly_white_ball_analysis_route():
-    monthly_balls = get_cached_analysis('monthly_balls', monthly_white_ball_analysis, df, last_draw['Draw Date'])
+    # Safely get last_draw_date for caching key and function call
+    last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
+    monthly_balls = get_cached_analysis('monthly_balls', monthly_white_ball_analysis, df, last_draw_date_str_for_cache)
     monthly_balls_json = json.dumps(monthly_balls)
     return render_template('monthly_white_ball_analysis.html', 
                            monthly_balls=monthly_balls,
@@ -1392,7 +1404,7 @@ def simulate_multiple_draws_route():
         if num_draws_str and num_draws_str.isdigit():
             num_draws = int(num_draws_str)
             num_draws_display = num_draws
-            simulated_freq = simulate_multiple_draws(df, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers, num_draws)
+            simulated_freq = simulate_multiple_draws(df, group_a, "Any", "No Combo", GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers, num_draws)
             simulated_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in simulated_freq.items()]
         else:
             flash("Please enter a valid number for Number of Simulations.", 'error')
@@ -1402,16 +1414,52 @@ def simulate_multiple_draws_route():
                            num_simulations=num_draws_display)
 
 
-@app.route('/winning_probability')
+@app.route('/winning_probability', methods=['GET', 'POST'])
 def winning_probability_route():
-    probability_1_in_x, probability_percentage = get_cached_analysis('winning_probability', winning_probability, white_ball_range, powerball_range)
+    # Default ranges (standard Powerball)
+    current_white_ball_range = GLOBAL_WHITE_BALL_RANGE
+    current_powerball_range = GLOBAL_POWERBALL_RANGE
+    
+    # Check if ranges are provided via POST request
+    if request.method == 'POST':
+        try:
+            wb_min = int(request.form.get('white_ball_min', GLOBAL_WHITE_BALL_RANGE[0]))
+            wb_max = int(request.form.get('white_ball_max', GLOBAL_WHITE_BALL_RANGE[1]))
+            pb_min = int(request.form.get('powerball_min', GLOBAL_POWERBALL_RANGE[0]))
+            pb_max = int(request.form.get('powerball_max', GLOBAL_POWERBALL_RANGE[1]))
+
+            # Basic validation
+            if not (1 <= wb_min <= wb_max <= 69 and 1 <= pb_min <= pb_max <= 26):
+                flash("Invalid range inputs. White ball range must be 1-69, Powerball 1-26, and min <= max.", 'error')
+                # Fallback to default if validation fails
+                wb_min, wb_max = GLOBAL_WHITE_BALL_RANGE
+                pb_min, pb_max = GLOBAL_POWERBALL_RANGE
+            
+            current_white_ball_range = (wb_min, wb_max)
+            current_powerball_range = (pb_min, pb_max)
+
+        except ValueError:
+            flash("Invalid number format for range inputs. Please enter integers.", 'error')
+            # Fallback to default if parsing fails
+            current_white_ball_range = GLOBAL_WHITE_BALL_RANGE
+            current_powerball_range = GLOBAL_POWERBALL_RANGE
+    
+    # Generate a unique cache key based on the ranges
+    cache_key = f"winning_probability_{current_white_ball_range[0]}-{current_white_ball_range[1]}_{current_powerball_range[0]}-{current_powerball_range[1]}"
+    
+    probability_1_in_x, probability_percentage = get_cached_analysis(
+        cache_key, winning_probability, current_white_ball_range, current_powerball_range
+    )
+
     return render_template('winning_probability.html', 
                            probability_1_in_x=probability_1_in_x, 
-                           probability_percentage=probability_percentage)
+                           probability_percentage=probability_percentage,
+                           white_ball_range=current_white_ball_range, # Pass ranges to template
+                           powerball_range=current_powerball_range) # Pass ranges to template
 
 @app.route('/partial_match_probabilities')
 def partial_match_probabilities_route():
-    probabilities = get_cached_analysis('partial_match_probabilities', partial_match_probabilities, white_ball_range, powerball_range)
+    probabilities = get_cached_analysis('partial_match_probabilities', partial_match_probabilities, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE)
     return render_template('partial_match_probabilities.html', 
                            probabilities=probabilities)
 
@@ -1447,13 +1495,17 @@ def powerball_position_frequency_route():
 
 @app.route('/odd_even_trends')
 def odd_even_trends_route():
-    odd_even_trends = get_cached_analysis('odd_even_trends', get_odd_even_split_trends, df, last_draw['Draw Date'])
+    # Safely get last_draw_date for caching key and function call
+    last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
+    odd_even_trends = get_cached_analysis('odd_even_trends', get_odd_even_split_trends, df, last_draw_date_str_for_cache)
     return render_template('odd_even_trends.html',
                            odd_even_trends=odd_even_trends)
 
 @app.route('/consecutive_trends')
 def consecutive_trends_route():
-    consecutive_trends = get_cached_analysis('consecutive_trends', get_consecutive_numbers_trends, df, last_draw['Draw Date'])
+    # Safely get last_draw_date for caching key and function call
+    last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
+    consecutive_trends = get_cached_analysis('consecutive_trends', get_consecutive_numbers_trends, df, last_draw_date_str_for_cache)
     return render_template('consecutive_trends.html',
                            consecutive_trends=consecutive_trends)
 
