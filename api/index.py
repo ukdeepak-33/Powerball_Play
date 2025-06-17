@@ -5,17 +5,7 @@ from itertools import combinations
 import math
 import os
 from collections import defaultdict
-from datetime import datetime
-import requests
-import json
-import numpy as np
-
-# --- Flask App Initialization with Template Path ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TEMPLATE_DIR = os.path.join(BASE_DIR, '..', 'templates')
-
-app = Flask(__name__, template_folder=TEMPLATE_DIR)
-app.secret_key = 'supersecretkey'
+from datetime import datetime, timedelta # Import timedelta
 
 # --- Supabase Configuration ---
 SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
@@ -23,7 +13,14 @@ SUPABASE_ANON_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY")
 
 SUPABASE_TABLE_NAME = 'powerball_draws'
-GENERATED_NUMBERS_TABLE_NAME = 'generated_powerball_numbers' # New table name for generated picks
+GENERATED_NUMBERS_TABLE_NAME = 'generated_powerball_numbers'
+
+# --- Flask App Initialization with Template Path ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TEMPLATE_DIR = os.path.join(BASE_DIR, '..', 'templates')
+
+app = Flask(__name__, template_folder=TEMPLATE_DIR)
+app.secret_key = 'supersecretkey'
 
 # --- Utility Functions ---
 
@@ -133,7 +130,7 @@ def generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white
         powerball = random.randint(powerball_range[0], powerball_range[1])
 
         last_draw_data = get_last_draw(df)
-        if not last_draw_data.empty and last_draw_data.get('Number 1') != 'N/A':
+        if not last_draw_data.empty and last_draw_data.get('Draw Date') != 'N/A':
             last_white_balls = [int(last_draw_data['Number 1']), int(last_draw_data['Number 2']), int(last_draw_data['Number 3']), int(last_draw_data['Number 4']), int(last_draw_data['Number 5'])]
             if set(white_balls) == set(last_white_balls) and powerball == int(last_draw_data['Powerball']):
                 attempts += 1
@@ -366,8 +363,9 @@ def partial_match_probabilities(white_ball_range, powerball_range):
     total_white_balls_in_range = white_ball_range[1] - white_ball_range[0] + 1
     total_powerballs_in_range = powerball_range[1] - powerball_range[0] + 1
 
-    total_winning_white_comb = calculate_combinations(total_white_balls_in_range, 5) # This should be fixed, was 'data["matched_w"]'
-
+    # Total possible combinations for 5 white balls from the range
+    total_white_ball_combinations_possible = calculate_combinations(total_white_balls_in_range, 5)
+    
     probabilities = {}
 
     prizes = {
@@ -383,14 +381,17 @@ def partial_match_probabilities(white_ball_range, powerball_range):
     }
 
     for scenario, data in prizes.items():
+        # Combinations of matching white balls
         comb_matched_w = calculate_combinations(5, data["matched_w"])
+        # Combinations of UNMATCHING white balls from the remaining pool
         comb_unmatched_w = calculate_combinations(total_white_balls_in_range - 5, data["unmatched_w"])
 
+        # Combinations for Powerball
         if data["matched_p"] == 1:
-            comb_p = calculate_combinations(1, 1) # Probability of matching the Powerball
+            comb_p = 1 # Must match the one Powerball
         else:
-            comb_p = calculate_combinations(total_powerballs_in_range - 1, 1) # Probability of NOT matching the Powerball
-            if total_powerballs_in_range == 1: # Edge case for only one powerball possible
+            comb_p = total_powerballs_in_range - 1 # Must NOT match the Powerball (pick from remaining)
+            if comb_p < 0: # Handle cases where total_powerballs_in_range is 1 and we need to "not match"
                 comb_p = 0
         
         numerator = comb_matched_w * comb_unmatched_w * comb_p
@@ -398,10 +399,11 @@ def partial_match_probabilities(white_ball_range, powerball_range):
         if numerator == 0:
             probabilities[scenario] = "N/A"
         else:
-            total_possible_combinations = total_white_balls_in_range # This was also incorrect; should be total white combinations calculated initially
-            total_possible_combinations_all = (calculate_combinations(total_white_balls_in_range, 5) * total_powerballs_in_range)
+            # Total possible unique combinations (5 white balls * 1 powerball)
+            total_possible_combinations_for_draw = calculate_combinations(total_white_balls_in_range, 5) * total_powerballs_in_range
             
-            probability = total_possible_combinations_all / numerator
+            # Probability is the inverse: total ways to draw / ways to win this specific scenario
+            probability = total_possible_combinations_for_draw / numerator
             probabilities[scenario] = f"{probability:,.0f} to 1"
 
     return probabilities
@@ -654,7 +656,6 @@ def get_consecutive_numbers_trends(df, last_draw_date_str):
 
     recent_data = df[df['Draw Date_dt'] >= six_months_ago].copy()
     recent_data = recent_data.sort_values(by='Draw Date_dt') # Ensure chronological order
-    print(f"[DEBUG-ConsecutiveTrends] recent_data shape after filtering: {recent_data.shape}")
     if recent_data.empty:
         print("[DEBUG-ConsecutiveTrends] recent_data is empty after filtering. Returning empty list.")
         return []
@@ -728,7 +729,6 @@ def get_odd_even_split_trends(df, last_draw_date_str):
 
     recent_data = df[df['Draw Date_dt'] >= six_months_ago].copy()
     recent_data = recent_data.sort_values(by='Draw Date_dt') # Ensure chronological order
-    print(f"[DEBUG-OddEvenTrends] recent_data shape after filtering: {recent_data.shape}")
     if recent_data.empty:
         print("[DEBUG-OddEvenTrends] recent_data is empty after filtering. Returning empty list.")
         return []
@@ -754,8 +754,6 @@ def get_odd_even_split_trends(df, last_draw_date_str):
         elif odd_count == 2 and even_count == 3:
             split_category = "2 Odd / 3 Even"
         
-        # Now, let's process trend_data to get counts per category per date for plotting multiple lines
-        # Or, just append the draw date and its split
         trend_data.append({
             'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
             'split_category': split_category
@@ -933,7 +931,8 @@ def get_generated_numbers_history():
                 'powerball': int(record['powerball'])
             })
         
-        # Convert defaultdict to a regular dict, sorting dates for consistent display
+        # Convert defaultdict to a regular dict, sorting dates for consistent display (already sorted by keys if iterating)
+        # However, to explicitly ensure order for template, we can sort items by date_key
         sorted_grouped_data = dict(sorted(grouped_data.items(), key=lambda item: item[0], reverse=True))
 
         return sorted_grouped_data
@@ -955,6 +954,93 @@ def get_generated_numbers_history():
         return {}
 
 
+def check_generated_against_history(generated_white_balls, generated_powerball, df_historical):
+    """
+    Checks a generated Powerball number against historical official draws from the last two years
+    and returns match counts and details.
+    """
+    results = {
+        "generated_balls": generated_white_balls,
+        "generated_powerball": generated_powerball,
+        "summary": {
+            "Match 5 White Balls + Powerball": {"count": 0, "draws": []},
+            "Match 5 White Balls Only": {"count": 0, "draws": []},
+            "Match 4 White Balls + Powerball": {"count": 0, "draws": []},
+            "Match 4 White Balls Only": {"count": 0, "draws": []},
+            "Match 3 White Balls + Powerball": {"count": 0, "draws": []},
+            "Match 3 White Balls Only": {"count": 0, "draws": []},
+            "Match 2 White Balls + Powerball": {"count": 0, "draws": []},
+            "Match 1 White Ball + Powerball": {"count": 0, "draws": []},
+            "Match Powerball Only": {"count": 0, "draws": []},
+            "No Match": {"count": 0, "draws": []}
+        }
+    }
+
+    if df_historical.empty:
+        return results
+
+    # Filter for last two years
+    two_years_ago = datetime.now() - timedelta(days=2 * 365) # Approximate two years
+    recent_historical_data = df_historical[df_historical['Draw Date_dt'] >= two_years_ago].copy()
+
+    if recent_historical_data.empty:
+        return results
+
+    # Ensure generated_white_balls is a set for efficient matching
+    gen_white_set = set(generated_white_balls)
+
+    for index, row in recent_historical_data.iterrows():
+        historical_white_balls = sorted([
+            int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+            int(row['Number 4']), int(row['Number 5'])
+        ])
+        historical_powerball = int(row['Powerball'])
+        historical_draw_date = row['Draw Date']
+
+        hist_white_set = set(historical_white_balls)
+
+        # Count matching white balls
+        white_matches = len(gen_white_set.intersection(hist_white_set))
+
+        # Check Powerball match
+        powerball_match = 1 if generated_powerball == historical_powerball else 0
+
+        # Determine the match category
+        category = "No Match"
+        if white_matches == 5 and powerball_match == 1:
+            category = "Match 5 White Balls + Powerball"
+        elif white_matches == 5 and powerball_match == 0:
+            category = "Match 5 White Balls Only"
+        elif white_matches == 4 and powerball_match == 1:
+            category = "Match 4 White Balls + Powerball"
+        elif white_matches == 4 and powerball_match == 0:
+            category = "Match 4 White Balls Only"
+        elif white_matches == 3 and powerball_match == 1:
+            category = "Match 3 White Balls + Powerball"
+        elif white_matches == 3 and powerball_match == 0:
+            category = "Match 3 White Balls Only"
+        elif white_matches == 2 and powerball_match == 1:
+            category = "Match 2 White Balls + Powerball"
+        elif white_matches == 1 and powerball_match == 1:
+            category = "Match 1 White Ball + Powerball"
+        elif white_matches == 0 and powerball_match == 1:
+            category = "Match Powerball Only"
+        # If no other match, it remains "No Match"
+
+        results["summary"][category]["count"] += 1
+        results["summary"][category]["draws"].append({
+            "date": historical_draw_date,
+            "white_balls": historical_white_balls,
+            "powerball": historical_powerball
+        })
+    
+    # Sort the draws within each category by date (most recent first)
+    for category in results["summary"]:
+        results["summary"][category]["draws"].sort(key=lambda x: x['date'], reverse=True)
+
+    return results
+
+
 # --- Global Data Loading and Pre-computation ---
 df = pd.DataFrame()
 last_draw = pd.Series(dtype='object') 
@@ -973,7 +1059,7 @@ precomputed_powerball_position_data = []
 precomputed_odd_even_trends = [] 
 precomputed_consecutive_trends = [] 
 precomputed_triplets = [] 
-precomputed_generated_history = {} # NEW: for generated picks history
+precomputed_generated_history = {}
 
 
 # This function will be called once after app initialization to load data
@@ -1031,7 +1117,7 @@ def initialize_app_data():
             
             precomputed_triplets = get_most_frequent_triplets(df)
 
-            precomputed_generated_history = get_generated_numbers_history() # NEW: Load generated history
+            precomputed_generated_history = get_generated_numbers_history() # Load generated history
 
 
             print("\n--- DEBUG: Precomputed Analysis Data Status ---")
@@ -1534,6 +1620,17 @@ def save_official_draw_route():
         n5 = int(request.form.get('n5'))
         pb = int(request.form.get('pb'))
 
+        # Basic validation for numbers (1-69 for white, 1-26 for powerball)
+        if not (1 <= n1 <= 69 and 1 <= n2 <= 69 and 1 <= n3 <= 69 and 1 <= n4 <= 69 and 1 <= n5 <= 69 and 1 <= pb <= 26):
+            flash("White balls must be between 1-69 and Powerball between 1-26.", 'error')
+            return redirect(url_for('index'))
+        
+        # Check for duplicate white balls within the submitted draw
+        submitted_white_balls = sorted([n1, n2, n3, n4, n5])
+        if len(set(submitted_white_balls)) != 5:
+            flash("White ball numbers must be unique within a single draw.", 'error')
+            return redirect(url_for('index'))
+
         success, message = save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb)
         if success:
             flash(message, 'info')
@@ -1564,14 +1661,17 @@ def save_generated_pick_route():
             flash("Invalid white balls format. Expected 5 numbers.", 'error')
             return redirect(url_for('index'))
         
+        # Basic validation for numbers (1-69 for white, 1-26 for powerball)
+        if not (all(1 <= n <= 69 for n in white_balls) and 1 <= powerball <= 26):
+            flash("White balls must be between 1-69 and Powerball between 1-26 for saving.", 'error')
+            return redirect(url_for('index'))
+
         success, message = save_generated_numbers_to_db(white_balls, powerball)
         if success:
             flash(message, 'info')
-            # No need to re-initialize all app data, only precomputed_generated_history if desired
-            # For simplicity now, we can just let it reload on the next access to generated_history route
-            # or add specific update for just this precomputed variable if needed for other parts of app
+            # Update only the precomputed generated history, no need to reload all historical data
             global precomputed_generated_history
-            precomputed_generated_history = get_generated_numbers_history() # Update this specific precomputed cache
+            precomputed_generated_history = get_generated_numbers_history()
         else:
             flash(message, 'error')
 
@@ -1586,3 +1686,40 @@ def save_generated_pick_route():
 def generated_numbers_history_route():
     return render_template('generated_numbers_history.html', 
                            generated_history=precomputed_generated_history) # Pass grouped data
+
+# NEW ROUTE for analyzing generated numbers against historical data
+@app.route('/analyze_generated_historical_matches', methods=['POST'])
+def analyze_generated_historical_matches_route():
+    if df.empty:
+        flash("Cannot perform historical analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    try:
+        generated_white_balls_str = request.form.get('generated_white_balls')
+        generated_powerball_str = request.form.get('generated_powerball')
+
+        if not generated_white_balls_str or not generated_powerball_str:
+            flash("No generated numbers provided for analysis.", 'error')
+            return redirect(url_for('index'))
+
+        generated_white_balls = sorted([int(x.strip()) for x in generated_white_balls_str.split(',') if x.strip().isdigit()])
+        generated_powerball = int(generated_powerball_str)
+
+        if len(generated_white_balls) != 5:
+            flash("Invalid generated white balls format. Expected 5 numbers for analysis.", 'error')
+            return redirect(url_for('index'))
+
+        historical_match_results = check_generated_against_history(generated_white_balls, generated_powerball, df)
+        
+        return render_template('historical_match_analysis_results.html', 
+                               generated_numbers_for_analysis=historical_match_results['generated_balls'],
+                               generated_powerball_for_analysis=historical_match_results['generated_powerball'],
+                               match_summary=historical_match_results['summary'])
+
+    except ValueError:
+        flash("Invalid number format for historical analysis.", 'error')
+    except Exception as e:
+        flash(f"An error occurred during historical analysis: {e}", 'error')
+        import traceback
+        traceback.print_exc()
+    return redirect(url_for('index'))
