@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Historical Match Analysis{% endblock %}
+
+{% block page_heading %}Historical Match Analysis for Your Pick{% endblock %}
+
+{% block content %}
+<div class="card p-6 bg-white rounded-lg shadow-lg">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">Your Generated Numbers Analyzed:</h2>
+    <div class="draw-numbers mb-6">
+        {% for ball in generated_numbers_for_analysis %}
+            <span class="ball">{{ ball }}</span>
+        {% endfor %}
+        <span class="ball powerball">{{ generated_powerball_for_analysis }}</span>
+    </div>
+
+    <p class="text-lg text-gray-700 mb-6">Below are the results of how many times your generated combination would have matched official Powerball draws from the last two years:</p>
+
+    <div class="space-y-4">
+        {% if match_summary %}
+            {% for category, data in match_summary.items() %}
+                <div class="mb-2 border-b pb-2">
+                    <button class="toggle-button w-full text-left py-2 px-4 bg-gray-100 rounded-md font-semibold text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 flex justify-between items-center">
+                        <span>{{ category }}: <span class="font-bold">{{ data.count }} time(s)</span></span>
+                        <span class="toggle-icon">+</span>
+                    </button>
+                    <div class="content-toggle hidden pl-4 pt-2">
+                        {% if data.draws %}
+                            <p class="text-sm text-gray-600 mb-2">Matched on the following dates:</p>
+                            <ul class="list-disc list-inside ml-4">
+                                {% for draw in data.draws %}
+                                    <li class="py-1">
+                                        <span class="font-medium text-gray-800">{{ draw.date }}:</span>
+                                        <div class="inline-flex space-x-1 ml-2">
+                                            {% for ball in draw.white_balls %}
+                                                <span class="ball tiny-ball">{{ ball }}</span>
+                                            {% endfor %}
+                                            <span class="ball powerball tiny-ball">{{ draw.powerball }}</span>
+                                        </div>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p class="text-sm text-gray-500">No specific draws found for this match category.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-gray-500">No match analysis data available.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    /* New style for even smaller balls in match history */
+    .tiny-ball {
+        width: 25px; /* Even smaller width */
+        height: 25px; /* Even smaller height */
+        font-size: 0.7rem; /* Even smaller font size */
+        border-width: 0.5px; /* Even thinner border */
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); /* Even lighter shadow */
+    }
+</style>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const toggleButtons = document.querySelectorAll('.toggle-button');
+
+        toggleButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const content = this.nextElementSibling; // The div immediately after the button
+                const icon = this.querySelector('.toggle-icon');
+
+                content.classList.toggle('hidden');
+                this.classList.toggle('expanded'); // Add/remove 'expanded' class to button
+                
+                if (content.classList.contains('hidden')) {
+                    icon.textContent = '+'; // Change to plus when collapsed
+                } else {
+                    icon.textContent = 'x'; // Change to 'x' when expanded (for close)
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}
