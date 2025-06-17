@@ -5,13 +5,28 @@
 {% block page_heading %}Consecutive Numbers Trends (Last 6 Months){% endblock %}
 
 {% block content %}
-<div class="chart-container">
-    <h2 class="text-xl font-semibold mb-4">Presence of Consecutive Numbers Over Time</h2>
+<div class="card">
+    <h2 class="text-xl font-semibold mb-4 text-gray-700">Presence of Consecutive Numbers Over Time</h2>
     {% if consecutive_trends %}
         <div id="consecutiveTrendChart"></div>
     {% else %}
         <p class="text-gray-500">No consecutive numbers trend data available to display chart.</p>
     {% endif %}
+
+    <div class="mt-6 text-gray-700 leading-relaxed">
+        <h3 class="text-lg font-semibold mb-2">Understanding This Chart:</h3>
+        <p>This chart visualizes the occurrence of consecutive numbers (e.g., 10, 11, 12) within the five white balls drawn in Powerball over the last six months. It helps you see how often a draw contains at least one sequence of consecutive numbers.</p>
+        <ul class="list-disc list-inside ml-4 mt-2">
+            <li><strong>X-Axis (Draw Date):</strong> Represents the timeline of Powerball draws.</li>
+            <li><strong>Y-Axis (Consecutive Numbers Present):</strong> This is a binary axis:
+                <ul class="list-circle list-inside ml-4">
+                    <li><strong>"Yes" (value 1):</strong> Indicates that the draw on that date contained at least one set of consecutive white balls.</li>
+                    <li><strong>"No" (value 0):</strong> Indicates that the draw on that date did not contain any consecutive white balls.</li>
+                </ul>
+            </li>
+        </ul>
+        <p class="mt-2">By examining this trend, you can gauge the historical frequency of draws with consecutive numbers. This might inform your decision on whether to include consecutive numbers in your own generated picks, depending on your preferred strategy.</p>
+    </div>
 </div>
 {% endblock %}
 
