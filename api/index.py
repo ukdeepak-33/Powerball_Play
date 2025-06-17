@@ -172,7 +172,7 @@ def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice
         elif odd_even_choice == "3 Odd / 2 Even" and (odd_count != 3 or even_count != 2):
             attempts += 1
             continue
-        elif odd_even_choice == "1 Even / 4 Odd" and (even_count != 1 or odd_count != 4):
+        elif odd_count == "1 Even / 4 Odd" and (even_count != 1 or odd_count != 4):
             attempts += 1
             continue
         elif odd_even_choice == "1 Odd / 4 Even" and (odd_count != 1 or even_count != 4):
