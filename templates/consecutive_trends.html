@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Consecutive Numbers Trends{% endblock %}
+
+{% block page_heading %}Consecutive Numbers Trends (Last 6 Months){% endblock %}
+
+{% block content %}
+<div class="chart-container">
+    <h2 class="text-xl font-semibold mb-4">Presence of Consecutive Numbers Over Time</h2>
+    {% if consecutive_trends %}
+        <div id="consecutiveTrendChart"></div>
+    {% else %}
+        <p class="text-gray-500">No consecutive numbers trend data available to display chart.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var consecutiveTrendsData = [];
+        {% if consecutive_trends %}
+            try {
+                consecutiveTrendsData = JSON.parse('{{ consecutive_trends | tojson | safe }}');
+            } catch (e) {
+                console.error("Error parsing consecutiveTrendsData JSON:", e);
+                consecutiveTrendsData = [];
+            }
+        {% endif %}
+        console.log("[D3 Debug] consecutive_trends.html - consecutiveTrendsData:", consecutiveTrendsData);
+
+        if (consecutiveTrendsData.length > 0) {
+            // Set up chart dimensions
+            const margin = { top: 30, right: 100, bottom: 60, left: 50 };
+            const width = Math.min(900, window.innerWidth - 40) - margin.left - margin.right;
+            const height = 500 - margin.top - margin.bottom;
+
+            // Append SVG
+            const svg = d3.select("#consecutiveTrendChart")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Parse dates
+            const parseDate = d3.timeParse("%Y-%m-%d");
+            consecutiveTrendsData.forEach(d => {
+                d.draw_date = parseDate(d.draw_date);
+            });
+
+            // Define Scales
+            const xScale = d3.scaleTime()
+                .domain(d3.extent(consecutiveTrendsData, d => d.draw_date))
+                .range([0, width]);
+
+            // Y scale for binary (0 or 1) presence
+            const yScale = d3.scaleLinear()
+                .domain([0, 1.1]) // Max 1.1 to show 1 clearly
+                .range([height, 0]);
+
+            // Add X-axis
+            svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(xScale).tickFormat(d3.timeFormat("%b %d")))
+                .selectAll("text")
+                .attr("transform", "rotate(-45)")
+                .style("text-anchor", "end");
+            
+            // X-axis label
+            svg.append("text")
+                .attr("class", "x label")
+                .attr("text-anchor", "end")
+                .attr("x", width / 2 + margin.right / 2)
+                .attr("y", height + margin.bottom - 10)
+                .text("Draw Date");
+
+
+            // Add Y-axis
+            svg.append("g")
+                .call(d3.axisLeft(yScale).tickValues([0, 1]).tickFormat(d => d === 1 ? "Yes" : "No")); 
+            
+            // Y-axis label
+            svg.append("text")
+                .attr("class", "y label")
+                .attr("text-anchor", "end")
+                .attr("y", -margin.left + 15)
+                .attr("x", -height / 2)
+                .attr("dy", ".75em")
+                .attr("transform", "rotate(-90)")
+                .text("Consecutive Numbers Present");
+
+            // Define the line generator
+            const line = d3.line()
+                .x(d => xScale(d.draw_date))
+                .y(d => yScale(d.consecutive_present))
+                .defined(d => !isNaN(d.consecutive_present)); // Handle missing data
+
+            // Add the line
+            svg.append("path")
+                .datum(consecutiveTrendsData)
+                .attr("fill", "none")
+                .attr("stroke", "steelblue") // A single color for this line
+                .attr("stroke-width", 2)
+                .attr("d", line);
+
+            // Add dots for each data point
+            svg.selectAll(".dot")
+                .data(consecutiveTrendsData)
+                .enter().append("circle")
+                .attr("class", "dot")
+                .attr("cx", d => xScale(d.draw_date))
+                .attr("cy", d => yScale(d.consecutive_present))
+                .attr("r", 3)
+                .attr("fill", "steelblue");
+        } else {
+            console.warn("consecutiveTrendsData is empty, not drawing chart.");
+        }
+    });
+</script>
+{% endblock %}
