@@ -100,11 +100,16 @@
                 </div>
             {% endif %}
 
-            <div class="mt-6">
+            <div class="mt-6 flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
                 <form action="{{ url_for('save_generated_pick_route') }}" method="post">
                     <input type="hidden" name="generated_white_balls" value="{{ white_balls | join(',') }}">
                     <input type="hidden" name="generated_powerball" value="{{ powerball }}">
-                    <button type="submit" class="btn-primary">Save These Numbers</button>
+                    <button type="submit" class="btn-primary w-full sm:w-auto">Save These Numbers</button>
+                </form>
+                <form action="{{ url_for('analyze_generated_historical_matches_route') }}" method="post">
+                    <input type="hidden" name="generated_white_balls" value="{{ white_balls | join(',') }}">
+                    <input type="hidden" name="generated_powerball" value="{{ powerball }}">
+                    <button type="submit" class="btn-primary w-full sm:w-auto bg-green-600 hover:bg-green-700">Analyze Against Historical Draws</button> {# NEW BUTTON #}
                 </form>
             </div>
         </div>
@@ -127,7 +132,7 @@
         {% endif %}
     </div>
 
-    <!-- NEW SECTION: Manual Latest Draw Entry -->
+    <!-- Manual Latest Draw Entry -->
     <div class="card p-6 bg-white rounded-lg shadow-lg mt-8">
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Manually Enter Latest Official Draw</h2>
         <form action="{{ url_for('save_official_draw_route') }}" method="post" class="space-y-4">
