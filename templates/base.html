@@ -145,6 +145,7 @@
         }
         .bar {
             fill: steelblue;
+            transition: fill 0.2s ease-in-out; /* Smooth transition for hover */
         }
         .bar.red {
             fill: #e53e3e; /* Red for Powerball */
@@ -208,7 +209,7 @@
             <nav class="flex-grow">
                 <ul class="space-y-2">
                     <li><a href="{{ url_for('index') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Home / Generate Numbers</a></li>
-                    <li><a href="{{ url_for('generated_numbers_history_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">View Generated Numbers History</a></li> {# NEW LINK #}
+                    <li><a href="{{ url_for('generated_numbers_history_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">View Generated Numbers History</a></li>
                     <li><a href="{{ url_for('frequency_analysis_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Frequency Analysis</a></li>
                     <li><a href="{{ url_for('hot_cold_numbers_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Hot & Cold Numbers</a></li>
                     <li><a href="{{ url_for('monthly_white_ball_analysis_route') }}" class="block py-1 px-2 text-sm text-indigo-200 hover:bg-indigo-700 rounded transition-colors duration-200">Monthly White Ball Analysis</a></li>
@@ -311,7 +312,29 @@
                 .attr("y", d => yScale(d[yValueKey]))
                 .attr("width", xScale.bandwidth())
                 .attr("height", d => height - yScale(d[yValueKey]))
-                .attr("fill", barColor); // Use dynamic bar color
+                .attr("fill", barColor) // Use dynamic bar color
+                .on("mouseover", function(event, d) {
+                    d3.select(this)
+                        .attr("fill", d3.color(barColor).brighter(0.8)); // Lighten color on hover
+
+                    // Add text label for value
+                    svg.append("text")
+                        .attr("class", "bar-value-label")
+                        .attr("x", xScale(d[xValueKey]) + xScale.bandwidth() / 2)
+                        .attr("y", yScale(d[yValueKey]) - 5) // Position above the bar
+                        .attr("text-anchor", "middle")
+                        .attr("fill", "#333")
+                        .style("font-size", "12px")
+                        .style("font-weight", "bold")
+                        .text(d[yValueKey]); // Display the y-value (frequency/count)
+                })
+                .on("mouseout", function(event, d) {
+                    d3.select(this)
+                        .attr("fill", barColor); // Revert to original color
+
+                    // Remove text label
+                    svg.selectAll(".bar-value-label").remove();
+                });
 
             // Add title
             svg.append("text")
