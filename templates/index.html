@@ -109,11 +109,46 @@
                 <form action="{{ url_for('analyze_generated_historical_matches_route') }}" method="post">
                     <input type="hidden" name="generated_white_balls" value="{{ white_balls | join(',') }}">
                     <input type="hidden" name="generated_powerball" value="{{ powerball }}">
-                    <button type="submit" class="btn-primary w-full sm:w-auto bg-green-600 hover:bg-green-700">Analyze Against Historical Draws</button> {# NEW BUTTON #}
+                    <button type="submit" class="btn-primary w-full sm:w-auto bg-green-600 hover:bg-green-700">Analyze Against Historical Draws</button>
                 </form>
             </div>
         </div>
     {% endif %}
+
+    <!-- New section for calculating probability with custom ranges -->
+    <div class="card p-6 bg-white rounded-lg shadow-lg mt-8">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Calculate Probability for Custom Ranges</h2>
+        <form action="{{ url_for('winning_probability_route') }}" method="post" class="space-y-4">
+            <p class="text-gray-700">Enter the min/max values for white balls and the Powerball to see the winning probability for those specific ranges.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="form-group">
+                    <label for="prob_white_ball_min" class="block text-gray-700 text-sm font-bold mb-2">White Ball Min (1-69):</label>
+                    <input type="number" name="white_ball_min" id="prob_white_ball_min" value="1" min="1" max="69"
+                           class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div class="form-group">
+                    <label for="prob_white_ball_max" class="block text-gray-700 text-sm font-bold mb-2">White Ball Max (1-69):</label>
+                    <input type="number" name="white_ball_max" id="prob_white_ball_max" value="69" min="1" max="69"
+                           class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="form-group">
+                    <label for="prob_powerball_min" class="block text-gray-700 text-sm font-bold mb-2">Powerball Min (1-26):</label>
+                    <input type="number" name="powerball_min" id="prob_powerball_min" value="1" min="1" max="26"
+                           class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div class="form-group">
+                    <label for="prob_powerball_max" class="block text-gray-700 text-sm font-bold mb-2">Powerball Max (1-26):</label>
+                    <input type="number" name="powerball_max" id="prob_powerball_max" value="26" min="1" max="26"
+                           class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+            </div>
+            <button type="submit" class="btn-primary w-full mt-4">Calculate Probability for These Ranges</button>
+        </form>
+    </div>
 
     <div class="mt-8 text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Latest Official Powerball Draw</h2>
