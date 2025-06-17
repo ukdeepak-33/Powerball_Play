@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Triplets Analysis{% endblock %}
+
+{% block page_heading %}Top 10 Most Frequent White Ball Triplets{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h3 class="text-xl font-semibold mb-4 text-gray-700">Most Frequent Triplets from Historical Draws</h3>
+    
+    {% if triplets_data %}
+    <div class="overflow-x-auto shadow-md rounded-lg">
+        <table class="min-w-full divide-y divide-gray-200" id="tripletsTable">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Triplet</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for triplet_info in triplets_data %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        <span class="inline-flex items-center justify-center bg-blue-200 text-blue-800 text-sm font-semibold px-2.5 py-0.5 rounded-full mr-1">
+                            {{ triplet_info['triplet'][0] }}
+                        </span>
+                        <span class="inline-flex items-center justify-center bg-blue-200 text-blue-800 text-sm font-semibold px-2.5 py-0.5 rounded-full mr-1">
+                            {{ triplet_info['triplet'][1] }}
+                        </span>
+                        <span class="inline-flex items-center justify-center bg-blue-200 text-blue-800 text-sm font-semibold px-2.5 py-0.5 rounded-full">
+                            {{ triplet_info['triplet'][2] }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ triplet_info['count'] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-gray-500">No triplets data available.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // No specific D3.js chart for this page, just rendering data in a table.
+    // However, we can add client-side sorting if desired later.
+</script>
+{% endblock %}
