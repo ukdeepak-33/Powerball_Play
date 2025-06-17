@@ -5,11 +5,10 @@ from itertools import combinations
 import math
 import os
 from collections import defaultdict
-from datetime import datetime, timedelta # Import timedelta
-import requests # Make sure this line is present and not commented out
+from datetime import datetime, timedelta
+import requests
 import json
-import numpy as np # Ensure numpy is imported if used (it is in frequency_analysis, etc.)
-
+import numpy as np
 
 # --- Supabase Configuration ---
 SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
@@ -17,7 +16,7 @@ SUPABASE_ANON_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY")
 
 SUPABASE_TABLE_NAME = 'powerball_draws'
-GENERATED_NUMBERS_TABLE_NAME = 'generated_powerball_numbers' # New table name for generated picks
+GENERATED_NUMBERS_TABLE_NAME = 'generated_powerball_numbers'
 
 # --- Flask App Initialization with Template Path ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -25,6 +24,17 @@ TEMPLATE_DIR = os.path.join(BASE_DIR, '..', 'templates')
 
 app = Flask(__name__, template_folder=TEMPLATE_DIR)
 app.secret_key = 'supersecretkey'
+
+# --- Global Data and Cache ---
+df = pd.DataFrame()
+last_draw = pd.Series(dtype='object') 
+
+# Cache for precomputed analysis data
+analysis_cache = {}
+last_analysis_cache_update = datetime.min # Initialize with the earliest possible datetime
+
+# Cache expiration time (e.g., 1 hour for analysis data)
+CACHE_EXPIRATION_SECONDS = 3600
 
 # --- Utility Functions ---
 
@@ -65,22 +75,22 @@ def load_historical_data_from_supabase():
             print("No data fetched from Supabase after pagination attempts.")
             return pd.DataFrame()
 
-        df = pd.DataFrame(all_data)
-        df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'], errors='coerce')
-        df = df.dropna(subset=['Draw Date_dt'])
+        df_loaded = pd.DataFrame(all_data)
+        df_loaded['Draw Date_dt'] = pd.to_datetime(df_loaded['Draw Date'], errors='coerce')
+        df_loaded = df_loaded.dropna(subset=['Draw Date_dt'])
 
         numeric_cols = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Powerball']
         for col in numeric_cols:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-                df[col] = df[col].fillna(0).astype(int)
+            if col in df_loaded.columns:
+                df_loaded[col] = pd.to_numeric(df_loaded[col], errors='coerce')
+                df_loaded[col] = df_loaded[col].fillna(0).astype(int)
             else:
                 print(f"Warning: Column '{col}' not found in fetched data. Skipping conversion for this column.")
 
-        df['Draw Date'] = df['Draw Date_dt'].dt.strftime('%Y-%m-%d')
+        df_loaded['Draw Date'] = df_loaded['Draw Date_dt'].dt.strftime('%Y-%m-%d')
         
-        print(f"Successfully loaded and processed {len(df)} records from Supabase.")
-        return df
+        print(f"Successfully loaded and processed {len(df_loaded)} records from Supabase.")
+        return df_loaded
 
     except requests.exceptions.RequestException as e:
         print(f"Error during Supabase data fetch request: {e}")
@@ -187,19 +197,19 @@ def check_historical_match(df, white_balls, powerball):
             return row['Draw Date']
     return None
 
-def frequency_analysis(df):
-    if df.empty: return pd.Series([], dtype=int), pd.Series([], dtype=int)
-    white_balls = df[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].values.flatten()
+def frequency_analysis(df_source): # Renamed df to df_source to avoid conflict with global df
+    if df_source.empty: return pd.Series([], dtype=int), pd.Series([], dtype=int)
+    white_balls = df_source[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].values.flatten()
     white_ball_freq = pd.Series(white_balls).value_counts().reindex(range(1, 70), fill_value=0)
-    powerball_freq = df['Powerball'].astype(int).value_counts().reindex(range(1, 27), fill_value=0)
+    powerball_freq = df_source['Powerball'].astype(int).value_counts().reindex(range(1, 27), fill_value=0)
     return white_ball_freq, powerball_freq
 
-def hot_cold_numbers(df, last_draw_date_str):
-    if df.empty or last_draw_date_str == 'N/A': return pd.Series([], dtype=int), pd.Series([], dtype=int)
+def hot_cold_numbers(df_source, last_draw_date_str): # Renamed df to df_source
+    if df_source.empty or last_draw_date_str == 'N/A': return pd.Series([], dtype=int), pd.Series([], dtype=int)
     last_draw_date = pd.to_datetime(last_draw_date_str)
     one_year_ago = last_draw_date - pd.DateOffset(years=1)
     
-    recent_data = df[df['Draw Date_dt'] >= one_year_ago].copy()
+    recent_data = df_source[df_source['Draw Date_dt'] >= one_year_ago].copy()
     if recent_data.empty: return pd.Series([], dtype=int), pd.Series([], dtype=int)
 
     white_balls = recent_data[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].values.flatten()
@@ -215,10 +225,10 @@ def hot_cold_numbers(df, last_draw_date_str):
 
     return hot_numbers, cold_numbers
 
-def monthly_white_ball_analysis(df, last_draw_date_str):
+def monthly_white_ball_analysis(df_source, last_draw_date_str): # Renamed df to df_source
     print("[DEBUG-Monthly] Inside monthly_white_ball_analysis function.")
-    if df.empty or last_draw_date_str == 'N/A':
-        print("[DEBUG-Monthly] df is empty or last_draw_date_str is N/A. Returning empty dict.")
+    if df_source.empty or last_draw_date_str == 'N/A':
+        print("[DEBUG-Monthly] df_source is empty or last_draw_date_str is N/A. Returning empty dict.")
         return {}
 
     try:
@@ -231,12 +241,12 @@ def monthly_white_ball_analysis(df, last_draw_date_str):
     six_months_ago = last_draw_date - pd.DateOffset(months=6)
     print(f"[DEBUG-Monthly] six_months_ago: {six_months_ago}")
 
-    if 'Draw Date_dt' not in df.columns or not pd.api.types.is_datetime64_any_dtype(df['Draw Date_dt']):
-        print("[ERROR-Monthly] 'Draw Date_dt' column missing or not datetime type in df. Attempting to re-create it.")
+    if 'Draw Date_dt' not in df_source.columns or not pd.api.types.is_datetime64_any_dtype(df_source['Draw Date_dt']):
+        print("[ERROR-Monthly] 'Draw Date_dt' column missing or not datetime type in df_source. Attempting to re-create it.")
         try:
-            df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'], errors='coerce')
-            df = df.dropna(subset=['Draw Date_dt'])
-            if df.empty:
+            df_source['Draw Date_dt'] = pd.to_datetime(df_source['Draw Date'], errors='coerce')
+            df_source = df_source.dropna(subset=['Draw Date_dt'])
+            if df_source.empty:
                 print("[ERROR-Monthly] Re-creating 'Draw Date_dt' resulted in empty DataFrame. Returning empty dict.")
                 return {}
             print("[DEBUG-Monthly] Successfully re-created 'Draw Date_dt' column.")
@@ -245,7 +255,7 @@ def monthly_white_ball_analysis(df, last_draw_date_str):
             return {}
 
 
-    recent_data = df[df['Draw Date_dt'] >= six_months_ago].copy()
+    recent_data = df_source[df_source['Draw Date_dt'] >= six_months_ago].copy()
     print(f"[DEBUG-Monthly] recent_data shape after filtering: {recent_data.shape}")
     if recent_data.empty:
         print("[DEBUG-Monthly] recent_data is empty after filtering. Returning empty dict.")
@@ -296,12 +306,12 @@ def monthly_white_ball_analysis(df, last_draw_date_str):
     return monthly_balls_str_keys
 
 
-def sum_of_main_balls(df):
+def sum_of_main_balls(df_source): # Renamed df to df_source
     """Calculates the sum of the five main white balls for each draw."""
-    if df.empty:
+    if df_source.empty:
         return pd.DataFrame(), [], 0, 0, 0.0
     
-    temp_df = df.copy()
+    temp_df = df_source.copy()
     for col in ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']:
         if col in temp_df.columns:
             temp_df[col] = pd.to_numeric(temp_df[col], errors='coerce').fillna(0).astype(int)
@@ -317,9 +327,9 @@ def sum_of_main_balls(df):
 
     return temp_df[['Draw Date', 'Sum']], sum_freq_list, min_sum, max_sum, avg_sum
 
-def find_results_by_sum(df, target_sum):
-    if df.empty: return pd.DataFrame()
-    temp_df = df.copy()
+def find_results_by_sum(df_source, target_sum): # Renamed df to df_source
+    if df_source.empty: return pd.DataFrame()
+    temp_df = df_source.copy()
     for col in ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']:
         if col in temp_df.columns:
             temp_df[col] = pd.to_numeric(temp_df[col], errors='coerce').fillna(0).astype(int)
@@ -330,12 +340,12 @@ def find_results_by_sum(df, target_sum):
     results = temp_df[temp_df['Sum'] == target_sum]
     return results[['Draw Date', 'Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Sum']]
 
-def simulate_multiple_draws(df, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, num_draws=100):
-    if df.empty: return pd.Series([], dtype=int)
+def simulate_multiple_draws(df_source, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, num_draws=100): # Renamed df to df_source
+    if df_source.empty: return pd.Series([], dtype=int)
     results = []
     for _ in range(num_draws):
         try:
-            white_balls, powerball = generate_powerball_numbers(df, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers)
+            white_balls, powerball = generate_powerball_numbers(df_source, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers)
             results.append(white_balls + [powerball])
         except ValueError:
             pass
@@ -413,15 +423,15 @@ def partial_match_probabilities(white_ball_range, powerball_range):
     return probabilities
 
 
-def export_analysis_results(df, file_path="analysis_results.csv"):
-    df.to_csv(file_path, index=False)
+def export_analysis_results(df_source, file_path="analysis_results.csv"): # Renamed df to df_source
+    df_source.to_csv(file_path, index=False)
     print(f"Analysis results saved to {file_path}")
 
-def find_last_draw_dates_for_numbers(df, white_balls, powerball):
-    if df.empty: return {}
+def find_last_draw_dates_for_numbers(df_source, white_balls, powerball): # Renamed df to df_source
+    if df_source.empty: return {}
     last_draw_dates = {}
     
-    sorted_df = df.sort_values(by='Draw Date_dt', ascending=False)
+    sorted_df = df_source.sort_values(by='Draw Date_dt', ascending=False)
 
     for number in white_balls:
         found = False
@@ -445,8 +455,8 @@ def find_last_draw_dates_for_numbers(df, white_balls, powerball):
 
     return last_draw_dates
 
-def modify_combination(df, white_balls, powerball, white_ball_range, powerball_range, excluded_numbers):
-    if df.empty:
+def modify_combination(df_source, white_balls, powerball, white_ball_range, powerball_range, excluded_numbers): # Renamed df to df_source
+    if df_source.empty:
         raise ValueError("Cannot modify combination: Historical data is empty.")
 
     white_balls = list(white_balls)
@@ -484,10 +494,10 @@ def modify_combination(df, white_balls, powerball, white_ball_range, powerball_r
     
     return white_balls, powerball
 
-def find_common_pairs(df, top_n=10):
-    if df.empty: return []
+def find_common_pairs(df_source, top_n=10): # Renamed df to df_source
+    if df_source.empty: return []
     pair_count = defaultdict(int)
-    for _, row in df.iterrows():
+    for _, row in df_source.iterrows():
         nums = sorted([int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])])
         for i in range(len(nums)):
             for j in range(i + 1, len(nums)):
@@ -508,8 +518,8 @@ def filter_common_pairs_by_range(common_pairs, num_range):
             filtered_pairs.append(pair)
     return filtered_pairs
 
-def generate_with_common_pairs(df, common_pairs, white_ball_range, excluded_numbers):
-    if df.empty:
+def generate_with_common_pairs(df_source, common_pairs, white_ball_range, excluded_numbers): # Renamed df to df_source
+    if df_source.empty:
         raise ValueError("Cannot generate numbers with common pairs: Historical data is empty.")
 
     if not common_pairs:
@@ -533,19 +543,19 @@ def generate_with_common_pairs(df, common_pairs, white_ball_range, excluded_numb
     white_balls = sorted([num1, num2] + remaining_numbers)
     return white_balls
 
-def get_number_age_distribution(df):
-    if df.empty: return [], [] # Return both lists
-    df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'])
-    all_draw_dates = sorted(df['Draw Date_dt'].drop_duplicates().tolist())
+def get_number_age_distribution(df_source): # Renamed df to df_source
+    if df_source.empty: return [], [] # Return both lists
+    df_source['Draw Date_dt'] = pd.to_datetime(df_source['Draw Date'])
+    all_draw_dates = sorted(df_source['Draw Date_dt'].drop_duplicates().tolist())
     
     detailed_ages = []
     
     # Process White Balls
     for i in range(1, 70):
         last_appearance_date = None
-        temp_df_filtered = df[(df['Number 1'].astype(int) == i) | (df['Number 2'].astype(int) == i) |
-                              (df['Number 3'].astype(int) == i) | (df['Number 4'].astype(int) == i) |
-                              (df['Number 5'].astype(int) == i)]
+        temp_df_filtered = df_source[(df_source['Number 1'].astype(int) == i) | (df_source['Number 2'].astype(int) == i) |
+                              (df_source['Number 3'].astype(int) == i) | (df_source['Number 4'].astype(int) == i) |
+                              (df_source['Number 5'].astype(int) == i)]
         
         if not temp_df_filtered.empty:
             last_appearance_date = temp_df_filtered['Draw Date_dt'].max()
@@ -566,7 +576,7 @@ def get_number_age_distribution(df):
     # Process Powerballs
     for i in range(1, 27):
         last_appearance_date = None
-        temp_df_filtered = df[df['Powerball'].astype(int) == i]
+        temp_df_filtered = df_source[df_source['Powerball'].astype(int) == i]
         if not temp_df_filtered.empty:
             last_appearance_date = temp_df_filtered['Draw Date_dt'].max()
 
@@ -590,11 +600,11 @@ def get_number_age_distribution(df):
     
     return age_counts_list, detailed_ages # Return both
 
-def get_co_occurrence_matrix(df):
-    if df.empty: return [], 0
+def get_co_occurrence_matrix(df_source): # Renamed df to df_source
+    if df_source.empty: return [], 0
     co_occurrence = defaultdict(int)
     
-    for index, row in df.iterrows():
+    for index, row in df_source.iterrows():
         white_balls = sorted([int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])])
         for i in range(len(white_balls)):
             for j in range(i + 1, len(white_balls)):
@@ -609,11 +619,11 @@ def get_co_occurrence_matrix(df):
     
     return co_occurrence_data, max_co_occurrence
 
-def get_powerball_position_frequency(df):
-    if df.empty: return []
+def get_powerball_position_frequency(df_source): # Renamed df to df_source
+    if df_source.empty: return []
     position_frequency_data = []
     
-    for index, row in df.iterrows():
+    for index, row in df_source.iterrows():
         powerball = int(row['Powerball'])
         for i in range(1, 6):
             col_name = f'Number {i}'
@@ -638,10 +648,10 @@ def _has_consecutive(numbers_list):
     return 0
 
 # Get consecutive numbers trends
-def get_consecutive_numbers_trends(df, last_draw_date_str):
+def get_consecutive_numbers_trends(df_source, last_draw_date_str): # Renamed df to df_source
     print("[DEBUG-ConsecutiveTrends] Inside get_consecutive_numbers_trends function.")
-    if df.empty or last_draw_date_str == 'N/A':
-        print("[DEBUG-ConsecutiveTrends] df is empty or last_draw_date_str is N/A. Returning empty list.")
+    if df_source.empty or last_draw_date_str == 'N/A':
+        print("[DEBUG-ConsecutiveTrends] df_source is empty or last_draw_date_str is N/A. Returning empty list.")
         return []
 
     try:
@@ -654,11 +664,11 @@ def get_consecutive_numbers_trends(df, last_draw_date_str):
     six_months_ago = last_draw_date - pd.DateOffset(months=6)
     print(f"[DEBUG-ConsecutiveTrends] six_months_ago: {six_months_ago}")
 
-    if 'Draw Date_dt' not in df.columns or not pd.api.types.is_datetime64_any_dtype(df['Draw Date_dt']):
-        print("[ERROR-ConsecutiveTrends] 'Draw Date_dt' column missing or not datetime type in df. Returning empty list.")
+    if 'Draw Date_dt' not in df_source.columns or not pd.api.types.is_datetime64_any_dtype(df_source['Draw Date_dt']):
+        print("[ERROR-ConsecutiveTrends] 'Draw Date_dt' column missing or not datetime type in df_source. Returning empty list.")
         return []
 
-    recent_data = df[df['Draw Date_dt'] >= six_months_ago].copy()
+    recent_data = df_source[df_source['Draw Date_dt'] >= six_months_ago].copy()
     recent_data = recent_data.sort_values(by='Draw Date_dt') # Ensure chronological order
     if recent_data.empty:
         print("[DEBUG-ConsecutiveTrends] recent_data is empty after filtering. Returning empty list.")
@@ -679,16 +689,16 @@ def get_consecutive_numbers_trends(df, last_draw_date_str):
     return trend_data
 
 # Get most frequent triplets
-def get_most_frequent_triplets(df, top_n=10):
+def get_most_frequent_triplets(df_source, top_n=10): # Renamed df to df_source
     print("[DEBUG-Triplets] Inside get_most_frequent_triplets function.")
-    if df.empty:
-        print("[DEBUG-Triplets] df is empty. Returning empty list.")
+    if df_source.empty:
+        print("[DEBUG-Triplets] df_source is empty. Returning empty list.")
         return []
 
     triplet_counts = defaultdict(int)
 
     # Iterate through each draw
-    for idx, row in df.iterrows():
+    for idx, row in df_source.iterrows():
         # Get the 5 white balls for the current draw
         white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])]
         
@@ -711,10 +721,10 @@ def get_most_frequent_triplets(df, top_n=10):
     return formatted_triplets
 
 
-def get_odd_even_split_trends(df, last_draw_date_str):
+def get_odd_even_split_trends(df_source, last_draw_date_str): # Renamed df to df_source
     print("[DEBUG-OddEvenTrends] Inside get_odd_even_split_trends function.")
-    if df.empty or last_draw_date_str == 'N/A':
-        print("[DEBUG-OddEvenTrends] df is empty or last_draw_date_str is N/A. Returning empty list.")
+    if df_source.empty or last_draw_date_str == 'N/A':
+        print("[DEBUG-OddEvenTrends] df_source is empty or last_draw_date_str is N/A. Returning empty list.")
         return []
 
     try:
@@ -727,11 +737,11 @@ def get_odd_even_split_trends(df, last_draw_date_str):
     six_months_ago = last_draw_date - pd.DateOffset(months=6)
     print(f"[DEBUG-OddEvenTrends] six_months_ago: {six_months_ago}")
 
-    if 'Draw Date_dt' not in df.columns or not pd.api.types.is_datetime64_any_dtype(df['Draw Date_dt']):
-        print("[ERROR-OddEvenTrends] 'Draw Date_dt' column missing or not datetime type in df. Returning empty list.")
+    if 'Draw Date_dt' not in df_source.columns or not pd.api.types.is_datetime64_any_dtype(df_source['Draw Date_dt']):
+        print("[ERROR-OddEvenTrends] 'Draw Date_dt' column missing or not datetime type in df_source. Returning empty list.")
         return []
 
-    recent_data = df[df['Draw Date_dt'] >= six_months_ago].copy()
+    recent_data = df_source[df_source['Draw Date_dt'] >= six_months_ago].copy()
     recent_data = recent_data.sort_values(by='Draw Date_dt') # Ensure chronological order
     if recent_data.empty:
         print("[DEBUG-OddEvenTrends] recent_data is empty after filtering. Returning empty list.")
@@ -1045,124 +1055,49 @@ def check_generated_against_history(generated_white_balls, generated_powerball, 
     return results
 
 
-# --- Global Data Loading and Pre-computation ---
-df = pd.DataFrame()
-last_draw = pd.Series(dtype='object') 
-
-precomputed_white_ball_freq_list = []
-precomputed_powerball_freq_list = []
-precomputed_last_draw_date_str = "N/A"
-precomputed_hot_numbers_list = []
-precomputed_cold_numbers_list = []
-precomputed_monthly_balls = {}
-precomputed_number_age_counts = [] 
-precomputed_detailed_number_ages = [] 
-precomputed_co_occurrence_data = []
-precomputed_max_co_occurrence = 0
-precomputed_powerball_position_data = []
-precomputed_odd_even_trends = [] 
-precomputed_consecutive_trends = [] 
-precomputed_triplets = [] 
-precomputed_generated_history = {}
-
-
-# This function will be called once after app initialization to load data
-def initialize_app_data():
-    global df, last_draw, precomputed_white_ball_freq_list, precomputed_powerball_freq_list, \
-           precomputed_last_draw_date_str, precomputed_hot_numbers_list, precomputed_cold_numbers_list, \
-           precomputed_monthly_balls, precomputed_number_age_counts, precomputed_detailed_number_ages, \
-           precomputed_co_occurrence_data, precomputed_max_co_occurrence, precomputed_powerball_position_data, \
-           precomputed_odd_even_trends, precomputed_consecutive_trends, precomputed_triplets, \
-           precomputed_generated_history
-    
-    print("Attempting to load and pre-compute data...")
+# --- Data Initialization (Only df and last_draw on startup) ---
+def initialize_core_data():
+    global df, last_draw
+    print("Attempting to load core historical data...")
     try:
-        df_temp = load_historical_data_from_supabase() # Load data into a temp DataFrame
-        
-        if not df_temp.empty: # Only update global df if data was successfully loaded
-            df = df_temp # Assign to global df
+        df_temp = load_historical_data_from_supabase()
+        if not df_temp.empty:
+            df = df_temp
             last_draw = get_last_draw(df)
-
-            white_ball_freq, powerball_freq = frequency_analysis(df)
-            precomputed_white_ball_freq_list.clear() # Clear before extending
-            precomputed_white_ball_freq_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in white_ball_freq.items()])
-            
-            precomputed_powerball_freq_list.clear() # Clear before extending
-            precomputed_powerball_freq_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in powerball_freq.items()])
-            
-            precomputed_last_draw_date_str = last_draw['Draw Date']
-            
-            hot_numbers, cold_numbers = hot_cold_numbers(df, precomputed_last_draw_date_str)
-            precomputed_hot_numbers_list.clear() # Clear before extending
-            precomputed_hot_numbers_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in hot_numbers.items()])
-            
-            precomputed_cold_numbers_list.clear() # Clear before extending
-            precomputed_cold_numbers_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in cold_numbers.items()])
-            
-            precomputed_monthly_balls = monthly_white_ball_analysis(df, precomputed_last_draw_date_str)
-            
-            age_counts_data, detailed_ages_data = get_number_age_distribution(df)
-            precomputed_number_age_counts.clear() # For the chart
-            precomputed_number_age_counts.extend(age_counts_data)
-            precomputed_detailed_number_ages.clear() # For the table
-            precomputed_detailed_number_ages.extend(detailed_ages_data)
-            
-            co_occurrence_data, max_co_occurrence = get_co_occurrence_matrix(df)
-            precomputed_co_occurrence_data.clear() # Clear before extending
-            precomputed_co_occurrence_data.extend(co_occurrence_data)
-            precomputed_max_co_occurrence = max_co_occurrence
-
-            precomputed_powerball_position_data.clear() # Clear before extending
-            precomputed_powerball_position_data.extend(get_powerball_position_frequency(df))
-
-            precomputed_odd_even_trends = get_odd_even_split_trends(df, precomputed_last_draw_date_str)
-            
-            precomputed_consecutive_trends = get_consecutive_numbers_trends(df, precomputed_last_draw_date_str)
-            
-            precomputed_triplets = get_most_frequent_triplets(df)
-
-            precomputed_generated_history = get_generated_numbers_history() # Load generated history
-
-
-            print("\n--- DEBUG: Precomputed Analysis Data Status ---")
-            print(f"precomputed_white_ball_freq_list is empty: {not bool(precomputed_white_ball_freq_list)}")
-            print(f"precomputed_white_ball_freq_list sample: {precomputed_white_ball_freq_list[:5]}")
-            print(f"precomputed_powerball_freq_list is empty: {not bool(precomputed_powerball_freq_list)}")
-            print(f"precomputed_powerball_freq_list sample: {precomputed_powerball_freq_list[:5]}")
-            print(f"precomputed_hot_numbers_list is empty: {not bool(precomputed_hot_numbers_list)}")
-            print(f"precomputed_hot_numbers_list sample: {precomputed_hot_numbers_list[:5]}")
-            print(f"precomputed_cold_numbers_list is empty: {not bool(precomputed_cold_numbers_list)}")
-            print(f"precomputed_cold_numbers_list sample: {precomputed_cold_numbers_list[:5]}")
-            print(f"precomputed_monthly_balls is empty: {not bool(precomputed_monthly_balls)}")
-            print(f"precomputed_monthly_balls sample: {list(precomputed_monthly_balls.keys())[:2] if precomputed_monthly_balls else 'N/A'}")
-            print(f"precomputed_number_age_counts is empty: {not bool(precomputed_number_age_counts)}")
-            print(f"precomputed_number_age_counts sample: {precomputed_number_age_counts[:2] if precomputed_number_age_counts else 'N/A'}")
-            print(f"precomputed_detailed_number_ages is empty: {not bool(precomputed_detailed_number_ages)}")
-            print(f"precomputed_detailed_number_ages sample: {precomputed_detailed_number_ages[:2] if precomputed_detailed_number_ages else 'N/A'}")
-            print(f"precomputed_co_occurrence_data is empty: {not bool(precomputed_co_occurrence_data)}")
-            print(f"precomputed_co_occurrence_data sample: {precomputed_co_occurrence_data[:2] if precomputed_co_occurrence_data else 'N/A'}")
-            print(f"precomputed_powerball_position_data is empty: {not bool(precomputed_powerball_position_data)}")
-            print(f"precomputed_powerball_position_data sample: {precomputed_powerball_position_data[:2] if precomputed_powerball_position_data else 'N/A'}")
-            print(f"precomputed_odd_even_trends is empty: {not bool(precomputed_odd_even_trends)}")
-            print(f"precomputed_odd_even_trends sample: {precomputed_odd_even_trends[:2] if precomputed_odd_even_trends else 'N/A'}")
-            print(f"precomputed_consecutive_trends is empty: {not bool(precomputed_consecutive_trends)}")
-            print(f"precomputed_consecutive_trends sample: {precomputed_consecutive_trends[:2] if precomputed_consecutive_trends else 'N/A'}")
-            print(f"precomputed_triplets is empty: {not bool(precomputed_triplets)}")
-            print(f"precomputed_triplets sample: {precomputed_triplets[:2] if precomputed_triplets else 'N/A'}")
-            print(f"precomputed_generated_history is empty: {not bool(precomputed_generated_history)}")
-            print(f"precomputed_generated_history sample: {list(precomputed_generated_history.keys())[:2] if precomputed_generated_history else 'N/A'}")
-            print("--- END DEBUG ---")
+            print("Core historical data loaded successfully.")
         else:
-            print("DataFrame is empty after loading. Skipping pre-computation and leaving precomputed lists/dicts empty.")
-
+            print("Core historical data is empty after loading. df remains empty.")
     except Exception as e:
-        print(f"An error occurred during initial data loading or pre-computation: {e}")
+        print(f"An error occurred during initial core data loading: {e}")
         import traceback
-        traceback.print_exc() # Print full traceback for initialization errors
+        traceback.print_exc()
 
-# Call the initialization function once when the module is loaded
-initialize_app_data()
+initialize_core_data() # Call this once on module load
 
+
+# --- Analysis Cache Management ---
+def get_cached_analysis(key, compute_function, *args, **kwargs):
+    global analysis_cache, last_analysis_cache_update
+    
+    # Check if cache is still fresh and data exists
+    if key in analysis_cache and (datetime.now() - last_analysis_cache_update).total_seconds() < CACHE_EXPIRATION_SECONDS:
+        print(f"Serving '{key}' from cache.")
+        return analysis_cache[key]
+    
+    print(f"Computing and caching '{key}'.")
+    # Compute the data
+    computed_data = compute_function(*args, **kwargs)
+    
+    # Store in cache
+    analysis_cache[key] = computed_data
+    last_analysis_cache_update = datetime.now() # Update timestamp whenever anything is computed/cached
+    return computed_data
+
+def invalidate_analysis_cache():
+    global analysis_cache, last_analysis_cache_update
+    analysis_cache = {} # Clear the cache
+    last_analysis_cache_update = datetime.min # Reset timestamp
+    print("Analysis cache invalidated.")
 
 # Group A numbers (constants)
 group_a = [3, 5, 6, 7, 9, 11, 15, 16, 18, 21, 23, 24, 27, 31, 32, 33, 36, 42, 44, 45, 48, 50, 51, 54, 55, 60, 66, 69]
@@ -1364,22 +1299,24 @@ def generate_modified():
 
 @app.route('/frequency_analysis')
 def frequency_analysis_route():
+    white_ball_freq_list, powerball_freq_list = get_cached_analysis('freq_analysis', frequency_analysis, df)
     return render_template('frequency_analysis.html', 
-                           white_ball_freq=precomputed_white_ball_freq_list, 
-                           powerball_freq=precomputed_powerball_freq_list)
+                           white_ball_freq=white_ball_freq_list, 
+                           powerball_freq=powerball_freq_list)
 
 @app.route('/hot_cold_numbers')
 def hot_cold_numbers_route():
+    hot_numbers_list, cold_numbers_list = get_cached_analysis('hot_cold_numbers', hot_cold_numbers, df, last_draw['Draw Date'])
     return render_template('hot_cold_numbers.html', 
-                           hot_numbers=precomputed_hot_numbers_list, 
-                           cold_numbers=precomputed_cold_numbers_list)
+                           hot_numbers=hot_numbers_list, 
+                           cold_numbers=cold_numbers_list)
 
 @app.route('/monthly_white_ball_analysis')
 def monthly_white_ball_analysis_route():
-    # The precomputed data is already available from initialize_app_data
-    monthly_balls_json = json.dumps(precomputed_monthly_balls)
+    monthly_balls = get_cached_analysis('monthly_balls', monthly_white_ball_analysis, df, last_draw['Draw Date'])
+    monthly_balls_json = json.dumps(monthly_balls)
     return render_template('monthly_white_ball_analysis.html', 
-                           monthly_balls=precomputed_monthly_balls,
+                           monthly_balls=monthly_balls,
                            monthly_balls_json=monthly_balls_json)
 
 
@@ -1389,10 +1326,9 @@ def sum_of_main_balls_route():
         flash("Cannot display Sum of Main Balls: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
-    sums_data_df, sum_freq_list, min_sum, max_sum, avg_sum = sum_of_main_balls(df)
+    sums_data_df, sum_freq_list, min_sum, max_sum, avg_sum = get_cached_analysis('sum_of_main_balls', sum_of_main_balls, df)
     
     sums_data = sums_data_df.to_dict('records')
-
     sum_freq_json = json.dumps(sum_freq_list)
 
     return render_template('sum_of_main_balls.html', 
@@ -1451,16 +1387,14 @@ def simulate_multiple_draws_route():
 
 @app.route('/winning_probability')
 def winning_probability_route():
-    probability_1_in_x, probability_percentage = winning_probability(white_ball_range, powerball_range)
-
+    probability_1_in_x, probability_percentage = get_cached_analysis('winning_probability', winning_probability, white_ball_range, powerball_range)
     return render_template('winning_probability.html', 
                            probability_1_in_x=probability_1_in_x, 
                            probability_percentage=probability_percentage)
 
 @app.route('/partial_match_probabilities')
 def partial_match_probabilities_route():
-    probabilities = partial_match_probabilities(white_ball_range, powerball_range)
-
+    probabilities = get_cached_analysis('partial_match_probabilities', partial_match_probabilities, white_ball_range, powerball_range)
     return render_template('partial_match_probabilities.html', 
                            probabilities=probabilities)
 
@@ -1476,36 +1410,41 @@ def export_analysis_results_route():
 
 @app.route('/number_age_distribution')
 def number_age_distribution_route():
-    # Pass both the aggregated data (for the chart) and the detailed data (for the table)
+    number_age_counts, detailed_number_ages = get_cached_analysis('number_age_distribution', get_number_age_distribution, df)
     return render_template('number_age_distribution.html',
-                           number_age_data=precomputed_number_age_counts, # For the chart (renamed for clarity)
-                           detailed_number_ages=precomputed_detailed_number_ages) # For the new table
+                           number_age_data=number_age_counts, # For the chart (renamed for clarity)
+                           detailed_number_ages=detailed_number_ages) # For the new table
 
 @app.route('/co_occurrence_analysis')
 def co_occurrence_analysis_route():
+    co_occurrence_data, max_co_occurrence = get_cached_analysis('co_occurrence_analysis', get_co_occurrence_matrix, df)
     return render_template('co_occurrence_analysis.html',
-                           co_occurrence_data=precomputed_co_occurrence_data,
-                           max_co_occurrence=precomputed_max_co_occurrence)
+                           co_occurrence_data=co_occurrence_data,
+                           max_co_occurrence=max_co_occurrence)
 
 @app.route('/powerball_position_frequency')
 def powerball_position_frequency_route():
+    powerball_position_data = get_cached_analysis('powerball_position_frequency', get_powerball_position_frequency, df)
     return render_template('powerball_position_frequency.html',
-                           powerball_position_data=precomputed_powerball_position_data)
+                           powerball_position_data=powerball_position_data)
 
 @app.route('/odd_even_trends')
 def odd_even_trends_route():
+    odd_even_trends = get_cached_analysis('odd_even_trends', get_odd_even_split_trends, df, last_draw['Draw Date'])
     return render_template('odd_even_trends.html',
-                           odd_even_trends=precomputed_odd_even_trends)
+                           odd_even_trends=odd_even_trends)
 
 @app.route('/consecutive_trends')
 def consecutive_trends_route():
+    consecutive_trends = get_cached_analysis('consecutive_trends', get_consecutive_numbers_trends, df, last_draw['Draw Date'])
     return render_template('consecutive_trends.html',
-                           consecutive_trends=precomputed_consecutive_trends)
+                           consecutive_trends=consecutive_trends)
 
 @app.route('/triplets_analysis')
 def triplets_analysis_route():
+    triplets_data = get_cached_analysis('triplets_analysis', get_most_frequent_triplets, df)
     return render_template('triplets_analysis.html',
-                           triplets_data=precomputed_triplets)
+                           triplets_data=triplets_data)
 
 @app.route('/find_results_by_first_white_ball', methods=['GET', 'POST'])
 def find_results_by_first_white_ball():
@@ -1588,8 +1527,9 @@ def update_powerball_data():
         if insert_response.status_code == 201:
             print(f"Successfully inserted new draw: {new_draw_data}")
             
-            # Re-initialize all precomputed data after adding a new draw
-            initialize_app_data() # This will reload and recompute everything
+            # Re-load core data and invalidate analysis cache
+            initialize_core_data() 
+            invalidate_analysis_cache()
 
             return f"Data updated successfully with draw for {simulated_draw_date}.", 200
         else:
@@ -1638,7 +1578,9 @@ def save_official_draw_route():
         success, message = save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb)
         if success:
             flash(message, 'info')
-            initialize_app_data() # Re-initialize all precomputed data after adding a new draw
+            # Re-load core data and invalidate analysis cache
+            initialize_core_data()
+            invalidate_analysis_cache()
         else:
             flash(message, 'error')
     except ValueError:
@@ -1673,9 +1615,8 @@ def save_generated_pick_route():
         success, message = save_generated_numbers_to_db(white_balls, powerball)
         if success:
             flash(message, 'info')
-            # Update only the precomputed generated history, no need to reload all historical data
-            global precomputed_generated_history
-            precomputed_generated_history = get_generated_numbers_history()
+            # Only update the generated history cache, not analysis cache for this
+            analysis_cache['generated_history'] = get_generated_numbers_history()
         else:
             flash(message, 'error')
 
@@ -1688,8 +1629,9 @@ def save_generated_pick_route():
 # NEW ROUTE for viewing generated numbers history
 @app.route('/generated_numbers_history')
 def generated_numbers_history_route():
+    generated_history = get_cached_analysis('generated_history', get_generated_numbers_history)
     return render_template('generated_numbers_history.html', 
-                           generated_history=precomputed_generated_history) # Pass grouped data
+                           generated_history=generated_history) # Pass grouped data
 
 # NEW ROUTE for analyzing generated numbers against historical data
 @app.route('/analyze_generated_historical_matches', methods=['POST'])
@@ -1713,6 +1655,8 @@ def analyze_generated_historical_matches_route():
             flash("Invalid generated white balls format. Expected 5 numbers for analysis.", 'error')
             return redirect(url_for('index'))
 
+        # This analysis is specific to the generated numbers, so it won't be cached in the general analysis_cache
+        # But if you wanted to cache specific generated number analyses, you'd extend get_cached_analysis with a key unique to the combination
         historical_match_results = check_generated_against_history(generated_white_balls, generated_powerball, df)
         
         return render_template('historical_match_analysis_results.html', 
