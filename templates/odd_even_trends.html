@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Odd/Even Split Trends{% endblock %}
+
+{% block page_heading %}Odd/Even Split Trends (Last 6 Months){% endblock %}
+
+{% block content %}
+<div class="chart-container">
+    <h2 class="text-xl font-semibold mb-4">Frequency of Odd/Even Splits Over Time</h2>
+    {% if odd_even_trends %}
+        <div id="oddEvenTrendChart"></div>
+    {% else %}
+        <p class="text-gray-500">No odd/even split trend data available to display chart.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var oddEvenTrendsData = [];
+        {% if odd_even_trends %}
+            try {
+                oddEvenTrendsData = JSON.parse('{{ odd_even_trends | tojson | safe }}');
+            } catch (e) {
+                console.error("Error parsing oddEvenTrendsData JSON:", e);
+                oddEvenTrendsData = [];
+            }
+        {% endif %}
+        console.log("[D3 Debug] odd_even_trends.html - oddEvenTrendsData:", oddEvenTrendsData);
+
+        if (oddEvenTrendsData.length > 0) {
+            // Define the specific split categories we are tracking
+            const categories = ["All Odd", "All Even", "4 Odd / 1 Even", "1 Odd / 4 Even", "3 Odd / 2 Even", "2 Odd / 3 Even", "Other"];
+
+            // Set up chart dimensions
+            const margin = { top: 30, right: 100, bottom: 60, left: 50 };
+            const width = Math.min(900, window.innerWidth - 40) - margin.left - margin.right;
+            const height = 500 - margin.top - margin.bottom;
+
+            // Append SVG
+            const svg = d3.select("#oddEvenTrendChart")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Parse dates
+            const parseDate = d3.timeParse("%Y-%m-%d");
+            oddEvenTrendsData.forEach(d => {
+                d.draw_date = parseDate(d.draw_date);
+            });
+
+            // Define Scales
+            const xScale = d3.scaleTime()
+                .domain(d3.extent(oddEvenTrendsData, d => d.draw_date))
+                .range([0, width]);
+
+            // Determine max Y value across all categories
+            let maxY = 0;
+            oddEvenTrendsData.forEach(d => {
+                categories.forEach(cat => {
+                    if (d[cat] > maxY) {
+                        maxY = d[cat];
+                    }
+                });
+            });
+
+            const yScale = d3.scaleLinear()
+                .domain([0, maxY * 1.1]) // Add some padding above max
+                .range([height, 0]);
+
+            // Define colors for each category
+            const colorScale = d3.scaleOrdinal()
+                .domain(categories)
+                .range(d3.schemeCategory10); // D3's built-in color scheme
+
+            // Add X-axis
+            svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(xScale).tickFormat(d3.timeFormat("%b %d")))
+                .selectAll("text")
+                .attr("transform", "rotate(-45)")
+                .style("text-anchor", "end");
+            
+            // X-axis label
+            svg.append("text")
+                .attr("class", "x label")
+                .attr("text-anchor", "end")
+                .attr("x", width / 2 + margin.right / 2)
+                .attr("y", height + margin.bottom - 10)
+                .text("Draw Date");
+
+
+            // Add Y-axis
+            svg.append("g")
+                .call(d3.axisLeft(yScale).tickFormat(d3.format("d"))); // Integer ticks
+            
+            // Y-axis label
+            svg.append("text")
+                .attr("class", "y label")
+                .attr("text-anchor", "end")
+                .attr("y", -margin.left + 15)
+                .attr("x", -height / 2)
+                .attr("dy", ".75em")
+                .attr("transform", "rotate(-90)")
+                .text("Number of Draws with Split");
+
+            // Create a line generator for each category
+            const line = d3.line()
+                .x(d => xScale(d.draw_date))
+                .y(d => yScale(d.value))
+                .defined(d => !isNaN(d.value)); // Handle missing data if any
+
+            // Add the lines for each category
+            categories.forEach(category => {
+                const dataForCategory = oddEvenTrendsData.map(d => ({
+                    draw_date: d.draw_date,
+                    value: d[category]
+                }));
+
+                svg.append("path")
+                    .datum(dataForCategory)
+                    .attr("fill", "none")
+                    .attr("stroke", colorScale(category))
+                    .attr("stroke-width", 2)
+                    .attr("d", line)
+                    .on("mouseover", function(event, d) {
+                        d3.select(this).attr("stroke-width", 4); // Thicker on hover
+                    })
+                    .on("mouseout", function(event, d) {
+                        d3.select(this).attr("stroke-width", 2); // Back to normal
+                    });
+            });
+
+            // Add a legend
+            const legend = svg.selectAll(".legend")
+                .data(categories)
+                .enter().append("g")
+                .attr("class", "legend")
+                .attr("transform", (d, i) => `translate(${width + 10}, ${i * 20})`); // Position legend to the right
+
+            legend.append("rect")
+                .attr("x", 0)
+                .attr("width", 18)
+                .attr("height", 18)
+                .style("fill", colorScale);
+
+            legend.append("text")
+                .attr("x", 24)
+                .attr("y", 9)
+                .attr("dy", ".35em")
+                .style("text-anchor", "start")
+                .text(d => d);
+        } else {
+            console.warn("oddEvenTrendsData is empty, not drawing chart.");
+        }
+    });
+</script>
+{% endblock %}
