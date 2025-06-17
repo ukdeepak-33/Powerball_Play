@@ -5,13 +5,23 @@
 {% block page_heading %}Odd/Even Split Trends (Last 6 Months){% endblock %}
 
 {% block content %}
-<div class="chart-container">
-    <h2 class="text-xl font-semibold mb-4">Frequency of Odd/Even Splits Over Time</h2>
+<div class="card">
+    <h2 class="text-xl font-semibold mb-4 text-gray-700">Frequency of Odd/Even Splits Over Time</h2>
     {% if odd_even_trends %}
         <div id="oddEvenTrendChart"></div>
     {% else %}
         <p class="text-gray-500">No odd/even split trend data available to display chart.</p>
     {% endif %}
+
+    <div class="mt-6 text-gray-700 leading-relaxed">
+        <h3 class="text-lg font-semibold mb-2">Understanding This Chart:</h3>
+        <p>This chart displays the trends of different Odd/Even splits among the five white balls drawn in Powerball over the last six months. Each colored line represents a specific combination of odd and even numbers (e.g., "3 Odd / 2 Even").</p>
+        <ul class="list-disc list-inside ml-4 mt-2">
+            <li><strong>X-Axis (Draw Date):</strong> Shows the timeline of Powerball draws.</li>
+            <li><strong>Y-Axis (Number of Draws with Split):</strong> Indicates how many times a particular odd/even split occurred on that specific draw date. (Typically, this will be 0 or 1 for any given draw, but lines connect the points over time).</li>
+        </ul>
+        <p class="mt-2">By observing these trends, you can identify if certain odd/even patterns are becoming more or less frequent. For instance, you might see if "3 Odd / 2 Even" is a consistently popular split, or if "All Even" draws are rare occurrences. This can help inform your number generation strategy by aligning with historical patterns or intentionally deviating from them.</p>
+    </div>
 </div>
 {% endblock %}
 
