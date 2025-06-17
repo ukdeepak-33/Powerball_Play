@@ -29,6 +29,9 @@ app.secret_key = 'supersecretkey'
 df = pd.DataFrame()
 last_draw = pd.Series(dtype='object') 
 
+# NEW: Set to store all historical white ball combinations for fast lookup
+historical_white_ball_sets = set() 
+
 # Cache for precomputed analysis data
 analysis_cache = {}
 last_analysis_cache_update = datetime.min # Initialize with the earliest possible datetime
@@ -114,16 +117,16 @@ def get_last_draw(df):
         }, dtype='object')
     return df.iloc[-1]
 
-def check_exact_match(df, white_balls):
-    if df.empty: return False
-    for _, row in df.iterrows():
-        historical_white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])]
-        if set(white_balls) == set(historical_white_balls):
-            return True
-    return False
+def check_exact_match(white_balls): # Removed df parameter as it uses global historical_white_ball_sets
+    """
+    Checks if the given white_balls combination exactly matches any historical draw.
+    Uses the precomputed global historical_white_ball_sets for efficient lookup.
+    """
+    global historical_white_ball_sets
+    return frozenset(white_balls) in historical_white_ball_sets
 
-def generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, high_low_balance=None):
-    if df.empty:
+def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, high_low_balance=None):
+    if df_source.empty:
         raise ValueError("Cannot generate numbers: Historical data is empty.")
 
     max_attempts = 1000
@@ -143,14 +146,15 @@ def generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white
 
         powerball = random.randint(powerball_range[0], powerball_range[1])
 
-        last_draw_data = get_last_draw(df)
+        last_draw_data = get_last_draw(df_source) # Use df_source here
         if not last_draw_data.empty and last_draw_data.get('Draw Date') != 'N/A':
             last_white_balls = [int(last_draw_data['Number 1']), int(last_draw_data['Number 2']), int(last_draw_data['Number 3']), int(last_draw_data['Number 4']), int(last_draw_data['Number 5'])]
             if set(white_balls) == set(last_white_balls) and powerball == int(last_draw_data['Powerball']):
                 attempts += 1
                 continue
 
-        if check_exact_match(df, white_balls):
+        # Optimized call to check_exact_match
+        if check_exact_match(white_balls): 
             attempts += 1
             continue
 
@@ -188,9 +192,9 @@ def generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white
 
     return white_balls, powerball
 
-def check_historical_match(df, white_balls, powerball):
-    if df.empty: return None
-    for _, row in df.iterrows():
+def check_historical_match(df_source, white_balls, powerball): # Renamed df to df_source
+    if df_source.empty: return None
+    for _, row in df_source.iterrows():
         historical_white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])]
         historical_powerball = int(row['Powerball'])
         if set(white_balls) == set(historical_white_balls) and powerball == historical_powerball:
@@ -732,7 +736,7 @@ def get_odd_even_split_trends(df_source, last_draw_date_str): # Renamed df to df
         print(f"[DEBUG-OddEvenTrends] last_draw_date: {last_draw_date}")
     except Exception as e:
         print(f"[ERROR-OddEvenTrends] Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty list.")
-        return []
+        return {}
 
     six_months_ago = last_draw_date - pd.DateOffset(months=6)
     print(f"[DEBUG-OddEvenTrends] six_months_ago: {six_months_ago}")
@@ -1057,13 +1061,22 @@ def check_generated_against_history(generated_white_balls, generated_powerball, 
 
 # --- Data Initialization (Only df and last_draw on startup) ---
 def initialize_core_data():
-    global df, last_draw
+    global df, last_draw, historical_white_ball_sets
     print("Attempting to load core historical data...")
     try:
         df_temp = load_historical_data_from_supabase()
         if not df_temp.empty:
             df = df_temp
             last_draw = get_last_draw(df)
+
+            # Precompute historical white ball sets for fast lookups
+            historical_white_ball_sets.clear() 
+            for _, row in df.iterrows():
+                # Ensure numbers are integers before creating frozenset
+                white_balls_list = [int(row[f'Number {i}']) for i in range(1, 6)]
+                historical_white_ball_sets.add(frozenset(white_balls_list))
+            print(f"Precomputed {len(historical_white_ball_sets)} historical white ball sets for fast uniqueness checks.")
+
             print("Core historical data loaded successfully.")
         else:
             print("Core historical data is empty after loading. df remains empty.")
@@ -1156,6 +1169,8 @@ def generate():
     last_draw_dates = {}
 
     try:
+        # Pass df (historical data) to generate_powerball_numbers if needed for logic other than exact match
+        # However, check_exact_match itself no longer needs df, it uses the global set.
         white_balls, powerball = generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white_ball_range_local, powerball_range_local, excluded_numbers_local, high_low_balance)
         last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
     except ValueError as e:
@@ -1243,7 +1258,8 @@ def generate_modified():
             
         max_attempts_unique = 100
         attempts_unique = 0
-        while check_exact_match(df, white_balls) and attempts_unique < max_attempts_unique:
+        # Use the optimized check_exact_match
+        while check_exact_match(white_balls) and attempts_unique < max_attempts_unique:
             if use_common_pairs:
                 common_pairs_recheck = find_common_pairs(df, top_n=20)
                 if num_range:
@@ -1326,6 +1342,7 @@ def sum_of_main_balls_route():
         flash("Cannot display Sum of Main Balls: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
+    # sums_data_df needs to be extracted from the tuple returned by sum_of_main_balls
     sums_data_df, sum_freq_list, min_sum, max_sum, avg_sum = get_cached_analysis('sum_of_main_balls', sum_of_main_balls, df)
     
     sums_data = sums_data_df.to_dict('records')
@@ -1616,7 +1633,8 @@ def save_generated_pick_route():
         if success:
             flash(message, 'info')
             # Only update the generated history cache, not analysis cache for this
-            analysis_cache['generated_history'] = get_generated_numbers_history()
+            # The get_generated_numbers_history function now internally fetches fresh data
+            get_cached_analysis('generated_history', get_generated_numbers_history) 
         else:
             flash(message, 'error')
 
