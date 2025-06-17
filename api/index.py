@@ -260,7 +260,7 @@ def monthly_white_ball_analysis(df, last_draw_date_str):
         required_cols = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']
         for col in required_cols:
             if col not in recent_data.columns:
-                print(f"[ERROR-Monthly] Missing required column '{col}' in recent_data. Cannot perform analysis.")
+                print(f"[[ERROR-Monthly] Missing required column '{col}' in recent_data. Cannot perform analysis.")
                 return {}
             # Ensure they are numeric, coerce errors to NaN
             recent_data[col] = pd.to_numeric(recent_data[col], errors='coerce')
@@ -365,7 +365,7 @@ def partial_match_probabilities(white_ball_range, powerball_range):
     total_white_balls_in_range = white_ball_range[1] - white_ball_range[0] + 1
     total_powerballs_in_range = powerball_range[1] - powerball_range[0] + 1
 
-    total_winning_white_comb = calculate_combinations(total_white_balls_in_range, 5)
+    total_winning_white_comb = calculate_combinations(5, data["matched_w"])
 
     probabilities = {}
 
@@ -616,6 +616,177 @@ def get_powerball_position_frequency(df):
                 })
     return position_frequency_data
 
+# Function to check for consecutive numbers in a draw
+def _has_consecutive(numbers_list):
+    """Checks if a list of numbers contains any consecutive sequence."""
+    if len(numbers_list) < 2:
+        return 0 # No consecutive numbers possible
+    
+    sorted_nums = sorted(numbers_list)
+    for i in range(len(sorted_nums) - 1):
+        if sorted_nums[i] + 1 == sorted_nums[i+1]:
+            return 1 # Found at least one consecutive pair
+    return 0
+
+# Get consecutive numbers trends
+def get_consecutive_numbers_trends(df, last_draw_date_str):
+    print("[DEBUG-ConsecutiveTrends] Inside get_consecutive_numbers_trends function.")
+    if df.empty or last_draw_date_str == 'N/A':
+        print("[DEBUG-ConsecutiveTrends] df is empty or last_draw_date_str is N/A. Returning empty list.")
+        return []
+
+    try:
+        last_draw_date = pd.to_datetime(last_draw_date_str)
+        print(f"[DEBUG-ConsecutiveTrends] last_draw_date: {last_draw_date}")
+    except Exception as e:
+        print(f"[ERROR-ConsecutiveTrends] Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty list.")
+        return []
+
+    six_months_ago = last_draw_date - pd.DateOffset(months=6)
+    print(f"[DEBUG-ConsecutiveTrends] six_months_ago: {six_months_ago}")
+
+    if 'Draw Date_dt' not in df.columns or not pd.api.types.is_datetime64_any_dtype(df['Draw Date_dt']):
+        print("[ERROR-ConsecutiveTrends] 'Draw Date_dt' column missing or not datetime type in df. Returning empty list.")
+        return []
+
+    recent_data = df[df['Draw Date_dt'] >= six_months_ago].copy()
+    recent_data = recent_data.sort_values(by='Draw Date_dt') # Ensure chronological order
+    print(f"[DEBUG-ConsecutiveTrends] recent_data shape after filtering: {recent_data.shape}")
+    if recent_data.empty:
+        print("[DEBUG-ConsecutiveTrends] recent_data is empty after filtering. Returning empty list.")
+        return []
+
+    trend_data = []
+    for idx, row in recent_data.iterrows():
+        white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])]
+        
+        has_consecutive = _has_consecutive(white_balls)
+        
+        trend_data.append({
+            'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
+            'consecutive_present': has_consecutive # 1 if consecutive, 0 otherwise
+        })
+    
+    print(f"[DEBUG-ConsecutiveTrends] Generated {len(trend_data)} trend data points.")
+    return trend_data
+
+# NEW FUNCTION: Get most frequent triplets
+def get_most_frequent_triplets(df, top_n=10):
+    print("[DEBUG-Triplets] Inside get_most_frequent_triplets function.")
+    if df.empty:
+        print("[DEBUG-Triplets] df is empty. Returning empty list.")
+        return []
+
+    triplet_counts = defaultdict(int)
+
+    # Iterate through each draw
+    for idx, row in df.iterrows():
+        # Get the 5 white balls for the current draw
+        white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])]
+        
+        # Generate all unique combinations of 3 numbers (triplets) from the 5 white balls
+        for triplet_combo in combinations(sorted(white_balls), 3):
+            triplet_counts[triplet_combo] += 1
+    
+    # Sort triplets by their frequency in descending order
+    sorted_triplets = sorted(triplet_counts.items(), key=lambda x: x[1], reverse=True)
+    
+    # Format for JSON serialization and return top_n
+    formatted_triplets = []
+    for triplet, count in sorted_triplets[:top_n]:
+        formatted_triplets.append({
+            'triplet': list(triplet), # Convert tuple to list for JSON
+            'count': int(count)
+        })
+    
+    print(f"[DEBUG-Triplets] Found {len(triplet_counts)} unique triplets. Returning top {len(formatted_triplets)}.")
+    return formatted_triplets
+
+
+def get_odd_even_split_trends(df, last_draw_date_str):
+    print("[DEBUG-OddEvenTrends] Inside get_odd_even_split_trends function.")
+    if df.empty or last_draw_date_str == 'N/A':
+        print("[DEBUG-OddEvenTrends] df is empty or last_draw_date_str is N/A. Returning empty list.")
+        return []
+
+    try:
+        last_draw_date = pd.to_datetime(last_draw_date_str)
+        print(f"[DEBUG-OddEvenTrends] last_draw_date: {last_draw_date}")
+    except Exception as e:
+        print(f"[ERROR-OddEvenTrends] Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty list.")
+        return []
+
+    six_months_ago = last_draw_date - pd.DateOffset(months=6)
+    print(f"[DEBUG-OddEvenTrends] six_months_ago: {six_months_ago}")
+
+    if 'Draw Date_dt' not in df.columns or not pd.api.types.is_datetime64_any_dtype(df['Draw Date_dt']):
+        print("[ERROR-OddEvenTrends] 'Draw Date_dt' column missing or not datetime type in df. Returning empty list.")
+        return []
+
+    recent_data = df[df['Draw Date_dt'] >= six_months_ago].copy()
+    recent_data = recent_data.sort_values(by='Draw Date_dt') # Ensure chronological order
+    print(f"[DEBUG-OddEvenTrends] recent_data shape after filtering: {recent_data.shape}")
+    if recent_data.empty:
+        print("[DEBUG-OddEvenTrends] recent_data is empty after filtering. Returning empty list.")
+        return []
+
+    trend_data = []
+    for idx, row in recent_data.iterrows():
+        white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])]
+        even_count = sum(1 for num in white_balls if num % 2 == 0)
+        odd_count = 5 - even_count
+
+        split_category = "Other" # Default for categories not explicitly listed
+
+        if odd_count == 5:
+            split_category = "All Odd"
+        elif even_count == 5:
+            split_category = "All Even"
+        elif odd_count == 4 and even_count == 1:
+            split_category = "4 Odd / 1 Even"
+        elif odd_count == 1 and even_count == 4:
+            split_category = "1 Odd / 4 Even"
+        elif odd_count == 3 and even_count == 2:
+            split_category = "3 Odd / 2 Even"
+        elif odd_count == 2 and even_count == 3:
+            split_category = "2 Odd / 3 Even"
+        
+        # Now, let's process trend_data to get counts per category per date for plotting multiple lines
+        # Or, just append the draw date and its split
+        trend_data.append({
+            'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
+            'split_category': split_category
+        })
+    
+    # Create a DataFrame from the raw trend_data
+    trend_df = pd.DataFrame(trend_data)
+    
+    if trend_df.empty:
+        print("[DEBUG-OddEvenTrends] trend_df is empty after categorizing. Returning empty list.")
+        return []
+
+    # Get all unique draw dates to ensure a continuous x-axis for plotting
+    all_dates = pd.to_datetime(trend_df['draw_date']).dt.date.unique()
+    all_dates.sort()
+
+    # Define all expected categories for consistent columns
+    categories = ["All Odd", "All Even", "4 Odd / 1 Even", "1 Odd / 4 Even", "3 Odd / 2 Even", "2 Odd / 3 Even", "Other"]
+
+    # Create a list of dictionaries for the chart
+    chart_data = []
+    for date_obj in all_dates:
+        date_str = date_obj.strftime('%Y-%m-%d')
+        daily_counts = trend_df[trend_df['draw_date'] == date_str]['split_category'].value_counts().to_dict()
+        
+        row_data = {'draw_date': date_str}
+        for cat in categories:
+            row_data[cat] = int(daily_counts.get(cat, 0)) # Ensure it's int
+        chart_data.append(row_data)
+
+    print(f"[DEBUG-OddEvenTrends] Generated {len(chart_data)} trend data points.")
+    return chart_data
+
+
 # --- Global Data Loading and Pre-computation ---
 df = pd.DataFrame()
 last_draw = pd.Series(dtype='object') 
@@ -626,18 +797,23 @@ precomputed_last_draw_date_str = "N/A"
 precomputed_hot_numbers_list = []
 precomputed_cold_numbers_list = []
 precomputed_monthly_balls = {}
-precomputed_number_age_counts = [] # Renamed for clarity (for the chart)
-precomputed_detailed_number_ages = [] # New global for detailed age data
+precomputed_number_age_counts = [] 
+precomputed_detailed_number_ages = [] 
 precomputed_co_occurrence_data = []
 precomputed_max_co_occurrence = 0
 precomputed_powerball_position_data = []
+precomputed_odd_even_trends = [] 
+precomputed_consecutive_trends = [] 
+precomputed_triplets = [] 
+
 
 # This function will be called once after app initialization to load data
 def initialize_app_data():
     global df, last_draw, precomputed_white_ball_freq_list, precomputed_powerball_freq_list, \
            precomputed_last_draw_date_str, precomputed_hot_numbers_list, precomputed_cold_numbers_list, \
            precomputed_monthly_balls, precomputed_number_age_counts, precomputed_detailed_number_ages, \
-           precomputed_co_occurrence_data, precomputed_max_co_occurrence, precomputed_powerball_position_data
+           precomputed_co_occurrence_data, precomputed_max_co_occurrence, precomputed_powerball_position_data, \
+           precomputed_odd_even_trends, precomputed_consecutive_trends, precomputed_triplets
     
     print("Attempting to load and pre-compute data...")
     try:
@@ -663,10 +839,8 @@ def initialize_app_data():
             precomputed_cold_numbers_list.clear() # Clear before extending
             precomputed_cold_numbers_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in cold_numbers.items()])
             
-            # --- IMPORTANT: Call monthly_white_ball_analysis during pre-computation ---
             precomputed_monthly_balls = monthly_white_ball_analysis(df, precomputed_last_draw_date_str)
             
-            # Update number age data to get both counts and detailed list
             age_counts_data, detailed_ages_data = get_number_age_distribution(df)
             precomputed_number_age_counts.clear() # For the chart
             precomputed_number_age_counts.extend(age_counts_data)
@@ -680,6 +854,12 @@ def initialize_app_data():
 
             precomputed_powerball_position_data.clear() # Clear before extending
             precomputed_powerball_position_data.extend(get_powerball_position_frequency(df))
+
+            precomputed_odd_even_trends = get_odd_even_split_trends(df, precomputed_last_draw_date_str)
+            
+            precomputed_consecutive_trends = get_consecutive_numbers_trends(df, precomputed_last_draw_date_str)
+            
+            precomputed_triplets = get_most_frequent_triplets(df)
 
 
             print("\n--- DEBUG: Precomputed Analysis Data Status ---")
@@ -701,6 +881,12 @@ def initialize_app_data():
             print(f"precomputed_co_occurrence_data sample: {precomputed_co_occurrence_data[:2] if precomputed_co_occurrence_data else 'N/A'}")
             print(f"precomputed_powerball_position_data is empty: {not bool(precomputed_powerball_position_data)}")
             print(f"precomputed_powerball_position_data sample: {precomputed_powerball_position_data[:2] if precomputed_powerball_position_data else 'N/A'}")
+            print(f"precomputed_odd_even_trends is empty: {not bool(precomputed_odd_even_trends)}")
+            print(f"precomputed_odd_even_trends sample: {precomputed_odd_even_trends[:2] if precomputed_odd_even_trends else 'N/A'}")
+            print(f"precomputed_consecutive_trends is empty: {not bool(precomputed_consecutive_trends)}")
+            print(f"precomputed_consecutive_trends sample: {precomputed_consecutive_trends[:2] if precomputed_consecutive_trends else 'N/A'}")
+            print(f"precomputed_triplets is empty: {not bool(precomputed_triplets)}")
+            print(f"precomputed_triplets sample: {precomputed_triplets[:2] if precomputed_triplets else 'N/A'}")
             print("--- END DEBUG ---")
         else:
             print("DataFrame is empty after loading. Skipping pre-computation and leaving precomputed lists/dicts empty.")
@@ -781,102 +967,14 @@ def generate():
     if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
         try:
             last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
-        except ValueError:
-            pass
-
-    return render_template('index.html', 
-                           white_balls=white_balls, 
-                           powerball=powerball, 
-                           last_draw=last_draw_dict, 
-                           last_draw_dates=last_draw_dates)
-
-
-@app.route('/generate_modified', methods=['POST'])
-def generate_modified():
-    if df.empty:
-        flash("Cannot generate modified combination: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return redirect(url_for('index'))
-
-    use_common_pairs = request.form.get('use_common_pairs') == 'on'
-    num_range_str = request.form.get('num_range', '')
-    num_range = None
-    if num_range_str:
-        try:
-            parts = [int(num.strip()) for num in num_range_str.split() if num.strip().isdigit()]
-            if len(parts) == 2:
-                num_range = tuple(parts)
-            else:
-                flash("Filter Common Pairs by Range input must be two numbers separated by space (e.g., '1 20').", 'error')
-        except ValueError:
-            flash("Invalid Filter Common Pairs by Range format. Please enter numbers separated by space.", 'error')
-
-    white_balls = []
-    powerball = None
-    last_draw_dates = {}
-
-    try:
-        if not df.empty:
-            random_row = df.sample(1).iloc[0]
-            white_balls_base = [int(random_row['Number 1']), int(random_row['Number 2']), int(random_row['Number 3']), int(random_row['Number 4']), int(random_row['Number 5'])]
-            powerball_base = int(random_row['Powerball'])
-        else:
-            flash("Historical data is empty, cannot generate or modify numbers.", 'error')
-            return redirect(url_for('index'))
-
-
-        if use_common_pairs:
-            common_pairs = find_common_pairs(df, top_n=20)
-            if num_range:
-                common_pairs = filter_common_pairs_by_range(common_pairs, num_range)
-            
-            if not common_pairs:
-                flash("No common pairs found with the specified filter. Generating a random combination instead.", 'info')
-                white_balls, powerball = generate_powerball_numbers(df, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers)
-            else:
-                white_balls = generate_with_common_pairs(df, common_pairs, white_ball_range, excluded_numbers)
-                powerball = random.randint(powerball_range[0], powerball_range[1])
-        else:
-            white_balls, powerball = modify_combination(df, white_balls_base, powerball_base, white_ball_range, powerball_range, excluded_numbers)
-            
-        max_attempts_unique = 100
-        attempts_unique = 0
-        while check_exact_match(df, white_balls) and attempts_unique < max_attempts_unique:
-            if use_common_pairs:
-                common_pairs_recheck = find_common_pairs(df, top_n=20)
-                if num_range:
-                    common_pairs_recheck = filter_common_pairs_by_range(common_pairs_recheck, num_range)
-                if common_pairs_recheck:
-                    white_balls = generate_with_common_pairs(df, common_pairs_recheck, white_ball_range, excluded_numbers)
-                else:
-                    white_balls, powerball = generate_powerball_numbers(df, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers)
-            else:
-                random_row = df.sample(1).iloc[0]
-                white_balls_base = [int(random_row['Number 1']), int(random_row['Number 2']), int(random_row['Number 3']), int(random_row['Number 4']), int(random_row['Number 5'])]
-                powerball_base = int(random_row['Powerball'])
-                white_balls, powerball = modify_combination(df, white_balls_base, powerball_base, white_ball_range, powerball_range, excluded_numbers)
-            attempts_unique += 1
-        
-        if attempts_unique == max_attempts_unique:
-            flash("Could not find a unique modified combination after many attempts. Please try again.", 'error')
-            return redirect(url_for('index'))
-
-        white_balls = [int(num) for num in white_balls]
-        powerball = int(powerball)
-
-        last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
-
-        last_draw_dict = last_draw.to_dict()
-        if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
-            try:
-                last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
             except ValueError:
                 pass
 
         return render_template('index.html', 
-                            white_balls=white_balls, 
-                            powerball=powerball, 
-                            last_draw=last_draw_dict, 
-                            last_draw_dates=last_draw_dates)
+                           white_balls=white_balls, 
+                           powerball=powerball, 
+                           last_draw=last_draw_dict, 
+                           last_draw_dates=last_draw_dates)
     except ValueError as e:
         flash(str(e), 'error')
         last_draw_dict = last_draw.to_dict()
@@ -1018,6 +1116,21 @@ def powerball_position_frequency_route():
     return render_template('powerball_position_frequency.html',
                            powerball_position_data=precomputed_powerball_position_data)
 
+@app.route('/odd_even_trends')
+def odd_even_trends_route():
+    return render_template('odd_even_trends.html',
+                           odd_even_trends=precomputed_odd_even_trends)
+
+@app.route('/consecutive_trends')
+def consecutive_trends_route():
+    return render_template('consecutive_trends.html',
+                           consecutive_trends=precomputed_consecutive_trends)
+
+@app.route('/triplets_analysis')
+def triplets_analysis_route():
+    return render_template('triplets_analysis.html',
+                           triplets_data=precomputed_triplets)
+
 @app.route('/find_results_by_first_white_ball', methods=['GET', 'POST'])
 def find_results_by_first_white_ball():
     if df.empty:
@@ -1102,7 +1215,8 @@ def update_powerball_data():
             global df, last_draw, precomputed_white_ball_freq_list, precomputed_powerball_freq_list, \
                    precomputed_last_draw_date_str, precomputed_hot_numbers_list, precomputed_cold_numbers_list, \
                    precomputed_monthly_balls, precomputed_number_age_counts, precomputed_detailed_number_ages, \
-                   precomputed_co_occurrence_data, precomputed_max_co_occurrence, precomputed_powerball_position_data
+                   precomputed_co_occurrence_data, precomputed_max_co_occurrence, precomputed_powerball_position_data, \
+                   precomputed_odd_even_trends, precomputed_consecutive_trends, precomputed_triplets
 
             df = load_historical_data_from_supabase()
             last_draw = get_last_draw(df)
@@ -1141,6 +1255,12 @@ def update_powerball_data():
 
                 precomputed_powerball_position_data.clear()
                 precomputed_powerball_position_data.extend(get_powerball_position_frequency(df))
+
+                precomputed_odd_even_trends = get_odd_even_split_trends(df, precomputed_last_draw_date_str)
+                
+                precomputed_consecutive_trends = get_consecutive_numbers_trends(df, precomputed_last_draw_date_str)
+
+                precomputed_triplets = get_most_frequent_triplets(df)
 
 
             return f"Data updated successfully with draw for {simulated_draw_date}.", 200
