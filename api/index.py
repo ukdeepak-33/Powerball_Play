@@ -23,6 +23,7 @@ SUPABASE_ANON_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY")
 
 SUPABASE_TABLE_NAME = 'powerball_draws'
+GENERATED_NUMBERS_TABLE_NAME = 'generated_powerball_numbers' # New table name for generated picks
 
 # --- Utility Functions ---
 
@@ -365,7 +366,7 @@ def partial_match_probabilities(white_ball_range, powerball_range):
     total_white_balls_in_range = white_ball_range[1] - white_ball_range[0] + 1
     total_powerballs_in_range = powerball_range[1] - powerball_range[0] + 1
 
-    total_winning_white_comb = calculate_combinations(5, data["matched_w"])
+    total_winning_white_comb = calculate_combinations(total_white_balls_in_range, 5) # This should be fixed, was 'data["matched_w"]'
 
     probabilities = {}
 
@@ -386,10 +387,10 @@ def partial_match_probabilities(white_ball_range, powerball_range):
         comb_unmatched_w = calculate_combinations(total_white_balls_in_range - 5, data["unmatched_w"])
 
         if data["matched_p"] == 1:
-            comb_p = calculate_combinations(1, 1)
+            comb_p = calculate_combinations(1, 1) # Probability of matching the Powerball
         else:
-            comb_p = calculate_combinations(total_powerballs_in_range - 1, 1)
-            if total_powerballs_in_range == 1:
+            comb_p = calculate_combinations(total_powerballs_in_range - 1, 1) # Probability of NOT matching the Powerball
+            if total_powerballs_in_range == 1: # Edge case for only one powerball possible
                 comb_p = 0
         
         numerator = comb_matched_w * comb_unmatched_w * comb_p
@@ -397,8 +398,10 @@ def partial_match_probabilities(white_ball_range, powerball_range):
         if numerator == 0:
             probabilities[scenario] = "N/A"
         else:
-            total_possible_combinations = total_winning_white_comb * total_powerballs_in_range
-            probability = total_possible_combinations / numerator
+            total_possible_combinations = total_white_balls_in_range # This was also incorrect; should be total white combinations calculated initially
+            total_possible_combinations_all = (calculate_combinations(total_white_balls_in_range, 5) * total_powerballs_in_range)
+            
+            probability = total_possible_combinations_all / numerator
             probabilities[scenario] = f"{probability:,.0f} to 1"
 
     return probabilities
@@ -670,7 +673,7 @@ def get_consecutive_numbers_trends(df, last_draw_date_str):
     print(f"[DEBUG-ConsecutiveTrends] Generated {len(trend_data)} trend data points.")
     return trend_data
 
-# NEW FUNCTION: Get most frequent triplets
+# Get most frequent triplets
 def get_most_frequent_triplets(df, top_n=10):
     print("[DEBUG-Triplets] Inside get_most_frequent_triplets function.")
     if df.empty:
@@ -787,6 +790,171 @@ def get_odd_even_split_trends(df, last_draw_date_str):
     return chart_data
 
 
+# --- NEW UTILITY FUNCTIONS for Generated Numbers and Manual Draws ---
+
+def save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb):
+    """
+    Saves a manually entered official Powerball draw to the 'powerball_draws' table.
+    Checks for existence of the draw date to prevent duplicates.
+    """
+    url = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
+    headers = _get_supabase_headers(is_service_key=True) # Use service key for writes
+
+    # First, check if the draw date already exists
+    check_params = {'select': 'Draw Date', 'Draw Date': f'eq.{draw_date}'}
+    check_response = requests.get(url, headers=headers, params=check_params)
+    check_response.raise_for_status()
+    existing_draws = check_response.json()
+
+    if existing_draws:
+        print(f"Draw for date {draw_date} already exists in {SUPABASE_TABLE_NAME}.")
+        return False, f"Draw for {draw_date} already exists."
+
+    new_draw_data = {
+        'Draw Date': draw_date,
+        'Number 1': n1,
+        'Number 2': n2,
+        'Number 3': n3,
+        'Number 4': n4,
+        'Number 5': n5,
+        'Powerball': pb
+    }
+
+    insert_response = requests.post(url, headers=headers, data=json.dumps(new_draw_data))
+    insert_response.raise_for_status()
+
+    if insert_response.status_code == 201:
+        print(f"Successfully inserted manual draw: {new_draw_data}")
+        return True, "Official draw saved successfully!"
+    else:
+        print(f"Failed to insert manual draw. Status: {insert_response.status_code}, Response: {insert_response.text}")
+        return False, f"Error saving official draw: {insert_response.status_code} - {insert_response.text}"
+
+def save_generated_numbers_to_db(numbers, powerball):
+    """
+    Saves a generated Powerball combination to the 'generated_powerball_numbers' table.
+    Ensures the combination is unique before saving.
+    """
+    url = f"{SUPABASE_PROJECT_URL}/rest/v1/{GENERATED_NUMBERS_TABLE_NAME}"
+    headers = _get_supabase_headers(is_service_key=True) # Use service key for writes
+
+    # Ensure numbers are sorted for consistent comparison
+    sorted_numbers = sorted(numbers)
+
+    # Check for existing combination
+    check_params = {
+        'select': 'id', # Only need the ID to confirm existence
+        'number_1': f'eq.{sorted_numbers[0]}',
+        'number_2': f'eq.{sorted_numbers[1]}',
+        'number_3': f'eq.{sorted_numbers[2]}',
+        'number_4': f'eq.{sorted_numbers[3]}',
+        'number_5': f'eq.{sorted_numbers[4]}',
+        'powerball': f'eq.{powerball}'
+    }
+    check_response = requests.get(url, headers=headers, params=check_params)
+    check_response.raise_for_status()
+    existing_combinations = check_response.json()
+
+    if existing_combinations:
+        print(f"Combination {sorted_numbers} + {powerball} already exists in {GENERATED_NUMBERS_TABLE_NAME}.")
+        return False, f"This exact combination ({', '.join(map(str, sorted_numbers))} + {powerball}) has already been saved."
+
+    # If not exists, proceed with insert
+    new_generated_data = {
+        'number_1': sorted_numbers[0],
+        'number_2': sorted_numbers[1],
+        'number_3': sorted_numbers[2],
+        'number_4': sorted_numbers[3],
+        'number_5': sorted_numbers[4],
+        'powerball': powerball,
+        'generated_date': datetime.now().isoformat() # Use ISO format for timestamp
+    }
+
+    insert_response = requests.post(url, headers=headers, data=json.dumps(new_generated_data))
+    insert_response.raise_for_status()
+
+    if insert_response.status_code == 201:
+        print(f"Successfully inserted generated numbers: {new_generated_data}")
+        return True, "Generated numbers saved successfully!"
+    else:
+        print(f"Failed to insert generated numbers. Status: {insert_response.status_code}, Response: {insert_response.text}")
+        return False, f"Error saving generated numbers: {insert_response.status_code} - {insert_response.text}"
+
+def get_generated_numbers_history():
+    """
+    Fetches all generated Powerball numbers and groups them by date, sorted by date descending.
+    """
+    all_data = []
+    offset = 0
+    limit = 1000
+
+    try:
+        url = f"{SUPABASE_PROJECT_URL}/rest/v1/{GENERATED_NUMBERS_TABLE_NAME}"
+        headers = _get_supabase_headers(is_service_key=False) # Read-only, so anon key is fine
+        
+        while True:
+            params = {
+                'select': 'generated_date,number_1,number_2,number_3,number_4,number_5,powerball',
+                'order': 'generated_date.desc', # Order by date descending for latest first
+                'offset': offset,
+                'limit': limit
+            }
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            
+            chunk = response.json()
+            if not chunk:
+                break
+            all_data.extend(chunk)
+            offset += limit
+
+        if not all_data:
+            print("No generated numbers fetched from Supabase.")
+            return {}
+
+        # Group by date for expand/collapse
+        grouped_data = defaultdict(list)
+        for record in all_data:
+            # Parse the full timestamp, then format just the date part for grouping
+            gen_dt = datetime.fromisoformat(record['generated_date'].replace('Z', '+00:00')) # Handle 'Z' for UTC
+            date_key = gen_dt.strftime('%Y-%m-%d')
+            
+            # Format time for display within the group
+            formatted_time = gen_dt.strftime('%I:%M %p') # e.g., "03:30 PM"
+
+            generated_balls = sorted([
+                int(record['number_1']), int(record['number_2']), int(record['number_3']),
+                int(record['number_4']), int(record['number_5'])
+            ])
+            
+            grouped_data[date_key].append({
+                'time': formatted_time,
+                'white_balls': generated_balls,
+                'powerball': int(record['powerball'])
+            })
+        
+        # Convert defaultdict to a regular dict, sorting dates for consistent display
+        sorted_grouped_data = dict(sorted(grouped_data.items(), key=lambda item: item[0], reverse=True))
+
+        return sorted_grouped_data
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error during Supabase data fetch request for generated numbers: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"Supabase response content: {e.response.text}")
+        return {}
+    except json.JSONDecodeError as e:
+        print(f"Error decoding JSON response for generated numbers from Supabase: {e}")
+        if 'response' in locals() and response is not None:
+            print(f"Response content that failed JSON decode: {response.text}")
+        return {}
+    except Exception as e:
+        print(f"An unexpected error occurred in get_generated_numbers_history: {e}")
+        import traceback
+        traceback.print_exc()
+        return {}
+
+
 # --- Global Data Loading and Pre-computation ---
 df = pd.DataFrame()
 last_draw = pd.Series(dtype='object') 
@@ -805,6 +973,7 @@ precomputed_powerball_position_data = []
 precomputed_odd_even_trends = [] 
 precomputed_consecutive_trends = [] 
 precomputed_triplets = [] 
+precomputed_generated_history = {} # NEW: for generated picks history
 
 
 # This function will be called once after app initialization to load data
@@ -813,7 +982,8 @@ def initialize_app_data():
            precomputed_last_draw_date_str, precomputed_hot_numbers_list, precomputed_cold_numbers_list, \
            precomputed_monthly_balls, precomputed_number_age_counts, precomputed_detailed_number_ages, \
            precomputed_co_occurrence_data, precomputed_max_co_occurrence, precomputed_powerball_position_data, \
-           precomputed_odd_even_trends, precomputed_consecutive_trends, precomputed_triplets
+           precomputed_odd_even_trends, precomputed_consecutive_trends, precomputed_triplets, \
+           precomputed_generated_history
     
     print("Attempting to load and pre-compute data...")
     try:
@@ -861,6 +1031,8 @@ def initialize_app_data():
             
             precomputed_triplets = get_most_frequent_triplets(df)
 
+            precomputed_generated_history = get_generated_numbers_history() # NEW: Load generated history
+
 
             print("\n--- DEBUG: Precomputed Analysis Data Status ---")
             print(f"precomputed_white_ball_freq_list is empty: {not bool(precomputed_white_ball_freq_list)}")
@@ -887,6 +1059,8 @@ def initialize_app_data():
             print(f"precomputed_consecutive_trends sample: {precomputed_consecutive_trends[:2] if precomputed_consecutive_trends else 'N/A'}")
             print(f"precomputed_triplets is empty: {not bool(precomputed_triplets)}")
             print(f"precomputed_triplets sample: {precomputed_triplets[:2] if precomputed_triplets else 'N/A'}")
+            print(f"precomputed_generated_history is empty: {not bool(precomputed_generated_history)}")
+            print(f"precomputed_generated_history sample: {list(precomputed_generated_history.keys())[:2] if precomputed_generated_history else 'N/A'}")
             print("--- END DEBUG ---")
         else:
             print("DataFrame is empty after loading. Skipping pre-computation and leaving precomputed lists/dicts empty.")
@@ -922,7 +1096,13 @@ def index():
 def generate():
     if df.empty:
         flash("Cannot generate numbers: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return redirect(url_for('index'))
+        last_draw_dict = last_draw.to_dict() # Ensure last_draw is passed even on error
+        if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
+            try:
+                last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+            except ValueError:
+                pass
+        return render_template('index.html', last_draw=last_draw_dict)
 
     odd_even_choice = request.form.get('odd_even_choice', 'Any')
     combo_choice = request.form.get('combo_choice', 'No Combo')
@@ -967,14 +1147,120 @@ def generate():
     if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
         try:
             last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
-            except ValueError:
-                pass
+        except ValueError:
+            pass
 
-        return render_template('index.html', 
+    return render_template('index.html', 
                            white_balls=white_balls, 
                            powerball=powerball, 
                            last_draw=last_draw_dict, 
                            last_draw_dates=last_draw_dates)
+
+
+@app.route('/generate_modified', methods=['POST'])
+def generate_modified():
+    if df.empty:
+        flash("Cannot generate modified combination: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        last_draw_dict = last_draw.to_dict() # Ensure last_draw is passed even on error
+        if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
+            try:
+                last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+            except ValueError:
+                pass
+        return render_template('index.html', last_draw=last_draw_dict)
+
+    use_common_pairs = request.form.get('use_common_pairs') == 'on'
+    num_range_str = request.form.get('num_range', '')
+    num_range = None
+    if num_range_str:
+        try:
+            parts = [int(num.strip()) for num in num_range_str.split() if num.strip().isdigit()]
+            if len(parts) == 2:
+                num_range = tuple(parts)
+            else:
+                flash("Filter Common Pairs by Range input must be two numbers separated by space (e.g., '1 20').", 'error')
+        except ValueError:
+            flash("Invalid Filter Common Pairs by Range format. Please enter numbers separated by space.", 'error')
+
+    white_balls = []
+    powerball = None
+    last_draw_dates = {}
+
+    try:
+        if not df.empty:
+            random_row = df.sample(1).iloc[0]
+            white_balls_base = [int(random_row['Number 1']), int(random_row['Number 2']), int(random_row['Number 3']), int(random_row['Number 4']), int(random_row['Number 5'])]
+            powerball_base = int(random_row['Powerball'])
+        else:
+            flash("Historical data is empty, cannot generate or modify numbers.", 'error')
+            last_draw_dict = last_draw.to_dict() # Ensure last_draw is passed even on error
+            if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
+                try:
+                    last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+                except ValueError:
+                    pass
+            return render_template('index.html', last_draw=last_draw_dict)
+
+
+        if use_common_pairs:
+            common_pairs = find_common_pairs(df, top_n=20)
+            if num_range:
+                common_pairs = filter_common_pairs_by_range(common_pairs, num_range)
+            
+            if not common_pairs:
+                flash("No common pairs found with the specified filter. Generating a random combination instead.", 'info')
+                white_balls, powerball = generate_powerball_numbers(df, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers)
+            else:
+                white_balls = generate_with_common_pairs(df, common_pairs, white_ball_range, excluded_numbers)
+                powerball = random.randint(powerball_range[0], powerball_range[1])
+        else:
+            white_balls, powerball = modify_combination(df, white_balls_base, powerball_base, white_ball_range, powerball_range, excluded_numbers)
+            
+        max_attempts_unique = 100
+        attempts_unique = 0
+        while check_exact_match(df, white_balls) and attempts_unique < max_attempts_unique:
+            if use_common_pairs:
+                common_pairs_recheck = find_common_pairs(df, top_n=20)
+                if num_range:
+                    common_pairs_recheck = filter_common_pairs_by_range(common_pairs_recheck, num_range)
+                if common_pairs_recheck:
+                    white_balls = generate_with_common_pairs(df, common_pairs_recheck, white_ball_range, excluded_numbers)
+                else:
+                    white_balls, powerball = generate_powerball_numbers(df, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers)
+            else:
+                random_row = df.sample(1).iloc[0]
+                white_balls_base = [int(random_row['Number 1']), int(random_row['Number 2']), int(random_row['Number 3']), int(random_row['Number 4']), int(random_row['Number 5'])]
+                powerball_base = int(random_row['Powerball'])
+                white_balls, powerball = modify_combination(df, white_balls_base, powerball_base, white_ball_range, powerball_range, excluded_numbers)
+            attempts_unique += 1
+        
+        if attempts_unique == max_attempts_unique:
+            flash("Could not find a unique modified combination after many attempts. Please try again.", 'error')
+            last_draw_dict = last_draw.to_dict() # Ensure last_draw is passed even on error
+            if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
+                try:
+                    last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+                except ValueError:
+                    pass
+            return render_template('index.html', last_draw=last_draw_dict)
+
+        white_balls = [int(num) for num in white_balls]
+        powerball = int(powerball)
+
+        last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
+
+        last_draw_dict = last_draw.to_dict()
+        if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
+            try:
+                last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+            except ValueError:
+                pass
+
+        return render_template('index.html', 
+                            white_balls=white_balls, 
+                            powerball=powerball, 
+                            last_draw=last_draw_dict, 
+                            last_draw_dates=last_draw_dates)
     except ValueError as e:
         flash(str(e), 'error')
         last_draw_dict = last_draw.to_dict()
@@ -1212,56 +1498,8 @@ def update_powerball_data():
         if insert_response.status_code == 201:
             print(f"Successfully inserted new draw: {new_draw_data}")
             
-            global df, last_draw, precomputed_white_ball_freq_list, precomputed_powerball_freq_list, \
-                   precomputed_last_draw_date_str, precomputed_hot_numbers_list, precomputed_cold_numbers_list, \
-                   precomputed_monthly_balls, precomputed_number_age_counts, precomputed_detailed_number_ages, \
-                   precomputed_co_occurrence_data, precomputed_max_co_occurrence, precomputed_powerball_position_data, \
-                   precomputed_odd_even_trends, precomputed_consecutive_trends, precomputed_triplets
-
-            df = load_historical_data_from_supabase()
-            last_draw = get_last_draw(df)
-
-            if not df.empty:
-                white_ball_freq, powerball_freq = frequency_analysis(df)
-                precomputed_white_ball_freq_list.clear()
-                precomputed_white_ball_freq_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in white_ball_freq.items()])
-                
-                precomputed_powerball_freq_list.clear()
-                precomputed_powerball_freq_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in powerball_freq.items()])
-                
-                precomputed_last_draw_date_str = last_draw['Draw Date']
-                
-                hot_numbers, cold_numbers = hot_cold_numbers(df, precomputed_last_draw_date_str)
-                precomputed_hot_numbers_list.clear()
-                precomputed_hot_numbers_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in hot_numbers.items()])
-                
-                precomputed_cold_numbers_list.clear()
-                precomputed_cold_numbers_list.extend([{'Number': int(k), 'Frequency': int(v)} for k, v in cold_numbers.items()])
-                
-                # Update precomputed_monthly_balls after new data
-                precomputed_monthly_balls = monthly_white_ball_analysis(df, precomputed_last_draw_date_str)
-                
-                # Update number age data to get both counts and detailed list
-                age_counts_data, detailed_ages_data = get_number_age_distribution(df)
-                precomputed_number_age_counts.clear() # For the chart
-                precomputed_number_age_counts.extend(age_counts_data)
-                precomputed_detailed_number_ages.clear() # For the table
-                precomputed_detailed_number_ages.extend(detailed_ages_data)
-                
-                co_occurrence_data, max_co_occurrence = get_co_occurrence_matrix(df)
-                precomputed_co_occurrence_data.clear()
-                precomputed_co_occurrence_data.extend(co_occurrence_data)
-                precomputed_max_co_occurrence = max_co_occurrence
-
-                precomputed_powerball_position_data.clear()
-                precomputed_powerball_position_data.extend(get_powerball_position_frequency(df))
-
-                precomputed_odd_even_trends = get_odd_even_split_trends(df, precomputed_last_draw_date_str)
-                
-                precomputed_consecutive_trends = get_consecutive_numbers_trends(df, precomputed_last_draw_date_str)
-
-                precomputed_triplets = get_most_frequent_triplets(df)
-
+            # Re-initialize all precomputed data after adding a new draw
+            initialize_app_data() # This will reload and recompute everything
 
             return f"Data updated successfully with draw for {simulated_draw_date}.", 200
         else:
@@ -1283,3 +1521,68 @@ def update_powerball_data():
         import traceback
         traceback.print_exc() # Print full traceback for update errors
         return f"An internal error occurred: {e}", 500
+
+# NEW ROUTE for saving manual official draws
+@app.route('/save_official_draw', methods=['POST'])
+def save_official_draw_route():
+    try:
+        draw_date = request.form.get('draw_date')
+        n1 = int(request.form.get('n1'))
+        n2 = int(request.form.get('n2'))
+        n3 = int(request.form.get('n3'))
+        n4 = int(request.form.get('n4'))
+        n5 = int(request.form.get('n5'))
+        pb = int(request.form.get('pb'))
+
+        success, message = save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb)
+        if success:
+            flash(message, 'info')
+            initialize_app_data() # Re-initialize all precomputed data after adding a new draw
+        else:
+            flash(message, 'error')
+    except ValueError:
+        flash("Invalid input. Please ensure all numbers and date are correctly entered.", 'error')
+    except Exception as e:
+        flash(f"An error occurred: {e}", 'error')
+    return redirect(url_for('index'))
+
+# NEW ROUTE for saving generated numbers
+@app.route('/save_generated_pick', methods=['POST'])
+def save_generated_pick_route():
+    try:
+        white_balls_str = request.form.get('generated_white_balls')
+        powerball_str = request.form.get('generated_powerball')
+
+        if not white_balls_str or not powerball_str:
+            flash("No numbers generated to save.", 'error')
+            return redirect(url_for('index'))
+
+        white_balls = [int(x.strip()) for x in white_balls_str.split(',') if x.strip().isdigit()]
+        powerball = int(powerball_str)
+
+        if len(white_balls) != 5:
+            flash("Invalid white balls format. Expected 5 numbers.", 'error')
+            return redirect(url_for('index'))
+        
+        success, message = save_generated_numbers_to_db(white_balls, powerball)
+        if success:
+            flash(message, 'info')
+            # No need to re-initialize all app data, only precomputed_generated_history if desired
+            # For simplicity now, we can just let it reload on the next access to generated_history route
+            # or add specific update for just this precomputed variable if needed for other parts of app
+            global precomputed_generated_history
+            precomputed_generated_history = get_generated_numbers_history() # Update this specific precomputed cache
+        else:
+            flash(message, 'error')
+
+    except ValueError:
+        flash("Invalid number format for saving generated numbers.", 'error')
+    except Exception as e:
+        flash(f"An error occurred while saving generated numbers: {e}", 'error')
+    return redirect(url_for('index'))
+
+# NEW ROUTE for viewing generated numbers history
+@app.route('/generated_numbers_history')
+def generated_numbers_history_route():
+    return render_template('generated_numbers_history.html', 
+                           generated_history=precomputed_generated_history) # Pass grouped data
