@@ -1,25 +1,217 @@
 {% extends "base.html" %}
 
+{% block title %}Co-occurrence Analysis{% endblock %}
+
+{% block page_heading %}White Ball Co-occurrence Analysis (Heatmap){% endblock %}
+
 {% block content %}
-<h1 class="text-3xl font-bold mb-6">Co-occurrence Analysis (Heatmap)</h1>
-
-<p class="mb-4 text-gray-700">This heatmap visualizes how often pairs of white balls have been drawn together. Darker colors indicate higher co-occurrence frequencies.</p>
-
-<div class="chart-container">
-    <h2 class="text-xl font-semibold mb-4">White Ball Co-occurrence</h2>
-    <div id="coOccurrenceHeatmap"></div>
+<div class="card">
+    <h2 class="text-xl font-semibold mb-4 text-gray-700">Frequency of White Ball Pairs Drawn Together</h2>
+    
+    {% if co_occurrence_data %}
+        <div id="coOccurrenceChart"></div>
+        <div class="mt-6 text-center text-gray-600">
+            <p>This heatmap visualizes how often pairs of white balls have been drawn together.</p>
+            <p class="text-sm">Darker squares indicate higher co-occurrence frequency.</p>
+        </div>
+    {% else %}
+        <p class="text-gray-500">No co-occurrence data available to display heatmap.</p>
+    {% endif %}
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Ensure data is an empty array if not provided or empty
-        var coOccurrenceData = {% if co_occurrence_data %}{{ co_occurrence_data | tojson }}{% else %}[]{% endif %};
-        var maxCoOccurrence = {% if max_co_occurrence %}{{ max_co_occurrence }}{% else %}0{% endif %};
-        
+        var coOccurrenceData = [];
+        var maxCoOccurrence = 0;
+
+        {% if co_occurrence_data %}
+            try {
+                coOccurrenceData = JSON.parse('{{ co_occurrence_data | tojson | safe }}');
+                maxCoOccurrence = {{ max_co_occurrence | tojson | safe }};
+            } catch (e) {
+                console.error("Error parsing coOccurrenceData JSON:", e);
+                coOccurrenceData = [];
+                maxCoOccurrence = 0;
+            }
+        {% endif %}
+
         console.log("[D3 Debug] co_occurrence_analysis.html - coOccurrenceData:", coOccurrenceData);
         console.log("[D3 Debug] co_occurrence_analysis.html - maxCoOccurrence:", maxCoOccurrence);
 
-        drawHeatmap(coOccurrenceData, "coOccurrenceHeatmap", "x", "y", "count", "White Ball Co-occurrence Heatmap", "Ball 1", "Ball 2", maxCoOccurrence);
+        if (coOccurrenceData.length === 0 || maxCoOccurrence === 0) {
+            console.warn("Co-occurrence data is empty or max frequency is zero, not drawing chart.");
+            d3.select("#coOccurrenceChart").append("p").text("No sufficient data available for this heatmap.");
+            return;
+        }
+
+        const margin = { top: 30, right: 30, bottom: 60, left: 60 };
+        const width = Math.min(600, window.innerWidth - 80) - margin.left - margin.right; // Max 600px width
+        const height = width; // Make it square for a heatmap
+
+        const svg = d3.select("#coOccurrenceChart")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // Get all unique white ball numbers present in data for domain
+        const allNumbers = new Set();
+        coOccurrenceData.forEach(d => {
+            allNumbers.add(d.x);
+            allNumbers.add(d.y);
+        });
+        const domainNumbers = Array.from(allNumbers).sort((a, b) => a - b);
+        // Fallback to 1-69 if no numbers present (though data.length check above handles this)
+        if (domainNumbers.length === 0) {
+            for (let i = 1; i <= 69; i++) {
+                domainNumbers.push(i);
+            }
+        }
+
+
+        // Build X and Y scales (band scales for discrete cells)
+        const xScale = d3.scaleBand()
+            .range([0, width])
+            .domain(domainNumbers)
+            .paddingInner(0.05);
+
+        const yScale = d3.scaleBand()
+            .range([height, 0]) // Y-axis typically starts from bottom
+            .domain(domainNumbers)
+            .paddingInner(0.05);
+
+        // Build color scale
+        const colorScale = d3.scaleSequential(d3.interpolateViridis) // Use a sequential color scheme
+            .domain([0, maxCoOccurrence]); // Domain from 0 to the highest frequency
+
+        // Add X axis
+        svg.append("g")
+            .attr("transform", `translate(0,${height})`)
+            .call(d3.axisBottom(xScale).tickValues(xScale.domain().filter(d => d % 5 === 0))) // Show fewer ticks
+            .selectAll("text")
+            .attr("transform", "rotate(-45)")
+            .style("text-anchor", "end");
+
+        // Add Y axis
+        svg.append("g")
+            .call(d3.axisLeft(yScale).tickValues(yScale.domain().filter(d => d % 5 === 0))); // Show fewer ticks
+
+        // Add X-axis label
+        svg.append("text")
+            .attr("transform", `translate(${width / 2}, ${height + margin.bottom - 10})`)
+            .style("text-anchor", "middle")
+            .text("White Ball Number");
+
+        // Add Y-axis label
+        svg.append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("y", 0 - margin.left + 15)
+            .attr("x", 0 - (height / 2))
+            .attr("dy", "1em")
+            .style("text-anchor", "middle")
+            .text("White Ball Number");
+
+
+        // Add the cells
+        svg.selectAll()
+            .data(coOccurrenceData)
+            .enter()
+            .append("rect")
+                .attr("x", d => xScale(d.x))
+                .attr("y", d => yScale(d.y))
+                .attr("width", xScale.bandwidth())
+                .attr("height", yScale.bandwidth())
+                .style("fill", d => colorScale(d.count))
+                .style("stroke", "#eee") // Add a light border to cells
+                .style("stroke-width", 0.5)
+            .on("mouseover", function(event, d) {
+                // Show tooltip (simple example, more complex tooltip could be a separate div)
+                d3.select(this)
+                    .style("stroke", "black")
+                    .style("stroke-width", 2);
+                
+                // Add text for count
+                svg.append("text")
+                    .attr("class", "hover-text")
+                    .attr("x", xScale(d.x) + xScale.bandwidth() / 2)
+                    .attr("y", yScale(d.y) + yScale.bandwidth() / 2)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "white")
+                    .style("font-size", "12px")
+                    .style("font-weight", "bold")
+                    .text(d.count);
+
+            })
+            .on("mouseout", function(event, d) {
+                // Hide tooltip
+                d3.select(this)
+                    .style("stroke", "#eee")
+                    .style("stroke-width", 0.5);
+                svg.selectAll(".hover-text").remove();
+            });
+
+        // Optional: Add a color legend (simple version)
+        const legendWidth = 20;
+        const legendHeight = height;
+
+        const legendScale = d3.scaleLinear()
+            .domain([0, maxCoOccurrence])
+            .range([legendHeight, 0]);
+
+        const legendAxis = d3.axisRight(legendScale).ticks(5);
+
+        const legendSvg = svg.append("g")
+            .attr("transform", `translate(${width + 10}, 0)`) // Position next to heatmap
+            .attr("class", "legend-axis")
+            .call(legendAxis);
+
+        const legendColors = d3.range(0, 1.01, 0.01).map(d => ({
+            offset: d,
+            color: d3.interpolateViridis(d)
+        }));
+
+        legendSvg.append("linearGradient")
+            .attr("id", "gradient")
+            .attr("x1", "0%")
+            .attr("y1", "100%")
+            .attr("x2", "0%")
+            .attr("y2", "0%")
+            .selectAll("stop")
+            .data(legendColors)
+            .enter().append("stop")
+            .attr("offset", d => d.offset)
+            .attr("stop-color", d => d.color);
+
+        legendSvg.append("rect")
+            .attr("x", -legendWidth / 2) // Center the gradient rect
+            .attr("width", legendWidth)
+            .attr("height", legendHeight)
+            .style("fill", "url(#gradient)");
+
+        legendSvg.append("text")
+            .attr("x", legendWidth / 2)
+            .attr("y", -margin.top + 10)
+            .attr("text-anchor", "middle")
+            .style("font-size", "12px")
+            .text("Frequency");
     });
 </script>
+<style>
+    /* Add specific styles for the co-occurrence chart axes if needed */
+    #coOccurrenceChart .axis text {
+        font-size: 9px; /* Smaller font for dense axes */
+    }
+    #coOccurrenceChart .axis line {
+        stroke: #ccc;
+    }
+    #coOccurrenceChart .axis path {
+        stroke: #ccc;
+    }
+    .legend-axis .tick text {
+        font-size: 10px;
+    }
+</style>
 {% endblock %}
