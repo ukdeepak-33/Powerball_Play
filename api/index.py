@@ -668,7 +668,7 @@ def get_consecutive_numbers_trends(df_source, last_draw_date_str): # Renamed df 
         print(f"[DEBUG-ConsecutiveTrends] last_draw_date: {last_draw_date}")
     except Exception as e:
         print(f"[ERROR-ConsecutiveTrends] Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty list.")
-        return {}
+        return []
 
     six_months_ago = last_draw_date - pd.DateOffset(months=6)
     print(f"[DEBUG-ConsecutiveTrends] six_months_ago: {six_months_ago}")
