@@ -5,53 +5,87 @@
 {% block page_heading %}Find Results by First White Ball{% endblock %}
 
 {% block content %}
-    <div class="card mb-6">
-        <h2 class="text-xl font-semibold mb-4 text-gray-700">Search by First White Ball Number</h2>
-        <form action="/find_results_by_first_white_ball" method="post" class="flex flex-col space-y-2">
-            <label for="white_ball_number" class="form-label">Enter First White Ball Number:</label>
-            <input type="number" id="white_ball_number" name="white_ball_number" class="form-input" placeholder="e.g., 7" value="{{ white_ball_number | default('') }}">
-            <div class="flex items-center mt-2">
-                <input type="checkbox" id="sort_by_year" name="sort_by_year" class="rounded text-indigo-600 focus:ring-indigo-500" {% if sort_by_year %}checked{% endif %}>
-                <label for="sort_by_year" class="ml-2 text-gray-700 font-medium">Sort by Year</label>
-            </div>
-            <button type="submit" class="btn-primary mt-2">Find Results</button>
-        </form>
-    </div>
+<div class="card p-6 bg-white rounded-lg shadow-lg">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">Search Historical Draws</h2>
+    
+    <form action="{{ url_for('find_results_by_first_white_ball') }}" method="post" class="space-y-4">
+        <div class="form-group">
+            <label for="white_ball_number" class="block text-gray-700 text-sm font-bold mb-2">Enter First White Ball Number (1-69):</label>
+            <input type="number" name="white_ball_number" id="white_ball_number" min="1" max="69"
+                   value="{{ white_ball_number if white_ball_number is not none else '' }}"
+                   class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+
+        <div class="form-group">
+            <label for="sort_by" class="block text-gray-700 text-sm font-bold mb-2">Sort Results By:</label>
+            <select name="sort_by" id="sort_by" class="shadow border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <option value="date_desc" {% if selected_sort_by == 'date_desc' %}selected{% endif %}>Draw Date (Newest First)</option>
+                <option value="date_asc" {% if selected_sort_by == 'date_asc' %}selected{% endif %}>Draw Date (Oldest First)</option>
+                <option value="balls_asc" {% if selected_sort_by == 'balls_asc' %}selected{% endif %}>White Balls (Ascending)</option>
+                <option value="balls_desc" {% if selected_sort_by == 'balls_desc' %}selected{% endif %}>White Balls (Descending)</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn-primary w-full mt-4">Find Results</button>
+    </form>
 
     {% if results_by_first_white_ball %}
-        <div class="card mt-6">
-            <h3 class="text-lg font-semibold mb-2 text-gray-700">Draws where Number 1 is: {{ white_ball_number }}</h3>
-            <p class="text-sm text-gray-600">Sorted by year: {% if sort_by_year %}Yes{% else %}No{% endif %}</p>
-            <table class="table-auto">
-                <thead>
-                    <tr>
-                        <th>Draw Date</th>
-                        <th>Number 1</th>
-                        <th>Number 2</th>
-                        <th>Number 3</th>
-                        <th>Number 4</th>
-                        <th>Number 5</th>
-                        <th>Powerball</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in results_by_first_white_ball %}
+        <div class="mt-8">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">Results for First White Ball: {{ white_ball_number }}</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
+                    <thead class="bg-gray-100">
                         <tr>
-                            <td>{{ row['Draw Date'] }}</td>
-                            <td>{{ row['Number 1'] }}</td>
-                            <td>{{ row['Number 2'] }}</td>
-                            <td>{{ row['Number 3'] }}</td>
-                            <td>{{ row['Number 4'] }}</td>
-                            <td>{{ row['Number 5'] }}</td>
-                            <td>{{ row['Powerball'] }}</td>
+                            <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Draw Date</th>
+                            <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">White Balls</th>
+                            <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Powerball</th>
                         </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {% for result in results_by_first_white_ball %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ result['Draw Date'] }}</td>
+                            <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
+                                {% for i in range(1, 6) %}
+                                    <span class="ball-sm">{{ result['Number ' + i|string] }}</span>
+                                {% endfor %}
+                            </td>
+                            <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
+                                <span class="ball-sm powerball-sm">{{ result['Powerball'] }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
-    {% elif white_ball_number is not none %} {# Only show if a search was attempted but no results #}
-        <div class="card mt-6">
-            <p class="text-gray-500">No draws found where the first white ball is {{ white_ball_number }}.</p>
+    {% elif white_ball_number is not none %} {# Only show this if a search was attempted but no results #}
+        <div class="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
+            No historical draws found where the first white ball is {{ white_ball_number }}.
         </div>
     {% endif %}
+
+    <style>
+        /* Small ball styling for tables */
+        .ball-sm {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 30px; /* Smaller size */
+            height: 30px; /* Smaller size */
+            background-color: #f0f0f0;
+            border-radius: 50%;
+            border: 1px solid #ccc;
+            font-weight: bold;
+            color: #333;
+            margin: 2px;
+            font-size: 0.8em; /* Smaller font */
+        }
+        .powerball-sm {
+            background-color: #ef4444; /* Red color for powerball */
+            color: white;
+            border-color: #dc2626;
+        }
+    </style>
+</div>
 {% endblock %}
