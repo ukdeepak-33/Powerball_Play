@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Powerball Frequency by Year{% endblock %}
+
+{% block page_heading %}Powerball Frequency by Year (Last 5 Years){% endblock %}
+
+{% block content %}
+<div class="card p-6 bg-white rounded-lg shadow-lg">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">Powerball Occurrences by Year</h2>
+    <p class="text-gray-700 mb-4">This table shows how many times each Powerball number (1-26) has been drawn in each of the last five years.</p>
+
+    {% if yearly_pb_freq_data %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Powerball Number</th>
+                        {% for year in years %}
+                        <th class="px-4 py-2 border-b-2 border-gray-200 text-center text-sm font-semibold text-gray-600 uppercase tracking-wider">{{ year }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row_data in yearly_pb_freq_data %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900 font-bold">{{ row_data.Powerball }}</td>
+                        {% for year in years %}
+                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900 text-center">
+                            {{ row_data['Year_' + year|string] }}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
+            No Powerball frequency data available for the last 5 years.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
