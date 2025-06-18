@@ -117,7 +117,7 @@ def get_last_draw(df):
         }, dtype='object')
     return df.iloc[-1]
 
-def check_exact_match(white_balls): # Removed df parameter as it uses global historical_white_ball_sets
+def check_exact_match(white_balls):
     """
     Checks if the given white_balls combination exactly matches any historical draw.
     Uses the precomputed global historical_white_ball_sets for efficient lookup.
@@ -146,7 +146,7 @@ def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice
 
         powerball = random.randint(powerball_range[0], powerball_range[1])
 
-        last_draw_data = get_last_draw(df_source) # Use df_source here
+        last_draw_data = get_last_draw(df_source)
         if not last_draw_data.empty and last_draw_data.get('Draw Date') != 'N/A':
             last_white_balls = [int(last_draw_data['Number 1']), int(last_draw_data['Number 2']), int(last_draw_data['Number 3']), int(last_draw_data['Number 4']), int(last_draw_data['Number 5'])]
             if set(white_balls) == set(last_white_balls) and powerball == int(last_draw_data['Powerball']):
@@ -172,7 +172,7 @@ def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice
         elif odd_even_choice == "3 Odd / 2 Even" and (odd_count != 3 or even_count != 2):
             attempts += 1
             continue
-        elif odd_count == "1 Even / 4 Odd" and (even_count != 1 or odd_count != 4):
+        elif odd_even_choice == "1 Even / 4 Odd" and (even_count != 1 or odd_count != 4):
             attempts += 1
             continue
         elif odd_even_choice == "1 Odd / 4 Even" and (odd_count != 1 or even_count != 4):
@@ -191,6 +191,64 @@ def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice
         raise ValueError("Could not generate a unique combination meeting all criteria after many attempts.")
 
     return white_balls, powerball
+
+# NEW FUNCTION: Generate numbers with explicit Group A strategy
+def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerball_range, excluded_numbers):
+    if df_source.empty:
+        raise ValueError("Cannot generate numbers: Historical data is empty.")
+
+    max_attempts = 1000
+    attempts = 0
+    
+    # Filter group_a for valid numbers within the specified range and not excluded
+    valid_group_a = [num for num in group_a if white_ball_range[0] <= num <= white_ball_range[1] and num not in excluded_numbers]
+    
+    # Remaining available numbers (not in group_a, not excluded, within range)
+    remaining_pool = [num for num in range(white_ball_range[0], white_ball_range[1] + 1)
+                      if num not in valid_group_a and num not in excluded_numbers]
+
+    if len(valid_group_a) < num_from_group_a:
+        raise ValueError(f"Not enough unique numbers in Group A ({len(valid_group_a)}) to pick {num_from_group_a}.")
+    
+    num_from_remaining = 5 - num_from_group_a
+    if len(remaining_pool) < num_from_remaining:
+        raise ValueError(f"Not enough unique numbers in the remaining pool ({len(remaining_pool)}) to pick {num_from_remaining}.")
+
+    while attempts < max_attempts:
+        try:
+            # Step 1: Pick numbers from group_a
+            selected_from_group_a = random.sample(valid_group_a, num_from_group_a)
+            
+            # Step 2: Pick numbers from the remaining pool
+            # Ensure numbers picked from remaining pool are not already in selected_from_group_a
+            available_for_remaining = [num for num in remaining_pool if num not in selected_from_group_a]
+            if len(available_for_remaining) < num_from_remaining:
+                attempts += 1
+                continue # Not enough unique numbers available, try again
+
+            selected_from_remaining = random.sample(available_for_remaining, num_from_remaining)
+            
+            white_balls = sorted(selected_from_group_a + selected_from_remaining)
+            
+            powerball = random.randint(powerball_range[0], powerball_range[1])
+
+            # Check for exact historical match
+            if check_exact_match(white_balls): 
+                attempts += 1
+                continue
+
+            # If all conditions met, break loop
+            break
+        except ValueError as e:
+            # This handles cases like not enough unique elements for random.sample
+            print(f"Attempt failed during group_a strategy: {e}. Retrying...")
+            attempts += 1
+            continue
+    else:
+        raise ValueError("Could not generate a unique combination with Group A strategy after many attempts.")
+
+    return white_balls, powerball
+
 
 def check_historical_match(df_source, white_balls, powerball): # Renamed df to df_source
     if df_source.empty: return None
@@ -1175,8 +1233,6 @@ def generate():
     last_draw_dates = {}
 
     try:
-        # Pass df (historical data) to generate_powerball_numbers if needed for logic other than exact match
-        # However, check_exact_match itself no longer needs df, it uses the global set.
         white_balls, powerball = generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white_ball_range_local, powerball_range_local, excluded_numbers_local, high_low_balance)
         last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
     except ValueError as e:
@@ -1200,7 +1256,8 @@ def generate():
                            white_balls=white_balls, 
                            powerball=powerball, 
                            last_draw=last_draw_dict, 
-                           last_draw_dates=last_draw_dates)
+                           last_draw_dates=last_draw_dates,
+                           generation_type='generated')
 
 
 @app.route('/generate_modified', methods=['POST'])
@@ -1307,7 +1364,8 @@ def generate_modified():
                             white_balls=white_balls, 
                             powerball=powerball, 
                             last_draw=last_draw_dict, 
-                            last_draw_dates=last_draw_dates)
+                            last_draw_dates=last_draw_dates,
+                            generation_type='modified')
     except ValueError as e:
         flash(str(e), 'error')
         last_draw_dict = last_draw.to_dict()
@@ -1317,6 +1375,60 @@ def generate_modified():
             except ValueError:
                 pass
         return render_template('index.html', last_draw=last_draw_dict)
+
+
+# NEW ROUTE for Group A strategy
+@app.route('/generate_group_a_strategy', methods=['POST'])
+def generate_group_a_strategy_route():
+    if df.empty:
+        flash("Cannot generate numbers with Group A strategy: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        last_draw_dict = last_draw.to_dict()
+        if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
+            try:
+                last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+            except ValueError:
+                pass
+        return render_template('index.html', last_draw=last_draw_dict)
+
+    num_from_group_a = int(request.form.get('num_from_group_a'))
+    white_ball_min = int(request.form.get('white_ball_min', 1))
+    white_ball_max = int(request.form.get('white_ball_max', 69))
+    white_ball_range_local = (white_ball_min, white_ball_max)
+    powerball_min = int(request.form.get('powerball_min', 1))
+    powerball_max = int(request.form.get('powerball_max', 26))
+    powerball_range_local = (powerball_min, powerball_max)
+    excluded_numbers_local = [int(num.strip()) for num in request.form.get('excluded_numbers', '').split(",") if num.strip().isdigit()] if request.form.get('excluded_numbers') else []
+    
+    white_balls = []
+    powerball = None
+    last_draw_dates = {}
+
+    try:
+        white_balls, powerball = generate_from_group_a(df, num_from_group_a, white_ball_range_local, powerball_range_local, excluded_numbers_local)
+        last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
+    except ValueError as e:
+        flash(str(e), 'error')
+        last_draw_dict = last_draw.to_dict()
+        if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
+            try:
+                last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+            except ValueError:
+                pass
+        return render_template('index.html', last_draw=last_draw_dict)
+
+    last_draw_dict = last_draw.to_dict()
+    if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
+        try:
+            last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+        except ValueError:
+            pass
+
+    return render_template('index.html', 
+                           white_balls=white_balls, 
+                           powerball=powerball, 
+                           last_draw=last_draw_dict, 
+                           last_draw_dates=last_draw_dates,
+                           generation_type='group_a_strategy') # <<< New generation_type here
 
 
 @app.route('/frequency_analysis')
