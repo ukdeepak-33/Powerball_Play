@@ -153,7 +153,6 @@ def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice
                 attempts += 1
                 continue
 
-        # Optimized call to check_exact_match
         if check_exact_match(white_balls): 
             attempts += 1
             continue
@@ -192,7 +191,6 @@ def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice
 
     return white_balls, powerball
 
-# NEW FUNCTION: Generate numbers with explicit Group A strategy
 def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerball_range, excluded_numbers):
     if df_source.empty:
         raise ValueError("Cannot generate numbers: Historical data is empty.")
@@ -200,10 +198,8 @@ def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerba
     max_attempts = 1000
     attempts = 0
     
-    # Filter group_a for valid numbers within the specified range and not excluded
     valid_group_a = [num for num in group_a if white_ball_range[0] <= num <= white_ball_range[1] and num not in excluded_numbers]
     
-    # Remaining available numbers (not in group_a, not excluded, within range)
     remaining_pool = [num for num in range(white_ball_range[0], white_ball_range[1] + 1)
                       if num not in valid_group_a and num not in excluded_numbers]
 
@@ -216,15 +212,12 @@ def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerba
 
     while attempts < max_attempts:
         try:
-            # Step 1: Pick numbers from group_a
             selected_from_group_a = random.sample(valid_group_a, num_from_group_a)
             
-            # Step 2: Pick numbers from the remaining pool
-            # Ensure numbers picked from remaining pool are not already in selected_from_group_a
             available_for_remaining = [num for num in remaining_pool if num not in selected_from_group_a]
             if len(available_for_remaining) < num_from_remaining:
                 attempts += 1
-                continue # Not enough unique numbers available, try again
+                continue
 
             selected_from_remaining = random.sample(available_for_remaining, num_from_remaining)
             
@@ -232,15 +225,12 @@ def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerba
             
             powerball = random.randint(powerball_range[0], powerball_range[1])
 
-            # Check for exact historical match
             if check_exact_match(white_balls): 
                 attempts += 1
                 continue
 
-            # If all conditions met, break loop
             break
         except ValueError as e:
-            # This handles cases like not enough unique elements for random.sample
             print(f"Attempt failed during group_a strategy: {e}. Retrying...")
             attempts += 1
             continue
@@ -680,16 +670,15 @@ def get_powerball_position_frequency(df_source):
                 })
     return position_frequency_data
 
-def _has_consecutive(numbers_list):
-    """Checks if a list of numbers contains any consecutive sequence."""
-    if len(numbers_list) < 2:
-        return 0
-    
+# MODIFIED FUNCTION: _find_consecutive_pairs and get_consecutive_numbers_trends
+def _find_consecutive_pairs(numbers_list):
+    """Identifies and returns all consecutive pairs in a sorted list of numbers."""
+    pairs = []
     sorted_nums = sorted(numbers_list)
     for i in range(len(sorted_nums) - 1):
         if sorted_nums[i] + 1 == sorted_nums[i+1]:
-            return 1
-    return 0
+            pairs.append([sorted_nums[i], sorted_nums[i+1]])
+    return pairs
 
 def get_consecutive_numbers_trends(df_source, last_draw_date_str):
     print("[DEBUG-ConsecutiveTrends] Inside get_consecutive_numbers_trends function.")
@@ -712,7 +701,7 @@ def get_consecutive_numbers_trends(df_source, last_draw_date_str):
         return []
 
     recent_data = df_source[df_source['Draw Date_dt'] >= six_months_ago].copy()
-    recent_data = recent_data.sort_values(by='Draw Date_dt')
+    recent_data = recent_data.sort_values(by='Draw Date_dt', ascending=False) # Sort by date descending for chronological display in table
     if recent_data.empty:
         print("[DEBUG-ConsecutiveTrends] recent_data is empty after filtering. Returning empty list.")
         return []
@@ -721,11 +710,12 @@ def get_consecutive_numbers_trends(df_source, last_draw_date_str):
     for idx, row in recent_data.iterrows():
         white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])]
         
-        has_consecutive = _has_consecutive(white_balls)
+        consecutive_pairs = _find_consecutive_pairs(white_balls)
         
         trend_data.append({
             'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
-            'consecutive_present': has_consecutive
+            'consecutive_present': "Yes" if consecutive_pairs else "No", # Change to "Yes"/"No"
+            'consecutive_pairs': consecutive_pairs # List of pairs, e.g., [[12, 13], [45, 46]]
         })
     
     print(f"[DEBUG-ConsecutiveTrends] Generated {len(trend_data)} trend data points.")
@@ -779,7 +769,7 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
         return []
 
     recent_data = df_source[df_source['Draw Date_dt'] >= six_months_ago].copy()
-    recent_data = recent_data.sort_values(by='Draw Date_dt')
+    recent_data = recent_data.sort_values(by='Draw Date_dt', ascending=False) # Sort by date descending for table display
     if recent_data.empty:
         print("[DEBUG-OddEvenTrends] recent_data is empty after filtering. Returning empty list.")
         return []
@@ -810,29 +800,9 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
             'split_category': split_category
         })
     
-    trend_df = pd.DataFrame(trend_data)
-    
-    if trend_df.empty:
-        print("[DEBUG-OddEvenTrends] trend_df is empty after categorizing. Returning empty list.")
-        return []
-
-    all_dates = pd.to_datetime(trend_df['draw_date']).dt.date.unique()
-    all_dates.sort()
-
-    categories = ["All Odd", "All Even", "4 Odd / 1 Even", "1 Odd / 4 Even", "3 Odd / 2 Even", "2 Odd / 3 Even", "Other"]
-
-    chart_data = []
-    for date_obj in all_dates:
-        date_str = date_obj.strftime('%Y-%m-%d')
-        daily_counts = trend_df[trend_df['draw_date'] == date_str]['split_category'].value_counts().to_dict()
-        
-        row_data = {'draw_date': date_str}
-        for cat in categories:
-            row_data[cat] = int(daily_counts.get(cat, 0))
-        chart_data.append(row_data)
-
-    print(f"[DEBUG-OddEvenTrends] Generated {len(chart_data)} trend data points.")
-    return chart_data
+    # We no longer need the Pandas DataFrame for charting, just return the list of dicts directly
+    print(f"[DEBUG-OddEvenTrends] Generated {len(trend_data)} trend data points.")
+    return trend_data
 
 
 def save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb):
@@ -1133,6 +1103,11 @@ def index():
     if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
         try:
             last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+            # Assuming you want to display the full last draw in a consistent format
+            last_draw_dict['Numbers'] = [
+                last_draw_dict['Number 1'], last_draw_dict['Number 2'], last_draw_dict['Number 3'], 
+                last_draw_dict['Number 4'], last_draw_dict['Number 5']
+            ]
         except ValueError:
             pass
     return render_template('index.html', last_draw=last_draw_dict)
@@ -1145,6 +1120,10 @@ def generate():
         if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
             try:
                 last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+                last_draw_dict['Numbers'] = [
+                    last_draw_dict['Number 1'], last_draw_dict['Number 2'], last_draw_dict['Number 3'], 
+                    last_draw_dict['Number 4'], last_draw_dict['Number 5']
+                ]
             except ValueError:
                 pass
         return render_template('index.html', last_draw=last_draw_dict)
@@ -1184,6 +1163,10 @@ def generate():
         if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
             try:
                 last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+                last_draw_dict['Numbers'] = [
+                    last_draw_dict['Number 1'], last_draw_dict['Number 2'], last_draw_dict['Number 3'], 
+                    last_draw_dict['Number 4'], last_draw_dict['Number 5']
+                ]
             except ValueError:
                 pass
         return render_template('index.html', last_draw=last_draw_dict)
@@ -1192,6 +1175,10 @@ def generate():
     if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
         try:
             last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+            last_draw_dict['Numbers'] = [
+                last_draw_dict['Number 1'], last_draw_dict['Number 2'], last_draw_dict['Number 3'], 
+                last_draw_dict['Number 4'], last_draw_dict['Number 5']
+            ]
         except ValueError:
             pass
 
@@ -1211,6 +1198,10 @@ def generate_modified():
         if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
             try:
                 last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+                last_draw_dict['Numbers'] = [
+                    last_draw_dict['Number 1'], last_draw_dict['Number 2'], last_draw_dict['Number 3'], 
+                    last_draw_dict['Number 4'], last_draw_dict['Number 5']
+                ]
             except ValueError:
                 pass
         return render_template('index.html', last_draw=last_draw_dict)
@@ -1243,6 +1234,10 @@ def generate_modified():
             if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
                 try:
                     last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+                    last_draw_dict['Numbers'] = [
+                        last_draw_dict['Number 1'], last_draw_dict['Number 2'], last_draw_dict['Number 3'], 
+                        last_draw_dict['Number 4'], last_draw_dict['Number 5']
+                    ]
                 except ValueError:
                     pass
             return render_template('index.html', last_draw=last_draw_dict)
@@ -1286,6 +1281,10 @@ def generate_modified():
             if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
                 try:
                     last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+                    last_draw_dict['Numbers'] = [
+                        last_draw_dict['Number 1'], last_draw_dict['Number 2'], last_draw_dict['Number 3'], 
+                        last_draw_dict['Number 4'], last_draw_dict['Number 5']
+                    ]
                 except ValueError:
                     pass
             return render_template('index.html', last_draw=last_draw_dict)
@@ -1299,6 +1298,10 @@ def generate_modified():
         if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
             try:
                 last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+                last_draw_dict['Numbers'] = [
+                    last_draw_dict['Number 1'], last_draw_dict['Number 2'], last_draw_dict['Number 3'], 
+                    last_draw_dict['Number 4'], last_draw_dict['Number 5']
+                ]
             except ValueError:
                 pass
 
@@ -1314,6 +1317,10 @@ def generate_modified():
         if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
             try:
                 last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+                last_draw_dict['Numbers'] = [
+                    last_draw_dict['Number 1'], last_draw_dict['Number 2'], last_draw_dict['Number 3'], 
+                    last_draw_dict['Number 4'], last_draw_dict['Number 5']
+                ]
             except ValueError:
                 pass
         return render_template('index.html', last_draw=last_draw_dict)
@@ -1327,6 +1334,10 @@ def generate_group_a_strategy_route():
         if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
             try:
                 last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+                last_draw_dict['Numbers'] = [
+                    last_draw_dict['Number 1'], last_draw_dict['Number 2'], last_draw_dict['Number 3'], 
+                    last_draw_dict['Number 4'], last_draw_dict['Number 5']
+                ]
             except ValueError:
                 pass
         return render_template('index.html', last_draw=last_draw_dict)
@@ -1353,6 +1364,10 @@ def generate_group_a_strategy_route():
         if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
             try:
                 last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+                last_draw_dict['Numbers'] = [
+                    last_draw_dict['Number 1'], last_draw_dict['Number 2'], last_draw_dict['Number 3'], 
+                    last_draw_dict['Number 4'], last_draw_dict['Number 5']
+                ]
             except ValueError:
                 pass
         return render_template('index.html', last_draw=last_draw_dict)
@@ -1361,6 +1376,10 @@ def generate_group_a_strategy_route():
     if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
         try:
             last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
+            last_draw_dict['Numbers'] = [
+                last_draw_dict['Number 1'], last_draw_dict['Number 2'], last_draw_dict['Number 3'], 
+                last_draw_dict['Number 4'], last_draw_dict['Number 5']
+            ]
         except ValueError:
             pass
 
@@ -1564,30 +1583,26 @@ def find_results_by_first_white_ball():
 
     results_dict = []
     white_ball_number_display = None
-    selected_sort_by = 'date_desc' # Default sort order
+    selected_sort_by = 'date_desc'
 
     if request.method == 'POST':
         white_ball_number_str = request.form.get('white_ball_number')
-        selected_sort_by = request.form.get('sort_by', 'date_desc') # Get selected sort order
+        selected_sort_by = request.form.get('sort_by', 'date_desc')
 
         if white_ball_number_str and white_ball_number_str.isdigit():
             white_ball_number = int(white_ball_number_str)
             white_ball_number_display = white_ball_number
             
-            # Ensure 'Draw Date_dt' is datetime for sorting by date
             if 'Draw Date_dt' not in df.columns:
                  df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'], errors='coerce')
 
-            # Filter results for the first white ball
             results = df[df['Number 1'].astype(int) == white_ball_number].copy()
 
-            # Apply sorting based on selected_sort_by
             if selected_sort_by == 'date_desc':
                 results = results.sort_values(by='Draw Date_dt', ascending=False)
             elif selected_sort_by == 'date_asc':
                 results = results.sort_values(by='Draw Date_dt', ascending=True)
             elif selected_sort_by == 'balls_asc':
-                # Create a tuple column for lexicographical sorting by all 5 white balls
                 results['WhiteBallsTuple'] = results.apply(
                     lambda row: tuple(sorted([
                         int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
@@ -1595,7 +1610,7 @@ def find_results_by_first_white_ball():
                     ])), axis=1
                 )
                 results = results.sort_values(by='WhiteBallsTuple', ascending=True)
-                results = results.drop(columns=['WhiteBallsTuple']) # Drop the temporary column
+                results = results.drop(columns=['WhiteBallsTuple'])
             elif selected_sort_by == 'balls_desc':
                 results['WhiteBallsTuple'] = results.apply(
                     lambda row: tuple(sorted([
@@ -1613,7 +1628,7 @@ def find_results_by_first_white_ball():
     return render_template('find_results_by_first_white_ball.html', 
                            results_by_first_white_ball=results_dict, 
                            white_ball_number=white_ball_number_display,
-                           selected_sort_by=selected_sort_by) # Pass selected sort order to template
+                           selected_sort_by=selected_sort_by)
 
 @app.route('/update_powerball_data', methods=['GET'])
 def update_powerball_data():
@@ -1772,7 +1787,7 @@ def analyze_generated_historical_matches_route():
         generated_white_balls_str = request.form.get('generated_white_balls')
         generated_powerball_str = request.form.get('generated_powerball')
 
-        if not generated_white_balls_str or not generated_powerball_str:
+        if not generated_white_balls_str or not powerball_str:
             flash("No generated numbers provided for analysis.", 'error')
             return redirect(url_for('index'))
 
