@@ -5,132 +5,43 @@
 {% block page_heading %}Consecutive Numbers Trends (Last 6 Months){% endblock %}
 
 {% block content %}
-<div class="card">
-    <h2 class="text-xl font-semibold mb-4 text-gray-700">Presence of Consecutive Numbers Over Time</h2>
+<div class="card p-6 bg-white rounded-lg shadow-lg">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">Recent Consecutive Numbers by Draw Date</h2>
+    <p class="text-gray-700 mb-4">This table indicates whether any consecutive white ball numbers appeared in each draw over the last six months, and lists the pairs if present.</p>
+
     {% if consecutive_trends %}
-        <div id="consecutiveTrendChart"></div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Draw Date</th>
+                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Consecutive Numbers Present?</th>
+                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Consecutive Pairs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for trend in consecutive_trends %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ trend.draw_date }}</td>
+                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ trend.consecutive_present }}</td>
+                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
+                            {% if trend.consecutive_pairs %}
+                                {% for pair in trend.consecutive_pairs %}
+                                    ({{ pair[0] }}, {{ pair[1] }}){% if not loop.last %}, {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     {% else %}
-        <p class="text-gray-500">No consecutive numbers trend data available to display chart.</p>
+        <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
+            No consecutive number trend data available for the last 6 months.
+        </div>
     {% endif %}
-
-    <div class="mt-6 text-gray-700 leading-relaxed">
-        <h3 class="text-lg font-semibold mb-2">Understanding This Chart:</h3>
-        <p>This chart visualizes the occurrence of consecutive numbers (e.g., 10, 11, 12) within the five white balls drawn in Powerball over the last six months. It helps you see how often a draw contains at least one sequence of consecutive numbers.</p>
-        <ul class="list-disc list-inside ml-4 mt-2">
-            <li><strong>X-Axis (Draw Date):</strong> Represents the timeline of Powerball draws.</li>
-            <li><strong>Y-Axis (Consecutive Numbers Present):</strong> This is a binary axis:
-                <ul class="list-circle list-inside ml-4">
-                    <li><strong>"Yes" (value 1):</strong> Indicates that the draw on that date contained at least one set of consecutive white balls.</li>
-                    <li><strong>"No" (value 0):</strong> Indicates that the draw on that date did not contain any consecutive white balls.</li>
-                </ul>
-            </li>
-        </ul>
-        <p class="mt-2">By examining this trend, you can gauge the historical frequency of draws with consecutive numbers. This might inform your decision on whether to include consecutive numbers in your own generated picks, depending on your preferred strategy.</p>
-    </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var consecutiveTrendsData = [];
-        {% if consecutive_trends %}
-            try {
-                consecutiveTrendsData = JSON.parse('{{ consecutive_trends | tojson | safe }}');
-            } catch (e) {
-                console.error("Error parsing consecutiveTrendsData JSON:", e);
-                consecutiveTrendsData = [];
-            }
-        {% endif %}
-        console.log("[D3 Debug] consecutive_trends.html - consecutiveTrendsData:", consecutiveTrendsData);
-
-        if (consecutiveTrendsData.length > 0) {
-            // Set up chart dimensions
-            const margin = { top: 30, right: 100, bottom: 60, left: 50 };
-            const width = Math.min(900, window.innerWidth - 40) - margin.left - margin.right;
-            const height = 500 - margin.top - margin.bottom;
-
-            // Append SVG
-            const svg = d3.select("#consecutiveTrendChart")
-                .append("svg")
-                .attr("width", width + margin.left + margin.right)
-                .attr("height", height + margin.top + margin.bottom)
-                .append("g")
-                .attr("transform", `translate(${margin.left},${margin.top})`);
-
-            // Parse dates
-            const parseDate = d3.timeParse("%Y-%m-%d");
-            consecutiveTrendsData.forEach(d => {
-                d.draw_date = parseDate(d.draw_date);
-            });
-
-            // Define Scales
-            const xScale = d3.scaleTime()
-                .domain(d3.extent(consecutiveTrendsData, d => d.draw_date))
-                .range([0, width]);
-
-            // Y scale for binary (0 or 1) presence
-            const yScale = d3.scaleLinear()
-                .domain([0, 1.1]) // Max 1.1 to show 1 clearly
-                .range([height, 0]);
-
-            // Add X-axis
-            svg.append("g")
-                .attr("transform", `translate(0,${height})`)
-                .call(d3.axisBottom(xScale).tickFormat(d3.timeFormat("%b %d")))
-                .selectAll("text")
-                .attr("transform", "rotate(-45)")
-                .style("text-anchor", "end");
-            
-            // X-axis label
-            svg.append("text")
-                .attr("class", "x label")
-                .attr("text-anchor", "end")
-                .attr("x", width / 2 + margin.right / 2)
-                .attr("y", height + margin.bottom - 10)
-                .text("Draw Date");
-
-
-            // Add Y-axis
-            svg.append("g")
-                .call(d3.axisLeft(yScale).tickValues([0, 1]).tickFormat(d => d === 1 ? "Yes" : "No")); 
-            
-            // Y-axis label
-            svg.append("text")
-                .attr("class", "y label")
-                .attr("text-anchor", "end")
-                .attr("y", -margin.left + 15)
-                .attr("x", -height / 2)
-                .attr("dy", ".75em")
-                .attr("transform", "rotate(-90)")
-                .text("Consecutive Numbers Present");
-
-            // Define the line generator
-            const line = d3.line()
-                .x(d => xScale(d.draw_date))
-                .y(d => yScale(d.consecutive_present))
-                .defined(d => !isNaN(d.consecutive_present)); // Handle missing data
-
-            // Add the line
-            svg.append("path")
-                .datum(consecutiveTrendsData)
-                .attr("fill", "none")
-                .attr("stroke", "steelblue") // A single color for this line
-                .attr("stroke-width", 2)
-                .attr("d", line);
-
-            // Add dots for each data point
-            svg.selectAll(".dot")
-                .data(consecutiveTrendsData)
-                .enter().append("circle")
-                .attr("class", "dot")
-                .attr("cx", d => xScale(d.draw_date))
-                .attr("cy", d => yScale(d.consecutive_present))
-                .attr("r", 3)
-                .attr("fill", "steelblue");
-        } else {
-            console.warn("consecutiveTrendsData is empty, not drawing chart.");
-        }
-    });
-</script>
 {% endblock %}
