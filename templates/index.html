@@ -79,9 +79,74 @@
         <button type="submit" class="btn-primary w-full mt-4">Generate Modified Numbers</button>
     </form>
 
+    <!-- NEW SECTION: Generate with Group A Strategy -->
+    <div class="card p-6 bg-white rounded-lg shadow-lg mt-8">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Generate with Group A Strategy</h2>
+        <form action="{{ url_for('generate_group_a_strategy_route') }}" method="post" class="space-y-4">
+            <p class="text-gray-700">Generate numbers by explicitly picking 2 or 3 white balls from your special 'Group A' pool. The remaining white balls will be picked from the general pool.</p>
+            
+            <div class="form-group">
+                <label for="num_from_group_a" class="block text-gray-700 text-sm font-bold mb-2">Numbers to pick from Group A:</label>
+                <select name="num_from_group_a" id="num_from_group_a" class="shadow border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    <option value="2">2 from Group A</option>
+                    <option value="3">3 from Group A</option>
+                </select>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="form-group">
+                    <label for="group_a_white_ball_min" class="block text-gray-700 text-sm font-bold mb-2">White Ball Min (1-69):</label>
+                    <input type="number" name="white_ball_min" id="group_a_white_ball_min" value="1" min="1" max="69"
+                           class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div class="form-group">
+                    <label for="group_a_white_ball_max" class="block text-gray-700 text-sm font-bold mb-2">White Ball Max (1-69):</label>
+                    <input type="number" name="white_ball_max" id="group_a_white_ball_max" value="69" min="1" max="69"
+                           class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="form-group">
+                    <label for="group_a_powerball_min" class="block text-gray-700 text-sm font-bold mb-2">Powerball Min (1-26):</label>
+                    <input type="number" name="powerball_min" id="group_a_powerball_min" value="1" min="1" max="26"
+                           class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+                <div class="form-group">
+                    <label for="group_a_powerball_max" class="block text-gray-700 text-sm font-bold mb-2">Powerball Max (1-26):</label>
+                    <input type="number" name="powerball_max" id="group_a_powerball_max" value="26" min="1" max="26"
+                           class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="group_a_excluded_numbers" class="block text-gray-700 text-sm font-bold mb-2">Excluded Numbers (comma-separated):</label>
+                <input type="text" name="excluded_numbers" id="group_a_excluded_numbers" placeholder="e.g., 4, 7, 12"
+                       class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+
+            <button type="submit" class="btn-primary w-full mt-4 bg-orange-600 hover:bg-orange-700">Generate with Group A Strategy</button>
+        </form>
+    </div>
+
+
     {% if white_balls and powerball %}
-        <div class="mt-8 text-center bg-blue-50 p-6 rounded-lg border border-blue-200">
-            <h3 class="text-2xl font-bold text-blue-800 mb-4">Your Generated Numbers:</h3>
+        <div class="mt-8 text-center p-6 rounded-lg 
+            {% if generation_type == 'generated' %}
+                bg-blue-50 border border-blue-200
+            {% elif generation_type == 'modified' %}
+                bg-green-50 border border-green-200
+            {% elif generation_type == 'group_a_strategy' %}
+                bg-orange-50 border border-orange-200
+            {% endif %}">
+            <h3 class="text-2xl font-bold 
+                {% if generation_type == 'generated' %}
+                    text-blue-800
+                {% elif generation_type == 'modified' %}
+                    text-green-800
+                {% elif generation_type == 'group_a_strategy' %}
+                    text-orange-800
+                {% endif %} mb-4">Your Generated Numbers:</h3>
             <div class="draw-numbers">
                 {% for ball in white_balls %}
                     <span class="ball">{{ ball }}</span>
@@ -115,7 +180,7 @@
         </div>
     {% endif %}
 
-    <!-- New section for calculating probability with custom ranges -->
+    <!-- Section for calculating probability with custom ranges -->
     <div class="card p-6 bg-white rounded-lg shadow-lg mt-8">
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Calculate Probability for Custom Ranges</h2>
         <form action="{{ url_for('winning_probability_route') }}" method="post" class="space-y-4">
@@ -154,7 +219,7 @@
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Latest Official Powerball Draw</h2>
         {% if last_draw %}
             <p class="text-lg mb-2"><span class="font-semibold">Draw Date:</span> {{ last_draw['Draw Date'] }}</p>
-            <div class="draw-numbers mb-4">
+            <div class="draw-numbers">
                 <span class="ball">{{ last_draw['Number 1'] }}</span>
                 <span class="ball">{{ last_draw['Number 2'] }}</span>
                 <span class="ball">{{ last_draw['Number 3'] }}</span>
