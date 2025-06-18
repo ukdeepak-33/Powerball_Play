@@ -1562,7 +1562,7 @@ def winning_probability_route():
             pb_max = int(request.form.get('powerball_max', GLOBAL_POWERBALL_RANGE[1]))
 
             if not (1 <= wb_min <= wb_max <= 69 and 1 <= pb_min <= pb_max <= 26):
-                flash("Invalid range inputs. White ball range must be 1-69, Powerball 1-26, and min <= max.", 'error')
+                flash("Invalid range inputs. White ball range must be 1-69 and Powerball 1-26, and min <= max.", 'error')
                 wb_min, wb_max = GLOBAL_WHITE_BALL_RANGE
                 pb_min, pb_max = GLOBAL_POWERBALL_RANGE
             
@@ -1862,7 +1862,8 @@ def analyze_generated_historical_matches_route():
         generated_white_balls_str = request.form.get('generated_white_balls')
         generated_powerball_str = request.form.get('generated_powerball')
 
-        if not generated_white_balls_str or not powerball_str:
+        # FIX: Corrected variable name from 'powerball_str' to 'generated_powerball_str'
+        if not generated_white_balls_str or not generated_powerball_str: 
             flash("No generated numbers provided for analysis.", 'error')
             return redirect(url_for('index'))
 
