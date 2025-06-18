@@ -758,7 +758,7 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
         print(f"[DEBUG-OddEvenTrends] last_draw_date: {last_draw_date}")
     except Exception as e:
         print(f"[ERROR-OddEvenTrends] Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty list.")
-        return []
+        return {}
 
     six_months_ago = last_draw_date - pd.DateOffset(months=6)
     print(f"[DEBUG-OddEvenTrends] six_months_ago: {six_months_ago}")
