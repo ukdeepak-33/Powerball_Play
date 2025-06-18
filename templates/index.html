@@ -208,14 +208,14 @@
         // Initial state
         if (useCommonPairsCheckbox && useCommonPairsCheckbox.checked) {
             numRangeField.classList.remove('hidden');
-        } else if (numRangeField) { // Check if numRangeField exists
+        } else if (numRangeField) {
             numRangeField.classList.add('hidden');
         }
 
         // Add event listener for changes
         if (useCommonPairsCheckbox) {
             useCommonPairsCheckbox.addEventListener('change', function() {
-                if (numRangeField) { // Check if numRangeField exists
+                if (numRangeField) {
                     if (this.checked) {
                         numRangeField.classList.remove('hidden');
                     } else {
