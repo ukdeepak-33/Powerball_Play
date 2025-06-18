@@ -2,216 +2,151 @@
 
 {% block title %}Co-occurrence Analysis{% endblock %}
 
-{% block page_heading %}White Ball Co-occurrence Analysis (Heatmap){% endblock %}
+{% block page_heading %}Co-occurrence Analysis (White Balls){% endblock %}
 
 {% block content %}
-<div class="card">
-    <h2 class="text-xl font-semibold mb-4 text-gray-700">Frequency of White Ball Pairs Drawn Together</h2>
-    
-    {% if co_occurrence_data %}
-        <div id="coOccurrenceChart"></div>
-        <div class="mt-6 text-center text-gray-600">
-            <p>This heatmap visualizes how often pairs of white balls have been drawn together.</p>
-            <p class="text-sm">Darker squares indicate higher co-occurrence frequency.</p>
-        </div>
-    {% else %}
-        <p class="text-gray-500">No co-occurrence data available to display heatmap.</p>
-    {% endif %}
-</div>
-{% endblock %}
+<div class="card p-6 bg-white rounded-lg shadow-lg">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">White Ball Co-occurrence Matrix</h2>
+    <p class="text-gray-700 mb-4">This heatmap shows how frequently pairs of white balls have appeared together in historical draws. Darker squares indicate more frequent co-occurrence.</p>
 
-{% block scripts %}
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var coOccurrenceData = [];
-        var maxCoOccurrence = 0;
+    <div id="coOccurrenceChart" class="w-full overflow-x-auto"></div>
 
-        {% if co_occurrence_data %}
-            try {
-                coOccurrenceData = JSON.parse('{{ co_occurrence_data | tojson | safe }}');
-                maxCoOccurrence = {{ max_co_occurrence | tojson | safe }};
-            } catch (e) {
-                console.error("Error parsing coOccurrenceData JSON:", e);
-                coOccurrenceData = [];
-                maxCoOccurrence = 0;
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var coOccurrenceData = {{ co_occurrence_data | tojson }};
+            var maxCoOccurrence = {{ max_co_occurrence | tojson }};
+
+            console.log("[D3 Debug] co_occurrence_analysis.html - coOccurrenceData:", coOccurrenceData);
+            console.log("[D3 Debug] co_occurrence_analysis.html - maxCoOccurrence:", maxCoOccurrence);
+
+            if (!coOccurrenceData || coOccurrenceData.length === 0) {
+                d3.select("#coOccurrenceChart").append("p").text("No co-occurrence data available to display.");
+                return;
             }
-        {% endif %}
 
-        console.log("[D3 Debug] co_occurrence_analysis.html - coOccurrenceData:", coOccurrenceData);
-        console.log("[D3 Debug] co_occurrence_analysis.html - maxCoOccurrence:", maxCoOccurrence);
+            // Define margins and dimensions
+            const margin = { top: 50, right: 30, bottom: 50, left: 50 };
+            const containerWidth = document.getElementById('coOccurrenceChart').clientWidth;
+            const width = Math.max(700, containerWidth - margin.left - margin.right); // Ensure a minimum width for readability
+            const height = width; // Make it square for a matrix
 
-        if (coOccurrenceData.length === 0 || maxCoOccurrence === 0) {
-            console.warn("Co-occurrence data is empty or max frequency is zero, not drawing chart.");
-            d3.select("#coOccurrenceChart").append("p").text("No sufficient data available for this heatmap.");
-            return;
-        }
+            // Append SVG to the chart container
+            const svg = d3.select("#coOccurrenceChart")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
 
-        const margin = { top: 30, right: 30, bottom: 60, left: 60 };
-        const width = Math.min(600, window.innerWidth - 80) - margin.left - margin.right; // Max 600px width
-        const height = width; // Make it square for a heatmap
+            // Get all unique numbers for X and Y axes
+            // Assumes numbers range from 1 to 69 for white balls
+            const allNumbers = Array.from({ length: 69 }, (_, i) => i + 1);
 
-        const svg = d3.select("#coOccurrenceChart")
-            .append("svg")
-            .attr("width", width + margin.left + margin.right)
-            .attr("height", height + margin.top + margin.bottom)
-            .append("g")
-            .attr("transform", `translate(${margin.left},${margin.top})`);
+            // Create X and Y scales
+            const x = d3.scaleBand()
+                .range([0, width])
+                .domain(allNumbers)
+                .padding(0.05);
 
-        // Get all unique white ball numbers present in data for domain
-        const allNumbers = new Set();
-        coOccurrenceData.forEach(d => {
-            allNumbers.add(d.x);
-            allNumbers.add(d.y);
+            const y = d3.scaleBand()
+                .range([height, 0])
+                .domain(allNumbers)
+                .padding(0.05);
+
+            // Append X and Y axes
+            svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x).tickSizeOuter(0))
+                .selectAll("text")
+                .attr("transform", "rotate(-45)")
+                .style("text-anchor", "end");
+
+            svg.append("g")
+                .call(d3.axisLeft(y).tickSizeOuter(0));
+
+            // Color scale
+            // Use a sequential color scheme that goes from light to dark (e.g., yellow to red)
+            const color = d3.scaleSequential(d3.interpolateYlOrRd)
+                            .domain([0, maxCoOccurrence || 1]); // Handle maxCoOccurrence being 0 for single data point or empty
+
+            // Create a tooltip div
+            const tooltip = d3.select("body").append("div")
+                .attr("class", "tooltip")
+                .style("position", "absolute")
+                .style("background", "rgba(0, 0, 0, 0.7)")
+                .style("color", "white")
+                .style("padding", "8px")
+                .style("border-radius", "4px")
+                .style("pointer-events", "none")
+                .style("opacity", 0);
+
+            // Add the squares
+            svg.selectAll()
+                .data(coOccurrenceData, d => `${d.x}:${d.y}`)
+                .enter()
+                .append("rect")
+                .attr("x", d => x(d.x))
+                .attr("y", d => y(d.y))
+                .attr("width", x.bandwidth())
+                .attr("height", y.bandwidth())
+                .style("fill", d => color(d.count))
+                // Add tooltip events
+                .on("mouseover", function(event, d) {
+                    tooltip.transition()
+                        .duration(200)
+                        .style("opacity", .9);
+                    tooltip.html(`Pair: ${d.x}, ${d.y}<br>Occurrences: ${d.count}`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", function(event, d) {
+                    tooltip.transition()
+                        .duration(500)
+                        .style("opacity", 0);
+                });
+
+            // Add axis labels
+            svg.append("text")
+                .attr("class", "x label")
+                .attr("text-anchor", "middle")
+                .attr("x", width / 2)
+                .attr("y", height + margin.bottom - 10)
+                .text("Ball Number (X)");
+
+            svg.append("text")
+                .attr("class", "y label")
+                .attr("text-anchor", "middle")
+                .attr("y", -margin.left + 15)
+                .attr("x", -height / 2)
+                .attr("transform", "rotate(-90)")
+                .text("Ball Number (Y)");
+
+            // Add a title to the chart
+            svg.append("text")
+                .attr("x", (width / 2))             
+                .attr("y", 0 - (margin.top / 2) + 10)
+                .attr("text-anchor", "middle")  
+                .style("font-size", "18px") 
+                .style("font-weight", "bold")
+                .text("White Ball Pair Co-occurrence Frequency");
+
+            // Add a simple style for the tooltip for demonstration (can be moved to a CSS file)
+            const style = document.createElement('style');
+            style.innerHTML = `
+                .tooltip {
+                    background: rgba(0, 0, 0, 0.7);
+                    color: white;
+                    padding: 8px;
+                    border-radius: 4px;
+                    pointer-events: none;
+                    font-size: 14px;
+                    line-height: 1.4;
+                    z-index: 1000; /* Ensure it's above other elements */
+                }
+            `;
+            document.head.appendChild(style);
         });
-        const domainNumbers = Array.from(allNumbers).sort((a, b) => a - b);
-        // Fallback to 1-69 if no numbers present (though data.length check above handles this)
-        if (domainNumbers.length === 0) {
-            for (let i = 1; i <= 69; i++) {
-                domainNumbers.push(i);
-            }
-        }
-
-
-        // Build X and Y scales (band scales for discrete cells)
-        const xScale = d3.scaleBand()
-            .range([0, width])
-            .domain(domainNumbers)
-            .paddingInner(0.05);
-
-        const yScale = d3.scaleBand()
-            .range([height, 0]) // Y-axis typically starts from bottom
-            .domain(domainNumbers)
-            .paddingInner(0.05);
-
-        // Build color scale
-        const colorScale = d3.scaleSequential(d3.interpolateViridis) // Use a sequential color scheme
-            .domain([0, maxCoOccurrence]); // Domain from 0 to the highest frequency
-
-        // Add X axis
-        svg.append("g")
-            .attr("transform", `translate(0,${height})`)
-            .call(d3.axisBottom(xScale).tickValues(xScale.domain().filter(d => d % 5 === 0))) // Show fewer ticks
-            .selectAll("text")
-            .attr("transform", "rotate(-45)")
-            .style("text-anchor", "end");
-
-        // Add Y axis
-        svg.append("g")
-            .call(d3.axisLeft(yScale).tickValues(yScale.domain().filter(d => d % 5 === 0))); // Show fewer ticks
-
-        // Add X-axis label
-        svg.append("text")
-            .attr("transform", `translate(${width / 2}, ${height + margin.bottom - 10})`)
-            .style("text-anchor", "middle")
-            .text("White Ball Number");
-
-        // Add Y-axis label
-        svg.append("text")
-            .attr("transform", "rotate(-90)")
-            .attr("y", 0 - margin.left + 15)
-            .attr("x", 0 - (height / 2))
-            .attr("dy", "1em")
-            .style("text-anchor", "middle")
-            .text("White Ball Number");
-
-
-        // Add the cells
-        svg.selectAll()
-            .data(coOccurrenceData)
-            .enter()
-            .append("rect")
-                .attr("x", d => xScale(d.x))
-                .attr("y", d => yScale(d.y))
-                .attr("width", xScale.bandwidth())
-                .attr("height", yScale.bandwidth())
-                .style("fill", d => colorScale(d.count))
-                .style("stroke", "#eee") // Add a light border to cells
-                .style("stroke-width", 0.5)
-            .on("mouseover", function(event, d) {
-                // Show tooltip (simple example, more complex tooltip could be a separate div)
-                d3.select(this)
-                    .style("stroke", "black")
-                    .style("stroke-width", 2);
-                
-                // Add text for count
-                svg.append("text")
-                    .attr("class", "hover-text")
-                    .attr("x", xScale(d.x) + xScale.bandwidth() / 2)
-                    .attr("y", yScale(d.y) + yScale.bandwidth() / 2)
-                    .attr("text-anchor", "middle")
-                    .attr("fill", "white")
-                    .style("font-size", "12px")
-                    .style("font-weight", "bold")
-                    .text(d.count);
-
-            })
-            .on("mouseout", function(event, d) {
-                // Hide tooltip
-                d3.select(this)
-                    .style("stroke", "#eee")
-                    .style("stroke-width", 0.5);
-                svg.selectAll(".hover-text").remove();
-            });
-
-        // Optional: Add a color legend (simple version)
-        const legendWidth = 20;
-        const legendHeight = height;
-
-        const legendScale = d3.scaleLinear()
-            .domain([0, maxCoOccurrence])
-            .range([legendHeight, 0]);
-
-        const legendAxis = d3.axisRight(legendScale).ticks(5);
-
-        const legendSvg = svg.append("g")
-            .attr("transform", `translate(${width + 10}, 0)`) // Position next to heatmap
-            .attr("class", "legend-axis")
-            .call(legendAxis);
-
-        const legendColors = d3.range(0, 1.01, 0.01).map(d => ({
-            offset: d,
-            color: d3.interpolateViridis(d)
-        }));
-
-        legendSvg.append("linearGradient")
-            .attr("id", "gradient")
-            .attr("x1", "0%")
-            .attr("y1", "100%")
-            .attr("x2", "0%")
-            .attr("y2", "0%")
-            .selectAll("stop")
-            .data(legendColors)
-            .enter().append("stop")
-            .attr("offset", d => d.offset)
-            .attr("stop-color", d => d.color);
-
-        legendSvg.append("rect")
-            .attr("x", -legendWidth / 2) // Center the gradient rect
-            .attr("width", legendWidth)
-            .attr("height", legendHeight)
-            .style("fill", "url(#gradient)");
-
-        legendSvg.append("text")
-            .attr("x", legendWidth / 2)
-            .attr("y", -margin.top + 10)
-            .attr("text-anchor", "middle")
-            .style("font-size", "12px")
-            .text("Frequency");
-    });
-</script>
-<style>
-    /* Add specific styles for the co-occurrence chart axes if needed */
-    #coOccurrenceChart .axis text {
-        font-size: 9px; /* Smaller font for dense axes */
-    }
-    #coOccurrenceChart .axis line {
-        stroke: #ccc;
-    }
-    #coOccurrenceChart .axis path {
-        stroke: #ccc;
-    }
-    .legend-axis .tick text {
-        font-size: 10px;
-    }
-</style>
+    </script>
+</div>
 {% endblock %}
