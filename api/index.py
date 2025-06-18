@@ -29,7 +29,7 @@ app.secret_key = 'supersecretkey'
 df = pd.DataFrame()
 last_draw = pd.Series(dtype='object') 
 
-# NEW: Set to store all historical white ball combinations for fast lookup
+# Set to store all historical white ball combinations for fast lookup
 historical_white_ball_sets = set() 
 
 # Cache for precomputed analysis data
@@ -776,6 +776,13 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
     trend_data = []
     for idx, row in recent_data.iterrows():
         white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])]
+        
+        # Calculate WB_Sum
+        wb_sum = sum(white_balls)
+
+        # Identify group_a numbers present in the draw
+        group_a_numbers_present = sorted([num for num in white_balls if num in group_a])
+
         even_count = sum(1 for num in white_balls if num % 2 == 0)
         odd_count = 5 - even_count
 
@@ -796,13 +803,14 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
         
         trend_data.append({
             'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
-            'split_category': split_category
+            'split_category': split_category,
+            'wb_sum': wb_sum,
+            'group_a_numbers': group_a_numbers_present
         })
     
-    print(f"[DEBUG-OddEvenTrends] Generated {len(trend_data)} trend data points.")
+    print(f"[DEBUG-OddEvenTrends] Generated {len(trend_data)} trend data points with WB_Sum and Group A numbers.")
     return trend_data
 
-# NEW FUNCTION: get_powerball_frequency_by_year
 def get_powerball_frequency_by_year(df_source, num_years=5):
     """
     Calculates the frequency of each Powerball number per year for the last `num_years`.
@@ -812,16 +820,13 @@ def get_powerball_frequency_by_year(df_source, num_years=5):
     print(f"[DEBUG-YearlyPB] Inside get_powerball_frequency_by_year for last {num_years} years.")
     if df_source.empty:
         print("[DEBUG-YearlyPB] df_source is empty. Returning empty data.")
-        return [], [] # Return empty list for data and empty list for years
+        return [], []
 
     current_year = datetime.now().year
     
-    # Generate the list of years we're interested in
     years = [y for y in range(current_year - num_years + 1, current_year + 1)]
     print(f"[DEBUG-YearlyPB] Years to analyze: {years}")
 
-    # Filter data for the relevant years
-    # Ensure 'Draw Date_dt' exists and is datetime
     if 'Draw Date_dt' not in df_source.columns or not pd.api.types.is_datetime64_any_dtype(df_source['Draw Date_dt']):
         print("[ERROR-YearlyPB] 'Draw Date_dt' column missing or not datetime type. Attempting to re-create.")
         df_source['Draw Date_dt'] = pd.to_datetime(df_source['Draw Date'], errors='coerce')
@@ -834,42 +839,33 @@ def get_powerball_frequency_by_year(df_source, num_years=5):
     
     if recent_data.empty:
         print("[DEBUG-YearlyPB] recent_data is empty after filtering by years. Returning empty data.")
-        return [], years # Return years even if data is empty
+        return [], years
 
-    # Extract year from Draw Date_dt
     recent_data['Year'] = recent_data['Draw Date_dt'].dt.year
 
-    # Calculate frequency of each Powerball per year
-    # Ensure 'Powerball' column is numeric
     recent_data['Powerball'] = pd.to_numeric(recent_data['Powerball'], errors='coerce').fillna(0).astype(int)
     
-    # Use pivot_table to get counts in a wide format
     yearly_pb_freq_pivot = pd.pivot_table(
         recent_data,
         index='Powerball',
         columns='Year',
-        values='Draw Date', # Any column can be used for counting, e.g., 'Draw Date'
+        values='Draw Date',
         aggfunc='count',
-        fill_value=0 # Fill missing combinations with 0
+        fill_value=0
     )
     
-    # Ensure all Powerball numbers (1-26) are present as index, fill missing with 0
     all_powerballs = pd.Series(range(1, 27))
     yearly_pb_freq_pivot = yearly_pb_freq_pivot.reindex(all_powerballs, fill_value=0)
 
-    # Ensure all years are present as columns, fill missing with 0
-    # Reindex columns to ensure order and presence of all target years
     yearly_pb_freq_pivot = yearly_pb_freq_pivot.reindex(columns=years, fill_value=0)
     
-    # Convert pivot table to a list of dictionaries for Jinja2
     formatted_data = []
     for powerball_num, row in yearly_pb_freq_pivot.iterrows():
         row_dict = {'Powerball': int(powerball_num)}
         for year in years:
-            row_dict[f'Year_{year}'] = int(row[year]) # Access by column name (year)
+            row_dict[f'Year_{year}'] = int(row[year])
         formatted_data.append(row_dict)
     
-    # Sort by Powerball number for consistent display
     formatted_data = sorted(formatted_data, key=lambda x: x['Powerball'])
 
     print(f"[DEBUG-YearlyPB] Successfully computed yearly Powerball frequencies. First 3: {formatted_data[:3]}")
