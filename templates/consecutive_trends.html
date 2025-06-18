@@ -26,9 +26,7 @@
                         <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ trend.consecutive_present }}</td>
                         <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
                             {% if trend.consecutive_pairs %}
-                                {% for pair in trend.consecutive_pairs %}
-                                    ({{ pair[0] }}, {{ pair[1] }}){% if not loop.last %}, {% endif %}
-                                {% endfor %}
+                                {{ trend.consecutive_pairs | map('join', '-') | join(', ') }}
                             {% else %}
                                 N/A
                             {% endif %}
