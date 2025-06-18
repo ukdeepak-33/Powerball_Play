@@ -1,162 +1,112 @@
 {% extends "base.html" %}
 
+{% block title %}Powerball Position Frequency{% endblock %}
+
+{% block page_heading %}Powerball Position Frequency{% endblock %}
+
 {% block content %}
-<h1 class="text-3xl font-bold mb-6">Powerball Position Frequency</h1>
-
-<p class="mb-4 text-gray-700">This analysis visualizes the average white ball value drawn at each position (1st, 2nd, 3rd, 4th, 5th) for each Powerball number. This can reveal trends in which white balls are drawn at certain positions when a specific Powerball is hit.</p>
-
-<div class="chart-container">
-    <h2 class="text-xl font-semibold mb-4">Average White Ball Value by Position and Powerball</h2>
-    <div id="powerballPositionChart"></div>
+<div class="card p-6 bg-white rounded-lg shadow-lg">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">Powerball Position Analysis</h2>
+    <p class="text-gray-700 mb-4">This scatter plot visualizes the white ball number that appeared at each position when a specific Powerball number was drawn. This can help identify patterns or preferences for certain white ball values appearing with certain Powerballs in specific positions (e.g., "Number 1" when Powerball 10 was drawn).</p>
+    
+    {% if powerball_position_data %}
+        <div class="relative h-96 w-full">
+            <canvas id="powerballPositionChart"></canvas>
+        </div>
+    {% else %}
+        <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
+            No Powerball position frequency data available.
+        </div>
+    {% endif %}
 </div>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        var powerballPositionData = {% if powerball_position_data %}{{ powerball_position_data | tojson }}{% else %}[]{% endif %};
-        console.log("[D3 Debug] powerball_position_frequency.html - powerballPositionData:", powerballPositionData);
+        const rawData = {{ powerball_position_data | tojson }};
 
-        if (!powerballPositionData || powerballPositionData.length === 0) {
-            d3.select("#powerballPositionChart").html("<p>No data available for this chart.</p>");
-            return;
-        }
+        // Prepare data for Chart.js scatter plot
+        // We'll create a dataset for each unique Powerball number
+        const datasets = [];
+        const uniquePowerballs = [...new Set(rawData.map(d => d.powerball_number))].sort((a, b) => a - b);
 
-        // --- Data Aggregation for Powerball Position Chart ---
-        // This chart requires more complex aggregation than simple bar charts or heatmaps.
-        // For each Powerball number, we need to calculate the average white ball value
-        // at each of the 5 positions.
-
-        const aggregatedData = d3.group(powerballPositionData, d => d.powerball_number);
-        const chartData = [];
-
-        aggregatedData.forEach((values, powerballNum) => {
-            const positions = d3.group(values, d => d.white_ball_position);
-            const entry = { Powerball: powerballNum };
+        uniquePowerballs.forEach(pb => {
+            const dataPoints = rawData
+                .filter(d => d.powerball_number === pb)
+                .map(d => ({
+                    x: d.white_ball_value_at_position, // White ball value
+                    y: d.white_ball_position           // Position (1-5)
+                }));
             
-            positions.forEach((posValues, position) => {
-                const avgValue = d3.mean(posValues, d => d.white_ball_value_at_position);
-                entry[`Pos ${position}`] = avgValue;
+            datasets.push({
+                label: `Powerball ${pb}`,
+                data: dataPoints,
+                backgroundColor: `hsl(${(pb * 15) % 360}, 70%, 50%)`, // Dynamic color for each Powerball
+                borderColor: `hsl(${(pb * 15) % 360}, 70%, 40%)`,
+                pointRadius: 5,
+                pointHoverRadius: 7
             });
-            chartData.push(entry);
         });
 
-        // Sort by Powerball number
-        chartData.sort((a, b) => a.Powerball - b.Powerball);
-
-        console.log("[D3 Debug] Aggregated Powerball Position Chart Data:", chartData);
-
-        // --- D3 Multi-line Chart Drawing Function ---
-        function drawMultiLineChart(data, elementId, chartTitle, xLabel, yLabel) {
-            console.log(`[D3 Debug] drawMultiLineChart called for ${elementId}`);
-            console.log("[D3 Debug] Multi-line data received:", data);
-
-            if (!data || data.length === 0) {
-                console.warn(`[D3 Warn] No data provided for multi-line chart: ${elementId}`);
-                d3.select(`#${elementId}`).html("<p>No data available for this chart.</p>");
-                return;
-            }
-
-            d3.select(`#${elementId}`).html(""); // Clear previous chart
-
-            const margin = { top: 50, right: 80, bottom: 60, left: 60 },
-                  width = 900 - margin.left - margin.right,
-                  height = 500 - margin.top - margin.bottom;
-
-            const svg = d3.select(`#${elementId}`)
-                .append("svg")
-                .attr("width", width + margin.left + margin.right)
-                .attr("height", height + margin.top + margin.bottom)
-                .append("g")
-                .attr("transform", `translate(${margin.left},${margin.top})`);
-
-            const x = d3.scaleLinear()
-                .domain(d3.extent(data, d => d.Powerball))
-                .range([0, width]);
-
-            const y = d3.scaleLinear()
-                .range([height, 0]);
-
-            // Determine all position keys (e.g., "Pos 1", "Pos 2")
-            const positionKeys = Object.keys(data[0]).filter(key => key !== "Powerball");
-
-            // Set Y domain based on all position values
-            const allValues = data.flatMap(d => positionKeys.map(key => d[key]));
-            y.domain([d3.min(allValues) - 5, d3.max(allValues) + 5]); // Add some padding
-
-            // Color scale for each line (position)
-            const color = d3.scaleOrdinal(d3.schemeCategory10)
-                            .domain(positionKeys);
-
-            svg.append("g")
-                .attr("transform", `translate(0,${height})`)
-                .call(d3.axisBottom(x).tickFormat(d3.format("d"))); // Ensure integer ticks for Powerball numbers
-
-            svg.append("g")
-                .call(d3.axisLeft(y));
-
-            // X-axis label
-            svg.append("text")
-                .attr("class", "x-axis-label")
-                .attr("x", width / 2)
-                .attr("y", height + margin.bottom - 10)
-                .style("text-anchor", "middle")
-                .text(xLabel);
-
-            // Y-axis label
-            svg.append("text")
-                .attr("class", "y-axis-label")
-                .attr("transform", "rotate(-90)")
-                .attr("y", 0 - margin.left + 10)
-                .attr("x", 0 - (height / 2))
-                .attr("dy", "1em")
-                .style("text-anchor", "middle")
-                .text(yLabel);
-
-            // Title
-            svg.append("text")
-                .attr("x", (width / 2))
-                .attr("y", 0 - (margin.top / 2))
-                .attr("text-anchor", "middle")
-                .style("font-size", "16px")
-                .style("font-weight", "bold")
-                .text(chartTitle);
-
-            const line = d3.line()
-                .defined(d => !isNaN(d.value)) // Only draw line where data is defined
-                .x(d => x(d.Powerball))
-                .y(d => y(d.value));
-
-            const positions = positionKeys.map(function(name) {
-                return {
-                    name: name,
-                    values: data.map(function(d) {
-                        return {Powerball: d.Powerball, value: d[name]};
-                    })
-                };
+        const ctx = document.getElementById('powerballPositionChart');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            title: {
+                                display: true,
+                                text: 'White Ball Value'
+                            },
+                            min: 1,
+                            max: 69,
+                            ticks: {
+                                stepSize: 5
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'White Ball Position (1st, 2nd, ...)'
+                            },
+                            min: 0.5, // To make positions centered at 1, 2, 3, 4, 5
+                            max: 5.5,
+                            ticks: {
+                                stepSize: 1,
+                                callback: function(value) {
+                                    return value; // Show 1, 2, 3, 4, 5
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const pbNum = context.dataset.label;
+                                    const wbValue = context.parsed.x;
+                                    const wbPosition = context.parsed.y;
+                                    return `${pbNum}, WB Value: ${wbValue}, Position: ${wbPosition}`;
+                                }
+                            }
+                        }
+                    }
+                }
             });
-
-            const serie = svg.selectAll(".serie")
-                .data(positions)
-                .enter().append("g")
-                .attr("class", "serie");
-
-            serie.append("path")
-                .attr("class", "line")
-                .attr("d", d => line(d.values))
-                .style("stroke", d => color(d.name))
-                .style("fill", "none")
-                .style("stroke-width", 2);
-
-            serie.append("text")
-                .datum(function(d) { return {name: d.name, value: d.values[d.values.length - 1]}; }) // Label at end of line
-                .attr("transform", function(d) { return `translate(${x(d.value.Powerball)},${y(d.value.value)})`; })
-                .attr("x", 3)
-                .attr("dy", "0.35em")
-                .style("font-size", "10px")
-                .style("fill", d => color(d.name))
-                .text(d => d.name);
         }
-
-        drawMultiLineChart(chartData, "powerballPositionChart", "Average White Ball Value by Powerball and Position", "Powerball Number", "Average White Ball Value");
     });
 </script>
 {% endblock %}
