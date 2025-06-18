@@ -670,7 +670,6 @@ def get_powerball_position_frequency(df_source):
                 })
     return position_frequency_data
 
-# MODIFIED FUNCTION: _find_consecutive_pairs and get_consecutive_numbers_trends
 def _find_consecutive_pairs(numbers_list):
     """Identifies and returns all consecutive pairs in a sorted list of numbers."""
     pairs = []
@@ -701,7 +700,7 @@ def get_consecutive_numbers_trends(df_source, last_draw_date_str):
         return []
 
     recent_data = df_source[df_source['Draw Date_dt'] >= six_months_ago].copy()
-    recent_data = recent_data.sort_values(by='Draw Date_dt', ascending=False) # Sort by date descending for chronological display in table
+    recent_data = recent_data.sort_values(by='Draw Date_dt', ascending=False)
     if recent_data.empty:
         print("[DEBUG-ConsecutiveTrends] recent_data is empty after filtering. Returning empty list.")
         return []
@@ -714,8 +713,8 @@ def get_consecutive_numbers_trends(df_source, last_draw_date_str):
         
         trend_data.append({
             'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
-            'consecutive_present': "Yes" if consecutive_pairs else "No", # Change to "Yes"/"No"
-            'consecutive_pairs': consecutive_pairs # List of pairs, e.g., [[12, 13], [45, 46]]
+            'consecutive_present': "Yes" if consecutive_pairs else "No",
+            'consecutive_pairs': consecutive_pairs
         })
     
     print(f"[DEBUG-ConsecutiveTrends] Generated {len(trend_data)} trend data points.")
@@ -769,7 +768,7 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
         return []
 
     recent_data = df_source[df_source['Draw Date_dt'] >= six_months_ago].copy()
-    recent_data = recent_data.sort_values(by='Draw Date_dt', ascending=False) # Sort by date descending for table display
+    recent_data = recent_data.sort_values(by='Draw Date_dt', ascending=False)
     if recent_data.empty:
         print("[DEBUG-OddEvenTrends] recent_data is empty after filtering. Returning empty list.")
         return []
@@ -800,10 +799,83 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
             'split_category': split_category
         })
     
-    # We no longer need the Pandas DataFrame for charting, just return the list of dicts directly
     print(f"[DEBUG-OddEvenTrends] Generated {len(trend_data)} trend data points.")
     return trend_data
 
+# NEW FUNCTION: get_powerball_frequency_by_year
+def get_powerball_frequency_by_year(df_source, num_years=5):
+    """
+    Calculates the frequency of each Powerball number per year for the last `num_years`.
+    Returns a list of dictionaries, where each dict represents a Powerball number
+    and its count for each of the last `num_years`.
+    """
+    print(f"[DEBUG-YearlyPB] Inside get_powerball_frequency_by_year for last {num_years} years.")
+    if df_source.empty:
+        print("[DEBUG-YearlyPB] df_source is empty. Returning empty data.")
+        return [], [] # Return empty list for data and empty list for years
+
+    current_year = datetime.now().year
+    
+    # Generate the list of years we're interested in
+    years = [y for y in range(current_year - num_years + 1, current_year + 1)]
+    print(f"[DEBUG-YearlyPB] Years to analyze: {years}")
+
+    # Filter data for the relevant years
+    # Ensure 'Draw Date_dt' exists and is datetime
+    if 'Draw Date_dt' not in df_source.columns or not pd.api.types.is_datetime64_any_dtype(df_source['Draw Date_dt']):
+        print("[ERROR-YearlyPB] 'Draw Date_dt' column missing or not datetime type. Attempting to re-create.")
+        df_source['Draw Date_dt'] = pd.to_datetime(df_source['Draw Date'], errors='coerce')
+        df_source = df_source.dropna(subset=['Draw Date_dt'])
+        if df_source.empty:
+            print("[ERROR-YearlyPB] Re-creation failed or resulted in empty df. Returning empty data.")
+            return [], []
+
+    recent_data = df_source[df_source['Draw Date_dt'].dt.year.isin(years)].copy()
+    
+    if recent_data.empty:
+        print("[DEBUG-YearlyPB] recent_data is empty after filtering by years. Returning empty data.")
+        return [], years # Return years even if data is empty
+
+    # Extract year from Draw Date_dt
+    recent_data['Year'] = recent_data['Draw Date_dt'].dt.year
+
+    # Calculate frequency of each Powerball per year
+    # Ensure 'Powerball' column is numeric
+    recent_data['Powerball'] = pd.to_numeric(recent_data['Powerball'], errors='coerce').fillna(0).astype(int)
+    
+    # Use pivot_table to get counts in a wide format
+    yearly_pb_freq_pivot = pd.pivot_table(
+        recent_data,
+        index='Powerball',
+        columns='Year',
+        values='Draw Date', # Any column can be used for counting, e.g., 'Draw Date'
+        aggfunc='count',
+        fill_value=0 # Fill missing combinations with 0
+    )
+    
+    # Ensure all Powerball numbers (1-26) are present as index, fill missing with 0
+    all_powerballs = pd.Series(range(1, 27))
+    yearly_pb_freq_pivot = yearly_pb_freq_pivot.reindex(all_powerballs, fill_value=0)
+
+    # Ensure all years are present as columns, fill missing with 0
+    # Reindex columns to ensure order and presence of all target years
+    yearly_pb_freq_pivot = yearly_pb_freq_pivot.reindex(columns=years, fill_value=0)
+    
+    # Convert pivot table to a list of dictionaries for Jinja2
+    formatted_data = []
+    for powerball_num, row in yearly_pb_freq_pivot.iterrows():
+        row_dict = {'Powerball': int(powerball_num)}
+        for year in years:
+            row_dict[f'Year_{year}'] = int(row[year]) # Access by column name (year)
+        formatted_data.append(row_dict)
+    
+    # Sort by Powerball number for consistent display
+    formatted_data = sorted(formatted_data, key=lambda x: x['Powerball'])
+
+    print(f"[DEBUG-YearlyPB] Successfully computed yearly Powerball frequencies. First 3: {formatted_data[:3]}")
+    return formatted_data, years
+
+# --- NEW UTILITY FUNCTIONS for Generated Numbers and Manual Draws ---
 
 def save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb):
     """
@@ -1103,7 +1175,6 @@ def index():
     if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
         try:
             last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
-            # Assuming you want to display the full last draw in a consistent format
             last_draw_dict['Numbers'] = [
                 last_draw_dict['Number 1'], last_draw_dict['Number 2'], last_draw_dict['Number 3'], 
                 last_draw_dict['Number 4'], last_draw_dict['Number 5']
@@ -1554,6 +1625,14 @@ def powerball_position_frequency_route():
     powerball_position_data = get_cached_analysis('powerball_position_frequency', get_powerball_position_frequency, df)
     return render_template('powerball_position_frequency.html',
                            powerball_position_data=powerball_position_data)
+
+@app.route('/powerball_frequency_by_year')
+def powerball_frequency_by_year_route():
+    yearly_pb_freq_data, years = get_cached_analysis('yearly_pb_freq', get_powerball_frequency_by_year, df)
+    return render_template('powerball_frequency_by_year.html',
+                           yearly_pb_freq_data=yearly_pb_freq_data,
+                           years=years)
+
 
 @app.route('/odd_even_trends')
 def odd_even_trends_route():
