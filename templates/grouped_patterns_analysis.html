@@ -14,7 +14,7 @@
     </p>
     <p class="text-gray-700">
         The ranges are defined as: 1-9, 10-19, 20-29, 30-39, 40-49, 50-59, 60-69.
-        Results are sorted by their overall frequency, from most to least frequent.
+        Click on the table headers (Year, Range, Type, Count) to sort the data!
     </p>
 </div>
 
@@ -25,31 +25,29 @@
             <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
                 <thead class="bg-gray-100">
                     <tr>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Year</th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Range</th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Type</th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Pattern</th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Count</th>
+                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150" data-sort-by="year" data-sort-dir="asc">
+                            Year
+                            <span class="sort-icon ml-1"></span>
+                        </th>
+                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150" data-sort-by="range" data-sort-dir="asc">
+                            Range
+                            <span class="sort-icon ml-1"></span>
+                        </th>
+                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150" data-sort-by="type" data-sort-dir="asc">
+                            Type
+                            <span class="sort-icon ml-1"></span>
+                        </th>
+                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">
+                            Pattern
+                        </th>
+                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150" data-sort-by="count" data-sort-dir="desc">
+                            Count
+                            <span class="sort-icon ml-1"></span>
+                        </th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for pattern in patterns_data %}
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ pattern.year }}</td>
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ pattern.range }}</td>
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ pattern.type }}</td>
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
-                            <div class="flex space-x-1">
-                                {% for num in pattern.pattern %}
-                                    <span class="inline-flex justify-center items-center w-8 h-8 bg-gray-200 rounded-full font-bold text-gray-700 text-sm">
-                                        {{ num }}
-                                    </span>
-                                {% endfor %}
-                            </div>
-                        </td>
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900 font-bold">{{ pattern.count }}</td>
-                    </tr>
-                    {% endfor %}
+                <tbody id="patterns-table-body">
+                    {# Data will be rendered here by JavaScript #}
                 </tbody>
             </table>
         </div>
@@ -59,4 +57,139 @@
         </div>
     {% endif %}
 </div>
+
+<style>
+    .ball-small {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        width: 30px;
+        height: 30px;
+        background-color: #f0f0f0;
+        border-radius: 50%;
+        border: 2px solid #ccc;
+        font-weight: bold;
+        color: #333;
+        font-size: 0.9em;
+        box-shadow: inset 0 0 3px rgba(0,0,0,0.2);
+    }
+    /* Styles for sort icons */
+    .sort-icon {
+        display: inline-block;
+        width: 0;
+        height: 0;
+        vertical-align: middle;
+        margin-left: 0.25rem;
+    }
+    .sort-icon.asc {
+        border-left: 5px solid transparent;
+        border-right: 5px solid transparent;
+        border-bottom: 5px solid #6b7280; /* Gray-500 */
+    }
+    .sort-icon.desc {
+        border-left: 5px solid transparent;
+        border-right: 5px solid transparent;
+        border-top: 5px solid #6b7280; /* Gray-500 */
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const patternsData = {{ patterns_data | tojson }};
+        const tableBody = document.getElementById('patterns-table-body');
+        const tableHeaders = document.querySelectorAll('th[data-sort-by]');
+
+        let currentSortBy = 'count'; // Default sort
+        let currentSortDir = 'desc'; // Default direction
+
+        function renderTable(data) {
+            tableBody.innerHTML = ''; // Clear existing rows
+            if (!data || data.length === 0) {
+                const noDataRow = document.createElement('tr');
+                noDataRow.innerHTML = `<td colspan="5" class="px-4 py-2 text-center text-gray-600">No grouped pattern data available.</td>`;
+                tableBody.appendChild(noDataRow);
+                return;
+            }
+
+            data.forEach(pattern => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                row.innerHTML = `
+                    <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${pattern.year}</td>
+                    <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${pattern.range}</td>
+                    <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${pattern.type}</td>
+                    <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
+                        <div class="flex space-x-1">
+                            ${pattern.pattern.map(num => `
+                                <span class="ball-small">
+                                    ${num}
+                                </span>
+                            `).join('')}
+                        </div>
+                    </td>
+                    <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900 font-bold">${pattern.count}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        function sortData(sortBy, sortDir) {
+            patternsData.sort((a, b) => {
+                let valA, valB;
+
+                if (sortBy === 'year' || sortBy === 'count') {
+                    valA = a[sortBy];
+                    valB = b[sortBy];
+                    return sortDir === 'asc' ? valA - valB : valB - valA;
+                } else if (sortBy === 'range' || sortBy === 'type') {
+                    valA = a[sortBy].toLowerCase();
+                    valB = b[sortBy].toLowerCase();
+                    const comparison = valA.localeCompare(valB);
+                    return sortDir === 'asc' ? comparison : -comparison;
+                }
+                return 0; // Should not happen
+            });
+            renderTable(patternsData);
+        }
+
+        function updateSortIcons() {
+            tableHeaders.forEach(header => {
+                const icon = header.querySelector('.sort-icon');
+                if (icon) {
+                    icon.classList.remove('asc', 'desc');
+                    if (header.dataset.sortBy === currentSortBy) {
+                        icon.classList.add(currentSortDir);
+                    }
+                }
+            });
+        }
+
+        // Add event listeners to headers for sorting
+        tableHeaders.forEach(header => {
+            header.addEventListener('click', function() {
+                const sortBy = this.dataset.sortBy;
+                let sortDir = this.dataset.sortDir; // Get initial direction from HTML
+
+                if (currentSortBy === sortBy) {
+                    // Toggle direction if same column is clicked
+                    currentSortDir = (currentSortDir === 'asc') ? 'desc' : 'asc';
+                } else {
+                    // New column clicked, reset to default direction (often asc for new column)
+                    currentSortBy = sortBy;
+                    currentSortDir = sortDir; // Use the default direction set in HTML for that column
+                }
+                
+                // Update the data-sort-dir attribute on the clicked header
+                this.dataset.sortDir = currentSortDir;
+
+                sortData(currentSortBy, currentSortDir);
+                updateSortIcons();
+            });
+        });
+
+        // Initial render and sort (based on count desc from backend)
+        sortData(currentSortBy, currentSortDir);
+        updateSortIcons();
+    });
+</script>
 {% endblock %}
