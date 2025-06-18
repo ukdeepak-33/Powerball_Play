@@ -1163,6 +1163,91 @@ GLOBAL_WHITE_BALL_RANGE = (1, 69)
 GLOBAL_POWERBALL_RANGE = (1, 26)
 excluded_numbers = []
 
+# Define number ranges for grouped patterns analysis
+NUMBER_RANGES = {
+    "1-9": (1, 9),
+    "10s": (10, 19),
+    "20s": (20, 29),
+    "30s": (30, 39),
+    "40s": (40, 49),
+    "50s": (50, 59),
+    "60s": (60, 69)
+}
+
+def get_grouped_patterns_over_years(df_source):
+    if df_source.empty:
+        print("[DEBUG-GroupedPatterns] df_source is empty. Returning empty list.")
+        return []
+
+    df_source_copy = df_source.copy()
+    if 'Draw Date_dt' not in df_source_copy.columns:
+        df_source_copy['Draw Date_dt'] = pd.to_datetime(df_source_copy['Draw Date'], errors='coerce')
+    df_source_copy = df_source_copy.dropna(subset=['Draw Date_dt'])
+    
+    if df_source_copy.empty:
+        print("[DEBUG-GroupedPatterns] df_source_copy is empty after datetime conversion. Returning empty list.")
+        return []
+
+    # Ensure white ball columns are numeric
+    for i in range(1, 6):
+        col = f'Number {i}'
+        if col in df_source_copy.columns:
+            df_source_copy[col] = pd.to_numeric(df_source_copy[col], errors='coerce').fillna(0).astype(int)
+        else:
+            print(f"[WARN-GroupedPatterns] Column '{col}' not found in DataFrame for pattern analysis.")
+
+
+    all_patterns_data = []
+    
+    # Iterate through unique years
+    for year in sorted(df_source_copy['Draw Date_dt'].dt.year.unique()):
+        yearly_df = df_source_copy[df_source_copy['Draw Date_dt'].dt.year == year]
+        
+        # Store counts for pairs and triplets for the current year
+        year_pairs_counts = defaultdict(int)
+        year_triplets_counts = defaultdict(int)
+
+        for _, row in yearly_df.iterrows():
+            # Get white balls, ensuring they are integers and handling potential NaNs after conversion
+            white_balls = [int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])]
+            
+            for range_name, (min_val, max_val) in NUMBER_RANGES.items():
+                numbers_in_current_range = sorted([num for num in white_balls if min_val <= num <= max_val])
+                
+                if len(numbers_in_current_range) >= 2:
+                    for pair in combinations(numbers_in_current_range, 2):
+                        year_pairs_counts[(range_name, tuple(sorted(pair)))] += 1
+                
+                if len(numbers_in_current_range) >= 3:
+                    for triplet in combinations(numbers_in_current_range, 3):
+                        year_triplets_counts[(range_name, tuple(sorted(triplet)))] += 1
+        
+        # Add to main results list
+        for (range_name, pattern), count in year_pairs_counts.items():
+            all_patterns_data.append({
+                "year": int(year),
+                "range": range_name,
+                "type": "Pair",
+                "pattern": list(pattern),
+                "count": int(count)
+            })
+        
+        for (range_name, pattern), count in year_triplets_counts.items():
+            all_patterns_data.append({
+                "year": int(year),
+                "range": range_name,
+                "type": "Triplet",
+                "pattern": list(pattern),
+                "count": int(count)
+            })
+
+    # Sort by count descending, then by year, then by range, then by pattern
+    # Convert pattern lists to strings for consistent sorting as a secondary key if counts are equal
+    all_patterns_data.sort(key=lambda x: (x['count'], x['year'], x['range'], str(x['pattern'])), reverse=True)
+    
+    print(f"[DEBUG-GroupedPatterns] Generated {len(all_patterns_data)} grouped patterns data points.")
+    return all_patterns_data
+
 # --- Flask Routes ---
 
 @app.route('/')
@@ -1862,7 +1947,6 @@ def analyze_generated_historical_matches_route():
         generated_white_balls_str = request.form.get('generated_white_balls')
         generated_powerball_str = request.form.get('generated_powerball')
 
-        # FIX: Corrected variable name from 'powerball_str' to 'generated_powerball_str'
         if not generated_white_balls_str or not generated_powerball_str: 
             flash("No generated numbers provided for analysis.", 'error')
             return redirect(url_for('index'))
@@ -1888,3 +1972,9 @@ def analyze_generated_historical_matches_route():
         import traceback
         traceback.print_exc()
     return redirect(url_for('index'))
+
+# New route for grouped patterns analysis
+@app.route('/grouped_patterns_analysis')
+def grouped_patterns_analysis_route():
+    patterns_data = get_cached_analysis('grouped_patterns', get_grouped_patterns_over_years, df)
+    return render_template('grouped_patterns_analysis.html', patterns_data=patterns_data)
