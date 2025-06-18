@@ -2,32 +2,131 @@
 
 {% block title %}Frequency Analysis{% endblock %}
 
-{% block page_heading %}Frequency Analysis{% endblock %}
+{% block page_heading %}Number Frequency Analysis{% endblock %}
 
 {% block content %}
-<div class="flex flex-col space-y-6"> {# Changed from grid to flex-col to stack charts always #}
-    <div class="chart-container w-full">
-        <h2 class="text-xl font-semibold mb-4">White Ball Frequency (1-69)</h2>
-        <div id="whiteBallFreqChart"></div>
+<div class="space-y-8">
+    <div class="card p-6 bg-white rounded-lg shadow-lg">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">White Ball Frequency (1-69)</h2>
+        <p class="text-gray-700 mb-4">This bar chart shows how many times each white ball number has been drawn historically.</p>
+        <div class="relative h-96 w-full">
+            <canvas id="whiteBallFrequencyChart"></canvas>
+        </div>
     </div>
 
-    <div class="chart-container w-full">
-        <h2 class="text-xl font-semibold mb-4">Powerball Frequency (1-26)</h2>
-        <div id="powerballFreqChart"></div>
+    <div class="card p-6 bg-white rounded-lg shadow-lg">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Powerball Frequency (1-26)</h2>
+        <p class="text-gray-700 mb-4">This bar chart shows how many times each Powerball number has been drawn historically.</p>
+        <div class="relative h-72 w-full">
+            <canvas id="powerballFrequencyChart"></canvas>
+        </div>
     </div>
 </div>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Ensure data is an empty array if not provided or empty
-        var whiteBallFreqData = {% if white_ball_freq %}{{ white_ball_freq | tojson }}{% else %}[]{% endif %};
-        var powerballFreqData = {% if powerball_freq %}{{ powerball_freq | tojson }}{% else %}[]{% endif %};
+        const whiteBallFreqData = {{ white_ball_freq | tojson }};
+        const powerballFreqData = {{ powerball_freq | tojson }};
 
-        console.log("[D3 Debug] frequency_analysis.html - whiteBallFreqData:", whiteBallFreqData);
-        console.log("[D3 Debug] frequency_analysis.html - powerballFreqData:", powerballFreqData);
+        // Process white ball data for Chart.js
+        const whiteBallLabels = whiteBallFreqData.map(d => d.Number);
+        const whiteBallFrequencies = whiteBallFreqData.map(d => d.Frequency);
 
-        drawBarChart(whiteBallFreqData, "whiteBallFreqChart", "Number", "Frequency", "White Ball Frequency (1-69)", "Ball Number", "Frequency");
-        drawBarChart(powerballFreqData, "powerballFreqChart", "Number", "Frequency", "Powerball Frequency (1-26)", "Powerball Number", "Frequency", "orange");
+        // Render White Ball Frequency Chart
+        const whiteBallCtx = document.getElementById('whiteBallFrequencyChart');
+        if (whiteBallCtx) {
+            new Chart(whiteBallCtx, {
+                type: 'bar',
+                data: {
+                    labels: whiteBallLabels,
+                    datasets: [{
+                        label: 'Frequency',
+                        data: whiteBallFrequencies,
+                        backgroundColor: 'rgba(59, 130, 246, 0.6)', // Tailwind blue-500
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Draws'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'White Ball Number'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // Process powerball data for Chart.js
+        const powerballLabels = powerballFreqData.map(d => d.Number);
+        const powerballFrequencies = powerballFreqData.map(d => d.Frequency);
+
+        // Render Powerball Frequency Chart
+        const powerballCtx = document.getElementById('powerballFrequencyChart');
+        if (powerballCtx) {
+            new Chart(powerballCtx, {
+                type: 'bar',
+                data: {
+                    labels: powerballLabels,
+                    datasets: [{
+                        label: 'Frequency',
+                        data: powerballFrequencies,
+                        backgroundColor: 'rgba(239, 68, 68, 0.6)', // Tailwind red-500
+                        borderColor: 'rgba(239, 68, 68, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Draws'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Powerball Number'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    }
+                }
+            });
+        }
     });
 </script>
 {% endblock %}
