@@ -12,14 +12,40 @@
         within predefined numerical ranges (e.g., 10s, 30s, 60s) for each year in the historical data.
         This can reveal popular combinations within certain number "decades".
     </p>
-    <p class="text-gray-700">
+    <p class="text-gray-700 mb-4">
         The ranges are defined as: 1-9, 10-19, 20-29, 30-39, 40-49, 50-59, 60-69.
-        Click on the table headers (Year, Range, Type, Count) to sort the data!
+    </p>
+    <p class="text-gray-700 font-semibold">
+        Use the filters below to narrow down the results, and click on the table headers (Year, Range, Type, Count) to sort the data!
     </p>
 </div>
 
+<div class="card p-6 bg-white rounded-lg shadow-lg mb-8">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">Filter Options</h2>
+    <div class="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
+        <div class="flex items-center space-x-2">
+            <label for="filter-year" class="block text-gray-700 font-bold">Year:</label>
+            <select id="filter-year" class="shadow appearance-none border rounded-lg py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <option value="all">All Years</option>
+                {# Years will be dynamically added by JavaScript #}
+            </select>
+        </div>
+        
+        <div class="flex items-center space-x-2">
+            <label for="filter-range" class="block text-gray-700 font-bold">Range:</label>
+            <select id="filter-range" class="shadow appearance-none border rounded-lg py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <option value="all">All Ranges</option>
+                {# Ranges will be dynamically added by JavaScript #}
+            </select>
+        </div>
+
+        <button id="reset-filters" class="btn-primary bg-gray-500 hover:bg-gray-600 px-4 py-2 rounded-lg">Reset Filters</button>
+    </div>
+</div>
+
+
 <div class="card p-6 bg-white rounded-lg shadow-lg">
-    <h2 class="text-2xl font-bold mb-4 text-gray-800">Most Frequent Patterns by Year and Range</h2>
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">Matching Patterns</h2>
     {% if patterns_data %}
         <div class="overflow-x-auto">
             <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
@@ -91,22 +117,51 @@
         border-right: 5px solid transparent;
         border-top: 5px solid #6b7280; /* Gray-500 */
     }
+    .btn-primary {
+        @apply bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:shadow-outline transition duration-200 ease-in-out;
+    }
 </style>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const patternsData = {{ patterns_data | tojson }};
+        // Original data received from Flask
+        const originalPatternsData = {{ patterns_data | tojson }}; 
+        let currentFilteredData = [...originalPatternsData]; // Data after filtering, before sorting
+
         const tableBody = document.getElementById('patterns-table-body');
         const tableHeaders = document.querySelectorAll('th[data-sort-by]');
+        const filterYearSelect = document.getElementById('filter-year');
+        const filterRangeSelect = document.getElementById('filter-range');
+        const resetFiltersBtn = document.getElementById('reset-filters');
 
-        let currentSortBy = 'count'; // Default sort
-        let currentSortDir = 'desc'; // Default direction
+        let currentSortBy = 'count'; 
+        let currentSortDir = 'desc'; 
 
+        // Populate filter dropdowns dynamically
+        function populateFilters() {
+            const uniqueYears = [...new Set(originalPatternsData.map(d => d.year))].sort((a, b) => b - a);
+            uniqueYears.forEach(year => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                filterYearSelect.appendChild(option);
+            });
+
+            const uniqueRanges = [...new Set(originalPatternsData.map(d => d.range))].sort();
+            uniqueRanges.forEach(range => {
+                const option = document.createElement('option');
+                option.value = range;
+                option.textContent = range;
+                filterRangeSelect.appendChild(option);
+            });
+        }
+
+        // Function to render the table based on current data
         function renderTable(data) {
             tableBody.innerHTML = ''; // Clear existing rows
             if (!data || data.length === 0) {
                 const noDataRow = document.createElement('tr');
-                noDataRow.innerHTML = `<td colspan="5" class="px-4 py-2 text-center text-gray-600">No grouped pattern data available.</td>`;
+                noDataRow.innerHTML = `<td colspan="5" class="px-4 py-2 text-center text-gray-600">No matching patterns found for the selected filters.</td>`;
                 tableBody.appendChild(noDataRow);
                 return;
             }
@@ -114,44 +169,58 @@
             data.forEach(pattern => {
                 const row = document.createElement('tr');
                 row.className = 'hover:bg-gray-50';
+                
+                const patternHtml = `<div class="flex space-x-1">
+                                    ${pattern.pattern.map(num => `
+                                        <span class="ball-small">
+                                            ${num}
+                                        </span>
+                                    `).join('')}
+                                </div>`;
+
                 row.innerHTML = `
                     <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${pattern.year}</td>
                     <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${pattern.range}</td>
                     <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${pattern.type}</td>
-                    <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
-                        <div class="flex space-x-1">
-                            ${pattern.pattern.map(num => `
-                                <span class="ball-small">
-                                    ${num}
-                                </span>
-                            `).join('')}
-                        </div>
-                    </td>
+                    <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${patternHtml}</td>
                     <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900 font-bold">${pattern.count}</td>
                 `;
                 tableBody.appendChild(row);
             });
         }
 
-        function sortData(sortBy, sortDir) {
-            patternsData.sort((a, b) => {
+        // Function to apply filters and then sort, then render
+        function filterSortAndRender() {
+            const selectedYear = filterYearSelect.value;
+            const selectedRange = filterRangeSelect.value;
+
+            // Apply filters
+            currentFilteredData = originalPatternsData.filter(pattern => {
+                const matchesYear = (selectedYear === 'all' || pattern.year == selectedYear);
+                const matchesRange = (selectedRange === 'all' || pattern.range === selectedRange);
+                return matchesYear && matchesRange;
+            });
+
+            // Apply current sorting to the filtered data
+            currentFilteredData.sort((a, b) => {
                 let valA, valB;
 
-                if (sortBy === 'year' || sortBy === 'count') {
-                    valA = a[sortBy];
-                    valB = b[sortBy];
-                    return sortDir === 'asc' ? valA - valB : valB - valA;
-                } else if (sortBy === 'range' || sortBy === 'type') {
-                    valA = a[sortBy].toLowerCase();
-                    valB = b[sortBy].toLowerCase();
-                    const comparison = valA.localeCompare(valB);
-                    return sortDir === 'asc' ? comparison : -comparison;
+                valA = a[currentSortBy];
+                valB = b[currentSortBy];
+
+                if (typeof valA === 'number' && typeof valB === 'number') {
+                    return currentSortDir === 'asc' ? valA - valB : valB - valA;
+                } else {
+                    const comparison = String(valA).localeCompare(String(valB));
+                    return currentSortDir === 'asc' ? comparison : -comparison;
                 }
-                return 0; // Should not happen
             });
-            renderTable(patternsData);
+
+            renderTable(currentFilteredData);
+            updateSortIcons();
         }
 
+        // Function to update sort icons in headers
         function updateSortIcons() {
             tableHeaders.forEach(header => {
                 const icon = header.querySelector('.sort-icon');
@@ -164,32 +233,38 @@
             });
         }
 
+        // Event listeners for filter dropdowns
+        filterYearSelect.addEventListener('change', filterSortAndRender);
+        filterRangeSelect.addEventListener('change', filterSortAndRender);
+
+        // Event listener for reset button
+        resetFiltersBtn.addEventListener('click', function() {
+            filterYearSelect.value = 'all';
+            filterRangeSelect.value = 'all';
+            currentSortBy = 'count'; // Reset sort to default
+            currentSortDir = 'desc'; // Reset sort direction to default
+            filterSortAndRender();
+        });
+
         // Add event listeners to headers for sorting
         tableHeaders.forEach(header => {
             header.addEventListener('click', function() {
                 const sortBy = this.dataset.sortBy;
-                let sortDir = this.dataset.sortDir; // Get initial direction from HTML
-
+                
                 if (currentSortBy === sortBy) {
-                    // Toggle direction if same column is clicked
                     currentSortDir = (currentSortDir === 'asc') ? 'desc' : 'asc';
                 } else {
-                    // New column clicked, reset to default direction (often asc for new column)
                     currentSortBy = sortBy;
-                    currentSortDir = sortDir; // Use the default direction set in HTML for that column
+                    currentSortDir = this.dataset.sortDir || 'asc'; 
                 }
                 
-                // Update the data-sort-dir attribute on the clicked header
-                this.dataset.sortDir = currentSortDir;
-
-                sortData(currentSortBy, currentSortDir);
-                updateSortIcons();
+                filterSortAndRender(); // Re-filter and sort with new criteria
             });
         });
 
-        // Initial render and sort (based on count desc from backend)
-        sortData(currentSortBy, currentSortDir);
-        updateSortIcons();
+        // Initial setup
+        populateFilters();
+        filterSortAndRender(); // Initial render with default filters and sort
     });
 </script>
 {% endblock %}
