@@ -6,13 +6,13 @@
     <title>Powerball Play</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #1a202c; /* Dark background */
-            color: #e2e8f0; /* Light text */
+            background-color: #f9fafb; /* bg-gray-50 - Light background */
+            color: #111827; /* text-gray-900 - Dark text */
         }
         .container {
             max-width: 1200px;
@@ -24,30 +24,30 @@
             font-weight: 500;
         }
         .flash-success {
-            background-color: #48bb78; /* Green */
-            color: #fff;
+            background-color: #d1fae5; /* Green-200 */
+            color: #065f46; /* Green-800 */
         }
         .flash-error {
-            background-color: #ef4444; /* Red */
-            color: #fff;
+            background-color: #fee2e2; /* Red-200 */
+            color: #991b1b; /* Red-800 */
         }
         .flash-info {
-            background-color: #3b82f6; /* Blue */
-            color: #fff;
+            background-color: #dbeafe; /* Blue-200 */
+            color: #1e40af; /* Blue-800 */
         }
         .navbar-link {
             position: relative;
-            padding-bottom: 0.25rem;
             text-decoration: none;
         }
+        /* Underline effect for sidebar links */
         .navbar-link::after {
             content: '';
             position: absolute;
             width: 0;
             height: 2px;
-            bottom: 0;
+            bottom: -4px; /* Adjust as needed for spacing from text */
             left: 0;
-            background-color: #63b3ed; /* Blue 300 */
+            background-color: #1d4ed8; /* Blue-700 */
             transition: width 0.3s ease-in-out;
         }
         .navbar-link:hover::after {
@@ -60,15 +60,16 @@
             width: 40px;
             height: 40px;
             border-radius: 50%;
-            background-color: #4a5568; /* Gray 700 */
-            color: #e2e8f0;
+            background-color: #d1d5db; /* Gray-300 */
+            color: #111827; /* Gray-900 */
             font-weight: bold;
             margin: 0 4px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             transition: transform 0.2s ease-in-out;
         }
         .powerball {
-            background-color: #e53e3e; /* Red 600 */
+            background-color: #dc2626; /* Red-600 */
+            color: #f9fafb; /* Light text for Powerball */
         }
         .number-ball:hover {
             transform: translateY(-2px);
@@ -82,22 +83,23 @@
             right: 20px;
             width: 350px;
             height: 500px;
-            background-color: #2d3748; /* Darker gray for modal */
+            background-color: #f9fafb; /* Light background for modal */
             border-radius: 12px;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
             flex-direction: column;
             z-index: 1000;
             overflow: hidden;
         }
         #chatbot-header {
-            background-color: #4a5568; /* Header background */
-            color: #e2e8f0;
+            background-color: #e5e7eb; /* Gray-200 - Header background */
+            color: #111827;
             padding: 1rem;
             border-top-left-radius: 12px;
             border-top-right-radius: 12px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border-bottom: 1px solid #d1d5db; /* Gray-300 */
         }
         #chat-messages {
             flex-grow: 1;
@@ -106,7 +108,7 @@
             display: flex;
             flex-direction: column;
             gap: 0.75rem;
-            background-color: #2d3748;
+            background-color: #f9fafb;
         }
         .message-bubble {
             max-width: 80%;
@@ -115,34 +117,34 @@
             word-wrap: break-word;
         }
         .user-message {
-            background-color: #3b82f6; /* Blue 500 */
+            background-color: #bfdbfe; /* Blue-200 */
             align-self: flex-end;
-            color: white;
+            color: #1e40af; /* Blue-800 */
             border-bottom-right-radius: 2px;
         }
         .ai-message {
-            background-color: #4a5568; /* Gray 700 */
+            background-color: #e5e7eb; /* Gray-200 */
             align-self: flex-start;
-            color: #e2e8f0;
+            color: #111827; /* Gray-900 */
             border-bottom-left-radius: 2px;
         }
         #chatbot-input-area {
             display: flex;
             padding: 1rem;
-            border-top: 1px solid #4a5568;
-            background-color: #2d3748;
+            border-top: 1px solid #e5e7eb;
+            background-color: #f9fafb;
         }
         #user-input {
             flex-grow: 1;
-            background-color: #4a5568;
+            background-color: #e5e7eb; /* Gray-200 */
             border: none;
             border-radius: 8px;
             padding: 0.75rem;
-            color: #e2e8f0;
+            color: #111827;
             margin-right: 0.5rem;
         }
         #send-button {
-            background-color: #48bb78; /* Green */
+            background-color: #22c55e; /* Green-500 */
             color: white;
             border: none;
             border-radius: 8px;
@@ -151,90 +153,126 @@
             transition: background-color 0.2s;
         }
         #send-button:hover {
-            background-color: #38a169;
+            background-color: #16a34a; /* Green-600 */
         }
         #loading-indicator {
             display: none;
             text-align: center;
             padding: 0.5rem;
             font-style: italic;
-            color: #a0aec0;
+            color: #6b7280; /* Gray-500 */
+        }
+
+        /* Styles for Left Navigation Sidebar */
+        .sidebar {
+            transition: transform 0.3s ease-in-out;
+            transform: translateX(0); /* Default: visible on desktop */
+            position: relative; /* Default: part of document flow on desktop */
+            z-index: auto; /* Default: no special z-index on desktop */
+        }
+
+        @media (max-width: 1023px) { /* Styles for screens smaller than 'lg' breakpoint */
+            .sidebar {
+                transform: translateX(-100%); /* Hidden off-screen on mobile */
+                position: fixed; /* Allow it to slide over content */
+                height: 100%; /* Full height */
+                z-index: 100; /* Above main content */
+                width: 256px; /* Explicit width for mobile sidebar */
+            }
+            .sidebar.show-mobile {
+                transform: translateX(0); /* Shown on mobile */
+            }
+            /* Add an overlay to dim content when sidebar is open on mobile */
+            .overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 90;
+            }
+            .overlay.active {
+                display: block;
+            }
         }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
-    <nav class="bg-gray-800 p-4 shadow-md">
-        <div class="container mx-auto flex flex-wrap justify-between items-center">
-            <a href="{{ url_for('index') }}" class="text-2xl font-bold text-blue-400 hover:text-blue-300 transition duration-150 ease-in-out">
-                Powerball Play
-            </a>
-            <button id="navbar-toggle" class="lg:hidden text-gray-400 hover:text-white focus:outline-none focus:text-white">
-                <i class="fas fa-bars"></i>
-            </button>
-            <div id="navbar-links" class="hidden lg:flex flex-grow items-center justify-end w-full lg:w-auto">
-                <ul class="flex flex-col lg:flex-row lg:space-x-4 mt-4 lg:mt-0">
-                    <li><a href="{{ url_for('index') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Generate Numbers</a></li>
-                    <li><a href="{{ url_for('generated_numbers_history_route') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Generated History</a></li>
-                    <li><a href="{{ url_for('frequency_analysis_route') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Frequency Analysis</a></li>
-                    <li><a href="{{ url_for('hot_cold_numbers_route') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Hot & Cold Numbers</a></li>
-                    <li><a href="{{ url_for('monthly_white_ball_analysis_route') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Monthly White Ball Analysis</a></li>
-                    <li><a href="{{ url_for('sum_of_main_balls_route') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Sum of Main Balls</a></li>
-                    <li><a href="{{ url_for('winning_probability_route') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Winning Probability</a></li>
-                    <li><a href="{{ url_for('partial_match_probabilities_route') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Partial Match Probabilities</a></li>
-                    <li><a href="{{ url_for('number_age_distribution_route') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Number Age Distribution</a></li>
-                    <li><a href="{{ url_for('co_occurrence_analysis_route') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Co-occurrence Analysis</a></li>
-                    <li><a href="{{ url_for('powerball_position_frequency_route') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Powerball Position Frequency</a></li>
-                    <li><a href="{{ url_for('powerball_frequency_by_year_route') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Powerball Frequency by Year</a></li>
-                    <li><a href="{{ url_for('odd_even_trends_route') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Odd/Even Trends</a></li>
-                    <li><a href="{{ url_for('consecutive_trends_route') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Consecutive Trends</a></li>
-                    <li><a href="{{ url_for('triplets_analysis_route') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Triplets Analysis</a></li>
-                    <li><a href="{{ url_for('grouped_patterns_analysis_route') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Grouped Patterns Analysis</a></li>
-                    <li><a href="{{ url_for('find_results_by_first_white_ball') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Search by First White Ball</a></li>
-                    <li><a href="{{ url_for('find_results_by_sum_route') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Search by Sum</a></li>
-                    <li><a href="{{ url_for('simulate_multiple_draws_route') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Simulate Draws</a></li>
-                    <li><a href="{{ url_for('update_powerball_data') }}" class="navbar-link block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Update Data</a></li>
-                </ul>
+<body class="flex bg-gray-50 text-gray-900 min-h-screen">
+
+    <button id="sidebar-toggle" class="lg:hidden fixed top-4 left-4 z-[101] text-gray-700 hover:text-gray-900 focus:outline-none focus:text-gray-900 p-2 bg-gray-100 rounded-md shadow">
+        <i class="fas fa-bars text-xl"></i>
+    </button>
+    
+    <div id="sidebar-overlay" class="overlay"></div>
+
+    <aside id="sidebar" class="sidebar bg-gray-100 p-4 shadow-md flex-shrink-0 flex flex-col w-64">
+        <a href="{{ url_for('index') }}" class="text-2xl font-bold text-blue-700 hover:text-blue-900 transition duration-150 ease-in-out mb-8 block text-center">
+            Powerball Play
+        </a>
+        <nav class="flex-grow overflow-y-auto">
+            <ul class="flex flex-col space-y-2">
+                <li><a href="{{ url_for('index') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Generate Numbers</a></li>
+                <li><a href="{{ url_for('generated_numbers_history_route') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Generated History</a></li>
+                <li><a href="{{ url_for('frequency_analysis_route') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Frequency Analysis</a></li>
+                <li><a href="{{ url_for('hot_cold_numbers_route') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Hot & Cold Numbers</a></li>
+                <li><a href="{{ url_for('monthly_white_ball_analysis_route') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Monthly White Ball Analysis</a></li>
+                <li><a href="{{ url_for('sum_of_main_balls_route') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Sum of Main Balls</a></li>
+                <li><a href="{{ url_for('winning_probability_route') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Winning Probability</a></li>
+                <li><a href="{{ url_for('partial_match_probabilities_route') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Partial Match Probabilities</a></li>
+                <li><a href="{{ url_for('number_age_distribution_route') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Number Age Distribution</a></li>
+                <li><a href="{{ url_for('co_occurrence_analysis_route') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Co-occurrence Analysis</a></li>
+                <li><a href="{{ url_for('powerball_position_frequency_route') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Powerball Position Frequency</a></li>
+                <li><a href="{{ url_for('powerball_frequency_by_year_route') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Powerball Frequency by Year</a></li>
+                <li><a href="{{ url_for('odd_even_trends_route') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Odd/Even Trends</a></li>
+                <li><a href="{{ url_for('consecutive_trends_route') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Consecutive Trends</a></li>
+                <li><a href="{{ url_for('triplets_analysis_route') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Triplets Analysis</a></li>
+                <li><a href="{{ url_for('grouped_patterns_analysis_route') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Grouped Patterns Analysis</a></li>
+                <li><a href="{{ url_for('find_results_by_first_white_ball') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Search by First White Ball</a></li>
+                <li><a href="{{ url_for('find_results_by_sum_route') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Search by Sum</a></li>
+                <li><a href="{{ url_for('simulate_multiple_draws_route') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Simulate Draws</a></li>
+                <li><a href="{{ url_for('update_powerball_data') }}" class="navbar-link block py-2 px-3 hover:bg-gray-200 transition duration-150 ease-in-out rounded-md">Update Data</a></li>
+            </ul>
+        </nav>
+    </aside>
+
+    <div class="flex-grow flex flex-col relative">
+        <main class="flex-grow container mx-auto p-4 lg:pt-4 pt-12">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="my-4">
+                        {% for category, message in messages %}
+                            <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="bg-gray-100 p-4 text-center text-gray-700 text-sm mt-auto shadow-inner">
+            <div class="container mx-auto">
+                <p>&copy; {{ current_year }} Powerball Play. All rights reserved.</p>
             </div>
-        </div>
-    </nav>
+        </footer>
+    </div>
 
-    <main class="flex-grow container mx-auto p-4">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="my-4">
-                    {% for category, message in messages %}
-                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
-        {% block content %}{% endblock %}
-    </main>
-
-    <footer class="bg-gray-800 p-4 text-center text-gray-400 text-sm">
-        <div class="container mx-auto">
-            <p>&copy; {{ current_year }} Powerball Play. All rights reserved.</p>
-        </div>
-    </footer>
-
-    <!-- Chatbot Floating Action Button -->
-    <button id="open-chatbot-btn" class="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-lg transition duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75">
+    <button id="open-chatbot-btn" class="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-lg transition duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 z-50">
         <i class="fas fa-comment-dots text-2xl"></i>
     </button>
 
-    <!-- Chatbot Modal -->
     <div id="chatbot-modal" class="flex">
         <div id="chatbot-header">
             <h3 class="text-lg font-semibold">Powerball AI Chatbot</h3>
-            <button id="close-chatbot-btn" class="text-gray-300 hover:text-white">
+            <button id="close-chatbot-btn" class="text-gray-600 hover:text-gray-800">
                 <i class="fas fa-times"></i>
             </button>
         </div>
         <div id="chat-messages">
-            <!-- Chat messages will be appended here -->
             <div class="ai-message message-bubble">Hello! I'm your Powerball AI assistant. How can I help you today?</div>
         </div>
-        <div id="loading-indicator" class="text-center text-gray-400 italic">AI is typing...</div>
+        <div id="loading-indicator" class="text-center text-gray-500 italic">AI is typing...</div>
         <div id="chatbot-input-area">
             <input type="text" id="user-input" placeholder="Type your message..." class="flex-grow">
             <button id="send-button">Send</button>
@@ -242,12 +280,18 @@
     </div>
 
     <script>
-        // Navbar toggle for mobile
-        document.getElementById('navbar-toggle').addEventListener('click', function() {
-            const navbarLinks = document.getElementById('navbar-links');
-            navbarLinks.classList.toggle('hidden');
-            navbarLinks.classList.toggle('flex');
-        });
+        // Sidebar toggle for mobile
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+        function toggleSidebar() {
+            sidebar.classList.toggle('show-mobile');
+            sidebarOverlay.classList.toggle('active');
+        }
+
+        sidebarToggle.addEventListener('click', toggleSidebar);
+        sidebarOverlay.addEventListener('click', toggleSidebar); // Close sidebar when clicking overlay
 
         // Chatbot functionality
         const openChatbotBtn = document.getElementById('open-chatbot-btn');
