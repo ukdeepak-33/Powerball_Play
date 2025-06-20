@@ -366,7 +366,7 @@ def monthly_white_ball_analysis(df_source, last_draw_date_str):
             return {}
 
         monthly_balls_raw = recent_data.groupby('Month')[required_cols].apply(
-            lambda x: sorted([int(num) for num in x.values.flatten() if not pd.isna(num)])
+            lambda x: sorted([int(num) for num  in x.values.flatten() if not pd.isna(num)])
         ).to_dict()
 
         monthly_balls_str_keys = {}
@@ -1397,6 +1397,10 @@ def invalidate_analysis_cache():
     last_analysis_cache_update = datetime.min
     print("Analysis cache invalidated.")
 
+# Context processor to inject current year into all templates
+@app.context_processor
+def inject_current_year():
+    return {'current_year': datetime.now().year}
 
 # --- Flask Routes (Ordered for Dependency - all UI-facing routes first, then API routes) ---
 
