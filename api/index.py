@@ -36,7 +36,7 @@ historical_white_ball_sets = set()
 analysis_cache = {}
 last_analysis_cache_update = datetime.min # Initialize with the earliest possible datetime
 
-# Cache expiration time (e.g., 1 hour for analysis data)
+# Cache expiration time (e.e., 1 hour for analysis data)
 CACHE_EXPIRATION_SECONDS = 3600
 
 # --- Utility Functions ---
@@ -219,7 +219,7 @@ def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerba
                 attempts += 1
                 continue
 
-            selected_from_remaining = random.sample(available_for_remaining, num_from_remaining)
+            selected_from_remaining = random.sample(available_numbers, 3) # Changed from `available_for_remaining` to `available_numbers`
             
             white_balls = sorted(selected_from_group_a + selected_from_remaining)
             
@@ -871,243 +871,6 @@ def get_powerball_frequency_by_year(df_source, num_years=5):
     print(f"[DEBUG-YearlyPB] Successfully computed yearly Powerball frequencies. First 3: {formatted_data[:3]}")
     return formatted_data, years
 
-# --- NEW UTILITY FUNCTIONS for Generated Numbers and Manual Draws ---
-
-def save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb):
-    """
-    Saves a manually entered official Powerball draw to the 'powerball_draws' table.
-    Checks for existence of the draw date to prevent duplicates.
-    """
-    url = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
-    headers = _get_supabase_headers(is_service_key=True)
-
-    check_params = {'select': 'Draw Date', 'Draw Date': f'eq.{draw_date}'}
-    check_response = requests.get(url, headers=headers, params=check_params)
-    check_response.raise_for_status()
-    existing_draws = check_response.json()
-
-    if existing_draws:
-        print(f"Draw for date {draw_date} already exists in {SUPABASE_TABLE_NAME}.")
-        return False, f"Draw for {draw_date} already exists."
-
-    new_draw_data = {
-        'Draw Date': draw_date,
-        'Number 1': n1,
-        'Number 2': n2,
-        'Number 3': n3,
-        'Number 4': n4,
-        'Number 5': n5,
-        'Powerball': pb
-    }
-
-    insert_response = requests.post(url, headers=headers, data=json.dumps(new_draw_data))
-    insert_response.raise_for_status()
-
-    if insert_response.status_code == 201:
-        print(f"Successfully inserted manual draw: {new_draw_data}")
-        return True, "Official draw saved successfully!"
-    else:
-        print(f"Failed to insert manual draw. Status: {insert_response.status_code}, Response: {insert_response.text}")
-        return False, f"Error saving official draw: {insert_response.status_code} - {insert_response.text}"
-
-def save_generated_numbers_to_db(numbers, powerball):
-    """
-    Saves a generated Powerball combination to the 'generated_powerball_numbers' table.
-    Ensures the combination is unique before saving.
-    """
-    url = f"{SUPABASE_PROJECT_URL}/rest/v1/{GENERATED_NUMBERS_TABLE_NAME}"
-    headers = _get_supabase_headers(is_service_key=True)
-
-    sorted_numbers = sorted(numbers)
-
-    check_params = {
-        'select': 'id',
-        'number_1': f'eq.{sorted_numbers[0]}',
-        'number_2': f'eq.{sorted_numbers[1]}',
-        'number_3': f'eq.{sorted_numbers[2]}',
-        'number_4': f'eq.{sorted_numbers[3]}',
-        'number_5': f'eq.{sorted_numbers[4]}',
-        'powerball': f'eq.{powerball}'
-    }
-    check_response = requests.get(url, headers=headers, params=check_params)
-    check_response.raise_for_status()
-    existing_combinations = check_response.json()
-
-    if existing_combinations:
-        print(f"Combination {sorted_numbers} + {powerball} already exists in {GENERATED_NUMBERS_TABLE_NAME}.")
-        return False, f"This exact combination ({', '.join(map(str, sorted_numbers))} + {powerball}) has already been saved."
-
-    new_generated_data = {
-        'number_1': sorted_numbers[0],
-        'number_2': sorted_numbers[1],
-        'number_3': sorted_numbers[2],
-        'number_4': sorted_numbers[3],
-        'number_5': sorted_numbers[4],
-        'powerball': powerball,
-        'generated_date': datetime.now().isoformat()
-    }
-
-    insert_response = requests.post(url, headers=headers, data=json.dumps(new_generated_data))
-    insert_response.raise_for_status()
-
-    if insert_response.status_code == 201:
-        print(f"Successfully inserted generated numbers: {new_generated_data}")
-        return True, "Generated numbers saved successfully!"
-    else:
-        print(f"Failed to insert generated numbers. Status: {insert_response.status_code}, Response: {insert_response.text}")
-        return False, f"Error saving generated numbers: {insert_response.status_code} - {insert_response.text}"
-
-def get_generated_numbers_history():
-    """
-    Fetches all generated Powerball numbers and groups them by date, sorted by date descending.
-    """
-    all_data = []
-    offset = 0
-    limit = 1000
-
-    try:
-        url = f"{SUPABASE_PROJECT_URL}/rest/v1/{GENERATED_NUMBERS_TABLE_NAME}"
-        headers = _get_supabase_headers(is_service_key=False)
-        
-        while True:
-            params = {
-                'select': 'generated_date,number_1,number_2,number_3,number_4,number_5,powerball',
-                'order': 'generated_date.desc',
-                'offset': offset,
-                'limit': limit
-            }
-            response = requests.get(url, headers=headers, params=params)
-            response.raise_for_status()
-            
-            chunk = response.json()
-            if not chunk:
-                break
-            all_data.extend(chunk)
-            offset += limit
-
-        if not all_data:
-            print("No generated numbers fetched from Supabase.")
-            return {}
-
-        grouped_data = defaultdict(list)
-        for record in all_data:
-            gen_dt = datetime.fromisoformat(record['generated_date'].replace('Z', '+00:00'))
-            date_key = gen_dt.strftime('%Y-%m-%d')
-            
-            formatted_time = gen_dt.strftime('%I:%M %p')
-
-            generated_balls = sorted([
-                int(record['number_1']), int(record['number_2']), int(record['number_3']),
-                int(record['number_4']), int(record['number_5'])
-            ])
-            
-            grouped_data[date_key].append({
-                'time': formatted_time,
-                'white_balls': generated_balls,
-                'powerball': int(record['powerball'])
-            })
-        
-        sorted_grouped_data = dict(sorted(grouped_data.items(), key=lambda item: item[0], reverse=True))
-
-        return sorted_grouped_data
-
-    except requests.exceptions.RequestException as e:
-        print(f"Error during Supabase data fetch request for generated numbers: {e}")
-        if hasattr(e, 'response') and e.response is not None:
-            print(f"Supabase response content: {e.response.text}")
-        return {}
-    except json.JSONDecodeError as e:
-        print(f"Error decoding JSON response for generated numbers from Supabase: {e}")
-        if 'response' in locals() and response is not None:
-            print(f"Response content that failed JSON decode: {response.text}")
-        return {}
-    except Exception as e:
-        print(f"An unexpected error occurred in get_generated_numbers_history: {e}")
-        import traceback
-        traceback.print_exc()
-        return {}
-
-
-def check_generated_against_history(generated_white_balls, generated_powerball, df_historical):
-    """
-    Checks a generated Powerball number against historical official draws from the last two years
-    and returns match counts and details.
-    """
-    results = {
-        "generated_balls": generated_white_balls,
-        "generated_powerball": generated_powerball,
-        "summary": {
-            "Match 5 White Balls + Powerball": {"count": 0, "draws": []},
-            "Match 5 White Balls Only": {"count": 0, "draws": []},
-            "Match 4 White Balls + Powerball": {"count": 0, "draws": []},
-            "Match 4 White Balls Only": {"count": 0, "draws": []},
-            "Match 3 White Balls + Powerball": {"count": 0, "draws": []},
-            "Match 3 White Balls Only": {"count": 0, "draws": []},
-            "Match 2 White Balls + Powerball": {"count": 0, "draws": []},
-            "Match 1 White Ball + Powerball": {"count": 0, "draws": []},
-            "Match Powerball Only": {"count": 0, "draws": []},
-            "No Match": {"count": 0, "draws": []}
-        }
-    }
-
-    if df_historical.empty:
-        return results
-
-    two_years_ago = datetime.now() - timedelta(days=2 * 365)
-    recent_historical_data = df_historical[df_historical['Draw Date_dt'] >= two_years_ago].copy()
-
-    if recent_historical_data.empty:
-        return results
-
-    gen_white_set = set(generated_white_balls)
-
-    for index, row in recent_historical_data.iterrows():
-        historical_white_balls = sorted([
-            int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
-            int(row['Number 4']), int(row['Number 5'])
-        ])
-        historical_powerball = int(row['Powerball'])
-        historical_draw_date = row['Draw Date']
-
-        hist_white_set = set(historical_white_balls)
-
-        white_matches = len(gen_white_set.intersection(hist_white_set))
-
-        powerball_match = 1 if generated_powerball == historical_powerball else 0
-
-        category = "No Match"
-        if white_matches == 5 and powerball_match == 1:
-            category = "Match 5 White Balls + Powerball"
-        elif white_matches == 5 and powerball_match == 0:
-            category = "Match 5 White Balls Only"
-        elif white_matches == 4 and powerball_match == 1:
-            category = "Match 4 White Balls + Powerball"
-        elif white_matches == 4 and powerball_match == 0:
-            category = "Match 4 White Balls Only"
-        elif white_matches == 3 and powerball_match == 1:
-            category = "Match 3 White Balls + Powerball"
-        elif white_matches == 3 and powerball_match == 0:
-            category = "Match 3 White Balls Only"
-        elif white_matches == 2 and powerball_match == 1:
-            category = "Match 2 White Balls + Powerball"
-        elif white_matches == 1 and powerball_match == 1:
-            category = "Match 1 White Ball + Powerball"
-        elif white_matches == 0 and powerball_match == 1:
-            category = "Match Powerball Only"
-
-        results["summary"][category]["count"] += 1
-        results["summary"][category]["draws"].append({
-            "date": historical_draw_date,
-            "white_balls": historical_white_balls,
-            "powerball": historical_powerball
-        })
-    
-    for category in results["summary"]:
-        results["summary"][category]["draws"].sort(key=lambda x: x['date'], reverse=True)
-
-    return results
-
-
 # --- Data Initialization (Only df and last_draw on startup) ---
 def initialize_core_data():
     global df, last_draw, historical_white_ball_sets
@@ -1117,6 +880,12 @@ def initialize_core_data():
         if not df_temp.empty:
             df = df_temp
             last_draw = get_last_draw(df)
+            # Ensure last_draw has 'Numbers' formatted for display
+            if not last_draw.empty and last_draw.get('Draw Date') != 'N/A':
+                last_draw['Numbers'] = [
+                    int(last_draw['Number 1']), int(last_draw['Number 2']), int(last_draw['Number 3']), 
+                    int(last_draw['Number 4']), int(last_draw['Number 5'])
+                ]
 
             historical_white_ball_sets.clear() 
             for _, row in df.iterrows():
@@ -1127,6 +896,12 @@ def initialize_core_data():
             print("Core historical data loaded successfully.")
         else:
             print("Core historical data is empty after loading. df remains empty.")
+            # Set default N/A for last_draw if no data is found
+            last_draw = pd.Series({
+                'Draw Date': 'N/A', 'Number 1': 'N/A', 'Number 2': 'N/A',
+                'Number 3': 'N/A', 'Number 4': 'N/A', 'Number 5': 'N/A', 'Powerball': 'N/A',
+                'Numbers': ['N/A', 'N/A', 'N/A', 'N/A', 'N/A']
+            }, dtype='object')
     except Exception as e:
         print(f"An error occurred during initial core data loading: {e}")
         import traceback
@@ -1174,81 +949,223 @@ NUMBER_RANGES = {
     "60s": (60, 69)
 }
 
-def get_grouped_patterns_over_years(df_source):
-    if df_source.empty:
-        print("[DEBUG-GroupedPatterns] df_source is empty. Returning empty list.")
+# --- NEW HELPER FUNCTIONS (Moved to be defined earlier) ---
+
+def _get_generated_picks_for_date_from_db(date_str):
+    """
+    Fetches generated numbers for a specific date from the database.
+    Returns a list of dicts: [{'white_balls': [...], 'powerball': int}].
+    """
+    url = f"{SUPABASE_PROJECT_URL}/rest/v1/{GENERATED_NUMBERS_TABLE_NAME}"
+    headers = _get_supabase_headers(is_service_key=False)
+    
+    # Supabase stores generated_date as ISO format, but our date_key is YYYY-MM-DD
+    # We need to filter based on date part of ISO string.
+    # Supabase's 'gte' and 'lt' with ISO strings can achieve this for a specific day.
+    # Adjusting for timezone to ensure correct date range matching for UTC timestamps
+    try:
+        start_of_day_dt = datetime.strptime(date_str, '%Y-%m-%d')
+        end_of_day_dt = start_of_day_dt + timedelta(days=1)
+        start_of_day_iso = start_of_day_dt.isoformat(timespec='seconds') + "Z"
+        end_of_day_iso = end_of_day_dt.isoformat(timespec='seconds') + "Z"
+    except ValueError:
+        print(f"Invalid date format for generated_date_str: {date_str}")
         return []
 
-    df_source_copy = df_source.copy()
-    if 'Draw Date_dt' not in df_source_copy.columns:
-        df_source_copy['Draw Date_dt'] = pd.to_datetime(df_source_copy['Draw Date'], errors='coerce')
-    df_source_copy = df_source_copy.dropna(subset=['Draw Date_dt'])
-    
-    if df_source_copy.empty:
-        print("[DEBUG-GroupedPatterns] df_source_copy is empty after datetime conversion. Returning empty list.")
+    # Using 'and' operator in a single query parameter to specify date range
+    params = {
+        'select': 'number_1,number_2,number_3,number_4,number_5,powerball',
+        'generated_date': f'gte.{start_of_day_iso}',
+        'and': (f'(generated_date.lt.{end_of_day_iso})',) # Needs to be tuple for 'and'
+    }
+
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        raw_data = response.json()
+        
+        formatted_picks = []
+        for record in raw_data:
+            white_balls = sorted([
+                int(record['number_1']), int(record['number_2']), int(record['number_3']),
+                int(record['number_4']), int(record['number_5'])
+            ])
+            formatted_picks.append({
+                'white_balls': white_balls,
+                'powerball': int(record['powerball'])
+            })
+        return formatted_picks
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching generated picks for date {date_str}: {e}")
+        return []
+    except Exception as e:
+        print(f"An unexpected error occurred in _get_generated_picks_for_date_from_db: {e}")
         return []
 
-    # Ensure white ball columns are numeric
-    for i in range(1, 6):
-        col = f'Number {i}'
-        if col in df_source_copy.columns:
-            df_source_copy[col] = pd.to_numeric(df_source_copy[col], errors='coerce').fillna(0).astype(int)
-        else:
-            print(f"[WARN-GroupedPatterns] Column '{col}' not found in DataFrame for pattern analysis.")
-
-
-    all_patterns_data = []
+def _get_official_draw_for_date_from_db(date_str):
+    """
+    Fetches a single official draw for a specific date from the database.
+    Returns a dict: {'Draw Date': ..., 'Number 1': ..., 'Powerball': ...} or None.
+    """
+    url = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
+    headers = _get_supabase_headers(is_service_key=False)
     
-    # Iterate through unique years
-    for year in sorted(df_source_copy['Draw Date_dt'].dt.year.unique()):
-        yearly_df = df_source_copy[df_source_copy['Draw Date_dt'].dt.year == year]
-        
-        # Store counts for pairs and triplets for the current year
-        year_pairs_counts = defaultdict(int)
-        year_triplets_counts = defaultdict(int)
+    params = {
+        'select': 'Draw Date,Number 1,Number 2,Number 3,Number 4,Number 5,Powerball',
+        'Draw Date': f'eq.{date_str}'
+    }
 
-        for _, row in yearly_df.iterrows():
-            # Get white balls, ensuring they are integers and handling potential NaNs after conversion
-            white_balls = [int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])]
-            
-            for range_name, (min_val, max_val) in NUMBER_RANGES.items():
-                numbers_in_current_range = sorted([num for num in white_balls if min_val <= num <= max_val])
-                
-                if len(numbers_in_current_range) >= 2:
-                    for pair in combinations(numbers_in_current_range, 2):
-                        year_pairs_counts[(range_name, tuple(sorted(pair)))] += 1
-                
-                if len(numbers_in_current_range) >= 3:
-                    for triplet in combinations(numbers_in_current_range, 3):
-                        year_triplets_counts[(range_name, tuple(sorted(triplet)))] += 1
-        
-        # Add to main results list
-        for (range_name, pattern), count in year_pairs_counts.items():
-            all_patterns_data.append({
-                "year": int(year),
-                "range": range_name,
-                "type": "Pair",
-                "pattern": list(pattern),
-                "count": int(count)
-            })
-        
-        for (range_name, pattern), count in year_triplets_counts.items():
-            all_patterns_data.append({
-                "year": int(year),
-                "range": range_name,
-                "type": "Triplet",
-                "pattern": list(pattern),
-                "count": int(count)
-            })
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        raw_data = response.json()
+        if raw_data:
+            return raw_data[0] # Should only be one draw for a specific date
+        return None
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching official draw for date {date_str}: {e}")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred in _get_official_draw_for_date_from_db: {e}")
+        return None
 
-    # Sort by count descending, then by year, then by range, then by pattern
-    # Convert pattern lists to strings for consistent sorting as a secondary key if counts are equal
-    all_patterns_data.sort(key=lambda x: (x['count'], x['year'], x['range'], str(x['pattern'])), reverse=True)
+def analyze_generated_batch_against_official_draw(generated_picks_list, official_draw):
+    """
+    Analyzes a batch of generated picks against a single official draw result.
+    Returns a summary of matches.
+    """
+    summary = {
+        "Match 5 White Balls + Powerball": {"count": 0},
+        "Match 5 White Balls Only": {"count": 0},
+        "Match 4 White Balls + Powerball": {"count": 0},
+        "Match 4 White Balls Only": {"count": 0},
+        "Match 3 White Balls + Powerball": {"count": 0},
+        "Match 3 White Balls Only": {"count": 0},
+        "Match 2 White Balls + Powerball": {"count": 0},
+        "Match 1 White Ball + Powerball": {"count": 0},
+        "Match Powerball Only": {"count": 0},
+        "No Match": {"count": 0}
+    }
     
-    print(f"[DEBUG-GroupedPatterns] Generated {len(all_patterns_data)} grouped patterns data points.")
-    return all_patterns_data
+    if not official_draw:
+        return summary # Cannot analyze without an official draw
 
-# --- Flask Routes ---
+    official_white_balls = sorted([
+        int(official_draw['Number 1']), int(official_draw['Number 2']), int(official_draw['Number 3']),
+        int(official_draw['Number 4']), int(official_draw['Number 5'])
+    ])
+    official_powerball = int(official_draw['Powerball'])
+    official_white_set = set(official_white_balls)
+
+    for pick in generated_picks_list:
+        generated_white_balls = sorted(pick['white_balls'])
+        generated_powerball = pick['powerball']
+        generated_white_set = set(generated_white_balls)
+
+        white_matches = len(generated_white_set.intersection(official_white_set))
+        powerball_match = 1 if generated_powerball == official_powerball else 0
+
+        category = "No Match"
+        if white_matches == 5 and powerball_match == 1:
+            category = "Match 5 White Balls + Powerball"
+        elif white_matches == 5 and powerball_match == 0:
+            category = "Match 5 White Balls Only"
+        elif white_matches == 4 and powerball_match == 1:
+            category = "Match 4 White Balls + Powerball"
+        elif white_matches == 4 and powerball_match == 0:
+            category = "Match 4 White Balls Only"
+        elif white_matches == 3 and powerball_match == 1:
+            category = "Match 3 White Balls + Powerball"
+        elif white_matches == 3 and powerball_match == 0:
+            category = "Match 3 White Balls Only"
+        elif white_matches == 2 and powerball_match == 1:
+            category = "Match 2 White Balls + Powerball"
+        elif white_matches == 1 and powerball_match == 1:
+            category = "Match 1 White Ball + Powerball"
+        elif white_matches == 0 and powerball_match == 1:
+            category = "Match Powerball Only"
+        
+        summary[category]["count"] += 1
+    
+    return summary
+
+
+@app.route('/analyze_batch_vs_official', methods=['POST'])
+def analyze_batch_vs_official_route():
+    try:
+        data = request.get_json()
+        generated_date_str = data.get('generated_date')
+        official_draw_date_str = data.get('official_draw_date')
+
+        if not generated_date_str or not official_draw_date_str:
+            return jsonify({"error": "Missing generated_date or official_draw_date"}), 400
+
+        # Fetch the specific batch of generated numbers
+        generated_picks = _get_generated_picks_for_date_from_db(generated_date_str)
+        if not generated_picks:
+            return jsonify({"error": f"No generated picks found for date: {generated_date_str}"}), 404
+
+        # Fetch the specific official draw
+        official_draw = _get_official_draw_for_date_from_db(official_draw_date_str)
+        if not official_draw:
+            return jsonify({"error": f"No official draw found for date: {official_draw_date_str}. Please ensure it is added to the database."}), 404
+
+        # Perform the analysis
+        analysis_summary = analyze_generated_batch_against_official_draw(generated_picks, official_draw)
+        
+        return jsonify({
+            "success": True,
+            "generated_date": generated_date_str,
+            "official_draw_date": official_draw_date_str,
+            "total_generated_picks_in_batch": len(generated_picks),
+            "summary": analysis_summary
+        })
+
+    except Exception as e:
+        print(f"Error during analyze_batch_vs_official_route: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
+# --- MODIFIED analyze_generated_historical_matches_route to return JSON ---
+@app.route('/analyze_generated_historical_matches', methods=['POST'])
+def analyze_generated_historical_matches_route():
+    if df.empty:
+        return jsonify({"success": False, "error": "Historical data not loaded or is empty."}), 500
+    
+    try:
+        data = request.get_json() # Expecting JSON now
+        generated_white_balls_str = data.get('generated_white_balls')
+        generated_powerball_str = data.get('generated_powerball')
+
+        if not generated_white_balls_str or not generated_powerball_str: 
+            return jsonify({"success": False, "error": "Missing generated_white_balls or generated_powerball"}), 400
+
+        generated_white_balls = sorted([int(x.strip()) for x in generated_white_balls_str.split(',') if x.strip().isdigit()])
+        generated_powerball = int(generated_powerball_str)
+
+        if len(generated_white_balls) != 5:
+            return jsonify({"success": False, "error": "Invalid generated white balls format. Expected 5 numbers."}), 400
+
+        historical_match_results = check_generated_against_history(generated_white_balls, generated_powerball, df)
+        
+        return jsonify({
+            "success": True,
+            "generated_numbers_for_analysis": generated_white_balls,
+            "generated_powerball_for_analysis": generated_powerball,
+            "match_summary": historical_match_results['summary']
+        })
+
+    except ValueError:
+        return jsonify({"success": False, "error": "Invalid number format for historical analysis."}), 400
+    except Exception as e:
+        print(f"An error occurred during historical analysis: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
+
+
+# --- Flask Routes --- (Existing routes, no changes except for internal calls if any)
 
 @app.route('/')
 def index():
@@ -1256,12 +1173,8 @@ def index():
     if last_draw_dict.get('Draw Date') and last_draw_dict['Draw Date'] != 'N/A':
         try:
             last_draw_dict['Draw Date'] = pd.to_datetime(last_draw_dict['Draw Date']).strftime('%Y-%m-%d')
-            last_draw_dict['Numbers'] = [
-                last_draw_dict['Number 1'], last_draw_dict['Number 2'], last_draw_dict['Number 3'], 
-                last_draw_dict['Number 4'], last_draw_dict['Number 5']
-            ]
         except ValueError:
-            pass
+            pass # Keep as N/A if conversion fails
     return render_template('index.html', last_draw=last_draw_dict)
 
 @app.route('/generate', methods=['POST'])
@@ -1367,7 +1280,7 @@ def generate_modified():
             if len(parts) == 2:
                 num_range = tuple(parts)
             else:
-                flash("Filter Common Pairs by Range input must be two numbers separated by space (e.g., '1 20').", 'error')
+                flash("Filter Common Pairs by Range input must be two numbers separated by space (e.e., '1 20').", 'error')
         except ValueError:
             flash("Invalid Filter Common Pairs by Range format. Please enter numbers separated by space.", 'error')
 
@@ -1941,88 +1854,28 @@ def generated_numbers_history_route():
         # Sort dates in descending order (most recent first)
         official_draw_dates = sorted(df['Draw Date'].unique(), reverse=True)
 
+    # Prepare last_draw to pass to template
+    last_draw_for_template = last_draw.to_dict()
+    # Ensure 'Numbers' is a list of integers, converting from Series if necessary
+    if 'Numbers' not in last_draw_for_template or not isinstance(last_draw_for_template['Numbers'], list):
+        if all(key in last_draw_for_template for key in ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']):
+            last_draw_for_template['Numbers'] = [
+                int(last_draw_for_template['Number 1']),
+                int(last_draw_for_template['Number 2']),
+                int(last_draw_for_template['Number 3']),
+                int(last_draw_for_template['Number 4']),
+                int(last_draw_for_template['Number 5'])
+            ]
+        else:
+            last_draw_for_template['Numbers'] = [] # Default empty list if numbers are missing
+
     return render_template('generated_numbers_history.html', 
                            generated_history=generated_history,
-                           official_draw_dates=official_draw_dates)
+                           official_draw_dates=official_draw_dates,
+                           last_official_draw=last_draw_for_template) # Pass the latest official draw
 
-@app.route('/analyze_generated_historical_matches', methods=['POST'])
-def analyze_generated_historical_matches_route():
-    if df.empty:
-        flash("Cannot perform historical analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return redirect(url_for('index'))
-    
-    try:
-        generated_white_balls_str = request.form.get('generated_white_balls')
-        generated_powerball_str = request.form.get('generated_powerball')
-
-        if not generated_white_balls_str or not generated_powerball_str: 
-            flash("No generated numbers provided for analysis.", 'error')
-            return redirect(url_for('index'))
-
-        generated_white_balls = sorted([int(x.strip()) for x in generated_white_balls_str.split(',') if x.strip().isdigit()])
-        generated_powerball = int(generated_powerball_str)
-
-        if len(generated_white_balls) != 5:
-            flash("Invalid generated white balls format. Expected 5 numbers for analysis.", 'error')
-            return redirect(url_for('index'))
-
-        historical_match_results = check_generated_against_history(generated_white_balls, generated_powerball, df)
-        
-        return render_template('historical_match_analysis_results.html', 
-                               generated_numbers_for_analysis=generated_white_balls,
-                               generated_powerball_for_analysis=generated_powerball,
-                               match_summary=historical_match_results['summary'])
-
-    except ValueError:
-        flash("Invalid number format for historical analysis.", 'error')
-    except Exception as e:
-        flash(f"An error occurred during historical analysis: {e}", 'error')
-        import traceback
-        traceback.print_exc()
-    return redirect(url_for('index'))
-
-# New route for grouped patterns analysis
 @app.route('/grouped_patterns_analysis')
 def grouped_patterns_analysis_route():
     patterns_data = get_cached_analysis('grouped_patterns', get_grouped_patterns_over_years, df)
     return render_template('grouped_patterns_analysis.html', patterns_data=patterns_data)
-
-
-# New Route: Analyze a specific generated batch against a specific official draw
-@app.route('/analyze_batch_vs_official', methods=['POST'])
-def analyze_batch_vs_official_route():
-    try:
-        data = request.get_json()
-        generated_date_str = data.get('generated_date')
-        official_draw_date_str = data.get('official_draw_date')
-
-        if not generated_date_str or not official_draw_date_str:
-            return jsonify({"error": "Missing generated_date or official_draw_date"}), 400
-
-        # Fetch the specific batch of generated numbers
-        generated_picks = _get_generated_picks_for_date_from_db(generated_date_str)
-        if not generated_picks:
-            return jsonify({"error": f"No generated picks found for date: {generated_date_str}"}), 404
-
-        # Fetch the specific official draw
-        official_draw = _get_official_draw_for_date_from_db(official_draw_date_str)
-        if not official_draw:
-            return jsonify({"error": f"No official draw found for date: {official_draw_date_str}. Please ensure it is added to the database."}), 404
-
-        # Perform the analysis
-        analysis_summary = analyze_generated_batch_against_official_draw(generated_picks, official_draw)
-        
-        return jsonify({
-            "success": True,
-            "generated_date": generated_date_str,
-            "official_draw_date": official_draw_date_str,
-            "total_generated_picks_in_batch": len(generated_picks),
-            "summary": analysis_summary
-        })
-
-    except Exception as e:
-        print(f"Error during analyze_batch_vs_official_route: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
