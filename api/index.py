@@ -1256,8 +1256,8 @@ def check_generated_against_history(generated_white_balls, generated_powerball, 
             category = "Match 1 White Ball + Powerball"
         elif white_matches == 0 and powerball_match == 1:
             category = "Match Powerball Only"
-
-        results["summary"][category]["count"] += 1
+        
+        summary[category]["count"] += 1
         results["summary"][category]["draws"].append({
             "date": historical_draw_date,
             "white_balls": historical_white_balls,
@@ -1397,15 +1397,15 @@ def invalidate_analysis_cache():
     print("Analysis cache invalidated.")
 
 
-# --- Flask Routes (Ordered for Dependency - most commonly accessed/linked routes first) ---
+# --- Flask Routes (Ordered for Dependency - all UI-facing routes first, then API routes) ---
 
+# Core home page route
 @app.route('/')
 def index():
     last_draw_dict = last_draw.to_dict()
     return render_template('index.html', last_draw=last_draw_dict)
 
-# Routes that are linked from the main navigation (base.html) or index.html
-# These need to be defined early to avoid BuildErrors
+# Generation Routes (referenced directly in index.html forms)
 @app.route('/generate', methods=['POST'])
 def generate():
     if df.empty:
@@ -1570,7 +1570,74 @@ def generate_group_a_strategy_route():
                            last_draw_dates=last_draw_dates,
                            generation_type='group_a_strategy')
 
+@app.route('/save_official_draw', methods=['POST'])
+def save_official_draw_route():
+    try:
+        draw_date = request.form.get('draw_date')
+        n1 = int(request.form.get('n1'))
+        n2 = int(request.form.get('n2'))
+        n3 = int(request.form.get('n3'))
+        n4 = int(request.form.get('n4'))
+        n5 = int(request.form.get('n5'))
+        pb = int(request.form.get('pb'))
 
+        if not (1 <= n1 <= 69 and 1 <= n2 <= 69 and 1 <= n3 <= 69 and 1 <= n4 <= 69 and 1 <= n5 <= 69 and 1 <= pb <= 26):
+            flash("White balls must be between 1-69 and Powerball between 1-26.", 'error')
+            return redirect(url_for('index'))
+        
+        submitted_white_balls = sorted([n1, n2, n3, n4, n5])
+        if len(set(submitted_white_balls)) != 5:
+            flash("White ball numbers must be unique within a single draw.", 'error')
+            return redirect(url_for('index'))
+
+        success, message = save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb)
+        if success:
+            flash(message, 'info')
+            initialize_core_data()
+            invalidate_analysis_cache()
+        else:
+            flash(message, 'error')
+    except ValueError:
+        flash("Invalid input. Please ensure all numbers and date are correctly entered.", 'error')
+    except Exception as e:
+        flash(f"An error occurred: {e}", 'error')
+    return redirect(url_for('index'))
+
+@app.route('/save_generated_pick', methods=['POST'])
+def save_generated_pick_route():
+    try:
+        white_balls_str = request.form.get('generated_white_balls')
+        powerball_str = request.form.get('generated_powerball')
+
+        if not white_balls_str or not powerball_str:
+            flash("No numbers generated to save.", 'error')
+            return redirect(url_for('index'))
+
+        white_balls = [int(x.strip()) for x in white_balls_str.split(',') if x.strip().isdigit()]
+        powerball = int(powerball_str)
+
+        if len(white_balls) != 5:
+            flash("Invalid white balls format. Expected 5 numbers.", 'error')
+            return redirect(url_for('index'))
+        
+        if not (all(1 <= n <= 69 for n in white_balls) and 1 <= powerball <= 26):
+            flash("White balls must be between 1-69 and Powerball between 1-26 for saving.", 'error')
+            return redirect(url_for('index'))
+
+        success, message = save_generated_numbers_to_db(white_balls, powerball)
+        if success:
+            flash(message, 'info')
+            # No need to invalidate full cache here, just ensure generated history is fresh
+        else:
+            flash(message, 'error')
+
+    except ValueError:
+        flash("Invalid number format for saving generated numbers.", 'error')
+    except Exception as e:
+        flash(f"An error occurred while saving generated numbers: {e}", 'error')
+    return redirect(url_for('index'))
+
+# All other UI-facing GET routes (from base.html navigation, and generated_numbers_history)
 @app.route('/frequency_analysis')
 def frequency_analysis_route():
     white_ball_freq_list, powerball_freq_list = get_cached_analysis('freq_analysis', frequency_analysis, df)
@@ -1595,7 +1662,6 @@ def monthly_white_ball_analysis_route():
     return render_template('monthly_white_ball_analysis.html', 
                            monthly_balls=monthly_balls,
                            monthly_balls_json=monthly_balls_json)
-
 
 @app.route('/sum_of_main_balls')
 def sum_of_main_balls_route():
@@ -1766,7 +1832,6 @@ def find_results_by_first_white_ball():
                            white_ball_number=white_ball_number_display,
                            selected_sort_by=selected_sort_by)
 
-
 @app.route('/generated_numbers_history')
 def generated_numbers_history_route():
     generated_history = get_cached_analysis('generated_history', get_generated_numbers_history)
@@ -1786,8 +1851,93 @@ def generated_numbers_history_route():
                            last_official_draw=last_draw_for_template) # Pass the latest official draw
 
 
-# --- Routes for backend API calls only (no direct template rendering) ---
+@app.route('/update_powerball_data', methods=['GET'])
+def update_powerball_data():
+    service_headers = _get_supabase_headers(is_service_key=True)
+    anon_headers = _get_supabase_headers(is_service_key=False)
 
+    try:
+        url_check_latest = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
+        params_check_latest = {
+            'select': 'Draw Date',
+            'order': 'Draw Date.desc',
+            'limit': 1
+        }
+        response_check_latest = requests.get(url_check_latest, headers=anon_headers, params=params_check_latest)
+        response_check_latest.raise_for_status()
+        
+        latest_db_draw_data = response_check_latest.json()
+        last_db_draw_date = None
+        if latest_db_draw_data:
+            last_db_draw_date = latest_db_draw_data[0]['Draw Date']
+        
+        print(f"Last draw date in Supabase: {last_db_draw_date}")
+
+        simulated_draw_date_dt = datetime.now()
+        simulated_draw_date = simulated_draw_date_dt.strftime('%Y-%m-%d')
+        simulated_numbers = sorted(random.sample(range(1, 70), 5))
+        simulated_powerball = random.randint(1, 26)
+
+        new_draw_data = {
+            'Draw Date': simulated_draw_date,
+            'Number 1': simulated_numbers[0],
+            'Number 2': simulated_numbers[1],
+            'Number 3': simulated_numbers[2],
+            'Number 4': simulated_numbers[3],
+            'Number 5': simulated_numbers[4],
+            'Powerball': simulated_powerball
+        }
+        
+        print(f"Simulated new draw data: {new_draw_data}")
+
+        if new_draw_data['Draw Date'] == last_db_draw_date:
+            print(f"Draw for {new_draw_data['Draw Date']} already exists. No update needed.")
+            return "No new draw data. Database is up-to-date.", 200
+        
+        url_insert = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
+        insert_response = requests.post(url_insert, headers=service_headers, data=json.dumps(new_draw_data))
+        insert_response.raise_for_status()
+
+        if insert_response.status_code == 201:
+            print(f"Successfully inserted new draw: {new_draw_data}")
+            
+            initialize_core_data() 
+            invalidate_analysis_cache()
+
+            return f"Data updated successfully with draw for {simulated_draw_date}.", 200
+        else:
+            print(f"Failed to insert data. Status: {insert_response.status_code}, Response: {insert_response.text}")
+            return f"Error updating data: {insert_response.status_code} - {insert_response.text}", 500
+
+    except requests.exceptions.RequestException as e:
+        print(f"Network or HTTP error during update_powerball_data: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"Supabase response content: {e.response.text}")
+        return f"Network or HTTP error: {e}", 500
+    except json.JSONDecodeError as e:
+        print(f"JSON decoding error in update_powerball_data: {e}")
+        if 'insert_response' in locals() and insert_response is not None:
+            print(f"Response content that failed JSON decode: {insert_response.text}")
+        return f"JSON parsing error: {e}", 500
+    except Exception as e:
+        print(f"An unexpected error occurred during data update: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"An internal error occurred: {e}", 500
+
+
+@app.route('/export_analysis_results')
+def export_analysis_results_route():
+    if df.empty:
+        flash("Cannot export results: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+
+    export_analysis_results(df) 
+    flash("Analysis results exported to analysis_results.csv (this file is temporary on Vercel's serverless environment).", 'info')
+    return redirect(url_for('index'))
+
+
+# Routes for backend API calls only (these do not render templates directly)
 @app.route('/analyze_batch_vs_official', methods=['POST'])
 def analyze_batch_vs_official_route():
     try:
@@ -1860,3 +2010,48 @@ def analyze_generated_historical_matches_route():
         import traceback
         traceback.print_exc()
         return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
+
+@app.route('/find_results_by_sum', methods=['GET', 'POST'])
+def find_results_by_sum_route():
+    if df.empty:
+        flash("Cannot find results: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+
+    results = []
+    target_sum_display = None
+
+    if request.method == 'POST':
+        target_sum_str = request.form.get('target_sum')
+        if target_sum_str and target_sum_str.isdigit():
+            target_sum = int(target_sum_str)
+            target_sum_display = target_sum
+            results_df = find_results_by_sum(df, target_sum)
+            results = results_df.to_dict('records')
+        else:
+            flash("Please enter a valid number for Target Sum.", 'error')
+    return render_template('find_results_by_sum.html', 
+                           results=results,
+                           target_sum=target_sum_display)
+
+@app.route('/simulate_multiple_draws', methods=['GET', 'POST'])
+def simulate_multiple_draws_route():
+    if df.empty:
+        flash("Cannot run simulation: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+
+    simulated_freq_list = []
+    num_draws_display = None
+
+    if request.method == 'POST':
+        num_draws_str = request.form.get('num_draws')
+        if num_draws_str and num_draws_str.isdigit():
+            num_draws = int(num_draws_str)
+            num_draws_display = num_draws
+            simulated_freq = simulate_multiple_draws(df, group_a, "Any", "No Combo", GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers, num_draws)
+            simulated_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in simulated_freq.items()]
+        else:
+            flash("Please enter a valid number for Number of Simulations.", 'error')
+
+    return render_template('simulate_multiple_draws.html', 
+                           simulated_freq=simulated_freq_list, 
+                           num_simulations=num_draws_display)
