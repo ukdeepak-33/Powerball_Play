@@ -5,6 +5,29 @@
 {% block page_heading %}Your Generated Numbers History & Batch Analysis{% endblock %}
 
 {% block content %}
+
+{# Display Latest Official Draw Results #}
+<div class="card p-6 bg-white rounded-lg shadow-lg mb-8">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">Latest Official Powerball Draw Result</h2>
+    {% if last_official_draw and last_official_draw['Draw Date'] != 'N/A' %}
+        <div class="flex flex-col sm:flex-row items-center justify-center sm:justify-start space-y-3 sm:space-y-0 sm:space-x-4 mb-4">
+            <span class="text-lg font-semibold text-gray-700">Draw Date: <span class="font-bold text-gray-900">{{ last_official_draw['Draw Date'] }}</span></span>
+            <div class="flex items-center space-x-2">
+                {% for ball in last_official_draw['Numbers'] %}
+                    <span class="ball-large">{{ ball }}</span>
+                {% endfor %}
+                <span class="ball-large powerball-large">{{ last_official_draw['Powerball'] }}</span>
+            </div>
+        </div>
+        <p class="text-sm text-gray-600 italic">This is the most recent official draw loaded into your database.</p>
+    {% else %}
+        <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
+            No latest official draw data available. Please ensure historical data is loaded.
+        </div>
+    {% endif %}
+</div>
+
+
 <div class="card p-6 bg-white rounded-lg shadow-lg mb-8">
     <h2 class="text-2xl font-bold mb-4 text-gray-800">Analyze Generated Batches</h2>
     <p class="text-gray-700 mb-4">
@@ -38,10 +61,34 @@
             {# Results will be dynamically inserted here #}
         </div>
     </div>
-    <div id="analysis-error-message" class="hidden mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+    <div id="batch-analysis-error-message" class="hidden mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
         {# Error messages will be dynamically inserted here #}
     </div>
 </div>
+
+{# New section for Single Pick Analysis Results #}
+<div id="single-pick-analysis-results" class="hidden card p-6 bg-white rounded-lg shadow-lg mb-8">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">Single Pick Historical Match Analysis</h2>
+    <p class="text-gray-700 mb-3">Analyzing generated pick: 
+        <span id="analyzed-single-white-balls" class="font-semibold flex space-x-1 inline-flex items-center"></span>
+        <span id="analyzed-single-powerball" class="font-semibold inline-flex items-center"></span>
+        against all historical draws.
+    </p>
+    <div id="single-match-summary-details" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-gray-700">
+        {# Results will be dynamically inserted here #}
+    </div>
+</div>
+<div id="single-pick-analysis-loading-indicator" class="hidden flex items-center text-blue-500 font-semibold mt-4 mb-8">
+    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+    Analyzing Single Pick...
+</div>
+<div id="single-pick-analysis-error-message" class="hidden mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg mb-8">
+    {# Error messages will be dynamically inserted here #}
+</div>
+
 
 <div class="card p-6 bg-white rounded-lg shadow-lg">
     <h2 class="text-2xl font-bold mb-4 text-gray-800">Saved Generated Picks History</h2>
@@ -69,11 +116,12 @@
                                 <span class="ball-small powerball-small">{{ pick.powerball }}</span>
                             </div>
                             <div class="flex space-x-2 mt-3 sm:mt-0">
-                                <form action="{{ url_for('analyze_generated_historical_matches_route') }}" method="post" class="inline-block">
-                                    <input type="hidden" name="generated_white_balls" value="{{ pick.white_balls | join(',') }}">
-                                    <input type="hidden" name="generated_powerball" value="{{ pick.powerball }}">
-                                    <button type="submit" class="btn-primary-small">Analyze Single Pick</button>
-                                </form>
+                                {# Changed from form submit to button with data attributes for AJAX #}
+                                <button type="button" class="btn-primary-small analyze-single-pick-btn" 
+                                        data-white-balls="{{ pick.white_balls | join(',') }}" 
+                                        data-powerball="{{ pick.powerball }}">
+                                    Analyze Single Pick
+                                </button>
                                 <button type="button" class="btn-primary-small analyze-batch-btn bg-purple-600 hover:bg-purple-700" data-generated-date="{{ date }}">
                                     Analyze This Batch
                                 </button>
@@ -112,6 +160,25 @@
         color: white;
         border-color: #dc2626;
     }
+    .ball-large {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        width: 45px;
+        height: 45px;
+        background-color: #e0e0e0;
+        border-radius: 50%;
+        border: 2px solid #bbb;
+        font-weight: bold;
+        color: #222;
+        font-size: 1.2em;
+        box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
+    }
+    .powerball-large {
+        background-color: #c02a2a; /* Darker red for large powerball */
+        color: white;
+        border-color: #991b1b;
+    }
     .btn-primary-small {
         @apply bg-blue-500 text-white text-xs font-bold py-1.5 px-3 rounded-lg hover:bg-blue-600 focus:outline-none focus:shadow-outline transition duration-200 ease-in-out;
     }
@@ -134,41 +201,77 @@
             });
         });
 
-        // New Batch Analysis Functionality
+        // Elements for Batch Analysis
         const officialDrawDateSelect = document.getElementById('official-draw-date-select');
         const analyzeBatchButtons = document.querySelectorAll('.analyze-batch-btn');
-        const analysisResultsDiv = document.getElementById('batch-analysis-results');
-        const analysisLoadingIndicator = document.getElementById('analysis-loading-indicator');
-        const analysisErrorMessage = document.getElementById('analysis-error-message');
+        const batchAnalysisResultsDiv = document.getElementById('batch-analysis-results');
+        const batchAnalysisLoadingIndicator = document.getElementById('analysis-loading-indicator');
+        const batchAnalysisErrorMessage = document.getElementById('batch-analysis-error-message');
         const analyzedGeneratedDateSpan = document.getElementById('analyzed-generated-date');
         const analyzedOfficialDateSpan = document.getElementById('analyzed-official-date');
         const totalPicksAnalyzedSpan = document.getElementById('total-picks-analyzed');
-        const matchSummaryDetailsDiv = document.getElementById('match-summary-details');
+        const batchMatchSummaryDetailsDiv = document.getElementById('match-summary-details');
 
-        // Populate official draw dates (already done via Flask, but ensure it's selected properly)
-        // If no official draws are available, disable buttons / show message
+        // Elements for Single Pick Analysis
+        const analyzeSinglePickButtons = document.querySelectorAll('.analyze-single-pick-btn');
+        const singlePickAnalysisResultsDiv = document.getElementById('single-pick-analysis-results');
+        const singlePickAnalysisLoadingIndicator = document.getElementById('single-pick-analysis-loading-indicator');
+        const singlePickAnalysisErrorMessage = document.getElementById('single-pick-analysis-error-message');
+        const analyzedSingleWhiteBallsSpan = document.getElementById('analyzed-single-white-balls');
+        const analyzedSinglePowerballSpan = document.getElementById('analyzed-single-powerball');
+        const singleMatchSummaryDetailsDiv = document.getElementById('single-match-summary-details');
+
+        // Initial check for official draw dates to enable/disable batch analysis buttons
         if (officialDrawDateSelect.options.length === 0 || officialDrawDateSelect.value === "") {
             analyzeBatchButtons.forEach(btn => btn.disabled = true);
-            analysisErrorMessage.classList.remove('hidden');
-            analysisErrorMessage.innerHTML = "No official draw dates available to analyze against. Please add official draws first.";
+            // batchAnalysisErrorMessage.classList.remove('hidden'); // Only show error on interaction now
+            // batchAnalysisErrorMessage.innerHTML = "No official draw dates available for batch analysis. Please add official draws first.";
         }
 
+        // Function to display match summary (reusable for both batch and single)
+        function displayMatchSummary(summary, targetDiv, totalPicks = 1) {
+            targetDiv.innerHTML = ''; // Clear previous summary
+            let foundMatches = false;
+            for (const key in summary) {
+                if (summary.hasOwnProperty(key)) {
+                    const count = summary[key].count;
+                    if (count > 0) {
+                        foundMatches = true;
+                        const div = document.createElement('div');
+                        div.className = 'bg-blue-100 p-2 rounded-md font-medium';
+                        div.innerHTML = `<span class="text-blue-900">${key}:</span> <span class="font-bold text-lg text-blue-700">${count}</span>`;
+                        targetDiv.appendChild(div);
+                    }
+                }
+            }
+            if (!foundMatches && totalPicks > 0) {
+                 const div = document.createElement('div');
+                 div.className = 'bg-blue-100 p-2 rounded-md font-medium';
+                 div.innerHTML = `<span class="text-blue-900">No Matches Found.</span>`;
+                 targetDiv.appendChild(div);
+            }
+        }
 
+        // Event Listeners for Batch Analysis
         analyzeBatchButtons.forEach(button => {
             button.addEventListener('click', async function() {
                 const generatedDate = this.dataset.generatedDate;
                 const officialDrawDate = officialDrawDateSelect.value;
 
-                // Clear previous results and errors
-                analysisResultsDiv.classList.add('hidden');
-                analysisErrorMessage.classList.add('hidden');
-                analysisErrorMessage.innerHTML = '';
-                analysisLoadingIndicator.classList.remove('hidden');
+                // Hide other analysis results
+                singlePickAnalysisResultsDiv.classList.add('hidden');
+                singlePickAnalysisErrorMessage.classList.add('hidden');
+
+                // Clear previous results and errors for batch analysis
+                batchAnalysisResultsDiv.classList.add('hidden');
+                batchAnalysisErrorMessage.classList.add('hidden');
+                batchAnalysisErrorMessage.innerHTML = '';
+                batchAnalysisLoadingIndicator.classList.remove('hidden');
 
                 if (!officialDrawDate) {
-                    analysisErrorMessage.classList.remove('hidden');
-                    analysisErrorMessage.innerHTML = "Please select an official draw date to analyze against.";
-                    analysisLoadingIndicator.classList.add('hidden');
+                    batchAnalysisErrorMessage.classList.remove('hidden');
+                    batchAnalysisErrorMessage.innerHTML = "Please select an official draw date to analyze against.";
+                    batchAnalysisLoadingIndicator.classList.add('hidden');
                     return;
                 }
 
@@ -191,41 +294,69 @@
                         analyzedOfficialDateSpan.textContent = officialDrawDate;
                         totalPicksAnalyzedSpan.textContent = result.total_generated_picks_in_batch;
                         
-                        matchSummaryDetailsDiv.innerHTML = ''; // Clear previous summary
-                        const summary = result.summary;
-                        let foundMatches = false;
-                        for (const key in summary) {
-                            if (summary.hasOwnProperty(key)) {
-                                const count = summary[key].count;
-                                if (count > 0) { // Only show categories with matches
-                                    foundMatches = true;
-                                    const div = document.createElement('div');
-                                    div.className = 'bg-blue-100 p-2 rounded-md font-medium';
-                                    div.innerHTML = `<span class="text-blue-900">${key}:</span> <span class="font-bold text-lg text-blue-700">${count}</span>`;
-                                    matchSummaryDetailsDiv.appendChild(div);
-                                }
-                            }
-                        }
-                        
-                        if (!foundMatches && result.total_generated_picks_in_batch > 0) {
-                             const div = document.createElement('div');
-                             div.className = 'bg-blue-100 p-2 rounded-md font-medium';
-                             div.innerHTML = `<span class="text-blue-900">No Matches Found across all picks.</span>`;
-                             matchSummaryDetailsDiv.appendChild(div);
-                        }
-
-
-                        analysisResultsDiv.classList.remove('hidden');
+                        displayMatchSummary(result.summary, batchMatchSummaryDetailsDiv, result.total_generated_picks_in_batch);
+                        batchAnalysisResultsDiv.classList.remove('hidden');
                     } else {
-                        analysisErrorMessage.classList.remove('hidden');
-                        analysisErrorMessage.innerHTML = result.error || "An unknown error occurred during analysis.";
+                        batchAnalysisErrorMessage.classList.remove('hidden');
+                        batchAnalysisErrorMessage.innerHTML = result.error || "An unknown error occurred during batch analysis.";
                     }
                 } catch (error) {
-                    console.error('Error during analysis fetch:', error);
-                    analysisErrorMessage.classList.remove('hidden');
-                    analysisErrorMessage.innerHTML = `Failed to connect to analysis server: ${error.message}`;
+                    console.error('Error during batch analysis fetch:', error);
+                    batchAnalysisErrorMessage.classList.remove('hidden');
+                    batchAnalysisErrorMessage.innerHTML = `Failed to connect to analysis server: ${error.message}`;
                 } finally {
-                    analysisLoadingIndicator.classList.add('hidden');
+                    batchAnalysisLoadingIndicator.classList.add('hidden');
+                }
+            });
+        });
+
+        // Event Listeners for Single Pick Analysis
+        analyzeSinglePickButtons.forEach(button => {
+            button.addEventListener('click', async function() {
+                const generatedWhiteBalls = this.dataset.whiteBalls;
+                const generatedPowerball = this.dataset.powerball;
+
+                // Hide other analysis results
+                batchAnalysisResultsDiv.classList.add('hidden');
+                batchAnalysisErrorMessage.classList.add('hidden');
+
+                // Clear previous results and errors for single pick analysis
+                singlePickAnalysisResultsDiv.classList.add('hidden');
+                singlePickAnalysisErrorMessage.classList.add('hidden');
+                singlePickAnalysisErrorMessage.innerHTML = '';
+                singlePickAnalysisLoadingIndicator.classList.remove('hidden');
+
+                // Display the pick being analyzed
+                analyzedSingleWhiteBallsSpan.innerHTML = generatedWhiteBalls.split(',').map(num => `<span class="ball-small">${num}</span>`).join('');
+                analyzedSinglePowerballSpan.innerHTML = `<span class="ball-small powerball-small">${generatedPowerball}</span>`;
+
+                try {
+                    const response = await fetch('/analyze_generated_historical_matches', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            generated_white_balls: generatedWhiteBalls,
+                            generated_powerball: generatedPowerball
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok && result.success) {
+                        displayMatchSummary(result.match_summary, singleMatchSummaryDetailsDiv);
+                        singlePickAnalysisResultsDiv.classList.remove('hidden');
+                    } else {
+                        singlePickAnalysisErrorMessage.classList.remove('hidden');
+                        singlePickAnalysisErrorMessage.innerHTML = result.error || "An unknown error occurred during single pick analysis.";
+                    }
+                } catch (error) {
+                    console.error('Error during single pick analysis fetch:', error);
+                    singlePickAnalysisErrorMessage.classList.remove('hidden');
+                    singlePickAnalysisErrorMessage.innerHTML = `Failed to connect to analysis server: ${error.message}`;
+                } finally {
+                    singlePickAnalysisLoadingIndicator.classList.add('hidden');
                 }
             });
         });
