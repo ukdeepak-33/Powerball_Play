@@ -2011,3 +2011,97 @@ def analyze_generated_historical_matches_route():
         import traceback
         traceback.print_exc()
         return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
+
+@app.route('/find_results_by_sum', methods=['GET', 'POST'])
+def find_results_by_sum_route():
+    if df.empty:
+        flash("Cannot find results: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+
+    results = []
+    target_sum_display = None
+
+    if request.method == 'POST':
+        target_sum_str = request.form.get('target_sum')
+        if target_sum_str and target_sum_str.isdigit():
+            target_sum = int(target_sum_str)
+            target_sum_display = target_sum
+            results_df = find_results_by_sum(df, target_sum)
+            results = results_df.to_dict('records')
+        else:
+            flash("Please enter a valid number for Target Sum.", 'error')
+    return render_template('find_results_by_sum.html', 
+                           results=results,
+                           target_sum=target_sum_display)
+
+@app.route('/simulate_multiple_draws', methods=['GET', 'POST'])
+def simulate_multiple_draws_route():
+    if df.empty:
+        flash("Cannot run simulation: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+
+    simulated_freq_list = []
+    num_draws_display = None
+
+    if request.method == 'POST':
+        num_draws_str = request.form.get('num_draws')
+        if num_draws_str and num_draws_str.isdigit():
+            num_draws = int(num_draws_str)
+            num_draws_display = num_draws
+            simulated_freq = simulate_multiple_draws(df, group_a, "Any", "No Combo", GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers, num_draws)
+            simulated_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in simulated_freq.items()]
+        else:
+            flash("Please enter a valid number for Number of Simulations.", 'error')
+
+    return render_template('simulate_multiple_draws.html', 
+                           simulated_freq=simulated_freq_list, 
+                           num_simulations=num_draws_display)
+
+@app.route('/chatbot', methods=['POST'])
+def chatbot_route():
+    try:
+        data = request.get_json()
+        user_message = data.get('message')
+        chat_history = data.get('chat_history', [])
+
+        if not user_message:
+            return jsonify({"error": "No message provided."}), 400
+
+        # Construct payload for Gemini API
+        # The API expects contents to be a list of chat turns
+        contents = chat_history # Already in the correct format from frontend
+        contents.append({"role": "user", "parts": [{"text": user_message}]})
+
+        # Gemini API call
+        # The apiKey should be empty as per instructions, Canvas injects it at runtime.
+        api_key = "" 
+        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+        
+        payload = {
+            "contents": contents
+        }
+
+        response = requests.post(api_url, headers={'Content-Type': 'application/json'}, data=json.dumps(payload))
+        response.raise_for_status() # Raise an exception for HTTP errors (4xx or 5xx)
+        
+        result = response.json()
+
+        if result.get('candidates') and len(result['candidates']) > 0 and result['candidates'][0].get('content') and result['candidates'][0]['content'].get('parts') and len(result['candidates'][0]['content']['parts']) > 0:
+            ai_response_text = result['candidates'][0]['content']['parts'][0]['text']
+        else:
+            ai_response_text = "I'm sorry, I couldn't generate a response."
+            print(f"Unexpected Gemini API response structure: {result}")
+
+        return jsonify({"response": ai_response_text})
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error calling Gemini API: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"Gemini API error response: {e.response.text}")
+        return jsonify({"error": f"Failed to connect to AI: {str(e)}"}), 500
+    except Exception as e:
+        print(f"An unexpected error occurred in chatbot_route: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"An internal error occurred: {str(e)}"}), 500
+
