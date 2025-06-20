@@ -1,5 +1,5 @@
 import pandas as pd
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 import random
 from itertools import combinations
 import math
@@ -1934,8 +1934,16 @@ def save_generated_pick_route():
 @app.route('/generated_numbers_history')
 def generated_numbers_history_route():
     generated_history = get_cached_analysis('generated_history', get_generated_numbers_history)
+    
+    # Get all official draw dates for the new dropdown
+    official_draw_dates = []
+    if not df.empty:
+        # Sort dates in descending order (most recent first)
+        official_draw_dates = sorted(df['Draw Date'].unique(), reverse=True)
+
     return render_template('generated_numbers_history.html', 
-                           generated_history=generated_history)
+                           generated_history=generated_history,
+                           official_draw_dates=official_draw_dates)
 
 @app.route('/analyze_generated_historical_matches', methods=['POST'])
 def analyze_generated_historical_matches_route():
@@ -1978,3 +1986,43 @@ def analyze_generated_historical_matches_route():
 def grouped_patterns_analysis_route():
     patterns_data = get_cached_analysis('grouped_patterns', get_grouped_patterns_over_years, df)
     return render_template('grouped_patterns_analysis.html', patterns_data=patterns_data)
+
+
+# New Route: Analyze a specific generated batch against a specific official draw
+@app.route('/analyze_batch_vs_official', methods=['POST'])
+def analyze_batch_vs_official_route():
+    try:
+        data = request.get_json()
+        generated_date_str = data.get('generated_date')
+        official_draw_date_str = data.get('official_draw_date')
+
+        if not generated_date_str or not official_draw_date_str:
+            return jsonify({"error": "Missing generated_date or official_draw_date"}), 400
+
+        # Fetch the specific batch of generated numbers
+        generated_picks = _get_generated_picks_for_date_from_db(generated_date_str)
+        if not generated_picks:
+            return jsonify({"error": f"No generated picks found for date: {generated_date_str}"}), 404
+
+        # Fetch the specific official draw
+        official_draw = _get_official_draw_for_date_from_db(official_draw_date_str)
+        if not official_draw:
+            return jsonify({"error": f"No official draw found for date: {official_draw_date_str}. Please ensure it is added to the database."}), 404
+
+        # Perform the analysis
+        analysis_summary = analyze_generated_batch_against_official_draw(generated_picks, official_draw)
+        
+        return jsonify({
+            "success": True,
+            "generated_date": generated_date_str,
+            "official_draw_date": official_draw_date_str,
+            "total_generated_picks_in_batch": len(generated_picks),
+            "summary": analysis_summary
+        })
+
+    except Exception as e:
+        print(f"Error during analyze_batch_vs_official_route: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
