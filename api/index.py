@@ -1748,7 +1748,8 @@ def powerball_position_frequency_route():
 
 @app.route('/powerball_frequency_by_year')
 def powerball_frequency_by_year_route():
-    yearly_pb_freq_data, years = get_cached_analysis('yearly_pb_freq', get_powerball_frequency_by_year, df)
+    # Calling with num_years=7 as requested
+    yearly_pb_freq_data, years = get_cached_analysis('yearly_pb_freq', get_powerball_frequency_by_year, df, num_years=7)
     return render_template('powerball_frequency_by_year.html',
                            yearly_pb_freq_data=yearly_pb_freq_data,
                            years=years)
@@ -2011,3 +2012,49 @@ def analyze_generated_historical_matches_route():
         import traceback
         traceback.print_exc()
         return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
+
+@app.route('/find_results_by_sum', methods=['GET', 'POST'])
+def find_results_by_sum_route():
+    if df.empty:
+        flash("Cannot find results: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+
+    results = []
+    target_sum_display = None
+
+    if request.method == 'POST':
+        target_sum_str = request.form.get('target_sum')
+        if target_sum_str and target_sum_str.isdigit():
+            target_sum = int(target_sum_str)
+            target_sum_display = target_sum
+            results_df = find_results_by_sum(df, target_sum)
+            results = results_df.to_dict('records')
+        else:
+            flash("Please enter a valid number for Target Sum.", 'error')
+    return render_template('find_results_by_sum.html', 
+                           results=results,
+                           target_sum=target_sum_display)
+
+@app.route('/simulate_multiple_draws', methods=['GET', 'POST'])
+def simulate_multiple_draws_route():
+    if df.empty:
+        flash("Cannot run simulation: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+
+    simulated_freq_list = []
+    num_draws_display = None
+
+    if request.method == 'POST':
+        num_draws_str = request.form.get('num_draws')
+        if num_draws_str and num_draws_str.isdigit():
+            num_draws = int(num_draws_str)
+            num_draws_display = num_draws
+            simulated_freq = simulate_multiple_draws(df, group_a, "Any", "No Combo", GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers, num_draws)
+            simulated_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in simulated_freq.items()]
+        else:
+            flash("Please enter a valid number for Number of Simulations.", 'error')
+
+    return render_template('simulate_multiple_draws.html', 
+                           simulated_freq=simulated_freq_list, 
+                           num_simulations=num_draws_display)
+
