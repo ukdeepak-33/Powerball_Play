@@ -4,65 +4,71 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Powerball Analysis{% endblock %}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <!-- Font Awesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <!-- D3.js for charts -->
-    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- Chart.js CDN for charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f9fafb; /* bg-gray-50 - Light background */
-            color: #111827; /* text-gray-900 - Dark text */
+            background-color: #f3f4f6;
+            color: #374151;
         }
-        .container {
-            max-width: 1200px;
+        /* Common styling for cards and buttons */
+        .btn-primary {
+            @apply bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:shadow-outline transition duration-200 ease-in-out;
+        }
+        .card {
+            @apply bg-white p-6 rounded-lg shadow-lg;
         }
         .flash-message {
             padding: 1rem;
             margin-bottom: 1rem;
             border-radius: 0.375rem;
-            font-weight: 500;
+            font-weight: 600;
         }
-        .flash-success {
-            background-color: #d1fae5; /* Green-200 */
-            color: #065f46; /* Green-800 */
+        .flash-message.error {
+            background-color: #fee2e2;
+            color: #ef4444;
+            border: 1px solid #fca5a5;
         }
-        .flash-error {
-            background-color: #fee2e2; /* Red-200 */
-            color: #991b1b; /* Red-800 */
+        .flash-message.info {
+            background-color: #dbeafe;
+            color: #3b82f6;
+            border: 1px solid #93c5fd;
         }
-        .flash-info {
-            background-color: #dbeafe; /* Blue-200 */
-            color: #1e40af; /* Blue-800 */
+        .draw-numbers {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 1rem;
         }
-        /* Styles for number balls in general UI, not for D3 charts */
-        .number-ball {
+        .ball {
             display: inline-flex;
             justify-content: center;
             align-items: center;
             width: 45px;
             height: 45px;
+            background-color: #f0f0f0;
             border-radius: 50%;
-            background-color: #e5e7eb; /* Gray-200 */
-            color: #1f2937; /* Gray-800 */
+            border: 2px solid #ccc;
             font-weight: bold;
-            font-size: 1.1em;
-            margin: 0 4px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            color: #333;
+            font-size: 1.2em;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
         }
         .powerball {
-            background-color: #ef4444; /* Red-500 */
+            background-color: #ef4444; /* Red color for powerball */
             color: white;
+            border-color: #dc2626;
         }
 
         /* Sidebar specific styles */
         .sidebar {
             width: 0; /* Hidden by default on mobile */
-            transition: width 0.3s ease-in-out, transform 0.3s ease-in-out;
+            transition: width 0.3s ease-in-out;
             position: fixed; /* Fixed position for mobile slide-out */
             top: 0;
             left: 0;
@@ -70,25 +76,12 @@
             z-index: 1000;
             overflow-x: hidden;
             overflow-y: auto;
-            background-color: #ffffff; /* White background for sidebar */
-            color: #374151; /* Dark text for sidebar */
-            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            background-color: #1a202c;
+            color: #ffffff;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.2);
         }
         .sidebar.open {
             width: 256px; /* Width when open on mobile */
-        }
-        .sidebar-link {
-            display: block;
-            padding: 0.75rem 1rem;
-            color: #374151; /* Dark text */
-            text-decoration: none;
-            transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
-            border-radius: 0.375rem;
-            margin: 0 0.5rem;
-        }
-        .sidebar-link:hover {
-            background-color: #f3f4f6; /* Lighter gray on hover */
-            color: #1d4ed8; /* Blue on hover */
         }
 
         /* Desktop styles - true column layout */
@@ -98,7 +91,6 @@
                 position: sticky; /* Keep it in flow within the flex container */
                 top: 0; /* Align to the top of the flex container */
                 flex-shrink: 0; /* Prevent it from shrinking */
-                border-right: 1px solid #e5e7eb; /* Subtle separator */
             }
             .content-area {
                 flex-grow: 1; /* Take remaining width */
@@ -113,7 +105,7 @@
 </head>
 <body class="flex min-h-screen">
     <!-- Mobile Menu Toggle Button (visible on small screens only) -->
-    <button id="menu-toggle" class="mobile-menu-toggle fixed top-4 left-4 z-20 bg-gray-100 text-gray-700 p-3 rounded-full shadow-lg lg:hidden">
+    <button id="menu-toggle" class="mobile-menu-toggle fixed top-4 left-4 z-20 bg-gray-800 text-white p-3 rounded-full shadow-lg lg:hidden">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
         </svg>
@@ -121,39 +113,38 @@
 
     <!-- Left Sidebar Navigation -->
     <aside id="sidebar" class="sidebar">
-        <div class="p-4 text-center text-2xl font-bold text-gray-800 border-b border-gray-200">
+        <div class="p-4 text-center text-2xl font-bold border-b border-gray-700">
             Powerball Insights
         </div>
         <nav class="mt-4">
             <ul>
-                <li class="mb-1"><a href="{{ url_for('index') }}" class="sidebar-link">Generate Numbers</a></li>
-                <li class="mb-1"><a href="{{ url_for('generated_numbers_history_route') }}" class="sidebar-link">Generated History</a></li>
-                <li class="mb-1"><a href="{{ url_for('frequency_analysis_route') }}" class="sidebar-link">Frequency Analysis</a></li>
-                <li class="mb-1"><a href="{{ url_for('hot_cold_numbers_route') }}" class="sidebar-link">Hot & Cold Numbers</a></li>
-                <li class="mb-1"><a href="{{ url_for('monthly_white_ball_analysis_route') }}" class="sidebar-link">Monthly White Ball Analysis</a></li>
-                <li class="mb-1"><a href="{{ url_for('sum_of_main_balls_route') }}" class="sidebar-link">Sum of Main Balls</a></li>
-                <li class="mb-1"><a href="{{ url_for('find_results_by_first_white_ball') }}" class="sidebar-link">Search by First White Ball</a></li>
-                <li class="mb-1"><a href="{{ url_for('find_results_by_sum_route') }}" class="sidebar-link">Search by Sum</a></li>
-                <li class="mb-1"><a href="{{ url_for('number_age_distribution_route') }}" class="sidebar-link">Number Age Distribution</a></li>
-                <li class="mb-1"><a href="{{ url_for('co_occurrence_analysis_route') }}" class="sidebar-link">Co-occurrence Analysis</a></li>
-                <li class="mb-1"><a href="{{ url_for('powerball_position_frequency_route') }}" class="sidebar-link">Powerball Position Frequency</a></li>
-                <li class="mb-1"><a href="{{ url_for('powerball_frequency_by_year_route') }}" class="sidebar-link">Powerball Frequency by Year</a></li>
-                <li class="mb-1"><a href="{{ url_for('odd_even_trends_route') }}" class="sidebar-link">Odd/Even Trends</a></li>
-                <li class="mb-1"><a href="{{ url_for('consecutive_trends_route') }}" class="sidebar-link">Consecutive Trends</a></li>
-                <li class="mb-1"><a href="{{ url_for('triplets_analysis_route') }}" class="sidebar-link">Triplets Analysis</a></li>
-                <li class="mb-1"><a href="{{ url_for('grouped_patterns_analysis_route') }}" class="sidebar-link">Grouped Patterns Analysis</a></li>
+                <li><a href="{{ url_for('index') }}" class="block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Generator</a></li>
+                <li><a href="{{ url_for('frequency_analysis_route') }}" class="block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Frequency Analysis</a></li>
+                <li><a href="{{ url_for('hot_cold_numbers_route') }}" class="block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Hot/Cold Numbers</a></li>
+                <li><a href="{{ url_for('monthly_white_ball_analysis_route') }}" class="block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Monthly White Ball Trends</a></li>
+                <li><a href="{{ url_for('sum_of_main_balls_route') }}" class="block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Sum of Main Balls</a></li>
+                <li><a href="{{ url_for('find_results_by_first_white_ball') }}" class="block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Find by First Ball</a></li>
                 {# Removed: Winning Probability #}
+                {# <li><a href="{{ url_for('winning_probability_route') }}" class="block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Winning Probability</a></li> #}
                 {# Removed: Partial Match Probabilities #}
-                <li class="mb-1"><a href="{{ url_for('simulate_multiple_draws_route') }}" class="sidebar-link">Simulate Draws</a></li>
-                <li class="mb-1"><a href="{{ url_for('update_powerball_data') }}" class="sidebar-link">Update Data</a></li> 
-                
+                {# <li><a href="{{ url_for('partial_match_probabilities_route') }}" class="block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Partial Match Probabilities</a></li> #}
+                <li><a href="{{ url_for('number_age_distribution_route') }}" class="block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Number Age Distribution</a></li>
+                <li><a href="{{ url_for('co_occurrence_analysis_route') }}" class="block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Co-occurrence Analysis</a></li>
+                <li><a href="{{ url_for('powerball_position_frequency_route') }}" class="block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Powerball Position Frequency</a></li>
+                <li><a href="{{ url_for('powerball_frequency_by_year_route') }}" class="block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Powerball Freq. by Year</a></li>
+                 <li><a href="{{ url_for('grouped_patterns_analysis_route') }}" class="block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Grouped Patterns</a></li>
+                <li><a href="{{ url_for('odd_even_trends_route') }}" class="block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Odd/Even Trends</a></li>
+                <li><a href="{{ url_for('consecutive_trends_route') }}" class="block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Consecutive Trends</a></li>
+                <li><a href="{{ url_for('triplets_analysis_route') }}" class="block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Triplets Analysis</a></li>
+                <li><a href="{{ url_for('generated_numbers_history_route') }}" class="block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Generated Numbers History</a></li>
+                <li><a href="{{ url_for('update_powerball_data') }}" class="block py-3 px-4 hover:bg-gray-700 transition duration-150 ease-in-out rounded-md mx-2 mb-1">Update Data</a></li>
             </ul>
         </nav>
     </aside>
 
     <!-- Main Content Area -->
     <div id="content-area" class="content-area flex flex-col flex-1">
-        <header class="bg-white p-6 shadow-md">
+        <header class="bg-gray-50 p-6 shadow-md">
             <h1 class="text-4xl font-bold text-gray-800 text-center">{% block page_heading %}{% endblock %}</h1>
         </header>
 
@@ -162,7 +153,7 @@
                 {% if messages %}
                     <div class="mb-6">
                         {% for category, message in messages %}
-                            <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                            <div class="flash-message {{ category }}">{{ message }}</div>
                         {% endfor %}
                     </div>
                 {% endif %}
@@ -170,18 +161,13 @@
 
             {% block content %}{% endblock %}
         </main>
-        
-        <footer class="bg-gray-100 p-4 text-center text-gray-700 text-sm mt-auto shadow-inner">
-            <div class="container mx-auto">
-                <p>&copy; {{ current_year }} Powerball Play. All rights reserved.</p>
-            </div>
-        </footer>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const menuToggle = document.getElementById('menu-toggle');
             const sidebar = document.getElementById('sidebar');
+            const contentArea = document.getElementById('content-area');
 
             // Function to close sidebar
             const closeSidebar = () => {
@@ -206,7 +192,6 @@
 
             // Close sidebar if clicked outside (only on mobile when opened)
             document.addEventListener('click', (event) => {
-                // Check if the click is outside the sidebar and not on the toggle button itself
                 if (window.innerWidth < 1024 && sidebar.classList.contains('open') &&
                     !sidebar.contains(event.target) && (menuToggle && !menuToggle.contains(event.target))) {
                     closeSidebar();
@@ -218,10 +203,8 @@
                 if (window.innerWidth >= 1024) {
                     sidebar.style.width = '256px'; // Ensure fixed width on desktop
                     sidebar.classList.remove('open'); // Ensure 'open' class is not interfering with desktop width
-                    sidebar.style.transform = 'translateX(0)'; // Ensure it's visible on desktop
                 } else {
                     sidebar.style.width = '0'; // Ensure hidden on mobile initially
-                    sidebar.style.transform = 'translateX(-100%)'; // Ensure it's hidden off-screen
                 }
             };
 
