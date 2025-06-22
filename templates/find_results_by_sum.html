@@ -10,12 +10,23 @@
     
     <form action="{{ url_for('find_results_by_sum_route') }}" method="post" class="space-y-4">
         <div class="form-group">
-            <label for="target_sum" class="block text-gray-700 text-sm font-bold mb-2">Enter Target Sum:</label>
-            <input type="number" name="target_sum" id="target_sum" min="15" max="345" {# Min sum: 1+2+3+4+5=15, Max sum: 69+68+67+66+65=345 #}
-                   value="{{ target_sum | default('') }}"
+            <label for="target_sum" class="block text-gray-700 text-sm font-bold mb-2">Enter Target Sum (15-345):</label>
+            <input type="number" name="target_sum" id="target_sum" min="15" max="345" 
+                   value="{{ target_sum | default('') }}" {# Preserve value after submission #}
                    class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                    placeholder="e.g., 100">
         </div>
+
+        <div class="form-group">
+            <label for="sort_by" class="block text-gray-700 text-sm font-bold mb-2">Sort Results By:</label>
+            <select name="sort_by" id="sort_by" class="shadow border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <option value="date_desc" {% if selected_sort_by == 'date_desc' %}selected{% endif %}>Draw Date (Newest First)</option>
+                <option value="date_asc" {% if selected_sort_by == 'date_asc' %}selected{% endif %}>Draw Date (Oldest First)</option>
+                <option value="balls_asc" {% if selected_sort_by == 'balls_asc' %}selected{% endif %}>White Balls (Ascending)</option>
+                <option value="balls_desc" {% if selected_sort_by == 'balls_desc' %}selected{% endif %}>White Balls (Descending)</option>
+            </select>
+        </div>
+
         <button type="submit" class="btn-primary w-full mt-4">Find Results</button>
     </form>
 
@@ -44,10 +55,7 @@
                                 <span class="ball-sm">{{ row['Number 5'] }}</span>
                             </td>
                             <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
-                                {# Assuming Powerball can be derived or passed. For now, it's not directly in find_results_by_sum's return, but for consistency, we'd need it. #}
-                                {# If Powerball is not available in the 'results' dictionary, you might need to adjust find_results_by_sum function in index.py to include it. #}
-                                {# For now, adding a placeholder. #}
-                                <span class="ball-sm powerball-sm">{{ row.get('Powerball', 'N/A') }}</span>
+                                <span class="ball-sm powerball-sm">{{ row['Powerball'] }}</span>
                             </td>
                             <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ row['Sum'] }}</td>
                         </tr>
@@ -61,28 +69,5 @@
             No draws found with a sum of {{ target_sum }}.
         </div>
     {% endif %}
-
-    {# Add the small ball styles directly here as they are specific to this page and find_results_by_first_white_ball.html #}
-    <style>
-        .ball-sm {
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-            width: 30px; /* Smaller size */
-            height: 30px; /* Smaller size */
-            background-color: #f0f0f0;
-            border-radius: 50%;
-            border: 1px solid #ccc;
-            font-weight: bold;
-            color: #333;
-            margin: 2px;
-            font-size: 0.8em; /* Smaller font */
-        }
-        .powerball-sm {
-            background-color: #ef4444; /* Red color for powerball */
-            color: white;
-            border-color: #dc2626;
-        }
-    </style>
 </div>
 {% endblock %}
