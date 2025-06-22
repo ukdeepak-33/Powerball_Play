@@ -391,7 +391,7 @@ def sum_of_main_balls(df_source):
         return pd.DataFrame(), [], 0, 0, 0.0
     
     temp_df = df_source.copy()
-    for col in ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']:
+    for col in ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Powerball']:
         if col in temp_df.columns:
             temp_df[col] = pd.to_numeric(temp_df[col], errors='coerce').fillna(0).astype(int)
     
@@ -404,12 +404,12 @@ def sum_of_main_balls(df_source):
     max_sum = int(temp_df['Sum'].max()) if not temp_df['Sum'].empty else 0
     avg_sum = round(temp_df['Sum'].mean(), 2) if not temp_df['Sum'].empty else 0.0
 
-    return temp_df[['Draw Date', 'Sum']], sum_freq_list, min_sum, max_sum, avg_sum
+    return temp_df[['Draw Date', 'Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Powerball', 'Sum']], sum_freq_list, min_sum, max_sum, avg_sum
 
 def find_results_by_sum(df_source, target_sum):
     if df_source.empty: return pd.DataFrame()
     temp_df = df_source.copy()
-    for col in ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']:
+    for col in ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Powerball']: # Include Powerball here
         if col in temp_df.columns:
             temp_df[col] = pd.to_numeric(temp_df[col], errors='coerce').fillna(0).astype(int)
 
@@ -417,7 +417,8 @@ def find_results_by_sum(df_source, target_sum):
         temp_df['Sum'] = temp_df[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].sum(axis=1)
     
     results = temp_df[temp_df['Sum'] == target_sum]
-    return results[['Draw Date', 'Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Sum']]
+    # Return all necessary columns for rendering, including Powerball
+    return results[['Draw Date', 'Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Powerball', 'Sum']]
 
 def simulate_multiple_draws(df_source, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, num_draws=100):
     if df_source.empty: return pd.Series([], dtype=int)
@@ -721,7 +722,7 @@ def get_consecutive_numbers_trends(df_source, last_draw_date_str):
         print(f"[DEBUG-ConsecutiveTrends] last_draw_date: {last_draw_date}")
     except Exception as e:
         print(f"[ERROR-ConsecutiveTrends] Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty list.")
-        return []
+        return {}
 
     six_months_ago = last_draw_date - pd.DateOffset(months=6)
     print(f"[DEBUG-ConsecutiveTrends] six_months_ago: {six_months_ago}")
@@ -1670,18 +1671,60 @@ def sum_of_main_balls_route():
         flash("Cannot display Sum of Main Balls: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
-    sums_data_df, sum_freq_list, min_sum, max_sum, avg_sum = get_cached_analysis('sum_of_main_balls', sum_of_main_balls, df)
-    
-    sums_data = sums_data_df.to_dict('records')
-    sum_freq_json = json.dumps(sum_freq_list)
+    # Retrieve target_sum and sort_by from form if it's a POST request
+    target_sum_display = None
+    selected_sort_by = request.args.get('sort_by', 'date_desc') # Default sort
 
-    return render_template('sum_of_main_balls.html', 
-                           sums_data=sums_data,
-                           sum_freq=sum_freq_list,
-                           sum_freq_json=sum_freq_json,
-                           min_sum=min_sum,
-                           max_sum=max_sum,
-                           avg_sum=avg_sum)
+    if request.method == 'POST':
+        target_sum_str = request.form.get('target_sum')
+        selected_sort_by = request.form.get('sort_by', 'date_desc') # Get sort_by from form submission
+        
+        if target_sum_str and target_sum_str.isdigit():
+            target_sum = int(target_sum_str)
+            target_sum_display = target_sum
+            results_df_raw = find_results_by_sum(df, target_sum)
+
+            # Apply sorting logic
+            if not results_df_raw.empty:
+                if selected_sort_by == 'date_desc':
+                    results_df_raw = results_df_raw.sort_values(by='Draw Date', ascending=False)
+                elif selected_sort_by == 'date_asc':
+                    results_df_raw = results_df_raw.sort_values(by='Draw Date', ascending=True)
+                elif selected_sort_by == 'balls_asc':
+                    # Create a tuple for sorting white balls
+                    results_df_raw['WhiteBallsTuple'] = results_df_raw.apply(
+                        lambda row: tuple(sorted([
+                            int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                            int(row['Number 4']), int(row['Number 5'])
+                        ])), axis=1
+                    )
+                    results_df_raw = results_df_raw.sort_values(by='WhiteBallsTuple', ascending=True)
+                    results_df_raw = results_df_raw.drop(columns=['WhiteBallsTuple'])
+                elif selected_sort_by == 'balls_desc':
+                    results_df_raw['WhiteBallsTuple'] = results_df_raw.apply(
+                        lambda row: tuple(sorted([
+                            int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                            int(row['Number 4']), int(row['Number 5'])
+                        ])), axis=1
+                    )
+                    results_df_raw = results_df_raw.sort_values(by='WhiteBallsTuple', ascending=False)
+                    results_df_raw = results_df_raw.drop(columns=['WhiteBallsTuple'])
+            
+            results = results_df_raw.to_dict('records')
+        else:
+            flash("Please enter a valid number for Target Sum.", 'error')
+            results = [] # Clear results if input is invalid
+            target_sum_display = None # Reset display value
+    else: # GET request, no search yet
+        results = []
+        target_sum_display = None # Initial state: no target sum
+    
+    # Pass all necessary data to the template
+    return render_template('find_results_by_sum.html', 
+                           results=results,
+                           target_sum=target_sum_display,
+                           selected_sort_by=selected_sort_by)
+
 
 @app.route('/winning_probability', methods=['GET', 'POST'])
 def winning_probability_route():
@@ -2021,19 +2064,62 @@ def find_results_by_sum_route():
 
     results = []
     target_sum_display = None
+    selected_sort_by = 'date_desc' # Default sort
 
     if request.method == 'POST':
         target_sum_str = request.form.get('target_sum')
+        selected_sort_by = request.form.get('sort_by', 'date_desc') # Get sort_by from form submission
+        
         if target_sum_str and target_sum_str.isdigit():
             target_sum = int(target_sum_str)
             target_sum_display = target_sum
-            results_df = find_results_by_sum(df, target_sum)
-            results = results_df.to_dict('records')
+            results_df_raw = find_results_by_sum(df, target_sum)
+
+            # Apply sorting logic
+            if not results_df_raw.empty:
+                # Ensure 'Draw Date_dt' exists for sorting by date
+                if 'Draw Date_dt' not in results_df_raw.columns:
+                    results_df_raw['Draw Date_dt'] = pd.to_datetime(results_df_raw['Draw Date'], errors='coerce')
+
+                if selected_sort_by == 'date_desc':
+                    results_df_raw = results_df_raw.sort_values(by='Draw Date_dt', ascending=False)
+                elif selected_sort_by == 'date_asc':
+                    results_df_raw = results_df_raw.sort_values(by='Draw Date_dt', ascending=True)
+                elif selected_sort_by == 'balls_asc':
+                    # Create a tuple for sorting white balls
+                    results_df_raw['WhiteBallsTuple'] = results_df_raw.apply(
+                        lambda row: tuple(sorted([
+                            int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                            int(row['Number 4']), int(row['Number 5'])
+                        ])), axis=1
+                    )
+                    results_df_raw = results_df_raw.sort_values(by='WhiteBallsTuple', ascending=True)
+                    results_df_raw = results_df_raw.drop(columns=['WhiteBallsTuple'])
+                elif selected_sort_by == 'balls_desc':
+                    results_df_raw['WhiteBallsTuple'] = results_df_raw.apply(
+                        lambda row: tuple(sorted([
+                            int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                            int(row['Number 4']), int(row['Number 5'])
+                        ])), axis=1
+                    )
+                    results_df_raw = results_df_raw.sort_values(by='WhiteBallsTuple', ascending=False)
+                    results_df_raw = results_df_raw.drop(columns=['WhiteBallsTuple'])
+            
+            results = results_df_raw.to_dict('records')
         else:
             flash("Please enter a valid number for Target Sum.", 'error')
+            results = [] # Clear results if input is invalid
+            target_sum_display = None # Reset display value
+    else: # GET request, no search yet or initial page load
+        results = []
+        target_sum_display = None # Initial state: no target sum
+        selected_sort_by = 'date_desc' # Keep default sort for initial page load
+    
+    # Pass all necessary data to the template
     return render_template('find_results_by_sum.html', 
                            results=results,
-                           target_sum=target_sum_display)
+                           target_sum=target_sum_display,
+                           selected_sort_by=selected_sort_by)
 
 @app.route('/simulate_multiple_draws', methods=['GET', 'POST'])
 def simulate_multiple_draws_route():
@@ -2057,4 +2143,3 @@ def simulate_multiple_draws_route():
     return render_template('simulate_multiple_draws.html', 
                            simulated_freq=simulated_freq_list, 
                            num_simulations=num_draws_display)
-
