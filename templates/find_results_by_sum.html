@@ -5,48 +5,84 @@
 {% block page_heading %}Find Results by Sum{% endblock %}
 
 {% block content %}
-    <div class="card mb-6">
-        <h2 class="text-xl font-semibold mb-4 text-gray-700">Search by Sum</h2>
-        <form action="/find_results_by_sum" method="post" class="flex flex-col space-y-2">
-            <label for="target_sum" class="form-label">Enter Target Sum:</label>
-            <input type="number" id="target_sum" name="target_sum" class="form-input" placeholder="e.g., 100" value="{{ target_sum | default('') }}">
-            <button type="submit" class="btn-primary">Find Results</button>
-        </form>
-    </div>
+<div class="card p-6 bg-white rounded-lg shadow-lg">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">Search Historical Draws by Sum</h2>
+    
+    <form action="{{ url_for('find_results_by_sum_route') }}" method="post" class="space-y-4">
+        <div class="form-group">
+            <label for="target_sum" class="block text-gray-700 text-sm font-bold mb-2">Enter Target Sum:</label>
+            <input type="number" name="target_sum" id="target_sum" min="15" max="345" {# Min sum: 1+2+3+4+5=15, Max sum: 69+68+67+66+65=345 #}
+                   value="{{ target_sum | default('') }}"
+                   class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                   placeholder="e.g., 100">
+        </div>
+        <button type="submit" class="btn-primary w-full mt-4">Find Results</button>
+    </form>
 
     {% if results %}
-        <div class="card mt-6">
-            <h3 class="text-lg font-semibold mb-2 text-gray-700">Draws with Sum: {{ target_sum }}</h3>
-            <table class="table-auto">
-                <thead>
-                    <tr>
-                        <th>Draw Date</th>
-                        <th>Number 1</th>
-                        <th>Number 2</th>
-                        <th>Number 3</th>
-                        <th>Number 4</th>
-                        <th>Number 5</th>
-                        <th>Sum</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in results %}
+        <div class="mt-8">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">Draws with Sum: {{ target_sum }}</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
+                    <thead class="bg-gray-100">
                         <tr>
-                            <td>{{ row['Draw Date'] }}</td>
-                            <td>{{ row['Number 1'] }}</td>
-                            <td>{{ row['Number 2'] }}</td>
-                            <td>{{ row['Number 3'] }}</td>
-                            <td>{{ row['Number 4'] }}</td>
-                            <td>{{ row['Number 5'] }}</td>
-                            <td>{{ row['Sum'] }}</td>
+                            <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Draw Date</th>
+                            <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">White Balls</th>
+                            <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Powerball</th>
+                            <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Sum</th>
                         </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {% for row in results %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ row['Draw Date'] }}</td>
+                            <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
+                                <span class="ball-sm">{{ row['Number 1'] }}</span>
+                                <span class="ball-sm">{{ row['Number 2'] }}</span>
+                                <span class="ball-sm">{{ row['Number 3'] }}</span>
+                                <span class="ball-sm">{{ row['Number 4'] }}</span>
+                                <span class="ball-sm">{{ row['Number 5'] }}</span>
+                            </td>
+                            <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
+                                {# Assuming Powerball can be derived or passed. For now, it's not directly in find_results_by_sum's return, but for consistency, we'd need it. #}
+                                {# If Powerball is not available in the 'results' dictionary, you might need to adjust find_results_by_sum function in index.py to include it. #}
+                                {# For now, adding a placeholder. #}
+                                <span class="ball-sm powerball-sm">{{ row.get('Powerball', 'N/A') }}</span>
+                            </td>
+                            <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ row['Sum'] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     {% elif target_sum is not none %} {# Only show if a search was attempted but no results #}
-        <div class="card mt-6">
-            <p class="text-gray-500">No draws found with a sum of {{ target_sum }}.</p>
+        <div class="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
+            No draws found with a sum of {{ target_sum }}.
         </div>
     {% endif %}
+
+    {# Add the small ball styles directly here as they are specific to this page and find_results_by_first_white_ball.html #}
+    <style>
+        .ball-sm {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 30px; /* Smaller size */
+            height: 30px; /* Smaller size */
+            background-color: #f0f0f0;
+            border-radius: 50%;
+            border: 1px solid #ccc;
+            font-weight: bold;
+            color: #333;
+            margin: 2px;
+            font-size: 0.8em; /* Smaller font */
+        }
+        .powerball-sm {
+            background-color: #ef4444; /* Red color for powerball */
+            color: white;
+            border-color: #dc2626;
+        }
+    </style>
+</div>
 {% endblock %}
