@@ -776,7 +776,7 @@ def get_consecutive_numbers_trends(df_source, last_draw_date_str):
     print(f"[DEBUG-ConsecutiveTrends] Generated {len(trend_data)} trend data points.")
     return trend_data
 
-def get_most_frequent_triplets(df_source, top_n=10):
+def get_most_frequent_triplets(df_source): # Removed top_n parameter
     print("[DEBUG-Triplets] Inside get_most_frequent_triplets function.")
     if df_source.empty:
         print("[DEBUG-Triplets] df_source is empty. Returning empty list.")
@@ -793,13 +793,13 @@ def get_most_frequent_triplets(df_source, top_n=10):
     sorted_triplets = sorted(triplet_counts.items(), key=lambda x: x[1], reverse=True)
     
     formatted_triplets = []
-    for triplet, count in sorted_triplets[:top_n]:
+    for triplet, count in sorted_triplets: # Iterate through all sorted triplets
         formatted_triplets.append({
             'triplet': list(triplet),
             'count': int(count)
         })
     
-    print(f"[DEBUG-Triplets] Found {len(triplet_counts)} unique triplets. Returning top {len(formatted_triplets)}.")
+    print(f"[DEBUG-Triplets] Found {len(triplet_counts)} unique triplets. Returning all {len(formatted_triplets)}.")
     return formatted_triplets
 
 
@@ -1856,7 +1856,7 @@ def consecutive_trends_route():
 
 @app.route('/triplets_analysis')
 def triplets_analysis_route():
-    triplets_data = get_cached_analysis('triplets_analysis', get_most_frequent_triplets, df)
+    triplets_data = get_cached_analysis('triplets_analysis', get_most_frequent_triplets, df) # No top_n passed, will return all
     return render_template('triplets_analysis.html',
                            triplets_data=triplets_data)
 
