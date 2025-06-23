@@ -8,7 +8,7 @@
 <div class="card p-6 bg-white rounded-lg shadow-lg">
     <h2 class="text-2xl font-bold mb-4 text-gray-800">Search Historical Draws by Sum</h2>
     
-    <form action="{{ url_for('sum_of_main_balls_route') }}" method="post" class="space-y-4">
+    <form action="{{ url_for('find_results_by_sum_route') }}" method="post" class="space-y-4">
         <div class="form-group">
             <label for="target_sum" class="block text-gray-700 text-sm font-bold mb-2">Enter Target Sum (15-345):</label>
             <input type="number" name="target_sum" id="target_sum" min="15" max="345" 
