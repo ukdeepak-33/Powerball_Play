@@ -468,7 +468,7 @@ def sum_of_main_balls(df_source):
     max_sum = int(temp_df['Sum'].max()) if not temp_df['Sum'].empty else 0
     avg_sum = round(temp_df['Sum'].mean(), 2) if not temp_df['Sum'].empty else 0.0
 
-    return temp_df[['Draw Date', 'Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Powerball', 'Sum']], sum_freq_list, min_sum, max_sum, avg_sum
+    return temp_df[['Draw Date', 'Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Powerball', 'Sum', 'Draw Date_dt']], sum_freq_list, min_sum, max_sum, avg_sum
 
 def find_results_by_sum(df_source, target_sum):
     if df_source.empty: return pd.DataFrame()
@@ -482,7 +482,7 @@ def find_results_by_sum(df_source, target_sum):
     
     results = temp_df[temp_df['Sum'] == target_sum]
     # Return all necessary columns for rendering, including Powerball
-    return results[['Draw Date', 'Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Powerball', 'Sum']]
+    return results[['Draw Date', 'Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Powerball', 'Sum', 'Draw Date_dt']]
 
 def simulate_multiple_draws(df_source, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, num_draws=100):
     if df_source.empty: return pd.Series([], dtype=int)
@@ -1691,10 +1691,35 @@ def monthly_white_ball_analysis_route():
                            monthly_balls=monthly_balls,
                            monthly_balls_json=monthly_balls_json)
 
-@app.route('/sum_of_main_balls', methods=['GET', 'POST']) # Added methods=['GET', 'POST']
+# New/Modified route for the overall Sum of Main Balls analysis (with chart and full table)
+@app.route('/sum_of_main_balls_analysis')
 def sum_of_main_balls_route():
     if df.empty:
-        flash("Cannot display Sum of Main Balls: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        flash("Cannot display Sum of Main Balls Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    # Get all sum data and frequencies for the chart and full table
+    sums_data_df, sum_freq_list, min_sum, max_sum, avg_sum = get_cached_analysis('sum_of_main_balls_data', sum_of_main_balls, df)
+    
+    # Convert DataFrame for template rendering for the table
+    sums_data = sums_data_df.to_dict('records') 
+    
+    # Convert sum frequency data to JSON string for Chart.js
+    sum_freq_json = json.dumps(sum_freq_list)
+
+    return render_template('sum_of_main_balls.html', # This will be the new template
+                           sums_data=sums_data,
+                           sum_freq_json=sum_freq_json,
+                           min_sum=min_sum,
+                           max_sum=max_sum,
+                           avg_sum=avg_sum)
+
+
+# This route remains for the search-by-sum functionality
+@app.route('/find_results_by_sum', methods=['GET', 'POST'])
+def find_results_by_sum_route():
+    if df.empty:
+        flash("Cannot display Search by Sum: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
     results = []
