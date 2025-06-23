@@ -1,255 +1,121 @@
 {% extends "base.html" %}
 
-{% block title %}Powerball Analysis{% endblock %}
+{% block title %}Number Age Distribution{% endblock %}
 
-{% block page_heading %}Powerball Generator & Analysis{% endblock %}
+{% block page_heading %}Draws Since Last Appearance (Number Age Distribution){% endblock %}
 
 {% block content %}
-<div class="space-y-8">
-    <!-- Last Draw Display -->
-    <div class="card bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6 rounded-lg shadow-xl animate-fade-in">
-        <h2 class="text-3xl font-bold mb-4 text-center">Last Official Powerball Draw</h2>
-        <div class="flex flex-wrap justify-center items-center space-x-2 sm:space-x-4 mb-4">
-            {% if last_draw['Draw Date'] and last_draw['Draw Date'] != 'N/A' %}
-                <span class="text-xl font-semibold">{{ last_draw['Draw Date'] }}</span>
-                <div class="draw-numbers mt-2 sm:mt-0">
-                    {% for number in last_draw['Numbers'] %}
-                        <span class="ball bg-blue-200 text-blue-900 border-blue-400">{{ number }}</span>
-                    {% endfor %}
-                    <span class="ball powerball bg-red-600 text-white border-red-800">{{ last_draw['Powerball'] }}</span>
-                </div>
-            {% else %}
-                <p class="text-center text-lg">No historical data loaded. Please check Supabase connection or add a manual draw.</p>
-            {% endif %}
-        </div>
-        <div class="text-center">
-            <a href="{{ url_for('update_powerball_data') }}" class="btn-primary inline-block bg-green-500 hover:bg-green-600">Update Latest Draw from Supabase (Simulated)</a>
-            <button onclick="document.getElementById('manualDrawModal').classList.remove('hidden')" class="btn-primary inline-block bg-purple-500 hover:bg-purple-600 ml-4">Add Manual Official Draw</button>
-        </div>
-    </div>
-
-    <!-- Generate Numbers Section -->
-    <div class="card">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Generate New Numbers</h2>
-        <form action="{{ url_for('generate') }}" method="post" class="space-y-4">
-            <div class="form-group">
-                <label for="odd_even_choice" class="form-label">Odd/Even Balance:</label>
-                <select name="odd_even_choice" id="odd_even_choice" class="form-input">
-                    <option value="Any">Any</option>
-                    <option value="All Even">All Even</option>
-                    <option value="All Odd">All Odd</option>
-                    <option value="3 Even / 2 Odd">3 Even / 2 Odd</option>
-                    <option value="3 Odd / 2 Even">3 Odd / 2 Even</option>
-                    <option value="1 Even / 4 Odd">1 Even / 4 Odd</option>
-                    <option value="1 Odd / 4 Even">1 Odd / 4 Even</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="high_low_balance" class="form-label">High/Low Balance (e.g., "2 3" for 2 Low, 3 High):</label>
-                <input type="text" name="high_low_balance" id="high_low_balance" class="form-input" placeholder="e.g., 2 3">
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="form-group">
-                    <label for="white_ball_min" class="form-label">White Ball Min (1-69):</label>
-                    <input type="number" name="white_ball_min" id="white_ball_min" class="form-input" value="1" min="1" max="69">
-                </div>
-                <div class="form-group">
-                    <label for="white_ball_max" class="form-label">White Ball Max (1-69):</label>
-                    <input type="number" name="white_ball_max" id="white_ball_max" class="form-input" value="69" min="1" max="69">
-                </div>
-                <div class="form-group">
-                    <label for="powerball_min" class="form-label">Powerball Min (1-26):</label>
-                    <input type="number" name="powerball_min" id="powerball_min" class="form-input" value="1" min="1" max="26">
-                </div>
-                <div class="form-group">
-                    <label for="powerball_max" class="form-label">Powerball Max (1-26):</label>
-                    <input type="number" name="powerball_max" id="powerball_max" class="form-input" value="26" min="1" max="26">
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="excluded_numbers" class="form-label">Exclude Numbers (comma-separated):</label>
-                <input type="text" name="excluded_numbers" id="excluded_numbers" class="form-input" placeholder="e.g., 1, 13, 27">
-            </div>
-
-            <button type="submit" class="btn-primary w-full">Generate Numbers</button>
-        </form>
-    </div>
-
-    <!-- Group A Strategy -->
-    <div class="card">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Generate with Group A Strategy</h2>
-        <p class="text-gray-600 mb-4">This strategy ensures at least 2 numbers from the "Group A" list are included (3, 5, 6, 7, 9, 11, 15, 16, 18, 21, 23, 24, 27, 31, 32, 33, 36, 42, 44, 45, 48, 50, 51, 54, 55, 60, 66, 69).</p>
-        <form action="{{ url_for('generate_group_a_strategy_route') }}" method="post" class="space-y-4">
-            <div class="form-group">
-                <label for="num_from_group_a" class="form-label">Number of balls from Group A (1-5):</label>
-                <input type="number" name="num_from_group_a" id="num_from_group_a" class="form-input" value="2" min="1" max="5">
-            </div>
-            <!-- Re-using global range and excluded numbers from the first form if needed -->
-            <button type="submit" class="btn-primary w-full">Generate using Group A</button>
-        </form>
-    </div>
-
-    <!-- Modify an Existing Combination Section -->
-    <div class="card">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Modify Existing Combination</h2>
-        <p class="text-gray-600 mb-4">This will pick a random historical draw, modify 3 white balls and the Powerball, and present a new combination.</p>
-        <form action="{{ url_for('generate_modified') }}" method="post">
-            <button type="submit" class="btn-primary w-full">Modify Random Historical Combination</button>
-        </form>
-
-        <h3 class="text-xl font-semibold mb-3 mt-8 text-gray-800">Generate from Your Starting Pair</h3>
-        <p class="text-gray-600 mb-4">Enter two white balls, and the application will generate the remaining three white balls and a Powerball to form a unique combination.</p>
-        <form action="{{ url_for('generate_with_user_pair') }}" method="post" class="space-y-4">
-            <div class="form-group">
-                <label for="user_pair" class="form-label">Your Two White Balls (e.g., "18, 19"):</label>
-                <input type="text" name="user_pair" id="user_pair" class="form-input" placeholder="e.g., 23, 45" required>
-            </div>
-            <button type="submit" class="btn-primary w-full">Generate from My Pair</button>
-        </form>
-    </div>
-
-
-    <!-- Generated Numbers Display -->
-    {% if white_balls and powerball %}
-    <div class="card bg-indigo-500 text-white p-6 rounded-lg shadow-xl animate-fade-in">
-        <h2 class="text-3xl font-bold mb-4 text-center">Your Generated Numbers</h2>
-        <div class="flex flex-wrap justify-center items-center space-x-2 sm:space-x-4 mb-4">
-            {% for number in white_balls %}
-                <span class="ball bg-green-200 text-green-900 border-green-400">{{ number }}</span>
-            {% endfor %}
-            <span class="ball powerball bg-red-600 text-white border-red-800">{{ powerball }}</span>
-        </div>
-
-        <div class="text-center mb-6">
-            <h3 class="text-xl font-semibold mb-2">Last Drawn Dates for Your Numbers:</h3>
-            <ul class="list-disc list-inside inline-block text-left">
-                {% for key, value in last_draw_dates.items() %}
-                    <li><strong>{{ key }}:</strong> {{ value }}</li>
-                {% endfor %}
-            </ul>
-        </div>
-
-        <form action="{{ url_for('save_generated_pick_route') }}" method="post" class="mt-4 flex flex-col items-center">
-            <input type="hidden" name="generated_white_balls" value="{{ white_balls | join(',') }}">
-            <input type="hidden" name="generated_powerball" value="{{ powerball }}">
-            <button type="submit" class="btn-primary bg-yellow-500 hover:bg-yellow-600">Save Generated Numbers</button>
-        </form>
-        <p class="text-sm text-center text-gray-200 mt-2">
-            Saving these numbers allows you to analyze them against future official draws in the "Generated Numbers History" page.
-        </p>
-
-        <!-- Analyze Against Historical Draws (AJAX) -->
-        <div class="mt-8 pt-6 border-t border-indigo-400">
-            <h3 class="text-2xl font-bold mb-4 text-center">Analyze Your Generated Numbers Against Historical Draws</h3>
-            <p class="text-center text-gray-200 mb-4">See how your generated numbers would have performed in the last 2 years.</p>
-            <div class="text-center">
-                <button id="analyzeHistoricalBtn" class="btn-primary bg-orange-500 hover:bg-orange-600">
-                    Analyze Now
-                </button>
-            </div>
-            <div id="historicalAnalysisResults" class="mt-4 hidden">
-                <h4 class="text-xl font-semibold mb-3 text-center">Match Summary (Last 2 Years):</h4>
-                <div id="analysisSummaryContent" class="bg-white text-gray-800 p-4 rounded-lg shadow">
-                    <p class="text-center">Loading results...</p>
-                </div>
-            </div>
-        </div>
-    </div>
+<div class="chart-container">
+    <h2 class="text-xl font-semibold mb-4">Age Distribution of All Balls</h2>
+    {% if number_age_data %}
+        <div id="numberAgeChart"></div>
+    {% else %}
+        <p class="text-gray-500">No number age distribution data available to display chart.</p>
     {% endif %}
+</div>
 
-    <!-- Manual Draw Modal -->
-    <div id="manualDrawModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
-            <h2 class="text-2xl font-bold mb-4 text-gray-800">Add New Official Draw</h2>
-            <form action="{{ url_for('save_official_draw_route') }}" method="post" class="space-y-4">
-                <div class="form-group">
-                    <label for="draw_date" class="form-label">Draw Date:</label>
-                    <input type="date" name="draw_date" id="draw_date" class="form-input" required>
-                </div>
-                <div class="grid grid-cols-3 gap-4">
-                    <div class="form-group"><label for="n1" class="form-label">N1:</label><input type="number" name="n1" class="form-input" min="1" max="69" required></div>
-                    <div class="form-group"><label for="n2" class="form-label">N2:</label><input type="number" name="n2" class="form-input" min="1" max="69" required></div>
-                    <div class="form-group"><label for="n3" class="form-label">N3:</label><input type="number" name="n3" class="form-input" min="1" max="69" required></div>
-                    <div class="form-group"><label for="n4" class="form-label">N4:</label><input type="number" name="n4" class="form-input" min="1" max="69" required></div>
-                    <div class="form-group"><label for="n5" class="form-label">N5:</label><input type="number" name="n5" class="form-input" min="1" max="69" required></div>
-                    <div class="form-group"><label for="pb" class="form-label">PB:</label><input type="number" name="pb" class="form-input" min="1" max="26" required></div>
-                </div>
-                <div class="flex justify-end space-x-4 mt-6">
-                    <button type="button" onclick="document.getElementById('manualDrawModal').classList.add('hidden')" class="btn-primary bg-gray-500 hover:bg-gray-600">Cancel</button>
-                    <button type="submit" class="btn-primary">Save Draw</button>
-                </div>
-            </form>
-        </div>
+<div class="card mt-8">
+    <h3 class="text-xl font-semibold mb-4 text-gray-700">Detailed Ball Ages</h3>
+    
+    {% if detailed_number_ages %}
+    <div class="mb-4">
+        <button id="sortByAgeBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-200 ease-in-out">
+            Sort by Age (Longest First)
+        </button>
     </div>
-
+    <div class="overflow-x-auto shadow-md rounded-lg">
+        <table class="min-w-full divide-y divide-gray-200" id="detailedAgesTable">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Number</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" data-sort="age">Age (Draws Missed) <span class="ml-1 text-gray-400">↑↓</span></th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {# Initial data will be sorted by number by default #}
+                {% for ball in detailed_number_ages %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ ball['number'] }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ ball['type'] }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ ball['age'] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-gray-500">No detailed number age data available.</p>
+    {% endif %}
 </div>
 {% endblock %}
 
 {% block scripts %}
-{{ super() }} {# Keep existing scripts from base.html #}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const analyzeHistoricalBtn = document.getElementById('analyzeHistoricalBtn');
-        const historicalAnalysisResults = document.getElementById('historicalAnalysisResults');
-        const analysisSummaryContent = document.getElementById('analysisSummaryContent');
+        var numberAgeData = [];
+        {% if number_age_data %}
+            try {
+                numberAgeData = JSON.parse('{{ number_age_data | tojson | safe }}');
+            } catch (e) {
+                console.error("Error parsing numberAgeData JSON for chart:", e);
+                numberAgeData = [];
+            }
+        {% endif %}
+        console.log("[D3 Debug] number_age_distribution.html - numberAgeData (for chart):", numberAgeData);
 
-        if (analyzeHistoricalBtn) {
-            analyzeHistoricalBtn.addEventListener('click', async function() {
-                historicalAnalysisResults.classList.remove('hidden');
-                analysisSummaryContent.innerHTML = '<p class="text-center">Loading results...</p>';
+        // Sort data by age for consistent chart display
+        numberAgeData.sort((a, b) => a.age - b.age);
 
-                const generatedWhiteBalls = document.querySelector('input[name="generated_white_balls"]').value;
-                const generatedPowerball = document.querySelector('input[name="generated_powerball"]').value;
+        drawBarChart(numberAgeData, "numberAgeChart", "age", "count", "Draws Since Last Appearance", "Draws Missed", "Number of Balls");
 
-                try {
-                    const response = await fetch('/analyze_generated_historical_matches', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            generated_white_balls: generatedWhiteBalls,
-                            generated_powerball: generatedPowerball
-                        })
-                    });
-                    const result = await response.json();
+        var detailedNumberAges = [];
+        {% if detailed_number_ages %}
+            try {
+                // Ensure the data passed is parsed correctly. Flask's tojson handles lists of dicts well.
+                detailedNumberAges = {{ detailed_number_ages | tojson | safe }};
+            } catch (e) {
+                console.error("Error parsing detailedNumberAges JSON for table:", e);
+                detailedNumberAges = [];
+            }
+        {% endif %}
+        console.log("[D3 Debug] number_age_distribution.html - detailedNumberAges (for table):", detailedNumberAges);
 
-                    if (result.success) {
-                        let summaryHtml = '<ul class="list-disc list-inside space-y-1">';
-                        for (const category in result.match_summary) {
-                            const count = result.match_summary[category].count;
-                            if (count > 0) {
-                                summaryHtml += `<li><strong>${category}:</strong> ${count} time(s)</li>`;
-                                // Optionally display draw dates for matches if needed
-                                // result.match_summary[category].draws.forEach(draw => {
-                                //     summaryHtml += `<ul><li>(${draw.date}): ${draw.white_balls.join(',')} + PB ${draw.powerball}</li></ul>`;
-                                // });
-                            }
-                        }
-                        summaryHtml += '</ul>';
-                        analysisSummaryContent.innerHTML = summaryHtml;
-                    } else {
-                        analysisSummaryContent.innerHTML = `<p class="text-red-600">Error: ${result.error}</p>`;
-                    }
-                } catch (error) {
-                    console.error('Error fetching historical analysis:', error);
-                    analysisSummaryContent.innerHTML = `<p class="text-red-600">An error occurred during analysis.</p>`;
-                }
+        const tableBody = document.querySelector('#detailedAgesTable tbody');
+        const sortByAgeBtn = document.getElementById('sortByAgeBtn');
+        let isSortedAscending = false; // Tracks current sort order for the button
+
+        function renderTable(data) {
+            tableBody.innerHTML = ''; // Clear existing rows
+            data.forEach(ball => {
+                const row = tableBody.insertRow();
+                row.className = 'hover:bg-gray-50';
+                row.insertCell().textContent = ball.number;
+                row.insertCell().textContent = ball.type;
+                row.insertCell().textContent = ball.age;
             });
         }
 
-        // Set today's date as default for the manual draw date input
-        const drawDateInput = document.getElementById('draw_date');
-        if (drawDateInput) {
-            const today = new Date();
-            const yyyy = today.getFullYear();
-            const mm = String(today.getMonth() + 1).padStart(2, '0'); // Months start at 0!
-            const dd = String(today.getDate()).padStart(2, '0');
-            drawDateInput.value = `${yyyy}-${mm}-${dd}`;
-        }
+        // Initial render (default sort by number, from Python side)
+        // detailedNumberAges is already sorted by number (1-69, then 1-26) due to Python loop order.
+        // If you want to explicitly sort by number in JS:
+        // detailedNumberAges.sort((a, b) => a.number - b.number);
+        renderTable(detailedNumberAges);
+
+        sortByAgeBtn.addEventListener('click', function() {
+            if (isSortedAscending) {
+                // Currently sorted ascending by age, click makes it sort descending
+                detailedNumberAges.sort((a, b) => b.age - a.age); // Sort descending
+                sortByAgeBtn.textContent = 'Sort by Age (Shortest First)';
+                isSortedAscending = false;
+            } else {
+                // Currently unsorted or sorted descending, click makes it sort ascending
+                detailedNumberAges.sort((a, b) => a.age - b.age); // Sort ascending
+                sortByAgeBtn.textContent = 'Sort by Age (Longest First)';
+                isSortedAscending = true;
+            }
+            renderTable(detailedNumberAges);
+        });
     });
 </script>
 {% endblock %}
