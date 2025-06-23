@@ -108,7 +108,7 @@
         <div class="card p-6 bg-white rounded-lg shadow-lg">
             <h2 class="text-xl font-bold mb-4 text-gray-800">Generate from Group A</h2>
             <p class="text-gray-600 mb-4">Generate numbers with a specified count of 'Group A' numbers.</p>
-            <form action="{{ url_for('generate_group_a_strategy') }}" method="post" class="space-y-4">
+            <form action="{{ url_for('generate_group_a_strategy_route') }}" method="post" class="space-y-4"> {# Corrected endpoint name here #}
                 <div class="form-group">
                     <label for="num_from_group_a" class="form-label">Numbers from Group A (min 2):</label>
                     <input type="number" name="num_from_group_a" id="num_from_group_a" min="2" max="5" value="2" class="form-input">
@@ -124,7 +124,7 @@
         {# Generate from Your Starting Pair Card #}
         <div class="card p-6 bg-white rounded-lg shadow-lg">
             <h2 class="text-xl font-bold mb-4 text-gray-800">Generate from Your Starting Pair</h2>
-            <p class="text-gray-600 mb-4">Provide two white balls to start your combination. The remaining three white balls and the Powerball will be randomly generated, ensuring the complete set of 5 white balls is unique historically.</p>
+            <p class="text-gray-600 mb-4">Provided two white balls to start your combination. The remaining three white balls and the Powerball will be randomly generated, ensuring the complete set of 5 white balls is unique historically.</p>
             <form action="{{ url_for('generate_with_user_pair_route') }}" method="post" class="space-y-4">
                 <div class="form-group">
                     <label for="user_pair" class="form-label">Enter Two White Balls (comma-separated, e.g., 18, 19):</label>
