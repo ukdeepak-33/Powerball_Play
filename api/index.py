@@ -1279,8 +1279,7 @@ def check_generated_against_history(generated_white_balls, generated_powerball, 
         elif white_matches == 0 and powerball_match == 1:
             category = "Match Powerball Only"
         
-        # Corrected lines: access 'summary' through the 'results' dictionary
-        results["summary"][category]["count"] += 1
+        summary[category]["count"] += 1
         results["summary"][category]["draws"].append({
             "date": historical_draw_date,
             "white_balls": historical_white_balls,
@@ -1377,10 +1376,10 @@ def initialize_core_data():
             df = df_temp
             last_draw = get_last_draw(df)
             # Ensure last_draw has 'Numbers' formatted for display
-            if not last_draw.empty and last_draw.get('Draw Date') != 'N/A':
-                # No need to convert to_datetime here, just strftime if it's not 'N/A'
+            if not last_draw.empty and 'Draw Date_dt' in last_draw and pd.notna(last_draw['Draw Date_dt']):
                 last_draw['Draw Date'] = last_draw['Draw Date_dt'].strftime('%Y-%m-%d')
-                # The get_last_draw already sets 'Numbers'
+            else:
+                 last_draw['Draw Date'] = 'N/A' # Fallback for display if datetime conversion fails
             print("Core historical data loaded successfully.")
         else:
             print("Core historical data is empty after loading. df remains empty.")
@@ -1542,6 +1541,7 @@ def generate_with_user_pair_route():
         if not user_pair_str:
             raise ValueError("Please enter two numbers for the starting pair.")
         
+        # Use a regex or more robust split if needed, but for 'X, Y' split(',') is fine
         pair_parts = [int(num.strip()) for num in user_pair_str.split(',') if num.strip().isdigit()]
         if len(pair_parts) != 2:
             raise ValueError("Please enter exactly two numbers for the pair, separated by a comma (e.g., '18, 19').")
@@ -1691,15 +1691,15 @@ def monthly_white_ball_analysis_route():
                            monthly_balls=monthly_balls,
                            monthly_balls_json=monthly_balls_json)
 
-@app.route('/sum_of_main_balls')
+@app.route('/sum_of_main_balls', methods=['GET', 'POST']) # Added methods=['GET', 'POST']
 def sum_of_main_balls_route():
     if df.empty:
         flash("Cannot display Sum of Main Balls: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
-    # Retrieve target_sum and sort_by from form if it's a POST request
+    results = []
     target_sum_display = None
-    selected_sort_by = request.args.get('sort_by', 'date_desc') # Default sort
+    selected_sort_by = request.args.get('sort_by', 'date_desc') # Default sort for GET requests or initial load
 
     if request.method == 'POST':
         target_sum_str = request.form.get('target_sum')
@@ -1747,11 +1747,10 @@ def sum_of_main_balls_route():
             target_sum_display = None # Reset display value
     else: # GET request, no search yet or initial page load
         results = []
-        target_sum_display = None # Initial state: no target sum
-        selected_sort_by = 'date_desc' # Keep default sort for initial page load
+        target_sum_display = None 
     
     # Pass all necessary data to the template
-    return render_template('find_results_by_sum.html', 
+    return render_template('find_results_by_sum.html', # This is the correct template for search by sum
                            results=results,
                            target_sum=target_sum_display,
                            selected_sort_by=selected_sort_by)
@@ -1779,48 +1778,50 @@ def simulate_multiple_draws_route():
                            simulated_freq=simulated_freq_list, 
                            num_simulations=num_draws_display)
 
-@app.route('/winning_probability', methods=['GET', 'POST'])
-def winning_probability_route():
-    current_white_ball_range = GLOBAL_WHITE_BALL_RANGE
-    current_powerball_range = GLOBAL_POWERBALL_RANGE
+# Commented out as requested
+# @app.route('/winning_probability', methods=['GET', 'POST'])
+# def winning_probability_route():
+#     current_white_ball_range = GLOBAL_WHITE_BALL_RANGE
+#     current_powerball_range = GLOBAL_POWERBALL_RANGE
     
-    if request.method == 'POST':
-        try:
-            wb_min = int(request.form.get('white_ball_min', GLOBAL_WHITE_BALL_RANGE[0]))
-            wb_max = int(request.form.get('white_ball_max', GLOBAL_WHITE_BALL_RANGE[1]))
-            pb_min = int(request.form.get('powerball_min', GLOBAL_POWERBALL_RANGE[0]))
-            pb_max = int(request.form.get('powerball_max', GLOBAL_POWERBALL_RANGE[1]))
+#     if request.method == 'POST':
+#         try:
+#             wb_min = int(request.form.get('white_ball_min', GLOBAL_WHITE_BALL_RANGE[0]))
+#             wb_max = int(request.form.get('white_ball_max', GLOBAL_WHITE_BALL_RANGE[1]))
+#             pb_min = int(request.form.get('powerball_min', GLOBAL_POWERBALL_RANGE[0]))
+#             pb_max = int(request.form.get('powerball_max', GLOBAL_POWERBALL_RANGE[1]))
 
-            if not (1 <= wb_min <= wb_max <= 69 and 1 <= pb_min <= pb_max <= 26):
-                flash("Invalid range inputs. White ball range must be 1-69 and Powerball 1-26, and min <= max.", 'error')
-                wb_min, wb_max = GLOBAL_WHITE_BALL_RANGE
-                pb_min, pb_max = GLOBAL_POWERBALL_RANGE
+#             if not (1 <= wb_min <= wb_max <= 69 and 1 <= pb_min <= pb_max <= 26):
+#                 flash("Invalid range inputs. White ball range must be 1-69 and Powerball 1-26, and min <= max.", 'error')
+#                 wb_min, wb_max = GLOBAL_WHITE_BALL_RANGE
+#                 pb_min, pb_max = GLOBAL_POWERBALL_RANGE
             
-            current_white_ball_range = (wb_min, wb_max)
-            current_powerball_range = (pb_min, pb_max)
+#             current_white_ball_range = (wb_min, wb_max)
+#             current_powerball_range = (pb_min, pb_max)
 
-        except ValueError:
-            flash("Invalid number format for range inputs. Please enter integers.", 'error')
-            current_white_ball_range = GLOBAL_WHITE_BALL_RANGE
-            current_powerball_range = GLOBAL_POWERBALL_RANGE
+#         except ValueError:
+#             flash("Invalid number format for range inputs. Please enter integers.", 'error')
+#             current_white_ball_range = GLOBAL_WHITE_BALL_RANGE
+#             current_powerball_range = GLOBAL_POWERBALL_RANGE
     
-    cache_key = f"winning_probability_{current_white_ball_range[0]}-{current_white_ball_range[1]}_{current_powerball_range[0]}-{current_powerball_range[1]}"
+#     cache_key = f"winning_probability_{current_white_ball_range[0]}-{current_white_ball_range[1]}_{current_powerball_range[0]}-{current_powerball_range[1]}"
     
-    probability_1_in_x, probability_percentage = get_cached_analysis(
-        cache_key, winning_probability, current_white_ball_range, current_powerball_range
-    )
+#     probability_1_in_x, probability_percentage = get_cached_analysis(
+#         cache_key, winning_probability, current_white_ball_range, current_powerball_range
+#     )
 
-    return render_template('winning_probability.html', 
-                           probability_1_in_x=probability_1_in_x, 
-                           probability_percentage=probability_percentage,
-                           white_ball_range=current_white_ball_range,
-                           powerball_range=current_powerball_range)
+#     return render_template('winning_probability.html', 
+#                            probability_1_in_x=probability_1_in_x, 
+#                            probability_percentage=probability_percentage,
+#                            white_ball_range=current_white_ball_range,
+#                            powerball_range=current_powerball_range)
 
-@app.route('/partial_match_probabilities')
-def partial_match_probabilities_route():
-    probabilities = get_cached_analysis('partial_match_probabilities', partial_match_probabilities, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE)
-    return render_template('partial_match_probabilities.html', 
-                           probabilities=probabilities)
+# Commented out as requested
+# @app.route('/partial_match_probabilities')
+# def partial_match_probabilities_route():
+#     probabilities = get_cached_analysis('partial_match_probabilities', partial_match_probabilities, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE)
+#     return render_template('partial_match_probabilities.html', 
+#                            probabilities=probabilities)
 
 @app.route('/number_age_distribution')
 def number_age_distribution_route():
