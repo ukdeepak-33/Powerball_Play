@@ -208,7 +208,9 @@
                 <li><a href="{{ url_for('frequency_analysis_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Frequency Analysis</a></li>
                 <li><a href="{{ url_for('hot_cold_numbers_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Hot/Cold Numbers</a></li>
                 <li><a href="{{ url_for('monthly_white_ball_analysis_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Monthly WB Analysis</a></li>
-                <li><a href="{{ url_for('sum_of_main_balls_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Search by Sum of WB</a></li> {# Updated text #}
+                {# Added two separate links for sum functionalities #}
+                <li><a href="{{ url_for('sum_of_main_balls_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Sum of Main Balls Analysis</a></li>
+                <li><a href="{{ url_for('find_results_by_sum_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Search by Sum of WB</a></li>
                 <li><a href="{{ url_for('simulate_multiple_draws_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Simulate Draws</a></li>
                 {# Hiding Winning Probability as requested #}
                 {# <li><a href="{{ url_for('winning_probability_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Winning Probability</a></li> #}
