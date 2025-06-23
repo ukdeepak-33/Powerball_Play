@@ -8,7 +8,7 @@
 <div class="chart-container">
     <h2 class="text-xl font-semibold mb-4">Age Distribution of All Balls</h2>
     {% if number_age_data %}
-        <div id="numberAgeChart"></div>
+        <canvas id="numberAgeChartCanvas" width="800" height="400"></canvas>
     {% else %}
         <p class="text-gray-500">No number age distribution data available to display chart.</p>
     {% endif %}
@@ -18,7 +18,10 @@
     <h3 class="text-xl font-semibold mb-4 text-gray-700">Detailed Ball Ages</h3>
     
     {% if detailed_number_ages %}
-    <div class="mb-4">
+    <div class="mb-4 flex flex-wrap gap-2">
+        <button id="sortByNumberBtn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-200 ease-in-out">
+            Sort by Number
+        </button>
         <button id="sortByAgeBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-200 ease-in-out">
             Sort by Age (Longest First)
         </button>
@@ -29,20 +32,12 @@
                 <tr>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Number</th>
                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" data-sort="age">Age (Draws Missed) <span class="ml-1 text-gray-400">↑↓</span></th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Drawn Date</th> {# New column header #}
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Age (Draws Missed)</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Drawn Date</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-                {# Initial data will be sorted by number by default #}
-                {% for ball in detailed_number_ages %}
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ ball['number'] }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ ball['type'] }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ ball['age'] }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ ball['last_drawn_date'] }}</td> {# New data cell #}
-                </tr>
-                {% endfor %}
+                {# Initial render will be handled by JavaScript #}
             </tbody>
         </table>
     </div>
@@ -58,34 +53,89 @@
         var numberAgeData = [];
         {% if number_age_data %}
             try {
-                numberAgeData = JSON.parse('{{ number_age_data | tojson | safe }}');
+                // Ensure data is parsed correctly for Chart.js
+                numberAgeData = {{ number_age_data | tojson | safe }};
             } catch (e) {
                 console.error("Error parsing numberAgeData JSON for chart:", e);
                 numberAgeData = [];
             }
         {% endif %}
-        console.log("[D3 Debug] number_age_distribution.html - numberAgeData (for chart):", numberAgeData);
 
-        // Sort data by age for consistent chart display
-        numberAgeData.sort((a, b) => a.age - b.age);
+        // Prepare data for Chart.js
+        const chartLabels = numberAgeData.map(d => d.age);
+        const chartCounts = numberAgeData.map(d => d.count);
 
-        drawBarChart(numberAgeData, "numberAgeChart", "age", "count", "Draws Since Last Appearance", "Draws Missed", "Number of Balls");
+        const ctx = document.getElementById('numberAgeChartCanvas').getContext('2d');
+        const numberAgeChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: chartLabels,
+                datasets: [{
+                    label: 'Number of Balls',
+                    data: chartCounts,
+                    backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Age Distribution of All Balls (Draws Missed)',
+                        font: {
+                            size: 16
+                        }
+                    },
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Age (Draws Missed)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return value;
+                            }
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Number of Balls'
+                        }
+                    }
+                }
+            }
+        });
 
+        // Detailed Ages Table Logic
         var detailedNumberAges = [];
         {% if detailed_number_ages %}
             try {
-                // Ensure the data passed is parsed correctly. Flask's tojson handles lists of dicts well.
+                // Ensure the data passed is parsed correctly.
                 detailedNumberAges = {{ detailed_number_ages | tojson | safe }};
             } catch (e) {
                 console.error("Error parsing detailedNumberAges JSON for table:", e);
                 detailedNumberAges = [];
             }
         {% endif %}
-        console.log("[D3 Debug] number_age_distribution.html - detailedNumberAges (for table):", detailedNumberAges);
+        
+        // Make a deep copy to preserve original order for "Sort by Number"
+        const originalDetailedNumberAges = JSON.parse(JSON.stringify(detailedNumberAges));
+
 
         const tableBody = document.querySelector('#detailedAgesTable tbody');
         const sortByAgeBtn = document.getElementById('sortByAgeBtn');
-        let isSortedAscending = false; // Tracks current sort order for the button
+        const sortByNumberBtn = document.getElementById('sortByNumberBtn'); // Get the new button
+        let isAgeSortedAscending = false; // Tracks current sort order for age button
 
         function renderTable(data) {
             tableBody.innerHTML = ''; // Clear existing rows
@@ -95,28 +145,40 @@
                 row.insertCell().textContent = ball.number;
                 row.insertCell().textContent = ball.type;
                 row.insertCell().textContent = ball.age;
-                row.insertCell().textContent = ball.last_drawn_date; // Add last_drawn_date
+                row.insertCell().textContent = ball.last_drawn_date; // NEW: Add the last drawn date
             });
         }
 
-        // Initial render (default sort by number, from Python side)
-        // detailedNumberAges is already sorted by number (1-69, then 1-26) due to Python loop order.
-        // If you want to explicitly sort by number in JS:
-        // detailedNumberAges.sort((a, b) => a.number - b.number);
+        // Initial render: sort by number by default (as it comes from Python or a dedicated sort)
+        // detailedNumberAges is initially sorted by number (1-69, then 1-26) due to Python loop order.
         renderTable(detailedNumberAges);
 
         sortByAgeBtn.addEventListener('click', function() {
-            if (isSortedAscending) {
+            if (isAgeSortedAscending) {
                 // Currently sorted ascending by age, click makes it sort descending
                 detailedNumberAges.sort((a, b) => b.age - a.age); // Sort descending
                 sortByAgeBtn.textContent = 'Sort by Age (Shortest First)';
-                isSortedAscending = false;
+                isAgeSortedAscending = false;
             } else {
                 // Currently unsorted or sorted descending, click makes it sort ascending
                 detailedNumberAges.sort((a, b) => a.age - b.age); // Sort ascending
                 sortByAgeBtn.textContent = 'Sort by Age (Longest First)';
-                isSortedAscending = true;
+                isAgeSortedAscending = true;
             }
+            renderTable(detailedNumberAages);
+        });
+
+        sortByNumberBtn.addEventListener('click', function() {
+            // Revert to original numerical sort (1-69, then 1-26)
+            detailedNumberAges.sort((a, b) => {
+                if (a.type === b.type) {
+                    return a.number - b.number;
+                }
+                // Sort white balls before powerballs
+                return a.type === 'White Ball' ? -1 : 1;
+            });
+            sortByAgeBtn.textContent = 'Sort by Age (Longest First)'; // Reset age button text
+            isAgeSortedAscending = false; // Reset age sort state
             renderTable(detailedNumberAges);
         });
     });
