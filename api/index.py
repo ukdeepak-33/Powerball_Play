@@ -269,6 +269,70 @@ def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerba
 
     return white_balls, powerball
 
+def generate_with_user_provided_pair(num1, num2, white_ball_range, powerball_range, excluded_numbers, df_source):
+    """
+    Generates a Powerball combination starting with two user-provided white balls.
+    """
+    if df_source.empty:
+        raise ValueError("Cannot generate numbers: Historical data is empty.")
+
+    # Validate user-provided numbers
+    if not (white_ball_range[0] <= num1 <= white_ball_range[1] and
+            white_ball_range[0] <= num2 <= white_ball_range[1]):
+        raise ValueError(f"Provided numbers ({num1}, {num2}) must be within the white ball range ({white_ball_range[0]}-{white_ball_range[1]}).")
+    
+    if num1 == num2:
+        raise ValueError("The two provided white balls must be unique.")
+    
+    if num1 in excluded_numbers or num2 in excluded_numbers:
+        raise ValueError(f"One or both provided numbers ({num1}, {num2}) are in the excluded list.")
+
+    initial_white_balls = sorted([num1, num2])
+    
+    # Create the pool for the remaining three white balls
+    available_for_remaining = [num for num in range(white_ball_range[0], white_ball_range[1] + 1) 
+                               if num not in excluded_numbers and num not in initial_white_balls]
+
+    if len(available_for_remaining) < 3:
+        raise ValueError("Not enough unique numbers available to generate the remaining three white balls.")
+
+    max_attempts = 1000
+    attempts = 0
+    while attempts < max_attempts:
+        try:
+            # Randomly select 3 more unique numbers from the available pool
+            remaining_white_balls = random.sample(available_for_remaining, 3)
+            
+            # Combine and sort all 5 white balls
+            white_balls = sorted(initial_white_balls + remaining_white_balls)
+            
+            # Generate Powerball
+            powerball = random.randint(powerball_range[0], powerball_range[1])
+
+            # Check for exact historical match
+            if check_exact_match(white_balls):
+                attempts += 1
+                continue # Retry if combination already exists historically
+
+            # Check against last draw
+            last_draw_data = get_last_draw(df_source)
+            if not last_draw_data.empty and last_draw_data.get('Draw Date') != 'N/A':
+                last_white_balls = [int(last_draw_data['Number 1']), int(last_draw_data['Number 2']), int(last_draw_data['Number 3']), int(last_draw_data['Number 4']), int(last_draw_data['Number 5'])]
+                if set(white_balls) == set(last_white_balls) and powerball == int(last_draw_data['Powerball']):
+                    attempts += 1
+                    continue
+
+
+            break # Found a valid, unique combination
+        except ValueError as e:
+            print(f"Attempt failed during user-pair strategy: {e}. Retrying...")
+            attempts += 1
+            continue
+    else:
+        raise ValueError("Could not generate a unique combination with the provided pair after many attempts.")
+
+    return white_balls, powerball
+
 
 def check_historical_match(df_source, white_balls, powerball):
     if df_source.empty: return None
@@ -538,7 +602,7 @@ def modify_combination(df_source, white_balls, powerball, white_ball_range, powe
     if len(white_balls) < 5:
         raise ValueError("Initial white balls list is too short for modification.")
 
-    indices_to_modify = random.sample(range(5), 3)
+    indices_to_modify = random.sample(range(5), 3) # Always modify 3 numbers
     
     for i in indices_to_modify:
         attempts = 0
@@ -568,54 +632,8 @@ def modify_combination(df_source, white_balls, powerball, white_ball_range, powe
     
     return white_balls, powerball
 
-def find_common_pairs(df_source, top_n=10):
-    if df_source.empty: return []
-    pair_count = defaultdict(int)
-    for _, row in df_source.iterrows():
-        nums = sorted([int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])])
-        for i in range(len(nums)):
-            for j in range(i + 1, len(nums)):
-                pair = tuple(sorted((nums[i], nums[j])))
-                pair_count[pair] += 1
-    
-    sorted_pairs = sorted(pair_count.items(), key=lambda x: x[1], reverse=True)
-    return [pair[0] for pair in sorted_pairs[:top_n]]
+# Removed find_common_pairs and generate_with_common_pairs as they are no longer used for this feature
 
-def filter_common_pairs_by_range(common_pairs, num_range):
-    filtered_pairs = []
-    if not num_range or len(num_range) != 2:
-        return common_pairs
-        
-    min_val, max_val = num_range
-    for pair in common_pairs:
-        if min_val <= pair[0] <= max_val and min_val <= pair[1] <= max_val:
-            filtered_pairs.append(pair)
-    return filtered_pairs
-
-def generate_with_common_pairs(df_source, common_pairs, white_ball_range, excluded_numbers):
-    if df_source.empty:
-        raise ValueError("Cannot generate numbers with common pairs: Historical data is empty.")
-
-    if not common_pairs:
-        available_numbers = [num for num in range(white_ball_range[0], white_ball_range[1] + 1) if num not in excluded_numbers]
-        if len(available_numbers) < 5:
-             raise ValueError("Not enough numbers to generate 5 white balls after exclusions.")
-        return sorted(random.sample(available_numbers, 5))
-
-    num1, num2 = random.choice(common_pairs)
-    
-    available_numbers = [num for num in range(white_ball_range[0], white_ball_range[1] + 1) 
-                         if num not in excluded_numbers and num not in [num1, num2]]
-    
-    if len(available_numbers) < 3:
-        available_numbers_fallback = [n for n in range(white_ball_range[0], white_ball_range[1] + 1) if n not in excluded_numbers]
-        if len(available_numbers_fallback) < 5:
-            raise ValueError("Not enough numbers to generate 5 white balls even with fallback after exclusions.")
-        return sorted(random.sample(available_numbers_fallback, 5))
-
-    remaining_numbers = random.sample(available_numbers, 3)
-    white_balls = sorted([num1, num2] + remaining_numbers)
-    return white_balls
 
 def get_number_age_distribution(df_source):
     if df_source.empty: return [], []
@@ -626,40 +644,43 @@ def get_number_age_distribution(df_source):
     
     for i in range(1, 70):
         last_appearance_date = None
+        last_appearance_date_str = "N/A" # Default to N/A
         temp_df_filtered = df_source[(df_source['Number 1'].astype(int) == i) | (df_source['Number 2'].astype(int) == i) |
                               (df_source['Number 3'].astype(int) == i) | (df_source['Number 4'].astype(int) == i) |
                               (df_source['Number 5'].astype(int) == i)]
         
         if not temp_df_filtered.empty:
             last_appearance_date = temp_df_filtered['Draw Date_dt'].max()
+            last_appearance_date_str = last_appearance_date.strftime('%Y-%m-%d')
 
         miss_streak_count = 0
         if last_appearance_date is not None:
-            for d_date in reversed(all_draw_dates):
-                if d_date > last_appearance_date:
-                    miss_streak_count += 1
-                else:
-                    break
-            detailed_ages.append({'number': int(i), 'type': 'White Ball', 'age': miss_streak_count})
+            # We need to correctly count missed draws based on *all* unique draw dates
+            # subsequent to the last appearance date.
+            draw_dates_after_last_appearance = [d for d in all_draw_dates if d > last_appearance_date]
+            miss_streak_count = len(draw_dates_after_last_appearance)
+
+            detailed_ages.append({'number': int(i), 'type': 'White Ball', 'age': miss_streak_count, 'last_drawn_date': last_appearance_date_str})
         else:
-            detailed_ages.append({'number': int(i), 'type': 'White Ball', 'age': len(all_draw_dates)})
+            # If never drawn, age is the total number of draws
+            detailed_ages.append({'number': int(i), 'type': 'White Ball', 'age': len(all_draw_dates), 'last_drawn_date': last_appearance_date_str})
 
     for i in range(1, 27):
         last_appearance_date = None
+        last_appearance_date_str = "N/A" # Default to N/A
         temp_df_filtered = df_source[df_source['Powerball'].astype(int) == i]
         if not temp_df_filtered.empty:
             last_appearance_date = temp_df_filtered['Draw Date_dt'].max()
+            last_appearance_date_str = last_appearance_date.strftime('%Y-%m-%d')
 
         miss_streak_count = 0
         if last_appearance_date is not None:
-            for d_date in reversed(all_draw_dates):
-                if d_date > last_appearance_date:
-                    miss_streak_count += 1
-                else:
-                    break
-            detailed_ages.append({'number': int(i), 'type': 'Powerball', 'age': miss_streak_count})
+            draw_dates_after_last_appearance = [d for d in all_draw_dates if d > last_appearance_date]
+            miss_streak_count = len(draw_dates_after_last_appearance)
+
+            detailed_ages.append({'number': int(i), 'type': 'Powerball', 'age': miss_streak_count, 'last_drawn_date': last_appearance_date_str})
         else:
-            detailed_ages.append({'number': int(i), 'type': 'Powerball', 'age': len(all_draw_dates)})
+            detailed_ages.append({'number': int(i), 'type': 'Powerball', 'age': len(all_draw_dates), 'last_drawn_date': last_appearance_date_str})
 
     all_miss_streaks_only = [item['age'] for item in detailed_ages]
     age_counts = pd.Series(all_miss_streaks_only).value_counts().sort_index()
@@ -974,7 +995,7 @@ def _get_official_draw_for_date_from_db(date_str):
         return None
     except Exception as e:
         print(f"An unexpected error occurred in _get_official_draw_for_date_from_db: {e}")
-        return None
+        return []
 
 def analyze_generated_batch_against_official_draw(generated_picks_list, official_draw):
     """
@@ -1187,7 +1208,7 @@ def get_generated_numbers_history():
     except Exception as e:
         print(f"An unexpected error occurred in get_generated_numbers_history: {e}")
         import traceback
-        traceback.print_exc()
+        traceback.traceback_exc()
         return {}
 
 
@@ -1456,22 +1477,10 @@ def generate():
 
 @app.route('/generate_modified', methods=['POST'])
 def generate_modified():
+    # This route now ONLY handles modifying a random historical draw by changing 3 white balls and Powerball.
     if df.empty:
-        flash("Cannot generate modified combination: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        flash("Cannot modify combination: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return render_template('index.html', last_draw=last_draw.to_dict())
-
-    use_common_pairs = request.form.get('use_common_pairs') == 'on'
-    num_range_str = request.form.get('num_range', '')
-    num_range = None
-    if num_range_str:
-        try:
-            parts = [int(num.strip()) for num in num_range_str.split() if num.strip().isdigit()]
-            if len(parts) == 2:
-                num_range = tuple(parts)
-            else:
-                flash("Filter Common Pairs by Range input must be two numbers separated by space (e.g., '1 20').", 'error')
-        except ValueError:
-            flash("Invalid Filter Common Pairs by Range format. Please enter numbers separated by space.", 'error')
 
     white_balls = []
     powerball = None
@@ -1486,37 +1495,16 @@ def generate_modified():
             flash("Historical data is empty, cannot generate or modify numbers.", 'error')
             return render_template('index.html', last_draw=last_draw.to_dict())
 
-
-        if use_common_pairs:
-            common_pairs = find_common_pairs(df, top_n=20)
-            if num_range:
-                common_pairs = filter_common_pairs_by_range(common_pairs, num_range)
-            
-            if not common_pairs:
-                flash("No common pairs found with the specified filter. Generating a random combination instead.", 'info')
-                white_balls, powerball = generate_powerball_numbers(df, group_a, "Any", "No Combo", GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers)
-            else:
-                white_balls = generate_with_common_pairs(df, common_pairs, GLOBAL_WHITE_BALL_RANGE, excluded_numbers)
-                powerball = random.randint(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1])
-        else:
-            white_balls, powerball = modify_combination(df, white_balls_base, powerball_base, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers)
+        white_balls, powerball = modify_combination(df, white_balls_base, powerball_base, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers)
             
         max_attempts_unique = 100
         attempts_unique = 0
         while check_exact_match(white_balls) and attempts_unique < max_attempts_unique:
-            if use_common_pairs:
-                common_pairs_recheck = find_common_pairs(df, top_n=20)
-                if num_range:
-                    common_pairs_recheck = filter_common_pairs_by_range(common_pairs_recheck, num_range)
-                if common_pairs_recheck:
-                    white_balls = generate_with_common_pairs(df, common_pairs_recheck, GLOBAL_WHITE_BALL_RANGE, excluded_numbers)
-                else:
-                    white_balls, powerball = generate_powerball_numbers(df, group_a, "Any", "No Combo", GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers)
-            else:
-                random_row = df.sample(1).iloc[0]
-                white_balls_base = [int(random_row['Number 1']), int(random_row['Number 2']), int(random_row['Number 3']), int(random_row['Number 4']), int(random_row['Number 5'])]
-                powerball_base = int(random_row['Powerball'])
-                white_balls, powerball = modify_combination(df, white_balls_base, powerball_base, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers)
+            # Re-generate from a random historical draw and modify if the new combo is not unique
+            random_row = df.sample(1).iloc[0]
+            white_balls_base = [int(random_row['Number 1']), int(random_row['Number 2']), int(random_row['Number 3']), int(random_row['Number 4']), int(random_row['Number 5'])]
+            powerball_base = int(random_row['Powerball'])
+            white_balls, powerball = modify_combination(df, white_balls_base, powerball_base, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers)
             attempts_unique += 1
         
         if attempts_unique == max_attempts_unique:
@@ -1536,6 +1524,44 @@ def generate_modified():
                             generation_type='modified')
     except ValueError as e:
         flash(str(e), 'error')
+        return render_template('index.html', last_draw=last_draw.to_dict())
+
+
+@app.route('/generate_with_user_pair', methods=['POST'])
+def generate_with_user_pair_route():
+    if df.empty:
+        flash("Cannot generate with provided pair: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return render_template('index.html', last_draw=last_draw.to_dict())
+
+    user_pair_str = request.form.get('user_pair')
+    white_balls = []
+    powerball = None
+    last_draw_dates = {}
+
+    try:
+        if not user_pair_str:
+            raise ValueError("Please enter two numbers for the starting pair.")
+        
+        pair_parts = [int(num.strip()) for num in user_pair_str.split(',') if num.strip().isdigit()]
+        if len(pair_parts) != 2:
+            raise ValueError("Please enter exactly two numbers for the pair, separated by a comma (e.g., '18, 19').")
+        
+        num1, num2 = pair_parts
+
+        white_balls, powerball = generate_with_user_provided_pair(num1, num2, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers, df)
+        last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
+
+        return render_template('index.html', 
+                               white_balls=white_balls, 
+                               powerball=powerball, 
+                               last_draw=last_draw.to_dict(), 
+                               last_draw_dates=last_draw_dates,
+                               generation_type='user_pair')
+    except ValueError as e:
+        flash(str(e), 'error')
+        return render_template('index.html', last_draw=last_draw.to_dict())
+    except Exception as e:
+        flash(f"An unexpected error occurred during pair-based generation: {e}", 'error')
         return render_template('index.html', last_draw=last_draw.to_dict())
 
 
@@ -1686,10 +1712,14 @@ def sum_of_main_balls_route():
 
             # Apply sorting logic
             if not results_df_raw.empty:
+                # Ensure 'Draw Date_dt' exists for sorting by date
+                if 'Draw Date_dt' not in results_df_raw.columns:
+                    results_df_raw['Draw Date_dt'] = pd.to_datetime(results_df_raw['Draw Date'], errors='coerce')
+
                 if selected_sort_by == 'date_desc':
-                    results_df_raw = results_df_raw.sort_values(by='Draw Date', ascending=False)
+                    results_df_raw = results_df_raw.sort_values(by='Draw Date_dt', ascending=False)
                 elif selected_sort_by == 'date_asc':
-                    results_df_raw = results_df_raw.sort_values(by='Draw Date', ascending=True)
+                    results_df_raw = results_df_raw.sort_values(by='Draw Date_dt', ascending=True)
                 elif selected_sort_by == 'balls_asc':
                     # Create a tuple for sorting white balls
                     results_df_raw['WhiteBallsTuple'] = results_df_raw.apply(
@@ -1715,9 +1745,10 @@ def sum_of_main_balls_route():
             flash("Please enter a valid number for Target Sum.", 'error')
             results = [] # Clear results if input is invalid
             target_sum_display = None # Reset display value
-    else: # GET request, no search yet
+    else: # GET request, no search yet or initial page load
         results = []
         target_sum_display = None # Initial state: no target sum
+        selected_sort_by = 'date_desc' # Keep default sort for initial page load
     
     # Pass all necessary data to the template
     return render_template('find_results_by_sum.html', 
@@ -1725,6 +1756,28 @@ def sum_of_main_balls_route():
                            target_sum=target_sum_display,
                            selected_sort_by=selected_sort_by)
 
+@app.route('/simulate_multiple_draws', methods=['GET', 'POST'])
+def simulate_multiple_draws_route():
+    if df.empty:
+        flash("Cannot run simulation: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+
+    simulated_freq_list = []
+    num_draws_display = None
+
+    if request.method == 'POST':
+        num_draws_str = request.form.get('num_draws')
+        if num_draws_str and num_draws_str.isdigit():
+            num_draws = int(num_draws_str)
+            num_draws_display = num_draws
+            simulated_freq = simulate_multiple_draws(df, group_a, "Any", "No Combo", GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers, num_draws)
+            simulated_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in simulated_freq.items()]
+        else:
+            flash("Please enter a valid number for Number of Simulations.", 'error')
+
+    return render_template('simulate_multiple_draws.html', 
+                           simulated_freq=simulated_freq_list, 
+                           num_simulations=num_draws_display)
 
 @app.route('/winning_probability', methods=['GET', 'POST'])
 def winning_probability_route():
