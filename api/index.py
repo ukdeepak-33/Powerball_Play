@@ -1208,7 +1208,7 @@ def get_generated_numbers_history():
     except Exception as e:
         print(f"An unexpected error occurred in get_generated_numbers_history: {e}")
         import traceback
-        traceback.traceback_exc()
+        traceback.print_exc()
         return {}
 
 
@@ -2108,91 +2108,3 @@ def analyze_generated_historical_matches_route():
         import traceback
         traceback.print_exc()
         return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
-
-@app.route('/find_results_by_sum', methods=['GET', 'POST'])
-def find_results_by_sum_route():
-    if df.empty:
-        flash("Cannot find results: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return redirect(url_for('index'))
-
-    results = []
-    target_sum_display = None
-    selected_sort_by = 'date_desc' # Default sort
-
-    if request.method == 'POST':
-        target_sum_str = request.form.get('target_sum')
-        selected_sort_by = request.form.get('sort_by', 'date_desc') # Get sort_by from form submission
-        
-        if target_sum_str and target_sum_str.isdigit():
-            target_sum = int(target_sum_str)
-            target_sum_display = target_sum
-            results_df_raw = find_results_by_sum(df, target_sum)
-
-            # Apply sorting logic
-            if not results_df_raw.empty:
-                # Ensure 'Draw Date_dt' exists for sorting by date
-                if 'Draw Date_dt' not in results_df_raw.columns:
-                    results_df_raw['Draw Date_dt'] = pd.to_datetime(results_df_raw['Draw Date'], errors='coerce')
-
-                if selected_sort_by == 'date_desc':
-                    results_df_raw = results_df_raw.sort_values(by='Draw Date_dt', ascending=False)
-                elif selected_sort_by == 'date_asc':
-                    results_df_raw = results_df_raw.sort_values(by='Draw Date_dt', ascending=True)
-                elif selected_sort_by == 'balls_asc':
-                    # Create a tuple for sorting white balls
-                    results_df_raw['WhiteBallsTuple'] = results_df_raw.apply(
-                        lambda row: tuple(sorted([
-                            int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
-                            int(row['Number 4']), int(row['Number 5'])
-                        ])), axis=1
-                    )
-                    results_df_raw = results_df_raw.sort_values(by='WhiteBallsTuple', ascending=True)
-                    results_df_raw = results_df_raw.drop(columns=['WhiteBallsTuple'])
-                elif selected_sort_by == 'balls_desc':
-                    results_df_raw['WhiteBallsTuple'] = results_df_raw.apply(
-                        lambda row: tuple(sorted([
-                            int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
-                            int(row['Number 4']), int(row['Number 5'])
-                        ])), axis=1
-                    )
-                    results_df_raw = results_df_raw.sort_values(by='WhiteBallsTuple', ascending=False)
-                    results_df_raw = results_df_raw.drop(columns=['WhiteBallsTuple'])
-            
-            results = results_df_raw.to_dict('records')
-        else:
-            flash("Please enter a valid number for Target Sum.", 'error')
-            results = [] # Clear results if input is invalid
-            target_sum_display = None # Reset display value
-    else: # GET request, no search yet or initial page load
-        results = []
-        target_sum_display = None # Initial state: no target sum
-        selected_sort_by = 'date_desc' # Keep default sort for initial page load
-    
-    # Pass all necessary data to the template
-    return render_template('find_results_by_sum.html', 
-                           results=results,
-                           target_sum=target_sum_display,
-                           selected_sort_by=selected_sort_by)
-
-@app.route('/simulate_multiple_draws', methods=['GET', 'POST'])
-def simulate_multiple_draws_route():
-    if df.empty:
-        flash("Cannot run simulation: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return redirect(url_for('index'))
-
-    simulated_freq_list = []
-    num_draws_display = None
-
-    if request.method == 'POST':
-        num_draws_str = request.form.get('num_draws')
-        if num_draws_str and num_draws_str.isdigit():
-            num_draws = int(num_draws_str)
-            num_draws_display = num_draws
-            simulated_freq = simulate_multiple_draws(df, group_a, "Any", "No Combo", GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers, num_draws)
-            simulated_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in simulated_freq.items()]
-        else:
-            flash("Please enter a valid number for Number of Simulations.", 'error')
-
-    return render_template('simulate_multiple_draws.html', 
-                           simulated_freq=simulated_freq_list, 
-                           num_simulations=num_draws_display)
