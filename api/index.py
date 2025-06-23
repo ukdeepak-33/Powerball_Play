@@ -1217,6 +1217,7 @@ def check_generated_against_history(generated_white_balls, generated_powerball, 
     Checks a generated Powerball number against historical official draws from the last two years
     and returns match counts and details.
     """
+    # Initialize the results dictionary correctly
     results = {
         "generated_balls": generated_white_balls,
         "generated_powerball": generated_powerball,
@@ -1279,7 +1280,8 @@ def check_generated_against_history(generated_white_balls, generated_powerball, 
         elif white_matches == 0 and powerball_match == 1:
             category = "Match Powerball Only"
         
-        summary[category]["count"] += 1
+        # Access the summary dictionary correctly as a key within the results dictionary
+        results["summary"][category]["count"] += 1
         results["summary"][category]["draws"].append({
             "date": historical_draw_date,
             "white_balls": historical_white_balls,
@@ -2118,6 +2120,7 @@ def analyze_generated_historical_matches_route():
         if len(generated_white_balls) != 5:
             return jsonify({"success": False, "error": "Invalid generated white balls format. Expected 5 numbers."}), 400
 
+        # Pass the results dictionary directly to the function
         historical_match_results = check_generated_against_history(generated_white_balls, generated_powerball, df)
         
         return jsonify({
