@@ -188,8 +188,8 @@
 
                 if (currentSortBy === 'Draw Date') {
                     // Convert date strings to Date objects for proper comparison
-                    valA = new Date(a['Draw Date']);
-                    valB = new Date(b['Draw Date']);
+                    valA = new Date(a['Draw Date_dt']); // Use 'Draw Date_dt' for accurate date sorting
+                    valB = new Date(b['Draw Date_dt']); // Use 'Draw Date_dt' for accurate date sorting
                 } else if (currentSortBy === 'Sum') {
                     valA = a.Sum;
                     valB = b.Sum;
@@ -287,5 +287,4 @@
         sortAndRenderHistoricalSumData();
     });
 </script>
-{% endblock %}
-
+{% endblock scripts %} {# Corrected closing tag for 'scripts' block #}
