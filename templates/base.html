@@ -208,10 +208,12 @@
                 <li><a href="{{ url_for('frequency_analysis_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Frequency Analysis</a></li>
                 <li><a href="{{ url_for('hot_cold_numbers_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Hot/Cold Numbers</a></li>
                 <li><a href="{{ url_for('monthly_white_ball_analysis_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Monthly WB Analysis</a></li>
-                <li><a href="{{ url_for('sum_of_main_balls_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Sum of Main Balls</a></li>
+                <li><a href="{{ url_for('sum_of_main_balls_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Search by Sum of WB</a></li> {# Updated text #}
                 <li><a href="{{ url_for('simulate_multiple_draws_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Simulate Draws</a></li>
-                <li><a href="{{ url_for('winning_probability_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Winning Probability</a></li>
-                <li><a href="{{ url_for('partial_match_probabilities_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Partial Match Prob.</a></li>
+                {# Hiding Winning Probability as requested #}
+                {# <li><a href="{{ url_for('winning_probability_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Winning Probability</a></li> #}
+                {# Hiding Partial Match Probability as requested #}
+                {# <li><a href="{{ url_for('partial_match_probabilities_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Partial Match Prob.</a></li> #}
                 <li><a href="{{ url_for('number_age_distribution_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Number Age Dist.</a></li>
                 <li><a href="{{ url_for('co_occurrence_analysis_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Co-Occurrence Matrix</a></li>
                 <li><a href="{{ url_for('powerball_position_frequency_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Powerball Position Freq.</a></li>
