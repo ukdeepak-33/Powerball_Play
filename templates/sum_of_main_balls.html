@@ -34,29 +34,23 @@
 
     <div class="card p-6 bg-white rounded-lg shadow-lg">
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Historical Sum Data</h2>
-        <p class="text-gray-700 mb-4">Click on the "Draw Date" or "Sum" headers to sort the table.</p>
+        <p class="text-gray-700 mb-4">Click on the "Sum" header to sort the table by sum in ascending or descending order.</p>
         {% if sums_data %}
-            <div class="overflow-x-auto shadow-md rounded-lg">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+            <div class="overflow-x-auto mb-4">
+                <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
+                    <thead class="bg-gray-100">
                         <tr>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150" data-sort-by="Draw Date" data-sort-dir="desc" id="draw-date-header">
+                            <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150" data-sort-by="Draw Date" data-sort-dir="desc" id="draw-date-header">
                                 Draw Date
                                 <span class="sort-icon ml-1"></span>
                             </th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Number 1</th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Number 2</th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Number 3</th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Number 4</th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Number 5</th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Powerball</th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150" data-sort-by="Sum" data-sort-dir="asc" id="sum-header">
+                            <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150" data-sort-by="Sum" data-sort-dir="asc" id="sum-header">
                                 Sum
                                 <span class="sort-icon ml-1"></span>
                             </th>
                         </tr>
                     </thead>
-                    <tbody id="historical-sum-table-body" class="bg-white divide-y divide-gray-200">
+                    <tbody id="historical-sum-table-body">
                         {# Data will be rendered here by JavaScript #}
                     </tbody>
                 </table>
@@ -88,36 +82,12 @@
         border-right: 5px solid transparent;
         border-top: 5px solid #6b7280; /* Gray-500 */
     }
-    /* Small ball styling for tables */
-    .ball-sm {
-        display: inline-flex;
-        justify-content: center;
-        align-items: center;
-        width: 30px; /* Smaller size */
-        height: 30px; /* Smaller size */
-        background-color: #f0f0f0;
-        border-radius: 50%;
-        border: 1px solid #ccc;
-        font-weight: bold;
-        color: #333;
-        margin: 2px;
-        font-size: 0.8em; /* Smaller font */
-    }
-    .powerball-sm {
-        background-color: #ef4444; /* Red color for powerball */
-        color: white;
-        border-color: #dc2626;
-    }
 </style>
 
-{% block scripts %}
-{{ super() }} {# Keep existing scripts from base.html #}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Parse data passed from Flask
         const sumFreqData = {{ sum_freq_json | safe }};
-        // Ensure historicalSumData uses original array directly or is converted properly
-        const historicalSumData = {{ sums_data | tojson }};
+        const historicalSumData = {{ sums_data | tojson }}; // This is the data for the table
 
         const historicalSumTableBody = document.getElementById('historical-sum-table-body');
         const drawDateHeader = document.getElementById('draw-date-header');
@@ -131,7 +101,7 @@
             historicalSumTableBody.innerHTML = ''; // Clear existing rows
             if (!data || data.length === 0) {
                 const noDataRow = document.createElement('tr');
-                noDataRow.innerHTML = `<td colspan="8" class="px-4 py-2 text-center text-gray-600">No historical sum data available.</td>`;
+                noDataRow.innerHTML = `<td colspan="2" class="px-4 py-2 text-center text-gray-600">No historical sum data available.</td>`;
                 historicalSumTableBody.appendChild(noDataRow);
                 return;
             }
@@ -141,16 +111,6 @@
                 row.className = 'hover:bg-gray-50';
                 row.innerHTML = `
                     <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${draw['Draw Date']}</td>
-                    <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
-                        <span class="ball-sm">${draw['Number 1']}</span>
-                        <span class="ball-sm">${draw['Number 2']}</span>
-                        <span class="ball-sm">${draw['Number 3']}</span>
-                        <span class="ball-sm">${draw['Number 4']}</span>
-                        <span class="ball-sm">${draw['Number 5']}</span>
-                    </td>
-                    <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
-                        <span class="ball-sm powerball-sm">${draw.Powerball}</span>
-                    </td>
                     <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${draw.Sum}</td>
                 `;
                 historicalSumTableBody.appendChild(row);
@@ -160,8 +120,7 @@
         // Function to update sort icons in headers
         function updateSortIcons() {
             // Reset all icons
-            const allHeaders = document.querySelectorAll('#draw-date-header, #sum-header');
-            allHeaders.forEach(header => {
+            document.querySelectorAll('#historical-sum-table-body').forEach(header => {
                 const icon = header.querySelector('.sort-icon');
                 if (icon) {
                     icon.classList.remove('asc', 'desc');
@@ -180,16 +139,13 @@
 
         // Function to sort data and re-render table
         function sortAndRenderHistoricalSumData() {
-            // Create a mutable copy of the data for sorting
-            const sortableData = [...historicalSumData]; 
-
-            sortableData.sort((a, b) => {
+            historicalSumData.sort((a, b) => {
                 let valA, valB;
 
                 if (currentSortBy === 'Draw Date') {
                     // Convert date strings to Date objects for proper comparison
-                    valA = new Date(a['Draw Date_dt']); // Use 'Draw Date_dt' for accurate date sorting
-                    valB = new Date(b['Draw Date_dt']); // Use 'Draw Date_dt' for accurate date sorting
+                    valA = new Date(a['Draw Date']);
+                    valB = new Date(b['Draw Date']);
                 } else if (currentSortBy === 'Sum') {
                     valA = a.Sum;
                     valB = b.Sum;
@@ -203,36 +159,32 @@
                 }
                 return 0;
             });
-            renderHistoricalSumTable(sortableData);
+            renderHistoricalSumTable(historicalSumData);
             updateSortIcons();
         }
 
         // Event Listeners for table headers
-        if (drawDateHeader) {
-            drawDateHeader.addEventListener('click', function() {
-                if (currentSortBy === 'Draw Date') {
-                    currentSortDir = (currentSortDir === 'asc' ? 'desc' : 'asc');
-                } else {
-                    currentSortBy = 'Draw Date';
-                    currentSortDir = 'desc'; // Default to descending for dates
-                }
-                sortAndRenderHistoricalSumData();
-            });
-        }
+        drawDateHeader.addEventListener('click', function() {
+            if (currentSortBy === 'Draw Date') {
+                currentSortDir = (currentSortDir === 'asc' ? 'desc' : 'asc');
+            } else {
+                currentSortBy = 'Draw Date';
+                currentSortDir = 'desc'; // Default to descending for dates
+            }
+            sortAndRenderHistoricalSumData();
+        });
 
-        if (sumHeader) {
-            sumHeader.addEventListener('click', function() {
-                if (currentSortBy === 'Sum') {
-                    currentSortDir = (currentSortDir === 'asc' ? 'desc' : 'asc');
-                } else {
-                    currentSortBy = 'Sum';
-                    currentSortDir = 'asc'; // Default to ascending for sums
-                }
-                sortAndRenderHistoricalSumData();
-            });
-        }
+        sumHeader.addEventListener('click', function() {
+            if (currentSortBy === 'Sum') {
+                currentSortDir = (currentSortDir === 'asc' ? 'desc' : 'asc');
+            } else {
+                currentSortBy = 'Sum';
+                currentSortDir = 'asc'; // Default to ascending for sums
+            }
+            sortAndRenderHistoricalSumData();
+        });
 
-        // --- Chart.js for Sum Frequency (existing code from your provided template) ---
+        // --- Chart.js for Sum Frequency (existing code) ---
         if (sumFreqData && sumFreqData.length > 0) {
             const labels = sumFreqData.map(d => d.sum);
             const data = sumFreqData.map(d => d.count);
@@ -287,4 +239,4 @@
         sortAndRenderHistoricalSumData();
     });
 </script>
-{% endblock scripts %} {# Corrected closing tag for 'scripts' block #}
+{% endblock %}
