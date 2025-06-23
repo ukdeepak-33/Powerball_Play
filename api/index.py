@@ -12,7 +12,7 @@ import numpy as np
 
 # --- Supabase Configuration ---
 SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
-SUPABASE_ANON_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlrc3h6YmJjb2l0ZWhkbXN4cWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NzMwNjUsImexFQI6MjA2NTM0OTA2NX0.AzUD7wjR7VbvtUH27NDRJ3AlvFW0nCWpiN9ADG8T_t4")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlrc3h6YmJjb2l0ZWhkbXN4cWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NzMwNjUsImexFQI6MjA2NTM0OTA2NX0.AzUD7wjR7VbvtUH27NDqJ3AlvFW0nCWpiN9ADG8T_t4")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY")
 
 SUPABASE_TABLE_NAME = 'powerball_draws'
@@ -626,43 +626,40 @@ def get_number_age_distribution(df_source):
     
     for i in range(1, 70):
         last_appearance_date = None
-        last_appearance_date_str = "N/A" # Default to N/A
         temp_df_filtered = df_source[(df_source['Number 1'].astype(int) == i) | (df_source['Number 2'].astype(int) == i) |
                               (df_source['Number 3'].astype(int) == i) | (df_source['Number 4'].astype(int) == i) |
                               (df_source['Number 5'].astype(int) == i)]
         
         if not temp_df_filtered.empty:
             last_appearance_date = temp_df_filtered['Draw Date_dt'].max()
-            last_appearance_date_str = last_appearance_date.strftime('%Y-%m-%d')
 
         miss_streak_count = 0
         if last_appearance_date is not None:
-            # We need to correctly count missed draws based on *all* unique draw dates
-            # subsequent to the last appearance date.
-            draw_dates_after_last_appearance = [d for d in all_draw_dates if d > last_appearance_date]
-            miss_streak_count = len(draw_dates_after_last_appearance)
-
-            detailed_ages.append({'number': int(i), 'type': 'White Ball', 'age': miss_streak_count, 'last_drawn_date': last_appearance_date_str})
+            for d_date in reversed(all_draw_dates):
+                if d_date > last_appearance_date:
+                    miss_streak_count += 1
+                else:
+                    break
+            detailed_ages.append({'number': int(i), 'type': 'White Ball', 'age': miss_streak_count})
         else:
-            # If never drawn, age is the total number of draws
-            detailed_ages.append({'number': int(i), 'type': 'White Ball', 'age': len(all_draw_dates), 'last_drawn_date': last_appearance_date_str})
+            detailed_ages.append({'number': int(i), 'type': 'White Ball', 'age': len(all_draw_dates)})
 
     for i in range(1, 27):
         last_appearance_date = None
-        last_appearance_date_str = "N/A" # Default to N/A
         temp_df_filtered = df_source[df_source['Powerball'].astype(int) == i]
         if not temp_df_filtered.empty:
             last_appearance_date = temp_df_filtered['Draw Date_dt'].max()
-            last_appearance_date_str = last_appearance_date.strftime('%Y-%m-%d')
 
         miss_streak_count = 0
         if last_appearance_date is not None:
-            draw_dates_after_last_appearance = [d for d in all_draw_dates if d > last_appearance_date]
-            miss_streak_count = len(draw_dates_after_last_appearance)
-
-            detailed_ages.append({'number': int(i), 'type': 'Powerball', 'age': miss_streak_count, 'last_drawn_date': last_appearance_date_str})
+            for d_date in reversed(all_draw_dates):
+                if d_date > last_appearance_date:
+                    miss_streak_count += 1
+                else:
+                    break
+            detailed_ages.append({'number': int(i), 'type': 'Powerball', 'age': miss_streak_count})
         else:
-            detailed_ages.append({'number': int(i), 'type': 'Powerball', 'age': len(all_draw_dates), 'last_drawn_date': last_appearance_date_str})
+            detailed_ages.append({'number': int(i), 'type': 'Powerball', 'age': len(all_draw_dates)})
 
     all_miss_streaks_only = [item['age'] for item in detailed_ages]
     age_counts = pd.Series(all_miss_streaks_only).value_counts().sort_index()
@@ -859,7 +856,6 @@ def get_powerball_frequency_by_year(df_source, num_years=5):
 
     current_year = datetime.now().year
     
-    # FIX: Corrected the typo in the list comprehension
     years = [y for y in range(current_year - num_years + 1, current_year + 1)]
     print(f"[DEBUG-YearlyPB] Years to analyze: {years}")
 
@@ -978,7 +974,7 @@ def _get_official_draw_for_date_from_db(date_str):
         return None
     except Exception as e:
         print(f"An unexpected error occurred in _get_official_draw_for_date_from_db: {e}")
-        return []
+        return None
 
 def analyze_generated_batch_against_official_draw(generated_picks_list, official_draw):
     """
@@ -1678,6 +1674,397 @@ def sum_of_main_balls_route():
     # Retrieve target_sum and sort_by from form if it's a POST request
     target_sum_display = None
     selected_sort_by = request.args.get('sort_by', 'date_desc') # Default sort
+
+    if request.method == 'POST':
+        target_sum_str = request.form.get('target_sum')
+        selected_sort_by = request.form.get('sort_by', 'date_desc') # Get sort_by from form submission
+        
+        if target_sum_str and target_sum_str.isdigit():
+            target_sum = int(target_sum_str)
+            target_sum_display = target_sum
+            results_df_raw = find_results_by_sum(df, target_sum)
+
+            # Apply sorting logic
+            if not results_df_raw.empty:
+                if selected_sort_by == 'date_desc':
+                    results_df_raw = results_df_raw.sort_values(by='Draw Date', ascending=False)
+                elif selected_sort_by == 'date_asc':
+                    results_df_raw = results_df_raw.sort_values(by='Draw Date', ascending=True)
+                elif selected_sort_by == 'balls_asc':
+                    # Create a tuple for sorting white balls
+                    results_df_raw['WhiteBallsTuple'] = results_df_raw.apply(
+                        lambda row: tuple(sorted([
+                            int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                            int(row['Number 4']), int(row['Number 5'])
+                        ])), axis=1
+                    )
+                    results_df_raw = results_df_raw.sort_values(by='WhiteBallsTuple', ascending=True)
+                    results_df_raw = results_df_raw.drop(columns=['WhiteBallsTuple'])
+                elif selected_sort_by == 'balls_desc':
+                    results_df_raw['WhiteBallsTuple'] = results_df_raw.apply(
+                        lambda row: tuple(sorted([
+                            int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                            int(row['Number 4']), int(row['Number 5'])
+                        ])), axis=1
+                    )
+                    results_df_raw = results_df_raw.sort_values(by='WhiteBallsTuple', ascending=False)
+                    results_df_raw = results_df_raw.drop(columns=['WhiteBallsTuple'])
+            
+            results = results_df_raw.to_dict('records')
+        else:
+            flash("Please enter a valid number for Target Sum.", 'error')
+            results = [] # Clear results if input is invalid
+            target_sum_display = None # Reset display value
+    else: # GET request, no search yet
+        results = []
+        target_sum_display = None # Initial state: no target sum
+    
+    # Pass all necessary data to the template
+    return render_template('find_results_by_sum.html', 
+                           results=results,
+                           target_sum=target_sum_display,
+                           selected_sort_by=selected_sort_by)
+
+
+@app.route('/winning_probability', methods=['GET', 'POST'])
+def winning_probability_route():
+    current_white_ball_range = GLOBAL_WHITE_BALL_RANGE
+    current_powerball_range = GLOBAL_POWERBALL_RANGE
+    
+    if request.method == 'POST':
+        try:
+            wb_min = int(request.form.get('white_ball_min', GLOBAL_WHITE_BALL_RANGE[0]))
+            wb_max = int(request.form.get('white_ball_max', GLOBAL_WHITE_BALL_RANGE[1]))
+            pb_min = int(request.form.get('powerball_min', GLOBAL_POWERBALL_RANGE[0]))
+            pb_max = int(request.form.get('powerball_max', GLOBAL_POWERBALL_RANGE[1]))
+
+            if not (1 <= wb_min <= wb_max <= 69 and 1 <= pb_min <= pb_max <= 26):
+                flash("Invalid range inputs. White ball range must be 1-69 and Powerball 1-26, and min <= max.", 'error')
+                wb_min, wb_max = GLOBAL_WHITE_BALL_RANGE
+                pb_min, pb_max = GLOBAL_POWERBALL_RANGE
+            
+            current_white_ball_range = (wb_min, wb_max)
+            current_powerball_range = (pb_min, pb_max)
+
+        except ValueError:
+            flash("Invalid number format for range inputs. Please enter integers.", 'error')
+            current_white_ball_range = GLOBAL_WHITE_BALL_RANGE
+            current_powerball_range = GLOBAL_POWERBALL_RANGE
+    
+    cache_key = f"winning_probability_{current_white_ball_range[0]}-{current_white_ball_range[1]}_{current_powerball_range[0]}-{current_powerball_range[1]}"
+    
+    probability_1_in_x, probability_percentage = get_cached_analysis(
+        cache_key, winning_probability, current_white_ball_range, current_powerball_range
+    )
+
+    return render_template('winning_probability.html', 
+                           probability_1_in_x=probability_1_in_x, 
+                           probability_percentage=probability_percentage,
+                           white_ball_range=current_white_ball_range,
+                           powerball_range=current_powerball_range)
+
+@app.route('/partial_match_probabilities')
+def partial_match_probabilities_route():
+    probabilities = get_cached_analysis('partial_match_probabilities', partial_match_probabilities, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE)
+    return render_template('partial_match_probabilities.html', 
+                           probabilities=probabilities)
+
+@app.route('/number_age_distribution')
+def number_age_distribution_route():
+    number_age_counts, detailed_number_ages = get_cached_analysis('number_age_distribution', get_number_age_distribution, df)
+    return render_template('number_age_distribution.html',
+                           number_age_data=number_age_counts,
+                           detailed_number_ages=detailed_number_ages)
+
+@app.route('/co_occurrence_analysis')
+def co_occurrence_analysis_route():
+    co_occurrence_data, max_co_occurrence = get_cached_analysis('co_occurrence_analysis', get_co_occurrence_matrix, df)
+    return render_template('co_occurrence_analysis.html',
+                           co_occurrence_data=co_occurrence_data,
+                           max_co_occurrence=max_co_occurrence)
+
+@app.route('/powerball_position_frequency')
+def powerball_position_frequency_route():
+    powerball_position_data = get_cached_analysis('powerball_position_frequency', get_powerball_position_frequency, df)
+    return render_template('powerball_position_frequency.html',
+                           powerball_position_data=powerball_position_data)
+
+@app.route('/powerball_frequency_by_year')
+def powerball_frequency_by_year_route():
+    # Calling with num_years=7 as requested
+    yearly_pb_freq_data, years = get_cached_analysis('yearly_pb_freq', get_powerball_frequency_by_year, df, num_years=7)
+    return render_template('powerball_frequency_by_year.html',
+                           yearly_pb_freq_data=yearly_pb_freq_data,
+                           years=years)
+
+@app.route('/odd_even_trends')
+def odd_even_trends_route():
+    last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
+    odd_even_trends = get_cached_analysis('odd_even_trends', get_odd_even_split_trends, df, last_draw_date_str_for_cache)
+    return render_template('odd_even_trends.html',
+                           odd_even_trends=odd_even_trends)
+
+@app.route('/consecutive_trends')
+def consecutive_trends_route():
+    last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
+    consecutive_trends = get_cached_analysis('consecutive_trends', get_consecutive_numbers_trends, df, last_draw_date_str_for_cache)
+    return render_template('consecutive_trends.html',
+                           consecutive_trends=consecutive_trends)
+
+@app.route('/triplets_analysis')
+def triplets_analysis_route():
+    triplets_data = get_cached_analysis('triplets_analysis', get_most_frequent_triplets, df)
+    return render_template('triplets_analysis.html',
+                           triplets_data=triplets_data)
+
+@app.route('/grouped_patterns_analysis')
+def grouped_patterns_analysis_route():
+    patterns_data = get_cached_analysis('grouped_patterns', get_grouped_patterns_over_years, df)
+    return render_template('grouped_patterns_analysis.html', patterns_data=patterns_data)
+
+@app.route('/find_results_by_first_white_ball', methods=['GET', 'POST'])
+def find_results_by_first_white_ball():
+    if df.empty:
+        flash("Cannot find results: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+
+    results_dict = []
+    white_ball_number_display = None
+    selected_sort_by = 'date_desc'
+
+    if request.method == 'POST':
+        white_ball_number_str = request.form.get('white_ball_number')
+        selected_sort_by = request.form.get('sort_by', 'date_desc')
+
+        if white_ball_number_str and white_ball_number_str.isdigit():
+            white_ball_number = int(white_ball_number_str)
+            white_ball_number_display = white_ball_number
+            
+            if 'Draw Date_dt' not in df.columns:
+                 df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'], errors='coerce')
+
+            results = df[df['Number 1'].astype(int) == white_ball_number].copy()
+
+            if selected_sort_by == 'date_desc':
+                results = results.sort_values(by='Draw Date_dt', ascending=False)
+            elif selected_sort_by == 'date_asc':
+                results = results.sort_values(by='Draw Date_dt', ascending=True)
+            elif selected_sort_by == 'balls_asc':
+                results['WhiteBallsTuple'] = results.apply(
+                    lambda row: tuple(sorted([
+                        int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                        int(row['Number 4']), int(row['Number 5'])
+                    ])), axis=1
+                )
+                results = results.sort_values(by='WhiteBallsTuple', ascending=True)
+                results = results.drop(columns=['WhiteBallsTuple'])
+            elif selected_sort_by == 'balls_desc':
+                results['WhiteBallsTuple'] = results.apply(
+                    lambda row: tuple(sorted([
+                        int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                        int(row['Number 4']), int(row['Number 5'])
+                    ])), axis=1
+                )
+                results = results.sort_values(by='WhiteBallsTuple', ascending=False)
+                results = results.drop(columns=['WhiteBallsTuple'])
+
+            results_dict = results.to_dict('records')
+        else:
+            flash("Please enter a valid number for First White Ball Number.", 'error')
+
+    return render_template('find_results_by_first_white_ball.html', 
+                           results_by_first_white_ball=results_dict, 
+                           white_ball_number=white_ball_number_display,
+                           selected_sort_by=selected_sort_by)
+
+@app.route('/generated_numbers_history')
+def generated_numbers_history_route():
+    generated_history = get_cached_analysis('generated_history', get_generated_numbers_history)
+    
+    # Get all official draw dates for the new dropdown
+    official_draw_dates = []
+    if not df.empty:
+        # Sort dates in descending order (most recent first)
+        official_draw_dates = sorted(df['Draw Date'].unique(), reverse=True)
+
+    # Prepare last_draw to pass to template
+    last_draw_for_template = last_draw.to_dict()
+
+    return render_template('generated_numbers_history.html', 
+                           generated_history=generated_history,
+                           official_draw_dates=official_draw_dates,
+                           last_official_draw=last_draw_for_template) # Pass the latest official draw
+
+
+@app.route('/update_powerball_data', methods=['GET'])
+def update_powerball_data():
+    service_headers = _get_supabase_headers(is_service_key=True)
+    anon_headers = _get_supabase_headers(is_service_key=False)
+
+    try:
+        url_check_latest = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
+        params_check_latest = {
+            'select': 'Draw Date',
+            'order': 'Draw Date.desc',
+            'limit': 1
+        }
+        response_check_latest = requests.get(url_check_latest, headers=anon_headers, params=params_check_latest)
+        response_check_latest.raise_for_status()
+        
+        latest_db_draw_data = response_check_latest.json()
+        last_db_draw_date = None
+        if latest_db_draw_data:
+            last_db_draw_date = latest_db_draw_data[0]['Draw Date']
+        
+        print(f"Last draw date in Supabase: {last_db_draw_date}")
+
+        simulated_draw_date_dt = datetime.now()
+        simulated_draw_date = simulated_draw_date_dt.strftime('%Y-%m-%d')
+        simulated_numbers = sorted(random.sample(range(1, 70), 5))
+        simulated_powerball = random.randint(1, 26)
+
+        new_draw_data = {
+            'Draw Date': simulated_draw_date,
+            'Number 1': simulated_numbers[0],
+            'Number 2': simulated_numbers[1],
+            'Number 3': simulated_numbers[2],
+            'Number 4': simulated_numbers[3],
+            'Number 5': simulated_numbers[4],
+            'Powerball': simulated_powerball
+        }
+        
+        print(f"Simulated new draw data: {new_draw_data}")
+
+        if new_draw_data['Draw Date'] == last_db_draw_date:
+            print(f"Draw for {new_draw_data['Draw Date']} already exists. No update needed.")
+            return "No new draw data. Database is up-to-date.", 200
+        
+        url_insert = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
+        insert_response = requests.post(url_insert, headers=service_headers, data=json.dumps(new_draw_data))
+        insert_response.raise_for_status()
+
+        if insert_response.status_code == 201:
+            print(f"Successfully inserted new draw: {new_draw_data}")
+            
+            initialize_core_data() 
+            invalidate_analysis_cache()
+
+            return f"Data updated successfully with draw for {simulated_draw_date}.", 200
+        else:
+            print(f"Failed to insert data. Status: {insert_response.status_code}, Response: {insert_response.text}")
+            return f"Error updating data: {insert_response.status_code} - {insert_response.text}", 500
+
+    except requests.exceptions.RequestException as e:
+        print(f"Network or HTTP error during update_powerball_data: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"Supabase response content: {e.response.text}")
+        return f"Network or HTTP error: {e}", 500
+    except json.JSONDecodeError as e:
+        print(f"JSON decoding error in update_powerball_data: {e}")
+        if 'insert_response' in locals() and insert_response is not None:
+            print(f"Response content that failed JSON decode: {insert_response.text}")
+        return f"JSON parsing error: {e}", 500
+    except Exception as e:
+        print(f"An unexpected error occurred during data update: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"An internal error occurred: {e}", 500
+
+
+@app.route('/export_analysis_results')
+def export_analysis_results_route():
+    if df.empty:
+        flash("Cannot export results: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+
+    export_analysis_results(df) 
+    flash("Analysis results exported to analysis_results.csv (this file is temporary on Vercel's serverless environment).", 'info')
+    return redirect(url_for('index'))
+
+
+# Routes for backend API calls only (these do not render templates directly)
+@app.route('/analyze_batch_vs_official', methods=['POST'])
+def analyze_batch_vs_official_route():
+    try:
+        data = request.get_json()
+        generated_date_str = data.get('generated_date')
+        official_draw_date_str = data.get('official_draw_date')
+
+        if not generated_date_str or not official_draw_date_str:
+            return jsonify({"error": "Missing generated_date or official_draw_date"}), 400
+
+        # Fetch the specific batch of generated numbers
+        generated_picks = _get_generated_picks_for_date_from_db(generated_date_str)
+        if not generated_picks:
+            return jsonify({"error": f"No generated picks found for date: {generated_date_str}"}), 404
+
+        # Fetch the specific official draw
+        official_draw = _get_official_draw_for_date_from_db(official_draw_date_str)
+        if not official_draw:
+            return jsonify({"error": f"No official draw found for date: {official_draw_date_str}. Please ensure it is added to the database."}), 404
+
+        # Perform the analysis
+        analysis_summary = analyze_generated_batch_against_official_draw(generated_picks, official_draw)
+        
+        return jsonify({
+            "success": True,
+            "generated_date": generated_date_str,
+            "official_draw_date": official_draw_date_str,
+            "total_generated_picks_in_batch": len(generated_picks),
+            "summary": analysis_summary
+        })
+
+    except Exception as e:
+        print(f"Error during analyze_batch_vs_official_route: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
+@app.route('/analyze_generated_historical_matches', methods=['POST'])
+def analyze_generated_historical_matches_route():
+    if df.empty:
+        return jsonify({"success": False, "error": "Historical data not loaded or is empty."}), 500
+    
+    try:
+        data = request.get_json() # Expecting JSON now
+        generated_white_balls_str = data.get('generated_white_balls')
+        generated_powerball_str = data.get('generated_powerball')
+
+        if not generated_white_balls_str or not generated_powerball_str: 
+            return jsonify({"success": False, "error": "Missing generated_white_balls or generated_powerball"}), 400
+
+        generated_white_balls = sorted([int(x.strip()) for x in generated_white_balls_str.split(',') if x.strip().isdigit()])
+        generated_powerball = int(generated_powerball_str)
+
+        if len(generated_white_balls) != 5:
+            return jsonify({"success": False, "error": "Invalid generated white balls format. Expected 5 numbers."}), 400
+
+        historical_match_results = check_generated_against_history(generated_white_balls, generated_powerball, df)
+        
+        return jsonify({
+            "success": True,
+            "generated_numbers_for_analysis": generated_white_balls,
+            "generated_powerball_for_analysis": generated_powerball,
+            "match_summary": historical_match_results['summary']
+        })
+
+    except ValueError:
+        return jsonify({"success": False, "error": "Invalid number format for historical analysis."}), 400
+    except Exception as e:
+        print(f"An error occurred during historical analysis: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
+
+@app.route('/find_results_by_sum', methods=['GET', 'POST'])
+def find_results_by_sum_route():
+    if df.empty:
+        flash("Cannot find results: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+
+    results = []
+    target_sum_display = None
+    selected_sort_by = 'date_desc' # Default sort
 
     if request.method == 'POST':
         target_sum_str = request.form.get('target_sum')
