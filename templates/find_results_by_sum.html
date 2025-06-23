@@ -2,20 +2,21 @@
 
 {% block title %}Find Results by Sum{% endblock %}
 
-{% block page_heading %}Find Results by Sum{% endblock %}
+{% block page_heading %}Search Historical Draws by Sum{% endblock %}
 
 {% block content %}
 <div class="card p-6 bg-white rounded-lg shadow-lg">
     <h2 class="text-2xl font-bold mb-4 text-gray-800">Search Historical Draws by Sum</h2>
     
-    <form action="{{ url_for('find_results_by_sum_route') }}" method="post" class="space-y-4">
+    <form action="{{ url_for('sum_of_main_balls_route') }}" method="post" class="space-y-4">
         <div class="form-group">
-            <label for="target_sum" class="block text-gray-700 text-sm font-bold mb-2">Enter Target Sum:</label>
-            <input type="number" name="target_sum" id="target_sum" min="15" max="345" {# Min sum: 1+2+3+4+5=15, Max sum: 69+68+67+66+65=345 #}
-                   value="{{ target_sum | default('') }}"
+            <label for="target_sum" class="block text-gray-700 text-sm font-bold mb-2">Enter Target Sum (15-345):</label>
+            <input type="number" name="target_sum" id="target_sum" min="15" max="345" 
+                   value="{{ target_sum | default('') }}" {# Preserve value after submission #}
                    class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                    placeholder="e.g., 100">
         </div>
+
         <div class="form-group">
             <label for="sort_by" class="block text-gray-700 text-sm font-bold mb-2">Sort Results By:</label>
             <select name="sort_by" id="sort_by" class="shadow border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
@@ -30,18 +31,18 @@
 
     {% if results %}
         <div class="mt-8">
-            <h3 class="text-xl font-semibold text-gray-800 mb-4">Draws with Sum: {{ target_sum }}</h3>
-            <div class="overflow-x-auto">
-                <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
-                    <thead class="bg-gray-100">
+            <h3 class="text-xl font-semibold text-gray-800 mb-3">Draws with Sum: {{ target_sum }}</h3>
+            <div class="overflow-x-auto shadow-md rounded-lg">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Draw Date</th>
-                            <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">White Balls</th>
-                            <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Powerball</th>
-                            <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Sum</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Draw Date</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">White Balls</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Powerball</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sum</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="bg-white divide-y divide-gray-200">
                         {% for row in results %}
                         <tr class="hover:bg-gray-50">
                             <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ row['Draw Date'] }}</td>
@@ -53,9 +54,7 @@
                                 <span class="ball-sm">{{ row['Number 5'] }}</span>
                             </td>
                             <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
-                                {# Assuming Powerball can be derived or passed. For now, it's not directly in find_results_by_sum's return, but for consistency, we'd need it. #}
-                                {# If Powerball is not available in the 'results' dictionary, you might need to adjust find_results_by_sum function in index.py to include it. #}
-                                {# For now, adding a placeholder. #}
+                                {# Ensure Powerball key is checked for existence with .get() as it's not always guaranteed by initial Python query for sum #}
                                 <span class="ball-sm powerball-sm">{{ row.get('Powerball', 'N/A') }}</span>
                             </td>
                             <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ row['Sum'] }}</td>
