@@ -593,44 +593,45 @@ def find_last_draw_dates_for_numbers(df_source, white_balls, powerball):
 
     return last_draw_dates
 
-def modify_combination(df_source, white_balls, powerball, white_ball_range, powerball_range, excluded_numbers):
-    if df_source.empty:
-        raise ValueError("Cannot modify combination: Historical data is empty.")
+# Removed modify_combination function as it is no longer needed
+# def modify_combination(df_source, white_balls, powerball, white_ball_range, powerball_range, excluded_numbers):
+#     if df_source.empty:
+#         raise ValueError("Cannot modify combination: Historical data is empty.")
 
-    white_balls = list(white_balls)
+#     white_balls = list(white_balls)
     
-    if len(white_balls) < 5:
-        raise ValueError("Initial white balls list is too short for modification.")
+#     if len(white_balls) < 5:
+#         raise ValueError("Initial white balls list is too short for modification.")
 
-    indices_to_modify = random.sample(range(5), 3) # Always modify 3 numbers
+#     indices_to_modify = random.sample(range(5), 3) # Always modify 3 numbers
     
-    for i in indices_to_modify:
-        attempts = 0
-        max_attempts_single_num = 100
-        while attempts < max_attempts_single_num:
-            new_number = random.randint(white_ball_range[0], white_ball_range[1])
-            if new_number not in excluded_numbers and new_number not in white_balls:
-                white_balls[i] = new_number
-                break
-            attempts += 1
-        else:
-            print(f"Warning: Could not find unique replacement for white ball at index {i}. Proceeding without replacement for this slot.")
+#     for i in indices_to_modify:
+#         attempts = 0
+#         max_attempts_single_num = 100
+#         while attempts < max_attempts_single_num:
+#             new_number = random.randint(white_ball_range[0], white_ball_range[1])
+#             if new_number not in excluded_numbers and new_number not in white_balls:
+#                 white_balls[i] = new_number
+#                 break
+#             attempts += 1
+#         else:
+#             print(f"Warning: Could not find unique replacement for white ball at index {i}. Proceeding without replacement for this slot.")
 
-    attempts_pb = 0
-    max_attempts_pb = 100
-    while attempts_pb < max_attempts_pb:
-        new_powerball = random.randint(powerball_range[0], powerball_range[1])
-        if new_powerball not in excluded_numbers and new_powerball != powerball:
-            powerball = new_powerball
-            break
-        attempts_pb += 1
-    else:
-        print("Warning: Could not find a unique replacement for powerball. Keeping original.")
+#     attempts_pb = 0
+#     max_attempts_pb = 100
+#     while attempts_pb < max_attempts_pb:
+#         new_powerball = random.randint(powerball_range[0], powerball_range[1])
+#         if new_powerball not in excluded_numbers and new_powerball != powerball:
+#             powerball = new_powerball
+#             break
+#         attempts_pb += 1
+#     else:
+#         print("Warning: Could not find a unique replacement for powerball. Keeping original.")
 
-    white_balls = sorted([int(num) for num in white_balls])
-    powerball = int(powerball)
+#     white_balls = sorted([int(num) for num in white_balls])
+#     powerball = int(powerball)
     
-    return white_balls, powerball
+#     return white_balls, powerball
 
 # Removed find_common_pairs and generate_with_common_pairs as they are no longer used for this feature
 
@@ -1382,6 +1383,16 @@ def initialize_core_data():
                 last_draw['Draw Date'] = last_draw['Draw Date_dt'].strftime('%Y-%m-%d')
             else:
                  last_draw['Draw Date'] = 'N/A' # Fallback for display if datetime conversion fails
+            
+            # Populate historical_white_ball_sets
+            historical_white_ball_sets.clear() # Clear existing set before repopulating
+            for _, row in df.iterrows():
+                white_balls_tuple = tuple(sorted([
+                    int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), 
+                    int(row['Number 4']), int(row['Number 5'])
+                ]))
+                historical_white_ball_sets.add(frozenset(white_balls_tuple))
+
             print("Core historical data loaded successfully.")
         else:
             print("Core historical data is empty after loading. df remains empty.")
@@ -1476,56 +1487,11 @@ def generate():
                            last_draw_dates=last_draw_dates,
                            generation_type='generated')
 
-@app.route('/generate_modified', methods=['POST'])
-def generate_modified():
-    # This route now ONLY handles modifying a random historical draw by changing 3 white balls and Powerball.
-    if df.empty:
-        flash("Cannot modify combination: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return render_template('index.html', last_draw=last_draw.to_dict())
-
-    white_balls = []
-    powerball = None
-    last_draw_dates = {}
-
-    try:
-        if not df.empty:
-            random_row = df.sample(1).iloc[0]
-            white_balls_base = [int(random_row['Number 1']), int(random_row['Number 2']), int(random_row['Number 3']), int(random_row['Number 4']), int(random_row['Number 5'])]
-            powerball_base = int(random_row['Powerball'])
-        else:
-            flash("Historical data is empty, cannot generate or modify numbers.", 'error')
-            return render_template('index.html', last_draw=last_draw.to_dict())
-
-        white_balls, powerball = modify_combination(df, white_balls_base, powerball_base, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers)
-            
-        max_attempts_unique = 100
-        attempts_unique = 0
-        while check_exact_match(white_balls) and attempts_unique < max_attempts_unique:
-            # Re-generate from a random historical draw and modify if the new combo is not unique
-            random_row = df.sample(1).iloc[0]
-            white_balls_base = [int(random_row['Number 1']), int(random_row['Number 2']), int(random_row['Number 3']), int(random_row['Number 4']), int(random_row['Number 5'])]
-            powerball_base = int(random_row['Powerball'])
-            white_balls, powerball = modify_combination(df, white_balls_base, powerball_base, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers)
-            attempts_unique += 1
-        
-        if attempts_unique == max_attempts_unique:
-            flash("Could not find a unique modified combination after many attempts. Please try again.", 'error')
-            return render_template('index.html', last_draw=last_draw.to_dict())
-
-        white_balls = [int(num) for num in white_balls]
-        powerball = int(powerball)
-
-        last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
-
-        return render_template('index.html', 
-                            white_balls=white_balls, 
-                            powerball=powerball, 
-                            last_draw=last_draw.to_dict(), 
-                            last_draw_dates=last_draw_dates,
-                            generation_type='modified')
-    except ValueError as e:
-        flash(str(e), 'error')
-        return render_template('index.html', last_draw=last_draw.to_dict())
+# Removed the /generate_modified route entirely
+# @app.route('/generate_modified', methods=['POST'])
+# def generate_modified():
+#     # ... (removed content) ...
+#     pass
 
 
 @app.route('/generate_with_user_pair', methods=['POST'])
