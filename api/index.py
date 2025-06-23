@@ -46,7 +46,7 @@ GLOBAL_WHITE_BALL_RANGE = (1, 69)
 GLOBAL_POWERBALL_RANGE = (1, 26)
 excluded_numbers = []
 
-# Define number ranges for grouped patterns analysis
+# Define number ranges for grouped patterns analysis and the new "starting pair" logic
 NUMBER_RANGES = {
     "1-9": (1, 9),
     "10s": (10, 19),
@@ -56,6 +56,15 @@ NUMBER_RANGES = {
     "50s": (50, 59),
     "60s": (60, 69)
 }
+
+# Specific ranges for the "Generate from Your Starting Pair" ascending logic
+ASCENDING_GEN_RANGES = [
+    (20, 29), # 20s
+    (30, 39), # 30s
+    (40, 49), # 40s
+    (50, 59), # 50s
+    (60, 69)  # 60s
+]
 
 
 # --- Core Utility Functions (All helpers defined here) ---
@@ -272,6 +281,7 @@ def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerba
 def generate_with_user_provided_pair(num1, num2, white_ball_range, powerball_range, excluded_numbers, df_source):
     """
     Generates a Powerball combination starting with two user-provided white balls.
+    The remaining three numbers are generated in ascending order from specific tens ranges (20s-60s).
     """
     if df_source.empty:
         raise ValueError("Cannot generate numbers: Historical data is empty.")
@@ -287,51 +297,86 @@ def generate_with_user_provided_pair(num1, num2, white_ball_range, powerball_ran
     if num1 in excluded_numbers or num2 in excluded_numbers:
         raise ValueError(f"One or both provided numbers ({num1}, {num2}) are in the excluded list.")
 
-    initial_white_balls = sorted([num1, num2])
+    initial_white_balls = sorted([num1, num2]) # Ensure they are sorted
     
-    # Create the pool for the remaining three white balls
-    available_for_remaining = [num for num in range(white_ball_range[0], white_ball_range[1] + 1) 
-                               if num not in excluded_numbers and num not in initial_white_balls]
+    max_attempts_overall = 1000 # Max attempts for the entire 5-ball combination
+    attempts_overall = 0
 
-    if len(available_for_remaining) < 3:
-        raise ValueError("Not enough unique numbers available to generate the remaining three white balls.")
-
-    max_attempts = 1000
-    attempts = 0
-    while attempts < max_attempts:
+    while attempts_overall < max_attempts_overall:
+        candidate_white_balls_generated = []
+        temp_current_min = initial_white_balls[-1] + 1 # Start for the 3rd number, e.g., 14 -> 15, 25 -> 26
+        
         try:
-            # Randomly select 3 more unique numbers from the available pool
-            remaining_white_balls = random.sample(available_for_remaining, 3)
+            # Generate the 3rd, 4th, and 5th white balls
+            for i in range(3): # We need to generate 3 more numbers
+                possible_nums_for_slot = []
+                
+                # Determine the eligible "tens" range to start from
+                start_range_idx = -1
+                for idx, (range_min, range_max) in enumerate(ASCENDING_GEN_RANGES):
+                    # Find the first range that either contains temp_current_min OR starts after temp_current_min
+                    if temp_current_min <= range_max and temp_current_min >= range_min: # temp_current_min is within this range
+                        start_range_idx = idx
+                        break
+                    elif temp_current_min < range_min: # temp_current_min is before this range's start
+                        start_range_idx = idx
+                        break
+                
+                if start_range_idx == -1: # temp_current_min is already beyond the 60s range max (69)
+                    raise ValueError("Cannot find suitable numbers in specified ascending ranges (already past 60s range).")
+
+                # Build the pool of possible numbers for the current slot
+                eligible_ranges = ASCENDING_GEN_RANGES[start_range_idx:]
+                
+                # Populate possible numbers respecting temp_current_min, ranges, uniqueness, and exclusions
+                for range_min, range_max in eligible_ranges:
+                    actual_start_val = max(temp_current_min, range_min) # Ensure ascending order and range constraint
+                    
+                    for num in range(actual_start_val, range_max + 1):
+                        if num not in excluded_numbers and \
+                           num not in initial_white_balls and \
+                           num not in candidate_white_balls_generated:
+                            possible_nums_for_slot.append(num)
+                
+                if not possible_nums_for_slot:
+                    raise ValueError(f"No available numbers for slot {i+3}. Current min: {temp_current_min}, initial: {initial_white_balls}, generated: {candidate_white_balls_generated}")
+
+                # Pick one number for the current slot
+                picked_num = random.choice(possible_nums_for_slot)
+                candidate_white_balls_generated.append(picked_num)
+                temp_current_min = picked_num + 1 # Next number must be strictly greater
             
-            # Combine and sort all 5 white balls
-            white_balls = sorted(initial_white_balls + remaining_white_balls)
+            # Combine user's numbers with generated numbers and sort them
+            final_white_balls = sorted(initial_white_balls + candidate_white_balls_generated)
             
             # Generate Powerball
             powerball = random.randint(powerball_range[0], powerball_range[1])
 
-            # Check for exact historical match
-            if check_exact_match(white_balls):
-                attempts += 1
+            # Check for exact historical match of the 5 white balls
+            if check_exact_match(final_white_balls):
+                attempts_overall += 1
                 continue # Retry if combination already exists historically
 
-            # Check against last draw
+            # Check against last draw (existing logic from previous versions)
             last_draw_data = get_last_draw(df_source)
             if not last_draw_data.empty and last_draw_data.get('Draw Date') != 'N/A':
                 last_white_balls = [int(last_draw_data['Number 1']), int(last_draw_data['Number 2']), int(last_draw_data['Number 3']), int(last_draw_data['Number 4']), int(last_draw_data['Number 5'])]
-                if set(white_balls) == set(last_white_balls) and powerball == int(last_draw_data['Powerball']):
-                    attempts += 1
+                if set(final_white_balls) == set(last_white_balls) and powerball == int(last_draw_data['Powerball']):
+                    attempts_overall += 1
                     continue
 
+            # If all checks pass, return the valid combination
+            return final_white_balls, powerball
 
-            break # Found a valid, unique combination
         except ValueError as e:
-            print(f"Attempt failed during user-pair strategy: {e}. Retrying...")
-            attempts += 1
+            # print(f"Attempt failed during user-pair strategy: {e}. Retrying... (Overall attempt {attempts_overall+1})") # For debugging
+            attempts_overall += 1
+            continue
+        except IndexError: # Catches errors if, for example, random.choice gets an empty sequence
+            attempts_overall += 1
             continue
     else:
-        raise ValueError("Could not generate a unique combination with the provided pair after many attempts.")
-
-    return white_balls, powerball
+        raise ValueError("Could not generate a unique combination with the provided pair and ascending range constraint after many attempts.")
 
 
 def check_historical_match(df_source, white_balls, powerball):
@@ -592,49 +637,6 @@ def find_last_draw_dates_for_numbers(df_source, white_balls, powerball):
         last_draw_dates[f"Powerball {powerball}"] = "N/A (Never Drawn)"
 
     return last_draw_dates
-
-# Removed modify_combination function as it is no longer needed
-# def modify_combination(df_source, white_balls, powerball, white_ball_range, powerball_range, excluded_numbers):
-#     if df_source.empty:
-#         raise ValueError("Cannot modify combination: Historical data is empty.")
-
-#     white_balls = list(white_balls)
-    
-#     if len(white_balls) < 5:
-#         raise ValueError("Initial white balls list is too short for modification.")
-
-#     indices_to_modify = random.sample(range(5), 3) # Always modify 3 numbers
-    
-#     for i in indices_to_modify:
-#         attempts = 0
-#         max_attempts_single_num = 100
-#         while attempts < max_attempts_single_num:
-#             new_number = random.randint(white_ball_range[0], white_ball_range[1])
-#             if new_number not in excluded_numbers and new_number not in white_balls:
-#                 white_balls[i] = new_number
-#                 break
-#             attempts += 1
-#         else:
-#             print(f"Warning: Could not find unique replacement for white ball at index {i}. Proceeding without replacement for this slot.")
-
-#     attempts_pb = 0
-#     max_attempts_pb = 100
-#     while attempts_pb < max_attempts_pb:
-#         new_powerball = random.randint(powerball_range[0], powerball_range[1])
-#         if new_powerball not in excluded_numbers and new_powerball != powerball:
-#             powerball = new_powerball
-#             break
-#         attempts_pb += 1
-#     else:
-#         print("Warning: Could not find a unique replacement for powerball. Keeping original.")
-
-#     white_balls = sorted([int(num) for num in white_balls])
-#     powerball = int(powerball)
-    
-#     return white_balls, powerball
-
-# Removed find_common_pairs and generate_with_common_pairs as they are no longer used for this feature
-
 
 def get_number_age_distribution(df_source):
     if df_source.empty: return [], []
@@ -1486,12 +1488,6 @@ def generate():
                            last_draw=last_draw.to_dict(), 
                            last_draw_dates=last_draw_dates,
                            generation_type='generated')
-
-# Removed the /generate_modified route entirely
-# @app.route('/generate_modified', methods=['POST'])
-# def generate_modified():
-#     # ... (removed content) ...
-#     pass
 
 
 @app.route('/generate_with_user_pair', methods=['POST'])
