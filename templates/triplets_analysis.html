@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Triplets Analysis{% endblock %}
+{% block title %}Triplet Analysis{% endblock %}
 
-{% block page_heading %}Top 10 Most Frequent White Ball Triplets{% endblock %}
+{% block page_heading %}White Ball Triplet Analysis{% endblock %} {# Changed heading to be more general #}
 
 {% block content %}
-<div class="card">
-    <h3 class="text-xl font-semibold mb-4 text-gray-700">Most Frequent Triplets from Historical Draws</h3>
+<div class="card p-6 bg-white rounded-lg shadow-lg"> {# Added padding and shadow classes for consistency #}
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">All White Ball Triplets by Frequency</h2> {# Changed heading to reflect "All Triplets" #}
     
     {% if triplets_data %}
     <div class="overflow-x-auto shadow-md rounded-lg">
@@ -21,6 +21,7 @@
                 {% for triplet_info in triplets_data %}
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {# Ensure the existing ball-like styling is applied #}
                         <span class="inline-flex items-center justify-center bg-blue-200 text-blue-800 text-sm font-semibold px-2.5 py-0.5 rounded-full mr-1">
                             {{ triplet_info['triplet'][0] }}
                         </span>
@@ -31,21 +32,42 @@
                             {{ triplet_info['triplet'][2] }}
                         </span>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ triplet_info['count'] }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ triplet_info['count'] }}</td> {# Changed text-gray-500 to text-gray-900 for better visibility #}
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
     {% else %}
-    <p class="text-gray-500">No triplets data available.</p>
+    <p class="text-gray-500">No triplet data available to display.</p>
     {% endif %}
 </div>
+
+{# Add the small ball styles directly here as they are specific to this page and find_results_by_first_white_ball.html #}
+{# This style block was often placed directly in relevant templates in your previous files #}
+<style>
+    .ball-sm {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        width: 30px; /* Smaller size */
+        height: 30px; /* Smaller size */
+        background-color: #f0f0f0;
+        border-radius: 50%;
+        border: 1px solid #ccc;
+        font-weight: bold;
+        color: #333;
+        margin: 2px;
+        font-size: 0.8em; /* Smaller font */
+        flex-shrink: 0; /* Prevent shrinking in flex container */
+    }
+</style>
 {% endblock %}
 
 {% block scripts %}
 <script>
     // No specific D3.js chart for this page, just rendering data in a table.
-    // However, we can add client-side sorting if desired later.
+    // If you want client-side sorting for this table in the future,
+    // JavaScript code could be added here to handle table sorting.
 </script>
 {% endblock %}
