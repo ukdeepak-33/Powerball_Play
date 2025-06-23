@@ -103,7 +103,7 @@
 
         <h3 class="text-xl font-semibold mb-3 mt-8 text-gray-800">Generate from Your Starting Pair</h3>
         <p class="text-gray-600 mb-4">Enter two white balls, and the application will generate the remaining three white balls and a Powerball to form a unique combination.</p>
-        <form action="{{ url_for('generate_with_user_pair') }}" method="post" class="space-y-4">
+        <form action="{{ url_for('generate_with_user_pair_route') }}" method="post" class="space-y-4"> {# <-- Corrected endpoint here #}
             <div class="form-group">
                 <label for="user_pair" class="form-label">Your Two White Balls (e.g., "18, 19"):</label>
                 <input type="text" name="user_pair" id="user_pair" class="form-input" placeholder="e.g., 23, 45" required>
@@ -246,10 +246,10 @@
         const drawDateInput = document.getElementById('draw_date');
         if (drawDateInput) {
             const today = new Date();
-            const yyyy = today.getFullYear();
-            const mm = String(today.getMonth() + 1).padStart(2, '0'); // Months start at 0!
-            const dd = String(today.getDate()).padStart(2, '0');
-            drawDateInput.value = `${yyyy}-${mm}-${dd}`;
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0'); // Months start at 0!
+            const day = String(today.getDate()).padStart(2, '0');
+            drawDateInput.value = `${year}-${month}-${day}`;
         }
     });
 </script>
