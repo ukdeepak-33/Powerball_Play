@@ -1,255 +1,307 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Powerball Analysis{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN for charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #374151;
+        }
+        /* Common styling for cards and buttons */
+        .btn-primary {
+            @apply bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:shadow-outline transition duration-200 ease-in-out;
+        }
+        .card {
+            @apply bg-white p-6 rounded-lg shadow-md;
+        }
+        .form-group {
+            @apply mb-4;
+        }
+        .form-label {
+            @apply block text-gray-700 text-sm font-bold mb-2;
+        }
+        .form-input {
+            @apply shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline;
+        }
+        .ball {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 45px;
+            height: 45px;
+            background-color: #f0f0f0;
+            border-radius: 50%;
+            border: 2px solid #ccc;
+            font-weight: bold;
+            color: #333;
+            font-size: 1.2em;
+            margin: 0 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .powerball {
+            background-color: #ef4444; /* Red color for powerball */
+            color: white;
+            border-color: #dc2626;
+        }
 
-{% block title %}Powerball Analysis{% endblock %}
+        /* Sidebar specific styles */
+        .sidebar {
+            width: 256px; /* Desktop default */
+            transition: width 0.3s ease-in-out;
+            z-index: 40; /* Ensure it's above main content but below modals */
+            position: fixed; /* Keep sidebar fixed on scroll */
+            height: 100%; /* Full height */
+            overflow-y: auto; /* Enable scrolling for long content */
+        }
+        .sidebar.open {
+            width: 256px;
+        }
+        @media (max-width: 1023px) {
+            .sidebar {
+                width: 0; /* Hidden on mobile by default */
+                position: fixed;
+                left: 0;
+                top: 0;
+            }
+            .sidebar.open {
+                width: 256px; /* Open width on mobile */
+            }
+            .content-area {
+                margin-left: 0; /* No margin on mobile */
+            }
+            .menu-toggle-btn {
+                display: block; /* Show hamburger on mobile */
+            }
+        }
+        @media (min-width: 1024px) {
+            .content-area {
+                margin-left: 256px; /* Desktop margin */
+            }
+            .menu-toggle-btn {
+                display: none; /* Hide hamburger on desktop */
+            }
+        }
+        /* Flash message styling */
+        .flash-message {
+            @apply p-4 mb-4 rounded-lg;
+        }
+        .flash-success {
+            @apply bg-green-100 text-green-800 border border-green-200;
+        }
+        .flash-error {
+            @apply bg-red-100 text-red-800 border border-red-200;
+        }
+        .flash-info {
+            @apply bg-blue-100 text-blue-800 border border-blue-200;
+        }
+    </style>
+    {# D3.js CDN #}
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+        // Common D3 bar chart function
+        function drawBarChart(data, elementId, xKey, yKey, title, xLabel, yLabel) {
+            if (!data || data.length === 0) {
+                document.getElementById(elementId).innerHTML = "<p class='text-gray-500 text-center'>No data available for chart.</p>";
+                return;
+            }
 
-{% block page_heading %}Powerball Generator & Analysis{% endblock %}
+            const container = document.getElementById(elementId);
+            if (!container) {
+                console.error(`Container element with ID '${elementId}' not found.`);
+                return;
+            }
 
-{% block content %}
-<div class="space-y-8">
-    <!-- Last Draw Display -->
-    <div class="card bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6 rounded-lg shadow-xl animate-fade-in">
-        <h2 class="text-3xl font-bold mb-4 text-center">Last Official Powerball Draw</h2>
-        <div class="flex flex-wrap justify-center items-center space-x-2 sm:space-x-4 mb-4">
-            {% if last_draw['Draw Date'] and last_draw['Draw Date'] != 'N/A' %}
-                <span class="text-xl font-semibold">{{ last_draw['Draw Date'] }}</span>
-                <div class="draw-numbers mt-2 sm:mt-0">
-                    {% for number in last_draw['Numbers'] %}
-                        <span class="ball bg-blue-200 text-blue-900 border-blue-400">{{ number }}</span>
-                    {% endfor %}
-                    <span class="ball powerball bg-red-600 text-white border-red-800">{{ last_draw['Powerball'] }}</span>
-                </div>
-            {% else %}
-                <p class="text-center text-lg">No historical data loaded. Please check Supabase connection or add a manual draw.</p>
-            {% endif %}
+            // Clear previous chart
+            container.innerHTML = '';
+
+            const margin = { top: 40, right: 30, bottom: 60, left: 70 };
+            const containerWidth = container.clientWidth;
+            const containerHeight = 400; // Fixed height for consistency
+            const width = containerWidth - margin.left - margin.right;
+            const height = containerHeight - margin.top - margin.bottom;
+
+            const svg = d3.select(`#${elementId}`)
+                .append("svg")
+                .attr("width", containerWidth)
+                .attr("height", containerHeight)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // X scale
+            const xScale = d3.scaleBand()
+                .domain(data.map(d => d[xKey]))
+                .range([0, width])
+                .padding(0.1);
+
+            // Y scale
+            const yScale = d3.scaleLinear()
+                .domain([0, d3.max(data, d => d[yKey])]).nice()
+                .range([height, 0]);
+
+            // X axis
+            svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(xScale))
+                .selectAll("text")
+                .attr("transform", "rotate(-45)")
+                .style("text-anchor", "end");
+
+            // Y axis
+            svg.append("g")
+                .call(d3.axisLeft(yScale));
+
+            // Bars
+            svg.selectAll(".bar")
+                .data(data)
+                .enter().append("rect")
+                .attr("class", "bar")
+                .attr("x", d => xScale(d[xKey]))
+                .attr("y", d => yScale(d[yKey]))
+                .attr("width", xScale.bandwidth())
+                .attr("height", d => height - yScale(d[yKey]))
+                .attr("fill", "#4F46E5"); // Indigo-600
+
+            // Title
+            svg.append("text")
+                .attr("x", width / 2)
+                .attr("y", -margin.top / 2)
+                .attr("text-anchor", "middle")
+                .attr("font-size", "1.2em")
+                .attr("font-weight", "bold")
+                .text(title);
+
+            // X-axis label
+            svg.append("text")
+                .attr("x", width / 2)
+                .attr("y", height + margin.bottom - 10)
+                .attr("text-anchor", "middle")
+                .text(xLabel);
+
+            // Y-axis label
+            svg.append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", -margin.left + 20)
+                .attr("x", -height / 2)
+                .attr("text-anchor", "middle")
+                .text(yLabel);
+        }
+    </script>
+</head>
+<body class="flex min-h-screen">
+    <!-- Sidebar -->
+    <aside class="sidebar bg-gray-800 text-white w-64 p-4 space-y-4 shadow-lg lg:relative">
+        <div class="text-2xl font-bold text-center mb-6">
+            Powerball App
         </div>
-        <div class="text-center">
-            <a href="{{ url_for('update_powerball_data') }}" class="btn-primary inline-block bg-green-500 hover:bg-green-600">Update Latest Draw from Supabase (Simulated)</a>
-            <button onclick="document.getElementById('manualDrawModal').classList.remove('hidden')" class="btn-primary inline-block bg-purple-500 hover:bg-purple-600 ml-4">Add Manual Official Draw</button>
-        </div>
-    </div>
-
-    <!-- Generate Numbers Section -->
-    <div class="card">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Generate New Numbers</h2>
-        <form action="{{ url_for('generate') }}" method="post" class="space-y-4">
-            <div class="form-group">
-                <label for="odd_even_choice" class="form-label">Odd/Even Balance:</label>
-                <select name="odd_even_choice" id="odd_even_choice" class="form-input">
-                    <option value="Any">Any</option>
-                    <option value="All Even">All Even</option>
-                    <option value="All Odd">All Odd</option>
-                    <option value="3 Even / 2 Odd">3 Even / 2 Odd</option>
-                    <option value="3 Odd / 2 Even">3 Odd / 2 Even</option>
-                    <option value="1 Even / 4 Odd">1 Even / 4 Odd</option>
-                    <option value="1 Odd / 4 Even">1 Odd / 4 Even</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="high_low_balance" class="form-label">High/Low Balance (e.g., "2 3" for 2 Low, 3 High):</label>
-                <input type="text" name="high_low_balance" id="high_low_balance" class="form-input" placeholder="e.g., 2 3">
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="form-group">
-                    <label for="white_ball_min" class="form-label">White Ball Min (1-69):</label>
-                    <input type="number" name="white_ball_min" id="white_ball_min" class="form-input" value="1" min="1" max="69">
-                </div>
-                <div class="form-group">
-                    <label for="white_ball_max" class="form-label">White Ball Max (1-69):</label>
-                    <input type="number" name="white_ball_max" id="white_ball_max" class="form-input" value="69" min="1" max="69">
-                </div>
-                <div class="form-group">
-                    <label for="powerball_min" class="form-label">Powerball Min (1-26):</label>
-                    <input type="number" name="powerball_min" id="powerball_min" class="form-input" value="1" min="1" max="26">
-                </div>
-                <div class="form-group">
-                    <label for="powerball_max" class="form-label">Powerball Max (1-26):</label>
-                    <input type="number" name="powerball_max" id="powerball_max" class="form-input" value="26" min="1" max="26">
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="excluded_numbers" class="form-label">Exclude Numbers (comma-separated):</label>
-                <input type="text" name="excluded_numbers" id="excluded_numbers" class="form-input" placeholder="e.g., 1, 13, 27">
-            </div>
-
-            <button type="submit" class="btn-primary w-full">Generate Numbers</button>
-        </form>
-    </div>
-
-    <!-- Group A Strategy -->
-    <div class="card">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Generate with Group A Strategy</h2>
-        <p class="text-gray-600 mb-4">This strategy ensures at least 2 numbers from the "Group A" list are included (3, 5, 6, 7, 9, 11, 15, 16, 18, 21, 23, 24, 27, 31, 32, 33, 36, 42, 44, 45, 48, 50, 51, 54, 55, 60, 66, 69).</p>
-        <form action="{{ url_for('generate_group_a_strategy_route') }}" method="post" class="space-y-4">
-            <div class="form-group">
-                <label for="num_from_group_a" class="form-label">Number of balls from Group A (1-5):</label>
-                <input type="number" name="num_from_group_a" id="num_from_group_a" class="form-input" value="2" min="1" max="5">
-            </div>
-            <!-- Re-using global range and excluded numbers from the first form if needed -->
-            <button type="submit" class="btn-primary w-full">Generate using Group A</button>
-        </form>
-    </div>
-
-    <!-- Modify an Existing Combination Section -->
-    <div class="card">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Modify Existing Combination</h2>
-        <p class="text-gray-600 mb-4">This will pick a random historical draw, modify 3 white balls and the Powerball, and present a new combination.</p>
-        <form action="{{ url_for('generate_modified') }}" method="post">
-            <button type="submit" class="btn-primary w-full">Modify Random Historical Combination</button>
-        </form>
-
-        <h3 class="text-xl font-semibold mb-3 mt-8 text-gray-800">Generate from Your Starting Pair</h3>
-        <p class="text-gray-600 mb-4">Enter two white balls, and the application will generate the remaining three white balls and a Powerball to form a unique combination.</p>
-        <form action="{{ url_for('generate_with_user_pair') }}" method="post" class="space-y-4">
-            <div class="form-group">
-                <label for="user_pair" class="form-label">Your Two White Balls (e.g., "18, 19"):</label>
-                <input type="text" name="user_pair" id="user_pair" class="form-input" placeholder="e.g., 23, 45" required>
-            </div>
-            <button type="submit" class="btn-primary w-full">Generate from My Pair</button>
-        </form>
-    </div>
-
-
-    <!-- Generated Numbers Display -->
-    {% if white_balls and powerball %}
-    <div class="card bg-indigo-500 text-white p-6 rounded-lg shadow-xl animate-fade-in">
-        <h2 class="text-3xl font-bold mb-4 text-center">Your Generated Numbers</h2>
-        <div class="flex flex-wrap justify-center items-center space-x-2 sm:space-x-4 mb-4">
-            {% for number in white_balls %}
-                <span class="ball bg-green-200 text-green-900 border-green-400">{{ number }}</span>
-            {% endfor %}
-            <span class="ball powerball bg-red-600 text-white border-red-800">{{ powerball }}</span>
-        </div>
-
-        <div class="text-center mb-6">
-            <h3 class="text-xl font-semibold mb-2">Last Drawn Dates for Your Numbers:</h3>
-            <ul class="list-disc list-inside inline-block text-left">
-                {% for key, value in last_draw_dates.items() %}
-                    <li><strong>{{ key }}:</strong> {{ value }}</li>
-                {% endfor %}
+        <nav>
+            <ul class="space-y-2">
+                <li><a href="{{ url_for('index') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Home / Generate</a></li>
+                <li><a href="{{ url_for('frequency_analysis_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Frequency Analysis</a></li>
+                <li><a href="{{ url_for('hot_cold_numbers_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Hot/Cold Numbers</a></li>
+                <li><a href="{{ url_for('monthly_white_ball_analysis_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Monthly WB Analysis</a></li>
+                <li><a href="{{ url_for('sum_of_main_balls_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Sum of Main Balls</a></li>
+                <li><a href="{{ url_for('simulate_multiple_draws_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Simulate Draws</a></li>
+                <li><a href="{{ url_for('winning_probability_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Winning Probability</a></li>
+                <li><a href="{{ url_for('partial_match_probabilities_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Partial Match Prob.</a></li>
+                <li><a href="{{ url_for('number_age_distribution_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Number Age Dist.</a></li>
+                <li><a href="{{ url_for('co_occurrence_analysis_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Co-Occurrence Matrix</a></li>
+                <li><a href="{{ url_for('powerball_position_frequency_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Powerball Position Freq.</a></li>
+                <li><a href="{{ url_for('powerball_frequency_by_year_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">PB Freq. by Year</a></li>
+                <li><a href="{{ url_for('odd_even_trends_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Odd/Even Trends</a></li>
+                <li><a href="{{ url_for('consecutive_trends_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Consecutive Trends</a></li>
+                <li><a href="{{ url_for('triplets_analysis_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Triplets Analysis</a></li>
+                <li><a href="{{ url_for('grouped_patterns_analysis_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Grouped Patterns</a></li>
+                <li><a href="{{ url_for('find_results_by_first_white_ball') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">Find by First WB</a></li>
+                <li><a href="{{ url_for('generated_numbers_history_route') }}" class="block py-2 px-4 rounded hover:bg-gray-700 transition duration-200">My Generated Numbers</a></li>
             </ul>
-        </div>
+        </nav>
+    </aside>
 
-        <form action="{{ url_for('save_generated_pick_route') }}" method="post" class="mt-4 flex flex-col items-center">
-            <input type="hidden" name="generated_white_balls" value="{{ white_balls | join(',') }}">
-            <input type="hidden" name="generated_powerball" value="{{ powerball }}">
-            <button type="submit" class="btn-primary bg-yellow-500 hover:bg-yellow-600">Save Generated Numbers</button>
-        </form>
-        <p class="text-sm text-center text-gray-200 mt-2">
-            Saving these numbers allows you to analyze them against future official draws in the "Generated Numbers History" page.
-        </p>
+    <!-- Main Content Area -->
+    <div class="flex-1 p-6 lg:ml-0 transition-all duration-300 ease-in-out content-area">
+        <!-- Mobile Menu Toggle Button -->
+        <button id="menuToggle" class="menu-toggle-btn fixed top-4 left-4 bg-gray-800 text-white p-3 rounded-full shadow-lg z-50">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
 
-        <!-- Analyze Against Historical Draws (AJAX) -->
-        <div class="mt-8 pt-6 border-t border-indigo-400">
-            <h3 class="text-2xl font-bold mb-4 text-center">Analyze Your Generated Numbers Against Historical Draws</h3>
-            <p class="text-center text-gray-200 mb-4">See how your generated numbers would have performed in the last 2 years.</p>
-            <div class="text-center">
-                <button id="analyzeHistoricalBtn" class="btn-primary bg-orange-500 hover:bg-orange-600">
-                    Analyze Now
-                </button>
-            </div>
-            <div id="historicalAnalysisResults" class="mt-4 hidden">
-                <h4 class="text-xl font-semibold mb-3 text-center">Match Summary (Last 2 Years):</h4>
-                <div id="analysisSummaryContent" class="bg-white text-gray-800 p-4 rounded-lg shadow">
-                    <p class="text-center">Loading results...</p>
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages space-y-3 mb-6">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
                 </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
+            {% endif %}
+        {% endwith %}
 
-    <!-- Manual Draw Modal -->
-    <div id="manualDrawModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50">
-        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
-            <h2 class="text-2xl font-bold mb-4 text-gray-800">Add New Official Draw</h2>
-            <form action="{{ url_for('save_official_draw_route') }}" method="post" class="space-y-4">
-                <div class="form-group">
-                    <label for="draw_date" class="form-label">Draw Date:</label>
-                    <input type="date" name="draw_date" id="draw_date" class="form-input" required>
-                </div>
-                <div class="grid grid-cols-3 gap-4">
-                    <div class="form-group"><label for="n1" class="form-label">N1:</label><input type="number" name="n1" class="form-input" min="1" max="69" required></div>
-                    <div class="form-group"><label for="n2" class="form-label">N2:</label><input type="number" name="n2" class="form-input" min="1" max="69" required></div>
-                    <div class="form-group"><label for="n3" class="form-label">N3:</label><input type="number" name="n3" class="form-input" min="1" max="69" required></div>
-                    <div class="form-group"><label for="n4" class="form-label">N4:</label><input type="number" name="n4" class="form-input" min="1" max="69" required></div>
-                    <div class="form-group"><label for="n5" class="form-label">N5:</label><input type="number" name="n5" class="form-input" min="1" max="69" required></div>
-                    <div class="form-group"><label for="pb" class="form-label">PB:</label><input type="number" name="pb" class="form-input" min="1" max="26" required></div>
-                </div>
-                <div class="flex justify-end space-x-4 mt-6">
-                    <button type="button" onclick="document.getElementById('manualDrawModal').classList.add('hidden')" class="btn-primary bg-gray-500 hover:bg-gray-600">Cancel</button>
-                    <button type="submit" class="btn-primary">Save Draw</button>
-                </div>
-            </form>
-        </div>
+        <h1 class="text-4xl font-extrabold text-gray-900 mb-8 text-center">{% block page_heading %}{% endblock %}</h1>
+        
+        {% block content %}{% endblock %}
     </div>
 
-</div>
-{% endblock %}
+    {% block scripts %}
+    {# This block is intentionally left to be overridden by child templates if they need to add more scripts. #}
+    {# If a child template uses {{ super() }} in its scripts block, it will include the D3 script from here. #}
+    {% endblock %}
 
-{% block scripts %}
-{{ super() }} {# Keep existing scripts from base.html #}
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const analyzeHistoricalBtn = document.getElementById('analyzeHistoricalBtn');
-        const historicalAnalysisResults = document.getElementById('historicalAnalysisResults');
-        const analysisSummaryContent = document.getElementById('analysisSummaryContent');
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.querySelector('.sidebar');
+            const menuToggle = document.getElementById('menuToggle');
 
-        if (analyzeHistoricalBtn) {
-            analyzeHistoricalBtn.addEventListener('click', async function() {
-                historicalAnalysisResults.classList.remove('hidden');
-                analysisSummaryContent.innerHTML = '<p class="text-center">Loading results...</p>';
+            const closeSidebar = () => {
+                sidebar.classList.remove('open');
+            };
 
-                const generatedWhiteBalls = document.querySelector('input[name="generated_white_balls"]').value;
-                const generatedPowerball = document.querySelector('input[name="generated_powerball"]').value;
+            if (menuToggle) {
+                menuToggle.addEventListener('click', () => {
+                    sidebar.classList.toggle('open');
+                });
+            }
 
-                try {
-                    const response = await fetch('/analyze_generated_historical_matches', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            generated_white_balls: generatedWhiteBalls,
-                            generated_powerball: generatedPowerball
-                        })
-                    });
-                    const result = await response.json();
-
-                    if (result.success) {
-                        let summaryHtml = '<ul class="list-disc list-inside space-y-1">';
-                        for (const category in result.match_summary) {
-                            const count = result.match_summary[category].count;
-                            if (count > 0) {
-                                summaryHtml += `<li><strong>${category}:</strong> ${count} time(s)</li>`;
-                                // Optionally display draw dates for matches if needed
-                                // result.match_summary[category].draws.forEach(draw => {
-                                //     summaryHtml += `<ul><li>(${draw.date}): ${draw.white_balls.join(',')} + PB ${draw.powerball}</li></ul>`;
-                                // });
-                            }
-                        }
-                        summaryHtml += '</ul>';
-                        analysisSummaryContent.innerHTML = summaryHtml;
-                    } else {
-                        analysisSummaryContent.innerHTML = `<p class="text-red-600">Error: ${result.error}</p>`;
+            // Close sidebar if a link is clicked (mobile only)
+            sidebar.querySelectorAll('a').forEach(link => {
+                link.addEventListener('click', () => {
+                    if (window.innerWidth < 1024) { // Only on mobile breakpoints
+                        closeSidebar();
                     }
-                } catch (error) {
-                    console.error('Error fetching historical analysis:', error);
-                    analysisSummaryContent.innerHTML = `<p class="text-red-600">An error occurred during analysis.</p>`;
+                });
+            });
+
+            // Close sidebar if clicked outside (only on mobile when opened)
+            document.addEventListener('click', (event) => {
+                if (window.innerWidth < 1024 && sidebar.classList.contains('open') &&
+                    !sidebar.contains(event.target) && (menuToggle && !menuToggle.contains(event.target))) {
+                    closeSidebar();
                 }
             });
-        }
 
-        // Set today's date as default for the manual draw date input
-        const drawDateInput = document.getElementById('draw_date');
-        if (drawDateInput) {
-            const today = new Date();
-            const yyyy = today.getFullYear();
-            const mm = String(today.getMonth() + 1).padStart(2, '0'); // Months start at 0!
-            const dd = String(today.getDate()).padStart(2, '0');
-            drawDateInput.value = `${yyyy}-${mm}-${dd}`;
-        }
-    });
-</script>
-{% endblock %}
+            // Handle initial state and resize for desktop
+            const adjustLayoutForDesktop = () => {
+                if (window.innerWidth >= 1024) {
+                    sidebar.style.width = '256px'; // Ensure fixed width on desktop
+                    sidebar.classList.remove('open'); // Ensure 'open' class is not interfering with desktop width
+                } else {
+                    sidebar.style.width = '0'; // Ensure hidden on mobile initially
+                }
+            };
+
+            // Run on load and resize
+            adjustLayoutForDesktop();
+            window.addEventListener('resize', adjustLayoutForDesktop);
+        });
+    </script>
+</body>
+</html>
