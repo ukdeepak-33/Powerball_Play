@@ -2,49 +2,61 @@
 
 {% block title %}Triplet Analysis{% endblock %}
 
-{% block page_heading %}White Ball Triplet Analysis{% endblock %} {# Changed heading to be more general #}
+{% block page_heading %}White Ball Triplet Analysis{% endblock %} {# Original heading maintained #}
 
 {% block content %}
-<div class="card p-6 bg-white rounded-lg shadow-lg"> {# Added padding and shadow classes for consistency #}
-    <h2 class="text-2xl font-bold mb-4 text-gray-800">All White Ball Triplets by Frequency</h2> {# Changed heading to reflect "All Triplets" #}
-    
-    {% if triplets_data %}
-    <div class="overflow-x-auto shadow-md rounded-lg">
-        <table class="min-w-full divide-y divide-gray-200" id="tripletsTable">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Triplet</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-                {% for triplet_info in triplets_data %}
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {# Ensure the existing ball-like styling is applied #}
-                        <span class="inline-flex items-center justify-center bg-blue-200 text-blue-800 text-sm font-semibold px-2.5 py-0.5 rounded-full mr-1">
-                            {{ triplet_info['triplet'][0] }}
-                        </span>
-                        <span class="inline-flex items-center justify-center bg-blue-200 text-blue-800 text-sm font-semibold px-2.5 py-0.5 rounded-full mr-1">
-                            {{ triplet_info['triplet'][1] }}
-                        </span>
-                        <span class="inline-flex items-center justify-center bg-blue-200 text-blue-800 text-sm font-semibold px-2.5 py-0.5 rounded-full">
-                            {{ triplet_info['triplet'][2] }}
-                        </span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ triplet_info['count'] }}</td> {# Changed text-gray-500 to text-gray-900 for better visibility #}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<div class="space-y-8"> {# Added space-y-8 for consistent vertical spacing between cards #}
+    {# New Card for Top Triplet Frequencies Chart #}
+    <div class="card p-6 bg-white rounded-lg shadow-lg"> {# Consistent card styling #}
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Top Triplet Frequencies</h2>
+        <p class="text-gray-700 mb-4">This chart displays the frequency of the most common white ball triplets from historical draws.</p>
+        <div class="relative h-96 w-full"> {# Chart container with fixed height for Chart.js #}
+            <canvas id="tripletFrequencyChart"></canvas>
+        </div>
     </div>
-    {% else %}
-    <p class="text-gray-500">No triplet data available to display.</p>
-    {% endif %}
+
+    {# Existing Detailed Table for ALL Triplets #}
+    <div class="card p-6 bg-white rounded-lg shadow-lg"> {# Original card styling maintained #}
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">All White Ball Triplets by Frequency</h2> {# Original heading maintained #}
+        <p class="text-gray-700 mb-4">A complete list of all unique white ball triplets found in historical draws, sorted by their frequency.</p> {# New descriptive paragraph #}
+        
+        {% if triplets_data %}
+        <div class="overflow-x-auto shadow-md rounded-lg">
+            <table class="min-w-full divide-y divide-gray-200" id="tripletsTable">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Triplet</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for triplet_info in triplets_data %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {# Original ball-like styling maintained #}
+                            <span class="inline-flex items-center justify-center bg-blue-200 text-blue-800 text-sm font-semibold px-2.5 py-0.5 rounded-full mr-1">
+                                {{ triplet_info['triplet'][0] }}
+                            </span>
+                            <span class="inline-flex items-center justify-center bg-blue-200 text-blue-800 text-sm font-semibold px-2.5 py-0.5 rounded-full mr-1">
+                                {{ triplet_info['triplet'][1] }}
+                            </span>
+                            <span class="inline-flex items-center justify-center bg-blue-200 text-blue-800 text-sm font-semibold px-2.5 py-0.5 rounded-full">
+                                {{ triplet_info['triplet'][2] }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ triplet_info['count'] }}</td> {# Original text-gray-900 maintained #}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-gray-500">No triplet data available to display.</p>
+        {% endif %}
+    </div>
 </div>
 
-{# Add the small ball styles directly here as they are specific to this page and find_results_by_first_white_ball.html #}
-{# This style block was often placed directly in relevant templates in your previous files #}
+{# Original small ball styles directly here as they are specific to this page #}
 <style>
     .ball-sm {
         display: inline-flex;
@@ -65,9 +77,79 @@
 {% endblock %}
 
 {% block scripts %}
+{{ super() }} {# Keep this to include Chart.js from base.html #}
 <script>
-    // No specific D3.js chart for this page, just rendering data in a table.
-    // If you want client-side sorting for this table in the future,
-    // JavaScript code could be added here to handle table sorting.
+    document.addEventListener('DOMContentLoaded', function() {
+        // All triplets data passed from Python
+        const allTripletsData = {{ triplets_data | tojson }}; 
+
+        if (allTripletsData && allTripletsData.length > 0) {
+            // Determine how many top triplets to show in the chart
+            // Showing top 30, or fewer if less than 30 unique triplets
+            const topN = Math.min(allTripletsData.length, 30); 
+            const chartData = allTripletsData.slice(0, topN);
+
+            const labels = chartData.map(d => d.triplet.join(', ')); // Format [1,2,3] as "1, 2, 3" for chart labels
+            const data = chartData.map(d => d.count);
+
+            const ctx = document.getElementById('tripletFrequencyChart');
+            if (ctx) {
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Frequency',
+                            data: data,
+                            backgroundColor: 'rgba(59, 130, 246, 0.7)', // Tailwind blue-500
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Number of Occurrences'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Triplet Combination'
+                                },
+                                ticks: {
+                                    autoSkip: false, // Prevent skipping labels on X-axis
+                                    maxRotation: 45, // Rotate labels for readability
+                                    minRotation: 45
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                callbacks: {
+                                    title: function(context) {
+                                        return 'Triplet: ' + context[0].label;
+                                    },
+                                    label: function(context) {
+                                        return 'Frequency: ' + context.parsed.y;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    });
 </script>
 {% endblock %}
