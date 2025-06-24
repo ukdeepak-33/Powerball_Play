@@ -168,6 +168,7 @@
         <div class="text-2xl font-bold mb-8 text-center text-blue-300">Powerball Pro</div>
         <nav>
             <ul class="space-y-3">
+                {# TOP 13 PREFERENCES #}
                 <li><a href="{{ url_for('index') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path></svg>
                     Home
@@ -175,10 +176,6 @@
                 <li><a href="{{ url_for('frequency_analysis_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M16 12a4 4 0 10-8 0 4 4 0 008 0z"></path><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 2a8 8 0 100 16 8 8 0 000-16z" clip-rule="evenodd"></path></svg>
                     Frequency Analysis
-                </a></li>
-                 <li><a href="{{ url_for('hot_cold_numbers_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
-                    Hot & Cold Numbers
                 </a></li>
                 <li><a href="{{ url_for('monthly_white_ball_analysis_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 3H5c-1.103 0-2 .897-2 2v14c0 1.103.897 2 2 2h14c1.103 0 2-.897 2-2V5c0-1.103-.897-2-2-2zm-5 14h-4v-6h4v6zm4-8H6V7h12v2z"></path></svg>
@@ -192,49 +189,54 @@
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15.5 14h-.79l-.28-.27C14.53 12.63 15 11.37 15 10c0-2.76-2.24-5-5-5S5 7.24 5 10s2.24 5 5 5c1.37 0 2.63-.47 3.66-1.28l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"></path></svg>
                     Search by Sum
                 </a></li>
-                <li><a href="{{ url_for('simulate_multiple_draws_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.63.09-1.24.22-1.83l.86.63c.12.09.28.16.44.16.29 0 .5-.21.5-.5V8.5c0-.28-.22-.5-.5-.5H6c-.28 0-.5.22-.5.5v2c0 .28-.22.5-.5.5s-.5-.22-.5-.5v-2c0-.28-.22-.5-.5-.5H3c-.28 0-.5.22-.5.5v.5c0 4.14 3.36 7.5 7.5 7.5 3.32 0 6.13-2.14 7.15-5.11l-1.3-.46c-.29-.1-.62.06-.72.35-.1.29.06.62.35.72l1.55.55c.08-.02.16-.04.24-.07.69-2.02.59-4.32-.24-6.32l.74-.53c.2-.14.26-.41.14-.62-.14-.2-.41-.26-.62-.14l-1.34.95C17.1 9.07 18 10.46 18 12c0 3.31-2.69 6-6 6zm6-9c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zM7 9c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zM12 4c-1.55 0-2.88.82-3.64 2.05l1.37.98c.2.14.26.41.14.62-.14.2-.41.26-.62.14L7.5 7.5c-1.42 1.95-1.52 4.41-.3 6.38l-.75.54c-.2.14-.26.41-.14.62.14.2.08-.47-.14-.62l-1.34-.95C7.9 16.93 10 18 12 18s4.1-1.07 5.66-2.8l1.34.95c.2.14.47.08.62-.14.14-.2.08-.47-.14-.62l-.75-.54C17.52 11.59 17.52 8.05 15.5 6.05L14 7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"></path></svg>
-                    Simulate Draws
+                <li><a href="{{ url_for('find_results_by_first_white_ball') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM11 6h2v6h-2zM11 14h2v2h-2z"></path></svg>
+                    Search by First White Ball
                 </a></li>
-                <li><a href="{{ url_for('generated_numbers_history_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 3H6c-1.103 0-2 .897-2 2v14c0 1.103.897 2 2 2h12c1.103 0 2-.897 2-2V9c0-.493-.061-.968-.179-1.428l-.058-.225A.996.996 0 0019 7h-6V3zm.001-2c.001 0 .001 0 .001 0V7h6V5.414L17.586 4H14v-.001c-.001-.001-.001-.001-.001-.001zm0 8h6v2h-6V9zm0 4h6v2h-6v-2z"></path></svg>
-                    Generated History
-                </a></li>
-                <li><a href="{{ url_for('number_age_distribution_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-.5-5h-1v-4h1v4zm0-6h-1V7h1v1zm3-3h-1V7h1v1zM9.5 9h-1V5h1v4z"></path></svg>
-                    Number Age Distribution
-                </a></li>
-                <li><a href="{{ url_for('co_occurrence_analysis_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9zm0 16c-3.86 0-7-3.14-7-7s3.14-7 7-7 7 3.14 7 7-3.14 7-7 7zM10.2 7.2l-2.8-2.8-1.4 1.4 2.8 2.8c.6-.6.9-1.3.9-2.2 0-.8-.3-1.5-.9-2.2zM13.8 16.8l2.8 2.8 1.4-1.4-2.8-2.8c-.6.6-.9 1.3-.9 2.2 0 .8.3 1.5.9 2.2zM16.8 13.8l-2.8 2.8-1.4-1.4 2.8-2.8c.6-.6.9-1.3.9-2.2 0-.8-.3-1.5-.9-2.2zM7.2 10.2l2.8 2.8 1.4-1.4-2.8-2.8c-.6.6-.9 1.3-.9 2.2 0 .8.3 1.5.9 2.2z"></path></svg>
-                    Co-occurrence Analysis
-                </a></li>
-                <li><a href="{{ url_for('powerball_position_frequency_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L4 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-8-3zm-1 15.93V13h2v4.93c0 .5-.19 1-.52 1.38L12 20.35l-.48-.04c-.33-.03-.52-.53-.52-1.03z"></path></svg>
-                    Powerball Position Freq
-                </a></li>
-                <li><a href="{{ url_for('powerball_frequency_by_year_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 3H5c-1.103 0-2 .897-2 2v14c0 1.103.897 2 2 2h14c1.103 0 2-.897 2-2V5c0-1.103-.897-2-2-2zM5 5h14v14H5V5zm4 10h2v-6H9v6zm4 0h2v-3h-2v3zm4 0h2v-9h-2v9z"></path></svg>
-                    Powerball Freq by Year
+                 <li><a href="{{ url_for('hot_cold_numbers_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
+                    Hot & Cold Numbers
                 </a></li>
                 <li><a href="{{ url_for('odd_even_trends_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12s4.48 10 10 10 10-4.48 10-10zm-9 7v-4h-2v4H7l4 4 4-4h-3zM12 5L8 9h3v4h2V9h3l-4-4z"></path></svg>
                     Odd/Even Trends
                 </a></li>
-                <li><a href="{{ url_for('consecutive_trends_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 9l-3-3H6V3h12v3h-5l3 3zm-3 6l3 3h5v3H6v-3h5l-3-3z"></path></svg>
-                    Consecutive Trends
+                <li><a href="{{ url_for('grouped_patterns_analysis_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"></path></svg>
+                    Grouped Patterns
+                </a></li>
+                <li><a href="{{ url_for('co_occurrence_analysis_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9zm0 16c-3.86 0-7-3.14-7-7s3.14-7 7-7 7 3.14 7 7-3.14 7-7 7zM10.2 7.2l-2.8-2.8-1.4 1.4 2.8 2.8c.6-.6.9-1.3.9-2.2 0-.8-.3-1.5-.9-2.2zM13.8 16.8l2.8 2.8 1.4-1.4-2.8-2.8c-.6.6-.9 1.3-.9 2.2 0 .8.3 1.5.9 2.2zM16.8 13.8l-2.8 2.8-1.4-1.4 2.8-2.8c.6-.6.9-1.3.9-2.2 0-.8-.3-1.5-.9-2.2zM7.2 10.2l2.8 2.8 1.4-1.4-2.8-2.8c-.6.6-.9 1.3-.9 2.2 0 .8.3 1.5.9 2.2z"></path></svg>
+                    Co-occurrence Analysis
+                </a></li>
+                <li><a href="{{ url_for('number_age_distribution_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-.5-5h-1v-4h1v4zm0-6h-1V7h1v1zm3-3h-1V7h1v1zM9.5 9h-1V5h1v4z"></path></svg>
+                    Number Age Distribution
+                </a></li>
+                <li><a href="{{ url_for('powerball_frequency_by_year_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 3H5c-1.103 0-2 .897-2 2v14c0 1.103.897 2 2 2h14c1.103 0 2-.897 2-2V5c0-1.103-.897-2-2-2zM5 5h14v14H5V5zm4 10h2v-6H9v6zm4 0h2v-3h-2v3zm4 0h2v-9h-2v9z"></path></svg>
+                    Powerball Freq by Year
+                </a></li>
+                <li><a href="{{ url_for('powerball_position_frequency_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L4 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-8-3zm-1 15.93V13h2v4.93c0 .5-.19 1-.52 1.38L12 20.35l-.48-.04c-.33-.03-.52-.53-.52-1.03z"></path></svg>
+                    Powerball Position Freq
+                </a></li>
+                {# REST OF THE ITEMS (Auto-arranged based on original order after top 13) #}
+                <li><a href="{{ url_for('simulate_multiple_draws_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.63.09-1.24.22-1.83l.86.63c.12.09.28.16.44.16.29 0 .5-.21.5-.5V8.5c0-.28-.22-.5-.5-.5H6c-.28 0-.5.22-.5.5v2c0 .28-.22.5-.5.5s-.5-.22-.5-.5v-2c0-.28-.22-.5-.5-.5H3c-.28 0-.5.22-.5.5v.5c0 4.14 3.36 7.5 7.5 7.5 3.32 0 6.13-2.14 7.15-5.11l-1.3-.46c-.29-.1-.62.06-.72.35-.1.29.06.62.35.72l1.55.55c.08-.02.16-.04.24-.07.69-2.02.59-4.32-.24-6.32l.74-.53c.2-.14.26-.41.14-.62-.14-.2-.41-.26-.62-.14l-1.34.95C17.1 9.07 18 10.46 18 12c0 3.31-2.69 6-6 6zm6-9c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zM7 9c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zM12 4c-1.55 0-2.88.82-3.64 2.05l1.37.98c.2.14.26.41.14.62-.14.2-.41.26-.62.14L7.5 7.5c-1.42 1.95-1.52 4.41-.3 6.38l-.75.54c-.2.14-.26.41-.14.62.14.2.08-.47-.14-.62l-1.34-.95C7.9 16.93 10 18 12 18s4.1-1.07 5.66-2.8l1.34.95c.2.14.47.08.62-.14.14-.2.08-.47-.14-.62l-.75-.54C17.52 11.59 17.52 8.05 15.5 6.05L14 7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"></path></svg>
+                    Simulate Draws
                 </a></li>
                 <li><a href="{{ url_for('triplets_analysis_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-4.5-9h9V9h-9v2z"></path></svg>
                     Triplets Analysis
                 </a></li>
-                <li><a href="{{ url_for('grouped_patterns_analysis_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"></path></svg>
-                    Grouped Patterns
+                <li><a href="{{ url_for('generated_numbers_history_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 3H6c-1.103 0-2 .897-2 2v14c0 1.103.897 2 2 2h12c1.103 0 2-.897 2-2V9c0-.493-.061-.968-.179-1.428l-.058-.225A.996.996 0 0019 7h-6V3zm.001-2c.001 0 .001 0 .001 0V7h6V5.414L17.586 4H14v-.001c-.001-.001-.001-.001-.001-.001zm0 8h6v2h-6V9zm0 4h6v2h-6v-2z"></path></svg>
+                    Generated History
                 </a></li>
-                <li><a href="{{ url_for('find_results_by_first_white_ball') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM11 6h2v6h-2zM11 14h2v2h-2z"></path></svg>
-                    Search by First White Ball
+                <li><a href="{{ url_for('consecutive_trends_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 9l-3-3H6V3h12v3h-5l3 3zm-3 6l3 3h5v3H6v-3h5l-3-3z"></path></svg>
+                    Consecutive Trends
                 </a></li>
                  <li><a href="{{ url_for('update_powerball_data') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 10h-4V6H6v12h12V6l-4 4zm-2 0h-1v-1l1-1V6h-1l-1 1-1-1H9l-1 1-1-1H4v10h14V8h-2z"></path></svg>
