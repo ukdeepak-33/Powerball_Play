@@ -201,8 +201,8 @@
         display: inline-flex;
         justify-content: center;
         align-items: center;
-        width: 48px; /* Increased size for better number fit */
-        height: 48px; /* Must be equal to width for perfect circle */
+        width: 48px; /* Consistent width */
+        height: 48px; /* Consistent height for perfect circle */
         background-color: #f0f0f0;
         border-radius: 50%; /* Ensures it's perfectly round */
         border: 1px solid #ccc;
@@ -214,10 +214,23 @@
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     .powerball-ball {
+        /* These properties are crucial for making it round */
+        width: 48px; /* Ensure width matches .ball */
+        height: 48px; /* Ensure height matches .ball */
+        border-radius: 50%; /* Explicitly make it perfectly round */
         background-color: #ef4444; /* Red color for powerball */
         color: white;
         border-color: #dc2626;
-        border-radius: 50%; /* Ensure this specific one is also perfectly round */
+        
+        /* Inherit or re-apply other necessary display properties from .ball */
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        font-weight: bold;
+        margin: 0 4px;
+        font-size: 1.25rem; /* Consistent font size */
+        flex-shrink: 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Consistent shadow */
     }
     .powerball-label {
         color: #ef4444; /* Red color for Powerball label */
@@ -230,23 +243,36 @@
         display: inline-flex;
         justify-content: center;
         align-items: center;
-        width: 80px; /* Further increased size */
-        height: 80px; /* Must be equal to width for perfect circle */
+        width: 80px; /* Consistent width */
+        height: 80px; /* Consistent height for perfect circle */
         background-color: #fff; /* White background for contrast */
         border-radius: 50%; /* Ensures it's perfectly round */
         border: 2px solid #a78bfa; /* Soft purple border */
         color: #374151; /* Dark text */
         box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Stronger shadow */
         font-family: 'Inter', sans-serif;
-        font-size: 3rem; /* Adjusted for better fit, equivalent to text-5xl or text-6xl */
+        font-size: 3rem; /* Adjusted for better fit */
         flex-shrink: 0;
     }
 
     .generated-powerball-ball {
+        /* These properties are crucial for making it round */
+        width: 80px; /* Ensure width matches .generated-ball */
+        height: 80px; /* Ensure height matches .generated-ball */
+        border-radius: 50%; /* Explicitly make it perfectly round */
         background-color: #ef4444; /* Red color for powerball */
         color: white;
         border-color: #dc2626;
-        border-radius: 50%; /* Ensure this specific one is also perfectly round */
+
+        /* Inherit or re-apply other necessary display properties from .generated-ball */
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        font-weight: bold;
+        margin: 0 4px; /* Adjust margin if needed, currently matching .ball */
+        font-size: 3rem; /* Consistent font size */
+        flex-shrink: 0;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Consistent shadow */
     }
 
     /* Animation for generated numbers */
