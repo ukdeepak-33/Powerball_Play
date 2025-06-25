@@ -6,16 +6,16 @@
 
 {% block content %}
 <div class="space-y-8">
-    {# Section 1: Monthly Top Numbers #}
+    {# Section 1: Monthly White Balls and Powerballs Drawn (Last 6 Months) #}
     <div class="card p-6 bg-white rounded-lg shadow-lg">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Top Numbers by Month (Last 12 Months)</h2>
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Monthly White Balls and Powerballs Drawn (Last 6 Months)</h2>
         {% if monthly_data %}
             {% for month_info in monthly_data %}
                 <div class="mb-6 pb-4 border-b border-gray-200 last:border-b-0">
                     <h3 class="text-xl font-semibold mb-3 text-blue-700">{{ month_info.month }}</h3>
                     
-                    {# Top White Balls for the Month #}
-                    <p class="font-medium text-gray-700 mb-2">Top {{ month_info.top_white_balls|length }} White Balls:</p>
+                    {# All White Balls for the Month #}
+                    <p class="font-medium text-gray-700 mb-2">White Balls Drawn:</p>
                     {% if month_info.top_white_balls %}
                         <div class="flex flex-wrap items-center mb-4">
                             {% for ball_info in month_info.top_white_balls %}
@@ -50,7 +50,7 @@
         {% endif %}
     </div>
 
-    {# Section 2: Monthly Streaks #}
+    {# Section 2: Consecutive Monthly Streaks #}
     <div class="card p-6 bg-white rounded-lg shadow-lg">
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Consecutive Monthly Streaks</h2>
         <p class="text-gray-700 mb-4">Numbers appearing in consecutive completed months:</p>
