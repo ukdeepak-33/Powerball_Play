@@ -6,9 +6,9 @@
 
 {% block content %}
 <div class="space-y-8">
-    {# Section 1: Monthly White Balls and Powerballs Drawn (Last 6 Months, including current) #}
+    {# Section 1: Monthly White Balls and Powerballs Drawn & Not Picked (Last 6 Months, including current) #}
     <div class="card p-6 bg-white rounded-lg shadow-lg">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Monthly White Balls and Powerballs Drawn (Last 6 Months)</h2>
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Monthly Number Analysis (Last 6 Months)</h2>
         {% if monthly_data %}
             {% for month_info in monthly_data %}
                 <div class="mb-6 pb-4 border-b border-gray-200 last:border-b-0">
@@ -19,11 +19,11 @@
                         {% endif %}
                     </h3>
                     
-                    {# All White Balls for the Month #}
+                    {# White Balls Drawn for the Month #}
                     <p class="font-medium text-gray-700 mb-2">White Balls Drawn:</p>
-                    {% if month_info.top_white_balls %}
+                    {% if month_info.drawn_white_balls_with_counts %}
                         <div class="flex flex-wrap items-center mb-4">
-                            {% for ball_info in month_info.top_white_balls %}
+                            {% for ball_info in month_info.drawn_white_balls_with_counts %}
                                 <div class="ball-sm flex flex-col justify-center items-center mr-1 mb-1">
                                     <span class="text-sm font-bold">{{ ball_info.number }}</span>
                                     <span class="text-xs text-gray-600">({{ ball_info.count }})</span>
@@ -31,11 +31,25 @@
                             {% endfor %}
                         </div>
                     {% else %}
-                        <p class="text-gray-500 text-sm">No white ball data for this month.</p>
+                        <p class="text-gray-500 text-sm">No white balls drawn this month.</p>
+                    {% endif %}
+
+                    {# White Balls Not Picked for the Month #}
+                    <p class="font-medium text-gray-700 mb-2 mt-4">White Balls Not Picked:</p>
+                    {% if month_info.not_picked_white_balls %}
+                        <div class="flex flex-wrap items-center mb-4">
+                            {% for number in month_info.not_picked_white_balls %}
+                                <div class="ball-sm not-picked-ball flex items-center justify-center mr-1 mb-1">
+                                    <span class="text-sm font-bold">{{ number }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-gray-500 text-sm">All white balls were picked this month!</p>
                     {% endif %}
 
                     {# Top Powerballs for the Month #}
-                    <p class="font-medium text-gray-700 mb-2">Top {{ month_info.top_powerballs|length }} Powerballs:</p>
+                    <p class="font-medium text-gray-700 mb-2 mt-4">Top {{ month_info.top_powerballs|length }} Powerballs:</p>
                     {% if month_info.top_powerballs %}
                         <div class="flex flex-wrap items-center">
                             {% for ball_info in month_info.top_powerballs %}
@@ -48,10 +62,25 @@
                     {% else %}
                         <p class="text-gray-500 text-sm">No Powerball data for this month.</p>
                     {% endif %}
+
+                    {# Powerballs Not Picked for the Month #}
+                    <p class="font-medium text-gray-700 mb-2 mt-4">Powerballs Not Picked:</p>
+                    {% if month_info.not_picked_powerballs %}
+                        <div class="flex flex-wrap items-center">
+                            {% for number in month_info.not_picked_powerballs %}
+                                <div class="ball-sm not-picked-powerball flex items-center justify-center mr-1 mb-1">
+                                    <span class="text-sm font-bold">{{ number }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-gray-500 text-sm">All Powerballs were picked this month!</p>
+                    {% endif %}
+
                 </div>
             {% endfor %}
         {% else %}
-            <p class="text-gray-500">No monthly top number data available. Please ensure historical data is loaded.</p>
+            <p class="text-gray-500">No monthly analysis data available. Please ensure historical data is loaded.</p>
         {% endif %}
     </div>
 
@@ -143,9 +172,20 @@
         color: white;
         border-color: #dc2626;
     }
+    .not-picked-ball {
+        background-color: #e0e7ff; /* Light blue for not picked white balls */
+        color: #4338ca; /* Darker blue text */
+        border-color: #a5b4fc;
+    }
+    .not-picked-powerball {
+        background-color: #ffe4e6; /* Light red for not picked powerballs */
+        color: #b91c1c; /* Darker red text */
+        border-color: #fda4af;
+    }
 </style>
 {% endblock %}
 
 {% block scripts %}
-    {# No specific D3.js chart for this page, just rendering data in a table. #}
+    {# All numbers are numerically sorted (ascending) by default from the backend. #}
+    {# Client-side dynamic sorting is a more complex feature that could be added later if needed. #}
 {% endblock %}
