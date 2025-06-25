@@ -20,7 +20,8 @@ GENERATED_NUMBERS_TABLE_NAME = 'generated_powerball_numbers'
 
 # --- Flask App Initialization with Template Path ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TEMPLATE_DIR = os.path.join(BASE_DIR, 'templates') # Corrected: Assuming 'templates' is directly inside BASE_DIR
+# Corrected TEMPLATE_DIR to likely be relative to the project root, not inside 'api'
+TEMPLATE_DIR = os.path.join(BASE_DIR, '..', 'templates') 
 
 app = Flask(__name__, template_folder=TEMPLATE_DIR)
 app.secret_key = 'supersecretkey'
@@ -1087,13 +1088,12 @@ def analyze_generated_batch_against_official_draw(generated_picks_list, official
             category = "Match 3 White Balls Only"
         elif white_matches == 2 and powerball_match == 1:
             category = "Match 2 White Balls + Powerball"
-        # Removed the specific check for "Match 2 White Balls Only" from here
         elif white_matches == 1 and powerball_match == 1:
             category = "Match 1 White Ball + Powerball"
         elif white_matches == 0 and powerball_match == 1:
             category = "Match Powerball Only"
         
-        summary[category]["count"] += 1 # Just increment count, no historical draw details here
+        summary[category]["count"] += 1 
     
     return summary
 
@@ -1320,7 +1320,6 @@ def check_generated_against_history(generated_white_balls, generated_powerball, 
         elif white_matches == 0 and powerball_match == 1:
             category = "Match Powerball Only"
         
-        # Access the summary dictionary correctly as a key within the results dictionary
         results["summary"][category]["count"] += 1
         results["summary"][category]["draws"].append({
             "date": historical_draw_date,
