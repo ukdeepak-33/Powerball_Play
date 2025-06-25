@@ -425,58 +425,81 @@ def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=69, num_top_pb=3,
     for the last N months, and numbers on consecutive monthly streaks (for completed months).
     """
     if dataframe.empty:
-        return {'monthly_top_numbers': [], 'streak_numbers': {'3_month_streaks': [], '4_month_streaks': [], '5_month_streaks': []}}
+        return {'monthly_data': [], 'streak_numbers': {'3_month_streaks': [], '4_month_streaks': [], '5_month_streaks': []}}
 
     df_sorted = dataframe.sort_values(by='Draw Date_dt', ascending=False).copy()
     df_sorted['YearMonth'] = df_sorted['Draw Date_dt'].dt.to_period('M')
     unique_months_periods = sorted(df_sorted['YearMonth'].unique(), reverse=True)
 
-    monthly_top_numbers_data = []
+    monthly_display_data = [] # Renamed for clarity on what's being displayed
     current_period = pd.Period(datetime.now(), freq='M')
     
     processed_months_count = 0
-    # Iterate through unique months, including the current month for display
+    # Iterate through unique months, including the current month for display up to `num_months_for_top_display`
     for period in unique_months_periods:
-        # Limit to the last N months including the current one if it's within the range
-        # Or, if we've already processed enough *completed* months and this is not the current month, break.
-        # This logic needs to be careful: if we want 6 months *total* including partial current, we take 6 periods.
-        # If we want 6 *completed* months + current, we need different logic.
-        # Sticking to "last N months total, including current" for simplicity here.
-        if processed_months_count >= num_months_for_top_display and period != current_period:
-            break
+        # If we've processed enough months (including current one if applicable), break
+        if processed_months_count >= num_months_for_top_display:
+            # We want exactly num_months_for_top_display entries.
+            # If the current month pushed us over, and we already added it, stop.
+            # If the current month is the last one to be added, break after adding.
+            # This logic ensures we get exactly the last N months, including current if present.
+            if not (period == current_period and processed_months_count < num_months_for_top_display):
+                break
+
 
         month_df = df_sorted[df_sorted['YearMonth'] == period]
         if month_df.empty:
             continue
 
-        # Determine if this is the current, incomplete month
         is_current_month_flag = (period == current_period)
 
-        wb_monthly_counts = defaultdict(int)
+        # White Balls Drawn
+        drawn_white_balls_set = set()
+        wb_monthly_counts = defaultdict(int) 
         for _, row in month_df.iterrows():
             for i in range(1, 6):
-                wb_monthly_counts[int(row[f'Number {i}'])] += 1
+                num = int(row[f'Number {i}'])
+                drawn_white_balls_set.add(num)
+                wb_monthly_counts[num] += 1
         
-        pb_monthly_counts = month_df['Powerball'].astype(int).value_counts().to_dict()
+        # Prepare drawn white balls with counts (sorted by number for display)
+        drawn_wb_with_counts = sorted([{'number': n, 'count': wb_monthly_counts[n]} for n in drawn_white_balls_set], key=lambda x: x['number'])
 
-        sorted_wb_freq = sorted(wb_monthly_counts.items(), key=lambda item: item[1], reverse=True)
-        top_wb = [{'number': int(n), 'count': int(c)} for n, c in sorted_wb_freq] # Get all white balls
+        # Calculate not picked white balls
+        all_possible_white_balls = set(range(GLOBAL_WHITE_BALL_RANGE[0], GLOBAL_WHITE_BALL_RANGE[1] + 1))
+        not_picked_white_balls = sorted(list(all_possible_white_balls - drawn_white_balls_set))
 
-        sorted_pb_freq = sorted(pb_monthly_counts.items(), key=lambda item: item[1], reverse=True)
+        # Powerballs Drawn
+        drawn_powerballs_set = set()
+        pb_monthly_counts = defaultdict(int) 
+        for _, row in month_df.iterrows():
+            pb_num = int(row['Powerball'])
+            drawn_powerballs_set.add(pb_num)
+            pb_monthly_counts[pb_num] += 1
+
+        # Prepare top Powerballs (sorted by frequency as before, then by number for tie-breaking)
+        sorted_pb_freq = sorted(pb_monthly_counts.items(), key=lambda item: (-item[1], item[0])) # Sort by count DESC, then number ASC
         top_pb = [{'number': int(n), 'count': int(c)} for n, c in sorted_pb_freq[:num_top_pb]]
-        
-        monthly_top_numbers_data.append({
+
+        # Calculate not picked powerballs
+        all_possible_powerballs = set(range(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1] + 1))
+        not_picked_powerballs = sorted(list(all_possible_powerballs - drawn_powerballs_set))
+
+        monthly_display_data.append({
             'month': period.strftime('%B %Y'),
-            'top_white_balls': top_wb,
+            'drawn_white_balls_with_counts': drawn_wb_with_counts,
+            'not_picked_white_balls': not_picked_white_balls,
             'top_powerballs': top_pb,
-            'is_current_month': is_current_month_flag # Flag for templating
+            'not_picked_powerballs': not_picked_powerballs,
+            'is_current_month': is_current_month_flag
         })
         processed_months_count += 1
     
     # Sort monthly data from oldest to newest for display
-    monthly_top_numbers_data.sort(key=lambda x: datetime.strptime(x['month'], '%B %Y'))
+    monthly_display_data.sort(key=lambda x: datetime.strptime(x['month'], '%B %Y'))
 
     # --- Part 2: Monthly Streaks (ONLY for completed months) ---
+    # This logic remains unchanged, as streaks should be based on full data.
     numbers_per_completed_month = defaultdict(set)
     for period in unique_months_periods:
         if period == current_period: # Exclude current month for streak calculation
@@ -517,7 +540,7 @@ def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=69, num_top_pb=3,
     streak_numbers['5_month_streaks'] = sorted(list(set(streak_numbers['5_month_streaks'])))
 
     return {
-        'monthly_top_numbers': monthly_top_numbers_data,
+        'monthly_data': monthly_display_data, # Return the renamed variable
         'streak_numbers': streak_numbers
     }
 
@@ -1689,14 +1712,14 @@ def monthly_white_ball_analysis_route():
         'monthly_trends_and_streaks', 
         get_monthly_white_ball_analysis_data, 
         df, 
-        num_top_wb=69, # Get all white balls
+        num_top_wb=69, # Get all white balls (passed for clarity, but logic handles all now)
         num_top_pb=3,  # Top 3 Powerballs
         num_months_for_top_display=6 # Display last 6 months for top numbers
     )
     
     return render_template('monthly_white_ball_analysis.html', 
-                           monthly_data=monthly_trends_data['monthly_top_numbers'], # For top numbers per month
-                           streak_numbers=monthly_trends_data['streak_numbers']) # For streak data
+                           monthly_data=monthly_trends_data['monthly_data'], # Renamed variable here
+                           streak_numbers=monthly_trends_data['streak_numbers'])
 
 # New/Modified route for the overall Sum of Main Balls analysis (with chart and full table)
 @app.route('/sum_of_main_balls_analysis')
