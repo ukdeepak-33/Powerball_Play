@@ -20,7 +20,8 @@ GENERATED_NUMBERS_TABLE_NAME = 'generated_powerball_numbers'
 
 # --- Flask App Initialization with Template Path ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TEMPLATE_DIR = os.path.join(BASE_DIR, '..', 'templates')
+TEMPLATE_DIR = os.path.join(BASE_DIR, 'templates') # Corrected: Assuming 'templates' is directly inside BASE_DIR
+# TEMPLATE_DIR = os.path.join(BASE_DIR, '..', 'templates') # Original, often wrong for single-file deployment
 
 app = Flask(__name__, template_folder=TEMPLATE_DIR)
 app.secret_key = 'supersecretkey'
@@ -419,79 +420,115 @@ def hot_cold_numbers(df_source, last_draw_date_str):
 
     return hot_numbers, cold_numbers
 
-def monthly_white_ball_analysis(df_source, last_draw_date_str):
-    print("[DEBUG-Monthly] Inside monthly_white_ball_analysis function.")
-    if df_source.empty or last_draw_date_str == 'N/A':
-        print("[DEBUG-Monthly] df_source is empty or last_draw_date_str is N/A. Returning empty dict.")
-        return {}
+def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=10, num_top_pb=3, num_months_for_top_display=12):
+    """
+    Analyzes monthly trends for white balls and Powerballs, including top numbers per month
+    and numbers on consecutive monthly streaks.
+    """
+    if dataframe.empty:
+        return {'monthly_top_numbers': [], 'streak_numbers': {'3_month_streaks': [], '4_month_streaks': [], '5_month_streaks': []}}
 
-    try:
-        last_draw_date = pd.to_datetime(last_draw_date_str)
-        print(f"[DEBUG-Monthly] last_draw_date: {last_draw_date}")
-    except Exception as e:
-        print(f"[ERROR-Monthly] Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty dict.")
-        return {}
-
-    six_months_ago = last_draw_date - pd.DateOffset(months=6)
-    print(f"[DEBUG-Monthly] six_months_ago: {six_months_ago}")
-
-    if 'Draw Date_dt' not in df_source.columns or not pd.api.types.is_datetime64_any_dtype(df_source['Draw Date_dt']):
-        print("[ERROR-Monthly] 'Draw Date_dt' column missing or not datetime type in df_source. Attempting to re-create it.")
-        try:
-            df_source['Draw Date_dt'] = pd.to_datetime(df_source['Draw Date'], errors='coerce')
-            df_source = df_source.dropna(subset=['Draw Date_dt'])
-            if df_source.empty:
-                print("[ERROR-Monthly] Re-creating 'Draw Date_dt' resulted in empty DataFrame. Returning empty dict.")
-                return {}
-            print("[DEBUG-Monthly] Successfully re-created 'Draw Date_dt' column.")
-        except Exception as e_recreate:
-            print(f"[ERROR-Monthly] Failed to re-create 'Draw Date_dt' column: {e_recreate}. Returning empty dict.")
-            return {}
-
-
-    recent_data = df_source[df_source['Draw Date_dt'] >= six_months_ago].copy()
-    print(f"[DEBUG-Monthly] recent_data shape after filtering: {recent_data.shape}")
-    if recent_data.empty:
-        print("[DEBUG-Monthly] recent_data is empty after filtering. Returning empty dict.")
-        return {}
-
-    monthly_balls = {}
-    try:
-        if 'Month' not in recent_data.columns:
-            recent_data['Month'] = recent_data['Draw Date_dt'].dt.to_period('M')
-            print(f"[DEBUG-Monthly] 'Month' column added to recent_data. First 2 months: {recent_data['Month'].head(2).tolist()}")
-        
-        required_cols = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']
-        for col in required_cols:
-            if col in recent_data.columns:
-                recent_data[col] = pd.to_numeric(recent_data[col], errors='coerce')
-            else:
-                print(f"[ERROR-Monthly] Missing required column '{col}' in recent_data. Cannot perform analysis.")
-                return {}
-
-        recent_data = recent_data.dropna(subset=required_cols)
-        if recent_data.empty:
-            print("[DEBUG-Monthly] recent_data is empty after dropping NaN in ball columns. Returning empty dict.")
-            return {}
-
-        monthly_balls_raw = recent_data.groupby('Month')[required_cols].apply(
-            lambda x: sorted([int(num) for num in x.values.flatten() if not pd.isna(num)])
-        ).to_dict()
-
-        monthly_balls_str_keys = {}
-        for period_key, ball_list in monthly_balls_raw.items():
-            monthly_balls_str_keys[str(period_key)] = [int(ball) for ball in ball_list]
-        
-        print(f"[DEBUG-Monthly] Groupby and apply successful. First item in monthly_balls_str_keys: {next(iter(monthly_balls_str_keys.items())) if monthly_balls_str_keys else 'N/A'}")
-
-    except Exception as e:
-        print(f"[ERROR-Monthly] Error during groupby/apply operation or conversion: {e}. Returning empty dict.")
-        import traceback
-        traceback.print_exc()
-        return {}
+    # Ensure 'Draw Date_dt' is datetime and sort by date descending (newest first)
+    df_sorted = dataframe.sort_values(by='Draw Date_dt', ascending=False).copy()
     
-    print("[DEBUG-Monthly] Successfully computed monthly_balls_str_keys.")
-    return monthly_balls_str_keys
+    # Get all unique year-month periods from newest to oldest
+    df_sorted['YearMonth'] = df_sorted['Draw Date_dt'].dt.to_period('M')
+    unique_months_periods = sorted(df_sorted['YearMonth'].unique(), reverse=True)
+
+    # --- Part 1: Monthly Top Numbers ---
+    monthly_top_numbers_data = []
+    
+    # We want to display data for the last `num_months_for_top_display` *completed* months.
+    # To get completed months, we ensure the month is not the current partial month.
+    current_period = pd.Period(datetime.now(), freq='M')
+    
+    processed_months_count = 0
+    for period in unique_months_periods:
+        if period == current_period: # Skip the current (possibly incomplete) month
+            continue
+
+        if processed_months_count >= num_months_for_top_display:
+            break # Stop after processing desired number of completed months
+
+        month_df = df_sorted[df_sorted['YearMonth'] == period]
+        if month_df.empty:
+            continue
+
+        # Calculate white ball frequencies for this month
+        wb_monthly_counts = defaultdict(int)
+        for _, row in month_df.iterrows():
+            for i in range(1, 6):
+                wb_monthly_counts[int(row[f'Number {i}'])] += 1
+        
+        # Calculate Powerball frequencies for this month
+        pb_monthly_counts = month_df['Powerball'].astype(int).value_counts().to_dict()
+
+        # Get top N white balls and top M powerballs for this month
+        sorted_wb_freq = sorted(wb_monthly_counts.items(), key=lambda item: item[1], reverse=True)
+        top_wb = [{'number': int(n), 'count': int(c)} for n, c in sorted_wb_freq[:num_top_wb]]
+
+        sorted_pb_freq = sorted(pb_monthly_counts.items(), key=lambda item: item[1], reverse=True)
+        top_pb = [{'number': int(n), 'count': int(c)} for n, c in sorted_pb_freq[:num_top_pb]]
+        
+        monthly_top_numbers_data.append({
+            'month': period.strftime('%B %Y'),
+            'top_white_balls': top_wb,
+            'top_powerballs': top_pb
+        })
+        processed_months_count += 1
+    
+    # Sort monthly data from oldest to newest for display
+    monthly_top_numbers_data.sort(key=lambda x: datetime.strptime(x['month'], '%B %Y'))
+
+    # --- Part 2: Monthly Streaks ---
+    # Prepare data for streak calculation: a set of numbers for each *completed* month
+    numbers_per_completed_month = defaultdict(set)
+    for period in unique_months_periods:
+        if period == current_period: # Only consider completed months for streaks
+            continue
+        month_df = df_sorted[df_sorted['YearMonth'] == period]
+        if not month_df.empty:
+            for _, row in month_df.iterrows():
+                # White balls
+                for i in range(1, 6):
+                    numbers_per_completed_month[period].add(int(row[f'Number {i}']))
+                # Powerball
+                numbers_per_completed_month[period].add(int(row['Powerball']))
+    
+    # Get sorted list of completed months (oldest to newest for iteration)
+    completed_months_sorted = sorted([p for p in unique_months_periods if p != current_period])
+
+    streak_numbers = {'3_month_streaks': [], '4_month_streaks': [], '5_month_streaks': []}
+
+    all_possible_numbers = set(range(GLOBAL_WHITE_BALL_RANGE[0], GLOBAL_WHITE_BALL_RANGE[1] + 1)) \
+                           .union(set(range(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1] + 1)))
+
+    for num in all_possible_numbers:
+        current_streak_length = 0
+        
+        for i in range(len(completed_months_sorted) - 1, -1, -1): # Iterate backwards from most recent completed month
+            month_period = completed_months_sorted[i]
+            if num in numbers_per_completed_month[month_period]:
+                current_streak_length += 1
+            else:
+                break # Streak broken
+        
+        if current_streak_length >= 5:
+            streak_numbers['5_month_streaks'].append(int(num))
+        if current_streak_length >= 4:
+            streak_numbers['4_month_streaks'].append(int(num))
+        if current_streak_length >= 3:
+            streak_numbers['3_month_streaks'].append(int(num))
+    
+    # Sort streak numbers
+    streak_numbers['3_month_streaks'] = sorted(list(set(streak_numbers['3_month_streaks'])))
+    streak_numbers['4_month_streaks'] = sorted(list(set(streak_numbers['4_month_streaks'])))
+    streak_numbers['5_month_streaks'] = sorted(list(set(streak_numbers['5_month_streaks'])))
+
+    return {
+        'monthly_top_numbers': monthly_top_numbers_data,
+        'streak_numbers': streak_numbers
+    }
 
 
 def sum_of_main_balls(df_source):
@@ -1051,12 +1088,20 @@ def analyze_generated_batch_against_official_draw(generated_picks_list, official
             category = "Match 3 White Balls Only"
         elif white_matches == 2 and powerball_match == 1:
             category = "Match 2 White Balls + Powerball"
+        elif white_matches == 2 and powerball_match == 0 and generated_white_balls[0] in official_white_set: # Example condition, could be more generic
+            category = "Match 2 White Balls Only" # Specific case for 2 WB only
         elif white_matches == 1 and powerball_match == 1:
             category = "Match 1 White Ball + Powerball"
         elif white_matches == 0 and powerball_match == 1:
             category = "Match Powerball Only"
         
+        # Access the summary dictionary correctly as a key within the results dictionary
         summary[category]["count"] += 1
+        summary[category]["draws"].append({
+            "date": historical_draw_date,
+            "white_balls": historical_white_balls,
+            "powerball": historical_powerball
+        })
     
     return summary
 
@@ -1278,6 +1323,7 @@ def check_generated_against_history(generated_white_balls, generated_powerball, 
             category = "Match 3 White Balls Only"
         elif white_matches == 2 and powerball_match == 1:
             category = "Match 2 White Balls + Powerball"
+        # Removed the specific check for "Match 2 White Balls Only"
         elif white_matches == 1 and powerball_match == 1:
             category = "Match 1 White Ball + Powerball"
         elif white_matches == 0 and powerball_match == 1:
@@ -1648,12 +1694,26 @@ def hot_cold_numbers_route():
 
 @app.route('/monthly_white_ball_analysis')
 def monthly_white_ball_analysis_route():
+    if df.empty:
+        flash("Cannot perform monthly trends analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    # Get last_draw_date_str correctly from the global df
     last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
-    monthly_balls = get_cached_analysis('monthly_balls', monthly_white_ball_analysis, df, last_draw_date_str_for_cache)
-    monthly_balls_json = json.dumps(monthly_balls)
+
+    # Call the enhanced function that calculates both monthly tops and streaks
+    monthly_trends_data = get_cached_analysis(
+        'monthly_trends_and_streaks', 
+        get_monthly_white_ball_analysis_data, 
+        df, 
+        num_top_wb=10, # Passed from user's request
+        num_top_pb=3,  # Passed from user's request
+        num_months_for_top_display=12 # Display last 12 months for top numbers
+    )
+    
     return render_template('monthly_white_ball_analysis.html', 
-                           monthly_balls=monthly_balls,
-                           monthly_balls_json=monthly_balls_json)
+                           monthly_data=json.dumps(monthly_trends_data['monthly_top_numbers']), # For top numbers per month
+                           streak_numbers=monthly_trends_data['streak_numbers']) # For streak data
 
 # New/Modified route for the overall Sum of Main Balls analysis (with chart and full table)
 @app.route('/sum_of_main_balls_analysis')
@@ -2099,3 +2159,5 @@ def analyze_generated_historical_matches_route():
         import traceback
         traceback.print_exc()
         return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
+
+}
