@@ -584,23 +584,35 @@ def find_results_by_sum(df_source, target_sum):
 
 def simulate_multiple_draws(df_source, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, num_draws=100):
     if df_source.empty: 
-        return pd.Series([], dtype=int)
+        # Return empty lists for white ball and powerball frequencies
+        return {'white_ball_freq': [], 'powerball_freq': []}
     
-    results = []
+    white_ball_results = defaultdict(int)
+    powerball_results = defaultdict(int)
+
     for _ in range(num_draws):
         try:
             # Pass is_simulation=True to generate_powerball_numbers for simulation
             white_balls, powerball = generate_powerball_numbers(df_source, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers, is_simulation=True)
-            results.append(white_balls + [powerball])
+            
+            for wb in white_balls:
+                white_ball_results[wb] += 1
+            powerball_results[powerball] += 1
+
         except ValueError:
             pass # Silently skip failed generations in simulation
     
-    if not results: 
-        return pd.Series([], dtype=int)
-    
-    all_numbers = [num for draw in results for num in draw]
-    freq = pd.Series(all_numbers).value_counts().sort_index()
-    return freq
+    # Convert defaultdicts to sorted lists of dictionaries
+    simulated_white_ball_freq_list = sorted([
+        {'Number': int(k), 'Frequency': int(v)} for k, v in white_ball_results.items()
+    ], key=lambda x: x['Number']) # Sort by Number ascending
+
+    simulated_powerball_freq_list = sorted([
+        {'Number': int(k), 'Frequency': int(v)} for k, v in powerball_results.items()
+    ], key=lambda x: x['Number']) # Sort by Number ascending
+
+    return {'white_ball_freq': simulated_white_ball_freq_list, 'powerball_freq': simulated_powerball_freq_list}
+
 
 def calculate_combinations(n, k):
     if k < 0 or k > n:
@@ -1793,7 +1805,7 @@ def find_results_by_sum_route():
                     results_df_raw = results_df_raw.sort_values(by='WhiteBallsTuple', ascending=True)
                     results_df_raw = results_df_raw.drop(columns=['WhiteBallsTuple'])
                 elif selected_sort_by == 'balls_desc':
-                    results_df_raw['WhiteBallsTuple'] = results_df_raw.apply(
+                    results_df_raw['WhiteBallsTuple'] = results.apply(
                         lambda row: tuple(sorted([
                             int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
                             int(row['Number 4']), int(row['Number 5'])
@@ -1823,7 +1835,8 @@ def simulate_multiple_draws_route():
         flash("Cannot run simulation: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
 
-    simulated_freq_list = []
+    simulated_white_ball_freq_list = []
+    simulated_powerball_freq_list = []
     num_draws_display = None
 
     if request.method == 'POST':
@@ -1831,13 +1844,18 @@ def simulate_multiple_draws_route():
         if num_draws_str and num_draws_str.isdigit():
             num_draws = int(num_draws_str)
             num_draws_display = num_draws
-            simulated_freq = simulate_multiple_draws(df, group_a, "Any", "No Combo", GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers, num_draws)
-            simulated_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in simulated_freq.items()]
+            
+            # Call the updated simulate_multiple_draws that returns a dictionary
+            sim_results = simulate_multiple_draws(df, group_a, "Any", "No Combo", GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers, num_draws)
+            
+            simulated_white_ball_freq_list = sim_results['white_ball_freq']
+            simulated_powerball_freq_list = sim_results['powerball_freq']
         else:
             flash("Please enter a valid number for Number of Simulations.", 'error')
 
     return render_template('simulate_multiple_draws.html', 
-                           simulated_freq=simulated_freq_list, 
+                           simulated_white_ball_freq=simulated_white_ball_freq_list, # Pass new variable
+                           simulated_powerball_freq=simulated_powerball_freq_list,   # Pass new variable
                            num_simulations=num_draws_display)
 
 # Commented out as requested
