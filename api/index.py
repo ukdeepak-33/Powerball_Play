@@ -21,7 +21,6 @@ GENERATED_NUMBERS_TABLE_NAME = 'generated_powerball_numbers'
 # --- Flask App Initialization with Template Path ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_DIR = os.path.join(BASE_DIR, 'templates') # Corrected: Assuming 'templates' is directly inside BASE_DIR
-# TEMPLATE_DIR = os.path.join(BASE_DIR, '..', 'templates') # Original, often wrong for single-file deployment
 
 app = Flask(__name__, template_folder=TEMPLATE_DIR)
 app.secret_key = 'supersecretkey'
@@ -877,7 +876,7 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
         group_a_numbers_present = sorted([num for num in white_balls if num in group_a])
 
         even_count = sum(1 for num in white_balls if num % 2 == 0)
-        odd_count = 5 - even_count
+        odd_count = 5 - odd_count
 
         split_category = "Other"
 
@@ -1088,20 +1087,13 @@ def analyze_generated_batch_against_official_draw(generated_picks_list, official
             category = "Match 3 White Balls Only"
         elif white_matches == 2 and powerball_match == 1:
             category = "Match 2 White Balls + Powerball"
-        elif white_matches == 2 and powerball_match == 0 and generated_white_balls[0] in official_white_set: # Example condition, could be more generic
-            category = "Match 2 White Balls Only" # Specific case for 2 WB only
+        # Removed the specific check for "Match 2 White Balls Only" from here
         elif white_matches == 1 and powerball_match == 1:
             category = "Match 1 White Ball + Powerball"
         elif white_matches == 0 and powerball_match == 1:
             category = "Match Powerball Only"
         
-        # Access the summary dictionary correctly as a key within the results dictionary
-        summary[category]["count"] += 1
-        summary[category]["draws"].append({
-            "date": historical_draw_date,
-            "white_balls": historical_white_balls,
-            "powerball": historical_powerball
-        })
+        summary[category]["count"] += 1 # Just increment count, no historical draw details here
     
     return summary
 
@@ -1323,7 +1315,6 @@ def check_generated_against_history(generated_white_balls, generated_powerball, 
             category = "Match 3 White Balls Only"
         elif white_matches == 2 and powerball_match == 1:
             category = "Match 2 White Balls + Powerball"
-        # Removed the specific check for "Match 2 White Balls Only"
         elif white_matches == 1 and powerball_match == 1:
             category = "Match 1 White Ball + Powerball"
         elif white_matches == 0 and powerball_match == 1:
@@ -1712,7 +1703,7 @@ def monthly_white_ball_analysis_route():
     )
     
     return render_template('monthly_white_ball_analysis.html', 
-                           monthly_data=json.dumps(monthly_trends_data['monthly_top_numbers']), # For top numbers per month
+                           monthly_data=monthly_trends_data['monthly_top_numbers'], # For top numbers per month
                            streak_numbers=monthly_trends_data['streak_numbers']) # For streak data
 
 # New/Modified route for the overall Sum of Main Balls analysis (with chart and full table)
@@ -2160,4 +2151,3 @@ def analyze_generated_historical_matches_route():
         traceback.print_exc()
         return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
 
-}
