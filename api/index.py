@@ -20,7 +20,6 @@ GENERATED_NUMBERS_TABLE_NAME = 'generated_powerball_numbers'
 
 # --- Flask App Initialization with Template Path ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Corrected TEMPLATE_DIR to likely be relative to the project root, not inside 'api'
 TEMPLATE_DIR = os.path.join(BASE_DIR, '..', 'templates') 
 
 app = Flask(__name__, template_folder=TEMPLATE_DIR)
@@ -420,56 +419,48 @@ def hot_cold_numbers(df_source, last_draw_date_str):
 
     return hot_numbers, cold_numbers
 
-def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=10, num_top_pb=3, num_months_for_top_display=12):
+def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=69, num_top_pb=3, num_months_for_top_display=6):
     """
-    Analyzes monthly trends for white balls and Powerballs, including top numbers per month
-    and numbers on consecutive monthly streaks.
-    
-    num_top_wb: If set to a large number (e.g., 69 or more), it will effectively return all white balls drawn in that month.
+    Analyzes monthly trends for white balls and Powerballs, including all numbers drawn per month
+    for the last N months, and numbers on consecutive monthly streaks (for completed months).
     """
     if dataframe.empty:
         return {'monthly_top_numbers': [], 'streak_numbers': {'3_month_streaks': [], '4_month_streaks': [], '5_month_streaks': []}}
 
-    # Ensure 'Draw Date_dt' is datetime and sort by date descending (newest first)
     df_sorted = dataframe.sort_values(by='Draw Date_dt', ascending=False).copy()
-    
-    # Get all unique year-month periods from newest to oldest
     df_sorted['YearMonth'] = df_sorted['Draw Date_dt'].dt.to_period('M')
     unique_months_periods = sorted(df_sorted['YearMonth'].unique(), reverse=True)
 
-    # --- Part 1: Monthly Top Numbers ---
     monthly_top_numbers_data = []
-    
-    # We want to display data for the last `num_months_for_top_display` *completed* months.
-    # To get completed months, we ensure the month is not the current partial month.
     current_period = pd.Period(datetime.now(), freq='M')
     
     processed_months_count = 0
+    # Iterate through unique months, including the current month for display
     for period in unique_months_periods:
-        if period == current_period: # Skip the current (possibly incomplete) month
-            continue
-
-        if processed_months_count >= num_months_for_top_display:
-            break # Stop after processing desired number of completed months
+        # Limit to the last N months including the current one if it's within the range
+        # Or, if we've already processed enough *completed* months and this is not the current month, break.
+        # This logic needs to be careful: if we want 6 months *total* including partial current, we take 6 periods.
+        # If we want 6 *completed* months + current, we need different logic.
+        # Sticking to "last N months total, including current" for simplicity here.
+        if processed_months_count >= num_months_for_top_display and period != current_period:
+            break
 
         month_df = df_sorted[df_sorted['YearMonth'] == period]
         if month_df.empty:
             continue
 
-        # Calculate white ball frequencies for this month
+        # Determine if this is the current, incomplete month
+        is_current_month_flag = (period == current_period)
+
         wb_monthly_counts = defaultdict(int)
         for _, row in month_df.iterrows():
             for i in range(1, 6):
                 wb_monthly_counts[int(row[f'Number {i}'])] += 1
         
-        # Calculate Powerball frequencies for this month
         pb_monthly_counts = month_df['Powerball'].astype(int).value_counts().to_dict()
 
-        # Get top N white balls (or all if num_top_wb is large enough)
         sorted_wb_freq = sorted(wb_monthly_counts.items(), key=lambda item: item[1], reverse=True)
-        # Apply num_top_wb limit if it's a reasonable number, otherwise take all
-        top_wb = [{'number': int(n), 'count': int(c)} for n, c in sorted_wb_freq[:num_top_wb]] if num_top_wb < len(sorted_wb_freq) else [{'number': int(n), 'count': int(c)} for n, c in sorted_wb_freq]
-
+        top_wb = [{'number': int(n), 'count': int(c)} for n, c in sorted_wb_freq] # Get all white balls
 
         sorted_pb_freq = sorted(pb_monthly_counts.items(), key=lambda item: item[1], reverse=True)
         top_pb = [{'number': int(n), 'count': int(c)} for n, c in sorted_pb_freq[:num_top_pb]]
@@ -477,29 +468,26 @@ def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=10, num_top_pb=3,
         monthly_top_numbers_data.append({
             'month': period.strftime('%B %Y'),
             'top_white_balls': top_wb,
-            'top_powerballs': top_pb
+            'top_powerballs': top_pb,
+            'is_current_month': is_current_month_flag # Flag for templating
         })
         processed_months_count += 1
     
     # Sort monthly data from oldest to newest for display
     monthly_top_numbers_data.sort(key=lambda x: datetime.strptime(x['month'], '%B %Y'))
 
-    # --- Part 2: Monthly Streaks ---
-    # Prepare data for streak calculation: a set of numbers for each *completed* month
+    # --- Part 2: Monthly Streaks (ONLY for completed months) ---
     numbers_per_completed_month = defaultdict(set)
     for period in unique_months_periods:
-        if period == current_period: # Only consider completed months for streaks
+        if period == current_period: # Exclude current month for streak calculation
             continue
         month_df = df_sorted[df_sorted['YearMonth'] == period]
         if not month_df.empty:
             for _, row in month_df.iterrows():
-                # White balls
                 for i in range(1, 6):
                     numbers_per_completed_month[period].add(int(row[f'Number {i}']))
-                # Powerball
                 numbers_per_completed_month[period].add(int(row['Powerball']))
     
-    # Get sorted list of completed months (oldest to newest for iteration)
     completed_months_sorted = sorted([p for p in unique_months_periods if p != current_period])
 
     streak_numbers = {'3_month_streaks': [], '4_month_streaks': [], '5_month_streaks': []}
@@ -524,7 +512,6 @@ def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=10, num_top_pb=3,
         if current_streak_length >= 3:
             streak_numbers['3_month_streaks'].append(int(num))
     
-    # Sort streak numbers
     streak_numbers['3_month_streaks'] = sorted(list(set(streak_numbers['3_month_streaks'])))
     streak_numbers['4_month_streaks'] = sorted(list(set(streak_numbers['4_month_streaks'])))
     streak_numbers['5_month_streaks'] = sorted(list(set(streak_numbers['5_month_streaks'])))
@@ -1697,7 +1684,7 @@ def monthly_white_ball_analysis_route():
 
     # Call the enhanced function that calculates both monthly tops and streaks
     # num_top_wb set to 69 to get all white balls (max possible is 69)
-    # num_months_for_top_display set to 6 as requested
+    # num_months_for_top_display set to 6 as requested, will include current partial month.
     monthly_trends_data = get_cached_analysis(
         'monthly_trends_and_streaks', 
         get_monthly_white_ball_analysis_data, 
@@ -1767,7 +1754,7 @@ def find_results_by_sum_route():
                     results_df_raw = results_df_raw.sort_values(by='Draw Date_dt', ascending=True)
                 elif selected_sort_by == 'balls_asc':
                     # Create a tuple for sorting white balls
-                    results_df_raw['WhiteBallsTuple'] = results.apply(
+                    results_df_raw['WhiteBallsTuple'] = results_df_raw.apply(
                         lambda row: tuple(sorted([
                             int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
                             int(row['Number 4']), int(row['Number 5'])
@@ -1784,7 +1771,7 @@ def find_results_by_sum_route():
                     )
                     results_df_raw = results_df_raw.sort_values(by='WhiteBallsTuple', ascending=False)
                     results_df_raw = results_df_raw.drop(columns=['WhiteBallsTuple'])
-            
+
             results = results_df_raw.to_dict('records')
         else:
             flash("Please enter a valid number for Target Sum.", 'error')
