@@ -163,7 +163,7 @@ def check_exact_match(white_balls):
     global historical_white_ball_sets
     return frozenset(white_balls) in historical_white_ball_sets
 
-def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, high_low_balance=None):
+def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, high_low_balance=None, is_simulation=False):
     if df_source.empty:
         raise ValueError("Cannot generate numbers: Historical data is empty.")
 
@@ -184,16 +184,18 @@ def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice
 
         powerball = random.randint(powerball_range[0], powerball_range[1])
 
-        last_draw_data = get_last_draw(df_source)
-        if not last_draw_data.empty and last_draw_data.get('Draw Date') != 'N/A':
-            last_white_balls = [int(last_draw_data['Number 1']), int(last_draw_data['Number 2']), int(last_draw_data['Number 3']), int(last_draw_data['Number 4']), int(last_draw_data['Number 5'])]
-            if set(white_balls) == set(last_white_balls) and powerball == int(last_draw_data['Powerball']):
+        # Skip these checks if it's a simulation
+        if not is_simulation:
+            last_draw_data = get_last_draw(df_source)
+            if not last_draw_data.empty and last_draw_data.get('Draw Date') != 'N/A':
+                last_white_balls = [int(last_draw_data['Number 1']), int(last_draw_data['Number 2']), int(last_draw_data['Number 3']), int(last_draw_data['Number 4']), int(last_draw_data['Number 5'])]
+                if set(white_balls) == set(last_white_balls) and powerball == int(last_draw_data['Powerball']):
+                    attempts += 1
+                    continue
+
+            if check_exact_match(white_balls): 
                 attempts += 1
                 continue
-
-        if check_exact_match(white_balls): 
-            attempts += 1
-            continue
 
         even_count = sum(1 for num in white_balls if num % 2 == 0)
         odd_count = 5 - even_count
@@ -581,16 +583,21 @@ def find_results_by_sum(df_source, target_sum):
     return results[['Draw Date', 'Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Powerball', 'Sum', 'Draw Date_dt']]
 
 def simulate_multiple_draws(df_source, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, num_draws=100):
-    if df_source.empty: return pd.Series([], dtype=int)
+    if df_source.empty: 
+        return pd.Series([], dtype=int)
+    
     results = []
     for _ in range(num_draws):
         try:
-            white_balls, powerball = generate_powerball_numbers(df_source, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers)
+            # Pass is_simulation=True to generate_powerball_numbers for simulation
+            white_balls, powerball = generate_powerball_numbers(df_source, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers, is_simulation=True)
             results.append(white_balls + [powerball])
         except ValueError:
-            pass
+            pass # Silently skip failed generations in simulation
     
-    if not results: return pd.Series([], dtype=int)
+    if not results: 
+        return pd.Series([], dtype=int)
+    
     all_numbers = [num for draw in results for num in draw]
     freq = pd.Series(all_numbers).value_counts().sort_index()
     return freq
@@ -1526,7 +1533,7 @@ def generate():
     last_draw_dates = {}
 
     try:
-        white_balls, powerball = generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white_ball_range_local, powerball_range_local, excluded_numbers_local, high_low_balance)
+        white_balls, powerball = generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white_ball_range_local, powerball_range_local, excluded_numbers_local, high_low_balance, is_simulation=False) # is_simulation is False for main generation
         last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
     except ValueError as e:
         flash(str(e), 'error')
