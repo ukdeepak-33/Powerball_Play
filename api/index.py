@@ -424,6 +424,8 @@ def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=10, num_top_pb=3,
     """
     Analyzes monthly trends for white balls and Powerballs, including top numbers per month
     and numbers on consecutive monthly streaks.
+    
+    num_top_wb: If set to a large number (e.g., 69 or more), it will effectively return all white balls drawn in that month.
     """
     if dataframe.empty:
         return {'monthly_top_numbers': [], 'streak_numbers': {'3_month_streaks': [], '4_month_streaks': [], '5_month_streaks': []}}
@@ -463,9 +465,11 @@ def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=10, num_top_pb=3,
         # Calculate Powerball frequencies for this month
         pb_monthly_counts = month_df['Powerball'].astype(int).value_counts().to_dict()
 
-        # Get top N white balls and top M powerballs for this month
+        # Get top N white balls (or all if num_top_wb is large enough)
         sorted_wb_freq = sorted(wb_monthly_counts.items(), key=lambda item: item[1], reverse=True)
-        top_wb = [{'number': int(n), 'count': int(c)} for n, c in sorted_wb_freq[:num_top_wb]]
+        # Apply num_top_wb limit if it's a reasonable number, otherwise take all
+        top_wb = [{'number': int(n), 'count': int(c)} for n, c in sorted_wb_freq[:num_top_wb]] if num_top_wb < len(sorted_wb_freq) else [{'number': int(n), 'count': int(c)} for n, c in sorted_wb_freq]
+
 
         sorted_pb_freq = sorted(pb_monthly_counts.items(), key=lambda item: item[1], reverse=True)
         top_pb = [{'number': int(n), 'count': int(c)} for n, c in sorted_pb_freq[:num_top_pb]]
@@ -877,7 +881,7 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
         group_a_numbers_present = sorted([num for num in white_balls if num in group_a])
 
         even_count = sum(1 for num in white_balls if num % 2 == 0)
-        odd_count = 5 - odd_count
+        odd_count = 5 - even_count
 
         split_category = "Other"
 
@@ -1692,13 +1696,15 @@ def monthly_white_ball_analysis_route():
     last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
 
     # Call the enhanced function that calculates both monthly tops and streaks
+    # num_top_wb set to 69 to get all white balls (max possible is 69)
+    # num_months_for_top_display set to 6 as requested
     monthly_trends_data = get_cached_analysis(
         'monthly_trends_and_streaks', 
         get_monthly_white_ball_analysis_data, 
         df, 
-        num_top_wb=10, # Passed from user's request
-        num_top_pb=3,  # Passed from user's request
-        num_months_for_top_display=12 # Display last 12 months for top numbers
+        num_top_wb=69, # Get all white balls
+        num_top_pb=3,  # Top 3 Powerballs
+        num_months_for_top_display=6 # Display last 6 months for top numbers
     )
     
     return render_template('monthly_white_ball_analysis.html', 
@@ -1761,7 +1767,7 @@ def find_results_by_sum_route():
                     results_df_raw = results_df_raw.sort_values(by='Draw Date_dt', ascending=True)
                 elif selected_sort_by == 'balls_asc':
                     # Create a tuple for sorting white balls
-                    results_df_raw['WhiteBallsTuple'] = results_df_raw.apply(
+                    results_df_raw['WhiteBallsTuple'] = results.apply(
                         lambda row: tuple(sorted([
                             int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
                             int(row['Number 4']), int(row['Number 5'])
