@@ -2,64 +2,64 @@
 
 {% block title %}My Jackpot Pick{% endblock %}
 
-{% block page_heading %}My Jackpot Pick{% endblock %}
+{% block page_heading %}My Jackpot Pick & Analysis{% endblock %}
 
 {% block content %}
-<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="space-y-8 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Select Your Numbers</h2>
-        <p class="text-gray-600 mb-6">Click to select 5 white balls (1-69) and 1 Powerball (1-26).</p>
+        <p class="text-gray-600 mb-4">Click on the white balls (1-69) to select 5 numbers, and then click on a Powerball (1-26) to select 1 number for your custom pick.</p>
 
-        <!-- White Balls Selection -->
-        <div class="mb-8">
-            <h3 class="text-xl font-semibold mb-3 text-gray-700">White Balls (1-69) <span id="whiteBallCount" class="text-blue-600">(0/5 selected)</span></h3>
-            <div id="whiteBallsContainer" class="grid grid-cols-7 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
+        <div class="mb-6">
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">White Balls (1-69)</h3>
+            <div id="whiteBallsContainer" class="flex flex-wrap gap-2 justify-center">
                 {% for i in range(1, 70) %}
-                    <span class="ball white-ball-selectable" data-number="{{ i }}">{{ i }}</span>
+                    <div class="ball" data-type="white" data-number="{{ i }}">{{ i }}</div>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- Powerball Selection -->
-        <div class="mb-8">
-            <h3 class="text-xl font-semibold mb-3 text-gray-700">Powerball (1-26) <span id="powerballCount" class="text-red-600">(0/1 selected)</span></h3>
-            <div id="powerballsContainer" class="grid grid-cols-7 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
+        <div class="mb-6">
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">Powerball (1-26)</h3>
+            <div id="powerballContainer" class="flex flex-wrap gap-2 justify-center">
                 {% for i in range(1, 27) %}
-                    <span class="ball powerball-ball-selectable" data-number="{{ i }}">{{ i }}</span>
+                    <div class="ball powerball-ball" data-type="powerball" data-number="{{ i }}">{{ i }}</div>
                 {% endfor %}
             </div>
         </div>
 
-        <!-- Selected Numbers Display -->
-        <div class="mt-8 p-4 bg-gray-100 rounded-lg border border-gray-200 shadow-inner">
-            <h3 class="text-xl font-semibold mb-3 text-gray-700">Your Current Pick:</h3>
-            <div class="flex flex-wrap items-center space-x-2">
-                <div id="selectedWhiteBallsDisplay" class="flex flex-wrap gap-2">
-                    <p class="text-gray-500" id="noWhiteBallsSelected">No white balls selected.</p>
-                </div>
-                <div class="text-lg font-bold text-gray-800 hidden" id="plusSign">+</div>
-                <div id="selectedPowerballDisplay" class="flex flex-wrap gap-2">
-                    <p class="text-gray-500" id="noPowerballSelected">No Powerball selected.</p>
-                </div>
-            </div>
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+            <button id="analyzePickBtn" class="btn-primary w-full sm:w-auto">Analyze My Pick</button>
+            <button id="resetSelectionBtn" class="btn-secondary w-full sm:w-auto">Reset Selection</button>
         </div>
 
-        <!-- Action Buttons -->
-        <div class="mt-8 flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 justify-center">
-            <button id="analyzePickBtn" class="btn-primary" disabled>Analyze My Pick</button>
-            <button id="savePickBtn" class="btn-secondary" disabled>Save My Pick</button>
-            <button id="resetPickBtn" class="bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-400 focus:outline-none focus:shadow-outline transition duration-200 ease-in-out">Reset</button>
+        <div id="selectedNumbersDisplay" class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200 text-blue-800 text-center font-medium hidden">
+            Selected: <span id="displayWhiteBalls"></span> + <span id="displayPowerball"></span>
+        </div>
+    </div>
+
+    <div id="analysisResults" class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200 mt-8 hidden">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Analysis Results</h2>
+        <div id="loadingIndicator" class="text-center text-blue-600 font-semibold hidden">
+            <svg class="animate-spin h-8 w-8 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p>Analyzing your pick...</p>
         </div>
 
-        <!-- Analysis Results Section -->
-        <div id="analysisResults" class="mt-8 hidden">
-            <h3 class="text-2xl font-bold mb-4 text-gray-800">Analysis Results</h3>
-            <div id="analysisSummary" class="card mb-6"></div>
+        <div id="matchSummary" class="mt-4">
+            <h3 class="text-xl font-semibold text-gray-700 mb-3">Historical Match Summary (Last 2 Years):</h3>
+            <ul class="list-disc list-inside space-y-2 text-gray-700">
+                <!-- Matches will be populated here by JavaScript -->
+            </ul>
+        </div>
 
-            <div id="lastDrawnDates" class="card">
-                <h4 class="text-xl font-semibold mb-3 text-gray-700">Last Drawn Dates:</h4>
-                <ul id="lastDrawnList" class="list-disc list-inside text-gray-700"></ul>
-            </div>
+        <div id="lastDrawnDates" class="mt-6">
+            <h3 class="text-xl font-semibold text-gray-700 mb-3">Last Drawn Dates for Your Numbers:</h3>
+            <ul class="list-disc list-inside space-y-2 text-gray-700">
+                <!-- Last drawn dates will be populated here by JavaScript -->
+            </ul>
         </div>
     </div>
 </div>
@@ -70,253 +70,172 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const whiteBallsContainer = document.getElementById('whiteBallsContainer');
-        const powerballsContainer = document.getElementById('powerballsContainer');
-        const whiteBallCountSpan = document.getElementById('whiteBallCount');
-        const powerballCountSpan = document.getElementById('powerballCount');
-        const selectedWhiteBallsDisplay = document.getElementById('selectedWhiteBallsDisplay');
-        const selectedPowerballDisplay = document.getElementById('selectedPowerballDisplay');
-        const noWhiteBallsSelected = document.getElementById('noWhiteBallsSelected');
-        const noPowerballSelected = document.getElementById('noPowerballSelected');
-        const plusSign = document.getElementById('plusSign');
+        const powerballContainer = document.getElementById('powerballContainer');
         const analyzePickBtn = document.getElementById('analyzePickBtn');
-        const savePickBtn = document.getElementById('savePickBtn');
-        const resetPickBtn = document.getElementById('resetPickBtn');
-        const analysisResultsSection = document.getElementById('analysisResults');
-        const analysisSummaryDiv = document.getElementById('analysisSummary');
-        const lastDrawnList = document.getElementById('lastDrawnList');
+        const resetSelectionBtn = document.getElementById('resetSelectionBtn');
+        const selectedNumbersDisplay = document.getElementById('selectedNumbersDisplay');
+        const displayWhiteBalls = document.getElementById('displayWhiteBalls');
+        const displayPowerball = document.getElementById('displayPowerball');
+        const analysisResults = document.getElementById('analysisResults');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const matchSummary = document.querySelector('#matchSummary ul');
+        const lastDrawnDatesList = document.querySelector('#lastDrawnDates ul');
 
         let selectedWhiteBalls = new Set();
         let selectedPowerball = null;
 
-        const updateSelectedDisplays = () => {
-            // Update white balls display
-            selectedWhiteBallsDisplay.innerHTML = '';
-            if (selectedWhiteBalls.size === 0) {
-                noWhiteBallsSelected.classList.remove('hidden');
+        const updateDisplay = () => {
+            const sortedWhiteBalls = Array.from(selectedWhiteBalls).sort((a, b) => a - b);
+            displayWhiteBalls.textContent = sortedWhiteBalls.join(', ');
+            displayPowerball.textContent = selectedPowerball !== null ? selectedPowerball : 'N/A';
+            
+            if (sortedWhiteBalls.length > 0 || selectedPowerball !== null) {
+                selectedNumbersDisplay.classList.remove('hidden');
             } else {
-                noWhiteBallsSelected.classList.add('hidden');
-                Array.from(selectedWhiteBalls).sort((a, b) => a - b).forEach(num => {
-                    const ballSpan = document.createElement('span');
-                    ballSpan.classList.add('ball'); // Use base .ball class for styling
-                    ballSpan.textContent = num;
-                    selectedWhiteBallsDisplay.appendChild(ballSpan);
-                });
-            }
-            whiteBallCountSpan.textContent = `(${selectedWhiteBalls.size}/5 selected)`;
-
-            // Update powerball display
-            selectedPowerballDisplay.innerHTML = '';
-            if (selectedPowerball === null) {
-                noPowerballSelected.classList.remove('hidden');
-            } else {
-                noPowerballSelected.classList.add('hidden');
-                const powerballSpan = document.createElement('span');
-                powerballSpan.classList.add('ball', 'powerball-ball'); // Use base .ball and .powerball-ball
-                powerballSpan.textContent = selectedPowerball;
-                selectedPowerballDisplay.appendChild(powerballSpan);
-            }
-            powerballCountSpan.textContent = `(${selectedPowerball !== null ? 1 : 0}/1 selected)`;
-
-            // Toggle '+' sign visibility
-            if (selectedWhiteBalls.size > 0 && selectedPowerball !== null) {
-                plusSign.classList.remove('hidden');
-            } else {
-                plusSign.classList.add('hidden');
-            }
-
-            // Enable/disable buttons
-            if (selectedWhiteBalls.size === 5 && selectedPowerball !== null) {
-                analyzePickBtn.disabled = false;
-                savePickBtn.disabled = false;
-            } else {
-                analyzePickBtn.disabled = true;
-                savePickBtn.disabled = true;
+                selectedNumbersDisplay.classList.add('hidden');
             }
         };
 
-        const resetSelections = () => {
+        const resetSelection = () => {
+            selectedWhiteBalls.forEach(num => {
+                const ballElement = whiteBallsContainer.querySelector(`.ball[data-number="${num}"]`);
+                if (ballElement) {
+                    ballElement.classList.remove('selected-white');
+                }
+            });
+            if (selectedPowerball !== null) {
+                const powerballElement = powerballContainer.querySelector(`.ball[data-number="${selectedPowerball}"]`);
+                if (powerballElement) {
+                    powerballElement.classList.remove('selected-powerball');
+                }
+            }
             selectedWhiteBalls.clear();
             selectedPowerball = null;
-
-            document.querySelectorAll('.white-ball-selectable.selected-white').forEach(ball => {
-                ball.classList.remove('selected-white');
-            });
-            document.querySelectorAll('.powerball-ball-selectable.selected-powerball').forEach(ball => {
-                ball.classList.remove('selected-powerball');
-            });
-
-            analysisResultsSection.classList.add('hidden');
-            analysisSummaryDiv.innerHTML = '';
-            lastDrawnList.innerHTML = '';
-            updateSelectedDisplays();
+            updateDisplay();
+            analysisResults.classList.add('hidden');
+            matchSummary.innerHTML = ''; // Clear previous analysis
+            lastDrawnDatesList.innerHTML = ''; // Clear previous analysis
         };
 
         // Event listener for white balls
         whiteBallsContainer.addEventListener('click', (event) => {
-            const clickedBall = event.target.closest('.white-ball-selectable');
-            if (clickedBall) {
-                const num = parseInt(clickedBall.dataset.number);
-                if (selectedWhiteBalls.has(num)) {
-                    selectedWhiteBalls.delete(num);
-                    clickedBall.classList.remove('selected-white');
+            const target = event.target;
+            if (target.classList.contains('ball') && target.dataset.type === 'white') {
+                const number = parseInt(target.dataset.number);
+                if (selectedWhiteBalls.has(number)) {
+                    selectedWhiteBalls.delete(number);
+                    target.classList.remove('selected-white');
                 } else {
                     if (selectedWhiteBalls.size < 5) {
-                        selectedWhiteBalls.add(num);
-                        clickedBall.classList.add('selected-white');
+                        selectedWhiteBalls.add(number);
+                        target.classList.add('selected-white');
                     } else {
-                        // Optionally, flash a message or prevent selection
-                        // console.log("Max 5 white balls already selected!");
+                        // Optionally provide feedback if user tries to select more than 5
+                        // alert('You can only select 5 white balls.');
                     }
                 }
-                updateSelectedDisplays();
+                updateDisplay();
             }
         });
 
-        // Event listener for Powerballs
-        powerballsContainer.addEventListener('click', (event) => {
-            const clickedBall = event.target.closest('.powerball-ball-selectable');
-            if (clickedBall) {
-                const num = parseInt(clickedBall.dataset.number);
-                if (selectedPowerball === num) {
+        // Event listener for powerball
+        powerballContainer.addEventListener('click', (event) => {
+            const target = event.target;
+            if (target.classList.contains('ball') && target.dataset.type === 'powerball') {
+                const number = parseInt(target.dataset.number);
+                if (selectedPowerball === number) {
                     selectedPowerball = null;
-                    clickedBall.classList.remove('selected-powerball');
+                    target.classList.remove('selected-powerball');
                 } else {
-                    if (selectedPowerball !== null) {
-                        // Deselect the previously selected Powerball
-                        document.querySelector(`.powerball-ball-selectable.selected-powerball`).classList.remove('selected-powerball');
+                    if (selectedPowerball !== null) { // Deselect previous if one was already selected
+                        const prevPowerball = powerballContainer.querySelector(`.ball[data-number="${selectedPowerball}"]`);
+                        if (prevPowerball) {
+                            prevPowerball.classList.remove('selected-powerball');
+                        }
                     }
-                    selectedPowerball = num;
-                    clickedBall.classList.add('selected-powerball');
+                    selectedPowerball = number;
+                    target.classList.add('selected-powerball');
                 }
-                updateSelectedDisplays();
+                updateDisplay();
             }
         });
 
-        // Analyze Pick Button Click
+        // Analyze button click
         analyzePickBtn.addEventListener('click', async () => {
             if (selectedWhiteBalls.size !== 5 || selectedPowerball === null) {
-                // This shouldn't happen if button is disabled, but as a safeguard
-                alert("Please select exactly 5 white balls and 1 Powerball.");
+                alert('Please select exactly 5 white balls and 1 Powerball before analyzing.');
                 return;
             }
 
-            const whiteBallsArray = Array.from(selectedWhiteBalls).sort((a, b) => a - b);
-            const powerball = selectedPowerball;
+            analysisResults.classList.remove('hidden');
+            loadingIndicator.classList.remove('hidden');
+            matchSummary.innerHTML = ''; // Clear previous results
+            lastDrawnDatesList.innerHTML = ''; // Clear previous results
 
-            analysisSummaryDiv.innerHTML = '<p class="text-center text-blue-600">Analyzing your pick...</p>';
-            lastDrawnList.innerHTML = '';
-            analysisResultsSection.classList.remove('hidden');
+            const whiteBallsArray = Array.from(selectedWhiteBalls).sort((a, b) => a - b);
+            const powerballNumber = selectedPowerball;
 
             try {
                 const response = await fetch('/analyze_manual_pick', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         white_balls: whiteBallsArray,
-                        powerball: powerball
-                    }),
+                        powerball: powerballNumber
+                    })
                 });
 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                    throw new Error(errorData.error || 'Failed to analyze pick.');
                 }
 
                 const data = await response.json();
-
-                // Display Historical Match Summary
-                let summaryHtml = '<h4 class="text-xl font-semibold mb-3 text-gray-700">Historical Match Summary (Last 2 Years):</h4>';
-                summaryHtml += '<ul class="list-disc list-inside text-gray-700 space-y-1">';
-                for (const category in data.match_summary) {
-                    const matchInfo = data.match_summary[category];
-                    if (matchInfo.count > 0) {
-                        summaryHtml += `<li><strong>${category}:</strong> ${matchInfo.count} time(s)`;
-                        if (matchInfo.draws && matchInfo.draws.length > 0) {
-                            summaryHtml += ` (Dates: ${matchInfo.draws.map(d => d.date).join(', ')})`;
-                        }
-                        summaryHtml += `</li>`;
-                    } else {
-                        summaryHtml += `<li><strong>${category}:</strong> 0 time(s)</li>`;
+                
+                // Display match summary
+                const summary = data.match_summary;
+                for (const category in summary) {
+                    const count = summary[category].count;
+                    const draws = summary[category].draws; // This will be an array of matching draws
+                    
+                    let listItemText = `${category}: ${count} time(s)`;
+                    if (count > 0 && draws.length > 0) {
+                        // Concatenate dates for display for each category
+                        const drawDates = draws.map(d => d.date).join(', ');
+                        listItemText += ` (Last drawn: ${drawDates})`;
                     }
+                    const li = document.createElement('li');
+                    li.textContent = listItemText;
+                    matchSummary.appendChild(li);
                 }
-                summaryHtml += '</ul>';
-                analysisSummaryDiv.innerHTML = summaryHtml;
 
-                // Display Last Drawn Dates
-                if (data.last_drawn_dates && Object.keys(data.last_drawn_dates).length > 0) {
-                    for (const key in data.last_drawn_dates) {
-                        const listItem = document.createElement('li');
-                        listItem.textContent = `${key}: ${data.last_drawn_dates[key]}`;
-                        lastDrawnList.appendChild(listItem);
-                    }
-                } else {
-                    lastDrawnList.innerHTML = '<li>No last drawn date information available.</li>';
+                // Display last drawn dates for individual numbers
+                const lastDrawnDates = data.last_drawn_dates;
+                for (const numKey in lastDrawnDates) {
+                    const date = lastDrawnDates[numKey];
+                    const li = document.createElement('li');
+                    li.textContent = `${numKey}: ${date}`;
+                    lastDrawnDatesList.appendChild(li);
                 }
 
             } catch (error) {
                 console.error('Error analyzing pick:', error);
-                analysisSummaryDiv.innerHTML = `<p class="text-red-600">Error analyzing your pick: ${error.message}</p>`;
-                lastDrawnList.innerHTML = '';
+                const li = document.createElement('li');
+                li.textContent = `Error: ${error.message}. Please try again later.`;
+                li.classList.add('text-red-600');
+                matchSummary.appendChild(li);
+                lastDrawnDatesList.innerHTML = ''; // Clear if error
+            } finally {
+                loadingIndicator.classList.add('hidden');
             }
         });
 
-        // Save Pick Button Click
-        savePickBtn.addEventListener('click', async () => {
-            if (selectedWhiteBalls.size !== 5 || selectedPowerball === null) {
-                alert("Please select exactly 5 white balls and 1 Powerball before saving.");
-                return;
-            }
+        resetSelectionBtn.addEventListener('click', resetSelection);
 
-            const whiteBallsArray = Array.from(selectedWhiteBalls).sort((a, b) => a - b);
-            const powerball = selectedPowerball;
-
-            try {
-                const response = await fetch('/save_generated_pick', { // Reuse existing route
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded', // Use form-urlencoded for this route
-                    },
-                    body: new URLSearchParams({
-                        generated_white_balls: whiteBallsArray.join(','),
-                        generated_powerball: powerball
-                    }).toString(),
-                });
-
-                const text = await response.text(); // Get raw text to check for Flask flash redirect
-                
-                // If Flask redirects, it means a flash message was set.
-                // We're looking for a successful save, so we'll check the response to see if it implies success.
-                // This is a common pattern for Flask flash messages that trigger redirects.
-                if (response.ok || response.redirected) {
-                     // In a real app, you might parse the redirected page or rely on server-side flashes.
-                     // For now, we'll assume a 200 or redirect implies Flask processed it.
-                    alert("Your pick has been saved successfully!"); // Simple client-side confirmation
-                    resetSelections(); // Clear selections after successful save
-                } else {
-                    // Handle non-OK status codes if the Flask route returns JSON on error
-                    let errorMsg = `Failed to save pick. Status: ${response.status}.`;
-                    try {
-                        const errorData = JSON.parse(text);
-                        if (errorData.message) errorMsg += ` Message: ${errorData.message}`;
-                    } catch (e) {
-                        // Not JSON, use raw text
-                        errorMsg += ` Response: ${text}`;
-                    }
-                    alert(errorMsg);
-                }
-
-            } catch (error) {
-                console.error('Error saving pick:', error);
-                alert(`Error saving pick: ${error.message}`);
-            }
-        });
-
-        // Reset Button Click
-        resetPickBtn.addEventListener('click', resetSelections);
-
-        // Initial display update
-        updateSelectedDisplays();
+        // Initial setup
+        updateDisplay();
     });
 </script>
+{% endblock %}
