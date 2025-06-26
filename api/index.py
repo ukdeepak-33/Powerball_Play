@@ -77,8 +77,8 @@ def _get_supabase_headers(is_service_key=False):
     key = SUPABASE_SERVICE_KEY if is_service_key else SUPABASE_ANON_KEY
     
     # --- TEMPORARY DEBUG PRINT: Remove these lines after verifying your keys are loaded ---
-    print(f"[DEBUG] Supabase URL used: {SUPABASE_PROJECT_URL}")
-    print(f"[DEBUG] Using {'Service Key' if is_service_key else 'Anon Key'}: {key[:5]}...{key[-5:]}") # Print only first/last 5 chars for security
+    # print(f"[DEBUG] Supabase URL used: {SUPABASE_PROJECT_URL}")
+    # print(f"[DEBUG] Using {'Service Key' if is_service_key else 'Anon Key'}: {key[:5]}...{key[-5:]}") # Print only first/last 5 chars for security
     # --- END TEMPORARY DEBUG PRINT ---
 
     return {
@@ -1692,6 +1692,53 @@ def save_official_draw_route():
         flash(f"An error occurred: {e}", 'error')
     return redirect(url_for('index'))
 
+def save_generated_numbers_to_db(numbers, powerball):
+    """
+    Saves a generated Powerball combination to the 'generated_powerball_numbers' table.
+    Ensures the combination is unique before saving.
+    """
+    url = f"{SUPABASE_PROJECT_URL}/rest/v1/{GENERATED_NUMBERS_TABLE_NAME}"
+    headers = _get_supabase_headers(is_service_key=True)
+
+    sorted_numbers = sorted(numbers)
+
+    check_params = {
+        'select': 'id',
+        'number_1': f'eq.{sorted_numbers[0]}',
+        'number_2': f'eq.{sorted_numbers[1]}',
+        'number_3': f'eq.{sorted_numbers[2]}',
+        'number_4': f'eq.{sorted_numbers[3]}',
+        'number_5': f'eq.{sorted_numbers[4]}',
+        'powerball': f'eq.{powerball}'
+    }
+    check_response = requests.get(url, headers=headers, params=check_params)
+    check_response.raise_for_status()
+    existing_combinations = check_response.json()
+
+    if existing_combinations:
+        print(f"Combination {sorted_numbers} + {powerball} already exists in {GENERATED_NUMBERS_TABLE_NAME}.")
+        return False, f"This exact combination ({', '.join(map(str, sorted_numbers))} + {powerball}) has already been saved."
+
+    new_generated_data = {
+        'number_1': sorted_numbers[0],
+        'number_2': sorted_numbers[1],
+        'number_3': sorted_numbers[2],
+        'number_4': sorted_numbers[3],
+        'number_5': sorted_numbers[4],
+        'powerball': powerball,
+        'generated_date': datetime.now().isoformat()
+    }
+
+    insert_response = requests.post(url, headers=headers, data=json.dumps(new_generated_data))
+    insert_response.raise_for_status()
+
+    if insert_response.status_code == 201:
+        print(f"Successfully inserted generated numbers: {new_generated_data}")
+        return True, "Generated numbers saved successfully!"
+    else:
+        print(f"Failed to insert generated numbers. Status: {insert_response.status_code}, Response: {insert_response.text}")
+        return False, f"Error saving generated numbers: {insert_response.status_code} - {insert_response.text}"
+
 @app.route('/save_generated_pick', methods=['POST'])
 def save_generated_pick_route():
     try:
@@ -2377,3 +2424,32 @@ def analyze_manual_pick_route():
         print(f"Error during manual pick analysis: {e}")
         traceback.print_exc() # Print full traceback
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
+@app.route('/save_manual_pick', methods=['POST']) # NEW ROUTE FOR SAVING MANUAL PICKS
+def save_manual_pick_route():
+    try:
+        data = request.get_json()
+        white_balls = data.get('white_balls')
+        powerball = data.get('powerball')
+
+        if not white_balls or len(white_balls) != 5 or powerball is None:
+            return jsonify({"success": False, "error": "Invalid input. Please provide 5 white balls and 1 powerball."}), 400
+        
+        # Ensure numbers are integers and sorted for consistency
+        white_balls = sorted([int(n) for n in white_balls])
+        powerball = int(powerball)
+
+        # Use the existing save_generated_numbers_to_db function
+        success, message = save_generated_numbers_to_db(white_balls, powerball)
+
+        if success:
+            return jsonify({"success": True, "message": message})
+        else:
+            return jsonify({"success": False, "error": message}), 400
+
+    except ValueError:
+        return jsonify({"success": False, "error": "Invalid number format provided."}), 400
+    except Exception as e:
+        print(f"Error during save_manual_pick_route: {e}")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
