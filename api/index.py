@@ -2308,3 +2308,47 @@ def chat_with_ai_route():
         import traceback
         traceback.print_exc()
         return jsonify({"response": f"An internal error occurred: {e}"}), 500
+
+# --- NEW MANUAL PICK ROUTES ---
+@app.route('/my_jackpot_pick')
+def my_jackpot_pick_route():
+    return render_template('my_jackpot_pick.html')
+
+@app.route('/analyze_manual_pick', methods=['POST'])
+def analyze_manual_pick_route():
+    if df.empty:
+        return jsonify({"error": "Historical data not loaded or is empty."}), 500
+    
+    try:
+        data = request.get_json()
+        white_balls = data.get('white_balls')
+        powerball = data.get('powerball')
+
+        if not white_balls or len(white_balls) != 5 or powerball is None:
+            return jsonify({"error": "Invalid input. Please provide 5 white balls and 1 powerball."}), 400
+        
+        # Ensure numbers are integers and sorted for consistency
+        white_balls = sorted([int(n) for n in white_balls])
+        powerball = int(powerball)
+
+        # Perform historical match analysis
+        historical_match_results = check_generated_against_history(white_balls, powerball, df)
+        
+        # Get last drawn dates for each selected number
+        last_drawn_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
+
+        return jsonify({
+            "success": True,
+            "generated_numbers": white_balls, # Renamed key for clarity for manual pick
+            "generated_powerball": powerball,
+            "match_summary": historical_match_results['summary'],
+            "last_drawn_dates": last_drawn_dates
+        })
+
+    except ValueError:
+        return jsonify({"error": "Invalid number format provided."}), 400
+    except Exception as e:
+        print(f"Error during manual pick analysis: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
