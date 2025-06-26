@@ -1,121 +1,276 @@
 {% extends "base.html" %}
 
-{% block title %}Simulate Multiple Draws{% endblock %}
+{% block title %}Simulate Multiple Powerball Draws{% endblock %}
 
-{% block page_heading %}Simulate Multiple Draws{% endblock %}
+{% block page_heading %}Simulate Multiple Powerball Draws{% endblock %}
 
 {% block content %}
 <div class="space-y-8">
     <div class="card p-6 bg-white rounded-lg shadow-lg">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Simulate Powerball Draws & See Frequency</h2>
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Simulate Draws</h2>
         <form method="POST" action="{{ url_for('simulate_multiple_draws_route') }}" class="space-y-4">
-            <div>
-                <label for="num_draws" class="block text-sm font-medium text-gray-700 mb-1">Number of Simulations:</label>
-                <input type="number" id="num_draws" name="num_draws" min="100" value="{{ num_simulations if num_simulations else 1000 }}" 
-                       class="mt-1 block w-full md:w-1/3 p-3 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                       placeholder="e.g., 1000" required>
-                <p class="mt-1 text-xs text-gray-500">More simulations provide a more accurate frequency distribution.</p>
+            <div class="form-group">
+                <label for="num_draws" class="form-label">Number of Simulations:</label>
+                <input type="number" id="num_draws" name="num_draws" class="form-input" min="1" value="{{ num_simulations if num_simulations else 100 }}" required>
+                <p class="text-gray-600 text-sm mt-1">Enter how many hypothetical draws you want to simulate (e.g., 100, 1000, 10000).</p>
             </div>
-            <button type="submit" class="btn-primary">
-                Run Simulation
-            </button>
+
+            <div class="form-group">
+                <label for="odd_even_choice" class="form-label">Odd/Even Split Preference:</label>
+                <select id="odd_even_choice" name="odd_even_choice" class="form-input">
+                    <option value="Any">Any Split (Random)</option>
+                    <option value="All Even">All Even (5 Even / 0 Odd)</option>
+                    <option value="All Odd">All Odd (0 Even / 5 Odd)</option>
+                    <option value="3 Even / 2 Odd">3 Even / 2 Odd</option>
+                    <option value="2 Even / 3 Odd">2 Even / 3 Odd</option>
+                    <option value="1 Even / 4 Odd">1 Even / 4 Odd</option>
+                    <option value="4 Even / 1 Odd">4 Even / 1 Odd</option>
+                </select>
+                <p class="text-gray-600 text-sm mt-1">Choose a specific odd/even distribution for the white balls in the simulation.</p>
+            </div>
+            
+            <button type="submit" class="btn-primary w-full md:w-auto">Run Simulation</button>
         </form>
     </div>
 
-    {% if simulated_white_ball_freq or simulated_powerball_freq %}
+    {% if simulated_white_ball_freq and simulated_powerball_freq %}
     <div class="card p-6 bg-white rounded-lg shadow-lg">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Simulation Results ({{ num_simulations }} Draws)</h2>
-
-        {# White Ball Frequencies #}
-        <h3 class="text-xl font-semibold mb-3 text-gray-700">White Ball Frequencies:</h3>
-        {% if simulated_white_ball_freq %}
-            <div class="overflow-x-auto max-h-96 custom-scrollbar mb-6">
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 py-2">
-                    {% for item in simulated_white_ball_freq %}
-                        <div class="ball-lg flex flex-col items-center justify-center">
-                            <span class="text-xl font-bold text-gray-900">{{ item.Number }}</span>
-                            <span class="text-xs text-gray-600">({{ item.Frequency }}x)</span>
-                        </div>
-                    {% endfor %}
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Simulated Frequencies ({{ num_simulations }} Draws)</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+                <h3 class="text-xl font-semibold mb-3 text-gray-700">White Ball Frequencies (1-69)</h3>
+                <div class="chart-container h-80">
+                    <canvas id="whiteBallFrequencyChart"></canvas>
                 </div>
             </div>
-        {% else %}
-            <p class="text-gray-500 mb-6">No white ball frequencies to display.</p>
-        {% endif %}
-
-        {# Powerball Frequencies #}
-        <h3 class="text-xl font-semibold mb-3 text-gray-700">Powerball Frequencies:</h3>
-        {% if simulated_powerball_freq %}
-            <div class="overflow-x-auto max-h-96 custom-scrollbar">
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 py-2">
-                    {% for item in simulated_powerball_freq %}
-                        <div class="ball-lg powerball-lg flex flex-col items-center justify-center">
-                            <span class="text-xl font-bold text-white">{{ item.Number }}</span>
-                            <span class="text-xs text-red-100">({{ item.Frequency }}x)</span>
-                        </div>
-                    {% endfor %}
+            <div>
+                <h3 class="text-xl font-semibold mb-3 text-gray-700">Powerball Frequencies (1-26)</h3>
+                <div class="chart-container h-80">
+                    <canvas id="powerballFrequencyChart"></canvas>
                 </div>
             </div>
-        {% else %}
-            <p class="text-gray-500">No Powerball frequencies to display.</p>
-        {% endif %}
+        </div>
 
-    </div>
-    {% elif request.method == 'POST' %}
-    <div class="card p-6 bg-white rounded-lg shadow-lg">
-        <p class="text-gray-500">No numbers were generated or frequencies calculated in the simulation. Please try again or check your data.</p>
+        {# New section for Simulated Hot Numbers #}
+        <div class="mt-8 border-t pt-6 border-gray-200">
+            <h3 class="text-xl font-semibold mb-4 text-gray-700">Simulated Hot Numbers 🔥</h3>
+            <p class="text-gray-600 mb-4">These are the numbers that appeared most frequently in your {{ num_simulations }} simulated draws.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h4 class="text-lg font-medium mb-3 text-gray-800">Hot White Balls:</h4>
+                    <div id="hotWhiteBallsContainer" class="flex flex-wrap gap-2 items-center">
+                        <!-- Hot white balls will be dynamically inserted here -->
+                    </div>
+                </div>
+                <div>
+                    <h4 class="text-lg font-medium mb-3 text-gray-800">Hot Powerballs:</h4>
+                    <div id="hotPowerballsContainer" class="flex flex-wrap gap-2 items-center">
+                        <!-- Hot powerballs will be dynamically inserted here -->
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     {% endif %}
 </div>
 
-{# Custom Styles for larger balls #}
+{# Custom CSS for the flashing effect #}
 <style>
-    .ball-lg {
-        display: flex;
-        flex-direction: column;
+    @keyframes flash {
+        0% { transform: scale(1); box-shadow: 0 0 0 rgba(0, 0, 0, 0); }
+        50% { transform: scale(1.1); box-shadow: 0 0 15px rgba(255, 215, 0, 0.8); } /* Gold glow */
+        100% { transform: scale(1); box-shadow: 0 0 0 rgba(0, 0, 0, 0); }
+    }
+
+    .ball.flash-hot {
+        animation: flash 1.5s infinite ease-in-out;
+        /* Ensure it maintains its ball-like appearance */
+        display: inline-flex;
         justify-content: center;
         align-items: center;
-        width: 60px; /* Larger size */
-        height: 60px; /* Larger size */
-        background-color: #e2e8f0; /* Light blue-gray for white balls */
+        width: 40px; 
+        height: 40px;
         border-radius: 50%;
-        border: 1px solid #cbd5e0;
         font-weight: bold;
-        margin: 5px; /* Adjust margin for spacing */
+        margin: 0 4px;
+        font-size: 1.1em;
         flex-shrink: 0;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-    }
-    .ball-lg:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    }
-    .powerball-lg {
-        background-color: #dc2626; /* Stronger red for Powerball */
-        border-color: #991b1b;
+        background-color: #f0f0f0; /* Default white ball color */
+        border: 1px solid #ccc;
+        color: #333;
     }
 
-    /* Custom scrollbar for better aesthetics */
-    .custom-scrollbar::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-
-    .custom-scrollbar::-webkit-scrollbar-track {
-        background: #f1f1f1;
-        border-radius: 10px;
-    }
-
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: #888;
-        border-radius: 10px;
-    }
-
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: #555;
+    .powerball-ball.flash-hot {
+        background-color: #ef4444; /* Red for Powerball */
+        color: white;
+        border-color: #dc2626;
     }
 </style>
+
 {% endblock %}
 
 {% block scripts %}
+{{ super() }}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const whiteBallFreqData = {{ simulated_white_ball_freq | tojson }};
+        const powerballFreqData = {{ simulated_powerball_freq | tojson }};
+
+        // Render charts if data exists
+        if (whiteBallFreqData && whiteBallFreqData.length > 0) {
+            renderSimulatedCharts(whiteBallFreqData, powerballFreqData);
+            displayHotNumbers(whiteBallFreqData, powerballFreqData);
+        }
+
+        // Set selected odd/even choice if it was submitted
+        const oddEvenChoice = "{{ request.form.get('odd_even_choice', 'Any') }}";
+        const oddEvenSelect = document.getElementById('odd_even_choice');
+        if (oddEvenSelect) {
+            oddEvenSelect.value = oddEvenChoice;
+        }
+
+        function renderSimulatedCharts(whiteBallData, powerballData) {
+            const whiteBallLabels = whiteBallData.map(d => d.Number);
+            const whiteBallCounts = whiteBallData.map(d => d.Frequency);
+
+            new Chart(document.getElementById('whiteBallFrequencyChart'), {
+                type: 'bar',
+                data: {
+                    labels: whiteBallLabels,
+                    datasets: [{
+                        label: 'Frequency',
+                        data: whiteBallCounts,
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)', // Blue
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Simulated Frequency'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'White Ball Number'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    }
+                }
+            });
+
+            const powerballLabels = powerballData.map(d => d.Number);
+            const powerballCounts = powerballData.map(d => d.Frequency);
+
+            new Chart(document.getElementById('powerballFrequencyChart'), {
+                type: 'bar',
+                data: {
+                    labels: powerballLabels,
+                    datasets: [{
+                        label: 'Frequency',
+                        data: powerballCounts,
+                        backgroundColor: 'rgba(255, 99, 132, 0.6)', // Red
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Simulated Frequency'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Powerball Number'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function displayHotNumbers(whiteBallData, powerballData) {
+            const hotWhiteBallsContainer = document.getElementById('hotWhiteBallsContainer');
+            const hotPowerballsContainer = document.getElementById('hotPowerballsContainer');
+
+            // Sort by frequency descending, then by number ascending (for ties)
+            const sortedWhiteBalls = [...whiteBallData].sort((a, b) => {
+                if (b.Frequency !== a.Frequency) {
+                    return b.Frequency - a.Frequency;
+                }
+                return a.Number - b.Number;
+            });
+
+            const sortedPowerballs = [...powerballData].sort((a, b) => {
+                if (b.Frequency !== a.Frequency) {
+                    return b.Frequency - a.Frequency;
+                }
+                return a.Number - b.Number;
+            });
+
+            // Get top N hot numbers (e.g., top 5 white balls, top 2 powerballs)
+            const numHotWhiteBalls = Math.min(5, sortedWhiteBalls.length);
+            const numHotPowerballs = Math.min(2, sortedPowerballs.length);
+
+            // Display and flash hot white balls
+            hotWhiteBallsContainer.innerHTML = '';
+            if (numHotWhiteBalls > 0 && sortedWhiteBalls[0].Frequency > 0) { // Only show if at least one number has frequency > 0
+                for (let i = 0; i < numHotWhiteBalls; i++) {
+                    const ball = document.createElement('span');
+                    ball.classList.add('ball', 'flash-hot');
+                    ball.textContent = sortedWhiteBalls[i].Number;
+                    hotWhiteBallsContainer.appendChild(ball);
+                }
+            } else {
+                hotWhiteBallsContainer.innerHTML = '<p class="text-gray-500">No hot white balls detected in this simulation (all numbers appeared equally or zero).</p>';
+            }
+
+            // Display and flash hot powerballs
+            hotPowerballsContainer.innerHTML = '';
+            if (numHotPowerballs > 0 && sortedPowerballs[0].Frequency > 0) { // Only show if at least one number has frequency > 0
+                for (let i = 0; i < numHotPowerballs; i++) {
+                    const ball = document.createElement('span');
+                    ball.classList.add('ball', 'powerball-ball', 'flash-hot');
+                    ball.textContent = sortedPowerballs[i].Number;
+                    hotPowerballsContainer.appendChild(ball);
+                }
+            } else {
+                hotPowerballsContainer.innerHTML = '<p class="text-gray-500">No hot powerballs detected in this simulation (all numbers appeared equally or zero).</p>';
+            }
+        }
+    });
+</script>
 {% endblock %}
