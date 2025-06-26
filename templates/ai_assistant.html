@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}AI Assistant{% endblock %}
+
+{% block page_heading %}Powerball AI Assistant{% endblock %}
+
+{% block content %}
+<div class="card p-6 bg-white rounded-lg shadow-lg max-w-2xl mx-auto flex flex-col h-[70vh]">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">Chat with the Powerball AI</h2>
+
+    <div id="chat-history" class="flex-grow overflow-y-auto border border-gray-300 rounded-lg p-4 mb-4 space-y-4 custom-scrollbar bg-gray-50">
+        <!-- Chat messages will be appended here -->
+        <div class="flex justify-start">
+            <div class="bg-blue-100 text-blue-800 p-3 rounded-lg max-w-[80%] shadow-sm">
+                Hello! I'm your Powerball AI Assistant. How can I help you analyze Powerball data or generate numbers today?
+            </div>
+        </div>
+    </div>
+
+    <div class="flex space-x-3">
+        <input type="text" id="user-input" class="flex-grow p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" placeholder="Ask me about Powerball data, trends, or numbers...">
+        <button id="send-button" class="btn-primary flex items-center justify-center">
+            <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7-7v14"></path></svg>
+            Send
+        </button>
+    </div>
+    <div id="typing-indicator" class="text-center text-gray-500 text-sm mt-2 hidden">AI is typing...</div>
+</div>
+
+<style>
+    /* Custom scrollbar for better aesthetics */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 10px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const chatHistory = document.getElementById('chat-history');
+        const typingIndicator = document.getElementById('typing-indicator');
+
+        // Function to add a message to chat history
+        function addMessage(sender, message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('flex', sender === 'user' ? 'justify-end' : 'justify-start');
+            
+            const messageBubble = document.createElement('div');
+            messageBubble.classList.add(
+                'p-3', 'rounded-lg', 'max-w-[80%]', 'shadow-sm',
+                sender === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'
+            );
+            messageBubble.textContent = message;
+            messageDiv.appendChild(messageBubble);
+            chatHistory.appendChild(messageDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
+        }
+
+        // Function to send message to AI
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (message === '') return;
+
+            addMessage('user', message);
+            userInput.value = ''; // Clear input
+
+            typingIndicator.classList.remove('hidden'); // Show typing indicator
+
+            try {
+                const response = await fetch('/chat_with_ai', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                addMessage('ai', data.response); // Display AI's response
+
+            } catch (error) {
+                console.error('Error communicating with AI:', error);
+                addMessage('ai', 'Oops! I encountered an error. Please try again later.');
+            } finally {
+                typingIndicator.classList.add('hidden'); // Hide typing indicator
+            }
+        }
+
+        sendButton.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    });
+</script>
+{% endblock %}
