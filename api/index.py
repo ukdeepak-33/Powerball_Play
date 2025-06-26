@@ -603,13 +603,16 @@ def simulate_multiple_draws(df_source, group_a, odd_even_choice, combo_choice, w
             pass # Silently skip failed generations in simulation
     
     # Convert defaultdicts to sorted lists of dictionaries
+    # Ensure all possible numbers from the full range are included, even if frequency is 0
+    full_white_ball_range_list = list(range(GLOBAL_WHITE_BALL_RANGE[0], GLOBAL_WHITE_BALL_RANGE[1] + 1))
     simulated_white_ball_freq_list = sorted([
-        {'Number': int(k), 'Frequency': int(v)} for k, v in white_ball_results.items()
-    ], key=lambda x: x['Number']) # Sort by Number ascending
+        {'Number': n, 'Frequency': white_ball_results[n]} for n in full_white_ball_range_list
+    ], key=lambda x: x['Number'])
 
+    full_powerball_range_list = list(range(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1] + 1))
     simulated_powerball_freq_list = sorted([
-        {'Number': int(k), 'Frequency': int(v)} for k, v in powerball_results.items()
-    ], key=lambda x: x['Number']) # Sort by Number ascending
+        {'Number': n, 'Frequency': powerball_results[n]} for n in full_powerball_range_list
+    ], key=lambda x: x['Number'])
 
     return {'white_ball_freq': simulated_white_ball_freq_list, 'powerball_freq': simulated_powerball_freq_list}
 
@@ -2190,4 +2193,87 @@ def analyze_generated_historical_matches_route():
         import traceback
         traceback.print_exc()
         return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
+
+# --- NEW AI ASSISTANT ROUTES ---
+@app.route('/ai_assistant')
+def ai_assistant_route():
+    return render_template('ai_assistant.html')
+
+@app.route('/chat_with_ai', methods=['POST'])
+def chat_with_ai_route():
+    user_message = request.json.get('message')
+    if not user_message:
+        return jsonify({"response": "Please provide a message."}), 400
+
+    # Initialize chat history for the AI's context
+    # This example starts fresh with each request. For a persistent conversation,
+    # you'd need to manage chat history on the client side and send it with each request.
+    chat_history = []
+    
+    # Define the AI's persona and provide context about Powerball
+    initial_prompt = {
+        "role": "user",
+        "parts": [{
+            "text": """
+            You are a highly knowledgeable Powerball Lottery Analysis AI Assistant. 
+            Your purpose is to help users understand Powerball data, trends, and probabilities.
+            You should be helpful, informative, and concise.
+            
+            Here's some general knowledge about Powerball:
+            - White Balls: 5 numbers are drawn from a pool of 1 to 69.
+            - Powerball: 1 number is drawn from a separate pool of 1 to 26.
+            - Odds of winning the jackpot (matching 5 White Balls + Powerball): 1 in 292,201,338.
+            - Common analysis includes: number frequency, hot/cold numbers, sum of balls, odd/even splits, consecutive numbers, grouped patterns, and Powerball position frequency.
+
+            When asked about specific data analysis (e.g., "hot numbers," "sum of balls," "monthly trends"), you should explain *what* that analysis means and *why* it might be relevant, without actually providing specific real-time data unless that functionality is explicitly added later through tool use. For now, focus on explanations and general insights.
+
+            If a user asks to "generate numbers," or requests specific real-time data that you don't have access to (like "what are the current hot numbers?"), you should gently explain that you are an analytical assistant and cannot perform live data lookups or generate numbers, but can explain the *concepts* behind them.
+
+            User's question: """ + user_message
+        }]
+    }
+    chat_history.append(initial_prompt)
+
+    try:
+        # Fetch the API key. In the Canvas environment, this will be automatically provided.
+        apiKey = "" # Leave this empty, Canvas runtime will inject the key.
+        apiUrl = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}"
+
+        payload = {
+            "contents": chat_history,
+            "generationConfig": {
+                "temperature": 0.7,
+                "topK": 40,
+                "topP": 0.95,
+                "maxOutputTokens": 500
+            },
+            "safetySettings": [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+            ]
+        }
+
+        response = requests.post(apiUrl, headers={'Content-Type': 'application/json'}, data=json.dumps(payload))
+        response.raise_for_status() # Raise an exception for HTTP errors (4xx or 5xx)
+        
+        result = response.json()
+
+        if result and result.get('candidates') and len(result['candidates']) > 0 and \
+           result['candidates'][0].get('content') and result['candidates'][0]['content'].get('parts') and \
+           len(result['candidates'][0]['content']['parts']) > 0:
+            ai_response = result['candidates'][0]['content']['parts'][0]['text']
+            return jsonify({"response": ai_response})
+        else:
+            return jsonify({"response": "I'm sorry, I couldn't generate a response."}), 500
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error calling Gemini API: {e}")
+        return jsonify({"response": f"Error communicating with AI: {e}"}), 500
+    except Exception as e:
+        print(f"An unexpected error occurred in chat_with_ai_route: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"response": f"An internal error occurred: {e}"}), 500
 
