@@ -12,11 +12,12 @@ import numpy as np
 import traceback # Ensure this is imported for logging errors
 
 # --- Supabase Configuration ---
-# IMPORTANT: These values should ideally be set as environment variables in your deployment platform (e.g., Render, Vercel).
-# The 'default' values provided here are placeholders. If running locally, you can set them in your shell or .env file.
+# IMPORTANT: These values should ALWAYS be set as environment variables in your deployment platform (e.g., Render, Vercel).
+# The 'default' values provided here are placeholders, ONLY used if the environment variable is NOT found.
+# If running locally for testing, you can set them in your shell or a .env file.
 SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
-SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "YOUR_SUPABASE_ANON_KEY_HERE") # Replace 'YOUR_SUPABASE_ANON_KEY_HERE' with your actual Anon Key in your environment variables.
-SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY_HERE") # Replace 'YOUR_SUPABASE_SERVICE_ROLE_KEY_HERE' with your actual Service Role Key in your environment variables.
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "YOUR_ACTUAL_SUPABASE_ANON_KEY_GOES_HERE") # REPLACE THIS IN YOUR ENV VARS
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_ACTUAL_SUPABASE_SERVICE_ROLE_KEY_GOES_HERE") # REPLACE THIS IN YOUR ENV VARS
 
 SUPABASE_TABLE_NAME = 'powerball_draws'
 GENERATED_NUMBERS_TABLE_NAME = 'generated_powerball_numbers'
@@ -74,6 +75,12 @@ ASCENDING_GEN_RANGES = [
 
 def _get_supabase_headers(is_service_key=False):
     key = SUPABASE_SERVICE_KEY if is_service_key else SUPABASE_ANON_KEY
+    
+    # --- TEMPORARY DEBUG PRINT: Remove these lines after verifying your keys are loaded ---
+    print(f"[DEBUG] Supabase URL used: {SUPABASE_PROJECT_URL}")
+    print(f"[DEBUG] Using {'Service Key' if is_service_key else 'Anon Key'}: {key[:5]}...{key[-5:]}") # Print only first/last 5 chars for security
+    # --- END TEMPORARY DEBUG PRINT ---
+
     return {
         "apikey": key,
         "Authorization": f"Bearer {key}",
