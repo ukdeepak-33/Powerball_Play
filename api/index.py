@@ -2202,40 +2202,40 @@ def ai_assistant_route():
 @app.route('/chat_with_ai', methods=['POST'])
 def chat_with_ai_route():
     user_message = request.json.get('message')
+    print(f"[AI-DEBUG] Received user message: '{user_message}'")
+
     if not user_message:
+        print("[AI-DEBUG] No user message provided.")
         return jsonify({"response": "Please provide a message."}), 400
 
-    # Initialize chat history for the AI's context
-    # This example starts fresh with each request. For a persistent conversation,
-    # you'd need to manage chat history on the client side and send it with each request.
     chat_history = []
     
-    # Define the AI's persona and provide context about Powerball
-    initial_prompt = {
+    initial_prompt_text = """
+    You are a highly knowledgeable Powerball Lottery Analysis AI Assistant. 
+    Your purpose is to help users understand Powerball data, trends, and probabilities.
+    You should be helpful, informative, and concise.
+    
+    Here's some general knowledge about Powerball:
+    - White Balls: 5 numbers are drawn from a pool of 1 to 69.
+    - Powerball: 1 number is drawn from a separate pool of 1 to 26.
+    - Odds of winning the jackpot (matching 5 White Balls + Powerball): 1 in 292,201,338.
+    - Common analysis includes: number frequency, hot/cold numbers, sum of balls, odd/even splits, consecutive numbers, grouped patterns, and Powerball position frequency.
+
+    When asked about specific data analysis (e.g., "hot numbers," "sum of balls," "monthly trends"), you should explain *what* that analysis means and *why* it might be relevant, without actually providing specific real-time data unless that functionality is explicitly added later through tool use. For now, focus on explanations and general insights.
+
+    If a user asks to "generate numbers," or requests specific real-time data that you don't have access to (like "what are the current hot numbers?"), you should gently explain that you are an analytical assistant and cannot perform live data lookups or generate numbers, but can explain the *concepts* behind them.
+
+    User's question: """ + user_message
+
+    chat_history.append({
         "role": "user",
-        "parts": [{
-            "text": """
-            You are a highly knowledgeable Powerball Lottery Analysis AI Assistant. 
-            Your purpose is to help users understand Powerball data, trends, and probabilities.
-            You should be helpful, informative, and concise.
-            
-            Here's some general knowledge about Powerball:
-            - White Balls: 5 numbers are drawn from a pool of 1 to 69.
-            - Powerball: 1 number is drawn from a separate pool of 1 to 26.
-            - Odds of winning the jackpot (matching 5 White Balls + Powerball): 1 in 292,201,338.
-            - Common analysis includes: number frequency, hot/cold numbers, sum of balls, odd/even splits, consecutive numbers, grouped patterns, and Powerball position frequency.
-
-            When asked about specific data analysis (e.g., "hot numbers," "sum of balls," "monthly trends"), you should explain *what* that analysis means and *why* it might be relevant, without actually providing specific real-time data unless that functionality is explicitly added later through tool use. For now, focus on explanations and general insights.
-
-            If a user asks to "generate numbers," or requests specific real-time data that you don't have access to (like "what are the current hot numbers?"), you should gently explain that you are an analytical assistant and cannot perform live data lookups or generate numbers, but can explain the *concepts* behind them.
-
-            User's question: """ + user_message
-        }]
-    }
-    chat_history.append(initial_prompt)
+        "parts": [{"text": initial_prompt_text}]
+    })
+    
+    # Debugging: Print the full chat history being sent
+    print(f"[AI-DEBUG] Chat history payload to Gemini: {json.dumps(chat_history, indent=2)}")
 
     try:
-        # Fetch the API key. In the Canvas environment, this will be automatically provided.
         apiKey = "" # Leave this empty, Canvas runtime will inject the key.
         apiUrl = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}"
 
@@ -2254,25 +2254,41 @@ def chat_with_ai_route():
                 {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
             ]
         }
+        
+        # Debugging: Print the full payload before sending
+        print(f"[AI-DEBUG] Full API payload: {json.dumps(payload, indent=2)}")
 
         response = requests.post(apiUrl, headers={'Content-Type': 'application/json'}, data=json.dumps(payload))
+        
+        # Debugging: Print raw response info
+        print(f"[AI-DEBUG] Gemini API Response Status Code: {response.status_code}")
+        print(f"[AI-DEBUG] Gemini API Raw Response Text: {response.text}")
+
         response.raise_for_status() # Raise an exception for HTTP errors (4xx or 5xx)
         
         result = response.json()
+        # Debugging: Print parsed JSON result
+        print(f"[AI-DEBUG] Gemini API Parsed JSON Result: {json.dumps(result, indent=2)}")
 
         if result and result.get('candidates') and len(result['candidates']) > 0 and \
            result['candidates'][0].get('content') and result['candidates'][0]['content'].get('parts') and \
            len(result['candidates'][0]['content']['parts']) > 0:
             ai_response = result['candidates'][0]['content']['parts'][0]['text']
+            print(f"[AI-DEBUG] Successfully extracted AI response.")
             return jsonify({"response": ai_response})
         else:
-            return jsonify({"response": "I'm sorry, I couldn't generate a response."}), 500
+            error_message = "I'm sorry, I couldn't generate a response. The AI model did not return valid content."
+            print(f"[AI-DEBUG] Failed to extract AI response: {error_message}")
+            return jsonify({"response": error_message}), 500
 
     except requests.exceptions.RequestException as e:
-        print(f"Error calling Gemini API: {e}")
+        print(f"[AI-ERROR] Error calling Gemini API: {e}")
         return jsonify({"response": f"Error communicating with AI: {e}"}), 500
+    except json.JSONDecodeError as e:
+        print(f"[AI-ERROR] JSON decoding error from Gemini API: {e}. Raw response was: {response.text}")
+        return jsonify({"response": f"Error parsing AI response: {e}"}), 500
     except Exception as e:
-        print(f"An unexpected error occurred in chat_with_ai_route: {e}")
+        print(f"[AI-ERROR] An unexpected error occurred in chat_with_ai_route: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({"response": f"An internal error occurred: {e}"}), 500
