@@ -12,9 +12,11 @@ import numpy as np
 import traceback # Ensure this is imported for logging errors
 
 # --- Supabase Configuration ---
+# IMPORTANT: These values should ideally be set as environment variables in your deployment platform (e.g., Render, Vercel).
+# The 'default' values provided here are placeholders. If running locally, you can set them in your shell or .env file.
 SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
-SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlrc3h6YmJjb2l0ZWhkbXN4cWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NzMwNjUsImexFQI6MjA2NTM0OTA2NX0.AzUD7wjR7VbvtUH27NDqG8T_t4")
-SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "YOUR_SUPABASE_ANON_KEY_HERE") # Replace 'YOUR_SUPABASE_ANON_KEY_HERE' with your actual Anon Key in your environment variables.
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY_HERE") # Replace 'YOUR_SUPABASE_SERVICE_ROLE_KEY_HERE' with your actual Service Role Key in your environment variables.
 
 SUPABASE_TABLE_NAME = 'powerball_draws'
 GENERATED_NUMBERS_TABLE_NAME = 'generated_powerball_numbers'
