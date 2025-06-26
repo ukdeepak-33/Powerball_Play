@@ -200,23 +200,26 @@ def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice
         even_count = sum(1 for num in white_balls if num % 2 == 0)
         odd_count = 5 - even_count
 
+        # Apply odd/even choice for simulation if specified
         if odd_even_choice == "All Even" and even_count != 5:
             attempts += 1
             continue
         elif odd_even_choice == "All Odd" and odd_count != 5:
+            attempts += 1
             continue
         elif odd_even_choice == "3 Even / 2 Odd" and (even_count != 3 or odd_count != 2):
             attempts += 1
             continue
-        elif odd_even_choice == "3 Odd / 2 Even" and (odd_count != 3 or even_count != 2):
+        elif odd_even_choice == "2 Even / 3 Odd" and (even_count != 2 or odd_count != 3):
             attempts += 1
             continue
         elif odd_even_choice == "1 Even / 4 Odd" and (even_count != 1 or odd_count != 4):
             attempts += 1
             continue
-        elif odd_even_choice == "1 Odd / 4 Even" and (odd_count != 1 or even_count != 4):
+        elif odd_even_choice == "4 Even / 1 Odd" and (even_count != 4 or odd_count != 1):
             attempts += 1
             continue
+
 
         if high_low_balance is not None:
             low_numbers_count = sum(1 for num in white_balls if num <= 34)
@@ -582,7 +585,7 @@ def find_results_by_sum(df_source, target_sum):
     # Return all necessary columns for rendering, including Powerball
     return results[['Draw Date', 'Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Powerball', 'Sum', 'Draw Date_dt']]
 
-def simulate_multiple_draws(df_source, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, num_draws=100):
+def simulate_multiple_draws(df_source, group_a, odd_even_choice, white_ball_range, powerball_range, excluded_numbers, num_draws=100):
     if df_source.empty: 
         # Return empty lists for white ball and powerball frequencies
         return {'white_ball_freq': [], 'powerball_freq': []}
@@ -592,8 +595,11 @@ def simulate_multiple_draws(df_source, group_a, odd_even_choice, combo_choice, w
 
     for _ in range(num_draws):
         try:
-            # Pass is_simulation=True to generate_powerball_numbers for simulation
-            white_balls, powerball = generate_powerball_numbers(df_source, group_a, "Any", "No Combo", white_ball_range, powerball_range, excluded_numbers, is_simulation=True)
+            # Pass is_simulation=True and the odd_even_choice
+            white_balls, powerball = generate_powerball_numbers(
+                df_source, group_a, odd_even_choice, "No Combo", # Combo choice not relevant for this simulation
+                white_ball_range, powerball_range, excluded_numbers, is_simulation=True
+            )
             
             for wb in white_balls:
                 white_ball_results[wb] += 1
@@ -1841,15 +1847,22 @@ def simulate_multiple_draws_route():
     simulated_white_ball_freq_list = []
     simulated_powerball_freq_list = []
     num_draws_display = None
+    odd_even_choice_display = "Any" # Default value for display
 
     if request.method == 'POST':
         num_draws_str = request.form.get('num_draws')
+        odd_even_choice_display = request.form.get('odd_even_choice', 'Any') # Get from form
+
         if num_draws_str and num_draws_str.isdigit():
             num_draws = int(num_draws_str)
             num_draws_display = num_draws
             
-            # Call the updated simulate_multiple_draws that returns a dictionary
-            sim_results = simulate_multiple_draws(df, group_a, "Any", "No Combo", GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers, num_draws)
+            # Pass the odd_even_choice to the simulation function
+            sim_results = simulate_multiple_draws(
+                df, group_a, odd_even_choice_display, # Pass odd_even_choice here
+                GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, 
+                excluded_numbers, num_draws
+            )
             
             simulated_white_ball_freq_list = sim_results['white_ball_freq']
             simulated_powerball_freq_list = sim_results['powerball_freq']
@@ -1857,9 +1870,12 @@ def simulate_multiple_draws_route():
             flash("Please enter a valid number for Number of Simulations.", 'error')
 
     return render_template('simulate_multiple_draws.html', 
-                           simulated_white_ball_freq=simulated_white_ball_freq_list, # Pass new variable
-                           simulated_powerball_freq=simulated_powerball_freq_list,   # Pass new variable
-                           num_simulations=num_draws_display)
+                           simulated_white_ball_freq=simulated_white_ball_freq_list, 
+                           simulated_powerball_freq=simulated_powerball_freq_list,   
+                           num_simulations=num_draws_display,
+                           # Pass back the selected odd_even_choice so the dropdown remains selected
+                           selected_odd_even_choice=odd_even_choice_display)
+
 
 # Commented out as requested
 # @app.route('/winning_probability', methods=['GET', 'POST'])
@@ -2065,8 +2081,8 @@ def update_powerball_data():
             'Number 1': simulated_numbers[0],
             'Number 2': simulated_numbers[1],
             'Number 3': simulated_numbers[2],
-            'Number 4': simulated_numbers[3],
-            'Number 5': simulated_numbers[4],
+            'Number 4': simulated_numbers[4],
+            'Number 5': simulated_numbers[5],
             'Powerball': simulated_powerball
         }
         
@@ -2292,4 +2308,3 @@ def chat_with_ai_route():
         import traceback
         traceback.print_exc()
         return jsonify({"response": f"An internal error occurred: {e}"}), 500
-
