@@ -9,10 +9,11 @@ from datetime import datetime, timedelta
 import requests
 import json
 import numpy as np
+import traceback # Ensure this is imported for logging errors
 
 # --- Supabase Configuration ---
 SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
-SUPABASE_ANON_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlrc3h6YmJjb2l0ZWhkbXN4cWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NzMwNjUsImexFQI6MjA2NTM0OTA2NX0.AzUD7wjR7VbvtUH27NDqJ3AlvFW0nCWpiN9ADG8T_t4")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlrc3h6YmJjb2l0ZWhkbXN4cWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NzMwNjUsImexFQI6MjA2NTM0OTA2NX0.AzUD7wjR7VbvtUH27NDqG8T_t4")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_SUPABASE_SERVICE_ROLE_KEY")
 
 SUPABASE_TABLE_NAME = 'powerball_draws'
@@ -1085,16 +1086,16 @@ def analyze_generated_batch_against_official_draw(generated_picks_list, official
     Returns a summary of matches.
     """
     summary = {
-        "Match 5 White Balls + Powerball": {"count": 0},
-        "Match 5 White Balls Only": {"count": 0},
-        "Match 4 White Balls + Powerball": {"count": 0},
-        "Match 4 White Balls Only": {"count": 0},
-        "Match 3 White Balls + Powerball": {"count": 0},
-        "Match 3 White Balls Only": {"count": 0},
-        "Match 2 White Balls + Powerball": {"count": 0},
-        "Match 1 White Ball + Powerball": {"count": 0},
-        "Match Powerball Only": {"count": 0},
-        "No Match": {"count": 0}
+        "Match 5 White Balls + Powerball": {"count": 0, "draws": []}, # Added 'draws' list for consistency
+        "Match 5 White Balls Only": {"count": 0, "draws": []},
+        "Match 4 White Balls + Powerball": {"count": 0, "draws": []},
+        "Match 4 White Balls Only": {"count": 0, "draws": []},
+        "Match 3 White Balls + Powerball": {"count": 0, "draws": []},
+        "Match 3 White Balls Only": {"count": 0, "draws": []},
+        "Match 2 White Balls + Powerball": {"count": 0, "draws": []},
+        "Match 1 White Ball + Powerball": {"count": 0, "draws": []},
+        "Match Powerball Only": {"count": 0, "draws": []},
+        "No Match": {"count": 0, "draws": []} # Added 'draws' list for consistency
     }
     
     if not official_draw:
@@ -1136,7 +1137,17 @@ def analyze_generated_batch_against_official_draw(generated_picks_list, official
             category = "Match Powerball Only"
         
         summary[category]["count"] += 1 
-    
+        # For batch analysis, we don't necessarily need to store all individual matching draws for each category
+        # However, for consistency with check_generated_against_history, we will add dummy draws
+        # if matchInfo.draws is expected to be present. Otherwise, simply remove the .append line
+        summary[category]["draws"].append({
+            "date": official_draw['Draw Date'], # The official draw date itself
+            "white_balls": official_white_balls,
+            "powerball": official_powerball
+        })
+
+    # The 'draws' list will contain duplicates if multiple generated picks match the *same* official draw.
+    # If uniqueness is desired here, you would need to process this list further.
     return summary
 
 def save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb):
@@ -1484,7 +1495,6 @@ def initialize_core_data():
             }, dtype='object')
     except Exception as e:
         print(f"An error occurred during initial core data loading: {e}")
-        import traceback
         traceback.print_exc()
 
 initialize_core_data()
@@ -2073,16 +2083,17 @@ def update_powerball_data():
 
         simulated_draw_date_dt = datetime.now()
         simulated_draw_date = simulated_draw_date_dt.strftime('%Y-%m-%d')
-        simulated_numbers = sorted(random.sample(range(1, 70), 5))
+        # Corrected indexing here: random.sample returns a list, need to access elements properly
+        simulated_numbers_list = sorted(random.sample(range(1, 70), 5))
         simulated_powerball = random.randint(1, 26)
 
         new_draw_data = {
             'Draw Date': simulated_draw_date,
-            'Number 1': simulated_numbers[0],
-            'Number 2': simulated_numbers[1],
-            'Number 3': simulated_numbers[2],
-            'Number 4': simulated_numbers[4],
-            'Number 5': simulated_numbers[5],
+            'Number 1': simulated_numbers_list[0],
+            'Number 2': simulated_numbers_list[1],
+            'Number 3': simulated_numbers_list[2],
+            'Number 4': simulated_numbers_list[3], # Fixed index
+            'Number 5': simulated_numbers_list[4], # Fixed index
             'Powerball': simulated_powerball
         }
         
@@ -2109,18 +2120,19 @@ def update_powerball_data():
 
     except requests.exceptions.RequestException as e:
         print(f"Network or HTTP error during update_powerball_data: {e}")
+        traceback.print_exc() # Print full traceback
         if hasattr(e, 'response') and e.response is not None:
             print(f"Supabase response content: {e.response.text}")
         return f"Network or HTTP error: {e}", 500
     except json.JSONDecodeError as e:
         print(f"JSON decoding error in update_powerball_data: {e}")
+        traceback.print_exc() # Print full traceback
         if 'insert_response' in locals() and insert_response is not None:
             print(f"Response content that failed JSON decode: {insert_response.text}")
         return f"JSON parsing error: {e}", 500
     except Exception as e:
         print(f"An unexpected error occurred during data update: {e}")
-        import traceback
-        traceback.print_exc()
+        traceback.print_exc() # Print full traceback
         return f"An internal error occurred: {e}", 500
 
 
@@ -2169,8 +2181,7 @@ def analyze_batch_vs_official_route():
 
     except Exception as e:
         print(f"Error during analyze_batch_vs_official_route: {e}")
-        import traceback
-        traceback.print_exc()
+        traceback.print_exc() # Print full traceback
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 @app.route('/analyze_generated_historical_matches', methods=['POST'])
@@ -2206,8 +2217,7 @@ def analyze_generated_historical_matches_route():
         return jsonify({"success": False, "error": "Invalid number format for historical analysis."}), 400
     except Exception as e:
         print(f"An error occurred during historical analysis: {e}")
-        import traceback
-        traceback.print_exc()
+        traceback.print_exc() # Print full traceback
         return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
 
 # --- NEW AI ASSISTANT ROUTES ---
@@ -2299,20 +2309,27 @@ def chat_with_ai_route():
 
     except requests.exceptions.RequestException as e:
         print(f"[AI-ERROR] Error calling Gemini API: {e}")
+        traceback.print_exc() # Print full traceback
         return jsonify({"response": f"Error communicating with AI: {e}"}), 500
     except json.JSONDecodeError as e:
         print(f"[AI-ERROR] JSON decoding error from Gemini API: {e}. Raw response was: {response.text}")
+        traceback.print_exc() # Print full traceback
         return jsonify({"response": f"Error parsing AI response: {e}"}), 500
     except Exception as e:
         print(f"[AI-ERROR] An unexpected error occurred in chat_with_ai_route: {e}")
-        import traceback
-        traceback.print_exc()
+        traceback.print_exc() # Print full traceback
         return jsonify({"response": f"An internal error occurred: {e}"}), 500
 
 # --- NEW MANUAL PICK ROUTES ---
 @app.route('/my_jackpot_pick')
 def my_jackpot_pick_route():
-    return render_template('my_jackpot_pick.html')
+    try:
+        return render_template('my_jackpot_pick.html')
+    except Exception as e:
+        print(f"Error rendering my_jackpot_pick.html: {e}")
+        traceback.print_exc() # Print full traceback
+        flash("An error occurred loading the Jackpot Pick page. Please try again.", 'error')
+        return redirect(url_for('index')) # Redirect to home or show a fallback
 
 @app.route('/analyze_manual_pick', methods=['POST'])
 def analyze_manual_pick_route():
@@ -2349,6 +2366,5 @@ def analyze_manual_pick_route():
         return jsonify({"error": "Invalid number format provided."}), 400
     except Exception as e:
         print(f"Error during manual pick analysis: {e}")
-        import traceback
-        traceback.print_exc()
+        traceback.print_exc() # Print full traceback
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
