@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+
+{% block title %}My Jackpot Pick{% endblock %}
+
+{% block page_heading %}My Jackpot Pick{% endblock %}
+
+{% block content %}
+<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Select Your Numbers</h2>
+        <p class="text-gray-600 mb-6">Click to select 5 white balls (1-69) and 1 Powerball (1-26).</p>
+
+        <!-- White Balls Selection -->
+        <div class="mb-8">
+            <h3 class="text-xl font-semibold mb-3 text-gray-700">White Balls (1-69) <span id="whiteBallCount" class="text-blue-600">(0/5 selected)</span></h3>
+            <div id="whiteBallsContainer" class="grid grid-cols-7 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
+                {% for i in range(1, 70) %}
+                    <span class="ball white-ball-selectable" data-number="{{ i }}">{{ i }}</span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Powerball Selection -->
+        <div class="mb-8">
+            <h3 class="text-xl font-semibold mb-3 text-gray-700">Powerball (1-26) <span id="powerballCount" class="text-red-600">(0/1 selected)</span></h3>
+            <div id="powerballsContainer" class="grid grid-cols-7 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
+                {% for i in range(1, 27) %}
+                    <span class="ball powerball-ball-selectable" data-number="{{ i }}">{{ i }}</span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Selected Numbers Display -->
+        <div class="mt-8 p-4 bg-gray-100 rounded-lg border border-gray-200 shadow-inner">
+            <h3 class="text-xl font-semibold mb-3 text-gray-700">Your Current Pick:</h3>
+            <div class="flex flex-wrap items-center space-x-2">
+                <div id="selectedWhiteBallsDisplay" class="flex flex-wrap gap-2">
+                    <p class="text-gray-500" id="noWhiteBallsSelected">No white balls selected.</p>
+                </div>
+                <div class="text-lg font-bold text-gray-800 hidden" id="plusSign">+</div>
+                <div id="selectedPowerballDisplay" class="flex flex-wrap gap-2">
+                    <p class="text-gray-500" id="noPowerballSelected">No Powerball selected.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="mt-8 flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 justify-center">
+            <button id="analyzePickBtn" class="btn-primary" disabled>Analyze My Pick</button>
+            <button id="savePickBtn" class="btn-secondary" disabled>Save My Pick</button>
+            <button id="resetPickBtn" class="bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-400 focus:outline-none focus:shadow-outline transition duration-200 ease-in-out">Reset</button>
+        </div>
+
+        <!-- Analysis Results Section -->
+        <div id="analysisResults" class="mt-8 hidden">
+            <h3 class="text-2xl font-bold mb-4 text-gray-800">Analysis Results</h3>
+            <div id="analysisSummary" class="card mb-6"></div>
+
+            <div id="lastDrawnDates" class="card">
+                <h4 class="text-xl font-semibold mb-3 text-gray-700">Last Drawn Dates:</h4>
+                <ul id="lastDrawnList" class="list-disc list-inside text-gray-700"></ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const whiteBallsContainer = document.getElementById('whiteBallsContainer');
+        const powerballsContainer = document.getElementById('powerballsContainer');
+        const whiteBallCountSpan = document.getElementById('whiteBallCount');
+        const powerballCountSpan = document.getElementById('powerballCount');
+        const selectedWhiteBallsDisplay = document.getElementById('selectedWhiteBallsDisplay');
+        const selectedPowerballDisplay = document.getElementById('selectedPowerballDisplay');
+        const noWhiteBallsSelected = document.getElementById('noWhiteBallsSelected');
+        const noPowerballSelected = document.getElementById('noPowerballSelected');
+        const plusSign = document.getElementById('plusSign');
+        const analyzePickBtn = document.getElementById('analyzePickBtn');
+        const savePickBtn = document.getElementById('savePickBtn');
+        const resetPickBtn = document.getElementById('resetPickBtn');
+        const analysisResultsSection = document.getElementById('analysisResults');
+        const analysisSummaryDiv = document.getElementById('analysisSummary');
+        const lastDrawnList = document.getElementById('lastDrawnList');
+
+        let selectedWhiteBalls = new Set();
+        let selectedPowerball = null;
+
+        const updateSelectedDisplays = () => {
+            // Update white balls display
+            selectedWhiteBallsDisplay.innerHTML = '';
+            if (selectedWhiteBalls.size === 0) {
+                noWhiteBallsSelected.classList.remove('hidden');
+            } else {
+                noWhiteBallsSelected.classList.add('hidden');
+                Array.from(selectedWhiteBalls).sort((a, b) => a - b).forEach(num => {
+                    const ballSpan = document.createElement('span');
+                    ballSpan.classList.add('ball'); // Use base .ball class for styling
+                    ballSpan.textContent = num;
+                    selectedWhiteBallsDisplay.appendChild(ballSpan);
+                });
+            }
+            whiteBallCountSpan.textContent = `(${selectedWhiteBalls.size}/5 selected)`;
+
+            // Update powerball display
+            selectedPowerballDisplay.innerHTML = '';
+            if (selectedPowerball === null) {
+                noPowerballSelected.classList.remove('hidden');
+            } else {
+                noPowerballSelected.classList.add('hidden');
+                const powerballSpan = document.createElement('span');
+                powerballSpan.classList.add('ball', 'powerball-ball'); // Use base .ball and .powerball-ball
+                powerballSpan.textContent = selectedPowerball;
+                selectedPowerballDisplay.appendChild(powerballSpan);
+            }
+            powerballCountSpan.textContent = `(${selectedPowerball !== null ? 1 : 0}/1 selected)`;
+
+            // Toggle '+' sign visibility
+            if (selectedWhiteBalls.size > 0 && selectedPowerball !== null) {
+                plusSign.classList.remove('hidden');
+            } else {
+                plusSign.classList.add('hidden');
+            }
+
+            // Enable/disable buttons
+            if (selectedWhiteBalls.size === 5 && selectedPowerball !== null) {
+                analyzePickBtn.disabled = false;
+                savePickBtn.disabled = false;
+            } else {
+                analyzePickBtn.disabled = true;
+                savePickBtn.disabled = true;
+            }
+        };
+
+        const resetSelections = () => {
+            selectedWhiteBalls.clear();
+            selectedPowerball = null;
+
+            document.querySelectorAll('.white-ball-selectable.selected-white').forEach(ball => {
+                ball.classList.remove('selected-white');
+            });
+            document.querySelectorAll('.powerball-ball-selectable.selected-powerball').forEach(ball => {
+                ball.classList.remove('selected-powerball');
+            });
+
+            analysisResultsSection.classList.add('hidden');
+            analysisSummaryDiv.innerHTML = '';
+            lastDrawnList.innerHTML = '';
+            updateSelectedDisplays();
+        };
+
+        // Event listener for white balls
+        whiteBallsContainer.addEventListener('click', (event) => {
+            const clickedBall = event.target.closest('.white-ball-selectable');
+            if (clickedBall) {
+                const num = parseInt(clickedBall.dataset.number);
+                if (selectedWhiteBalls.has(num)) {
+                    selectedWhiteBalls.delete(num);
+                    clickedBall.classList.remove('selected-white');
+                } else {
+                    if (selectedWhiteBalls.size < 5) {
+                        selectedWhiteBalls.add(num);
+                        clickedBall.classList.add('selected-white');
+                    } else {
+                        // Optionally, flash a message or prevent selection
+                        // console.log("Max 5 white balls already selected!");
+                    }
+                }
+                updateSelectedDisplays();
+            }
+        });
+
+        // Event listener for Powerballs
+        powerballsContainer.addEventListener('click', (event) => {
+            const clickedBall = event.target.closest('.powerball-ball-selectable');
+            if (clickedBall) {
+                const num = parseInt(clickedBall.dataset.number);
+                if (selectedPowerball === num) {
+                    selectedPowerball = null;
+                    clickedBall.classList.remove('selected-powerball');
+                } else {
+                    if (selectedPowerball !== null) {
+                        // Deselect the previously selected Powerball
+                        document.querySelector(`.powerball-ball-selectable.selected-powerball`).classList.remove('selected-powerball');
+                    }
+                    selectedPowerball = num;
+                    clickedBall.classList.add('selected-powerball');
+                }
+                updateSelectedDisplays();
+            }
+        });
+
+        // Analyze Pick Button Click
+        analyzePickBtn.addEventListener('click', async () => {
+            if (selectedWhiteBalls.size !== 5 || selectedPowerball === null) {
+                // This shouldn't happen if button is disabled, but as a safeguard
+                alert("Please select exactly 5 white balls and 1 Powerball.");
+                return;
+            }
+
+            const whiteBallsArray = Array.from(selectedWhiteBalls).sort((a, b) => a - b);
+            const powerball = selectedPowerball;
+
+            analysisSummaryDiv.innerHTML = '<p class="text-center text-blue-600">Analyzing your pick...</p>';
+            lastDrawnList.innerHTML = '';
+            analysisResultsSection.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/analyze_manual_pick', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        white_balls: whiteBallsArray,
+                        powerball: powerball
+                    }),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // Display Historical Match Summary
+                let summaryHtml = '<h4 class="text-xl font-semibold mb-3 text-gray-700">Historical Match Summary (Last 2 Years):</h4>';
+                summaryHtml += '<ul class="list-disc list-inside text-gray-700 space-y-1">';
+                for (const category in data.match_summary) {
+                    const matchInfo = data.match_summary[category];
+                    if (matchInfo.count > 0) {
+                        summaryHtml += `<li><strong>${category}:</strong> ${matchInfo.count} time(s)`;
+                        if (matchInfo.draws && matchInfo.draws.length > 0) {
+                            summaryHtml += ` (Dates: ${matchInfo.draws.map(d => d.date).join(', ')})`;
+                        }
+                        summaryHtml += `</li>`;
+                    } else {
+                        summaryHtml += `<li><strong>${category}:</strong> 0 time(s)</li>`;
+                    }
+                }
+                summaryHtml += '</ul>';
+                analysisSummaryDiv.innerHTML = summaryHtml;
+
+                // Display Last Drawn Dates
+                if (data.last_drawn_dates && Object.keys(data.last_drawn_dates).length > 0) {
+                    for (const key in data.last_drawn_dates) {
+                        const listItem = document.createElement('li');
+                        listItem.textContent = `${key}: ${data.last_drawn_dates[key]}`;
+                        lastDrawnList.appendChild(listItem);
+                    }
+                } else {
+                    lastDrawnList.innerHTML = '<li>No last drawn date information available.</li>';
+                }
+
+            } catch (error) {
+                console.error('Error analyzing pick:', error);
+                analysisSummaryDiv.innerHTML = `<p class="text-red-600">Error analyzing your pick: ${error.message}</p>`;
+                lastDrawnList.innerHTML = '';
+            }
+        });
+
+        // Save Pick Button Click
+        savePickBtn.addEventListener('click', async () => {
+            if (selectedWhiteBalls.size !== 5 || selectedPowerball === null) {
+                alert("Please select exactly 5 white balls and 1 Powerball before saving.");
+                return;
+            }
+
+            const whiteBallsArray = Array.from(selectedWhiteBalls).sort((a, b) => a - b);
+            const powerball = selectedPowerball;
+
+            try {
+                const response = await fetch('/save_generated_pick', { // Reuse existing route
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded', // Use form-urlencoded for this route
+                    },
+                    body: new URLSearchParams({
+                        generated_white_balls: whiteBallsArray.join(','),
+                        generated_powerball: powerball
+                    }).toString(),
+                });
+
+                const text = await response.text(); // Get raw text to check for Flask flash redirect
+                
+                // If Flask redirects, it means a flash message was set.
+                // We're looking for a successful save, so we'll check the response to see if it implies success.
+                // This is a common pattern for Flask flash messages that trigger redirects.
+                if (response.ok || response.redirected) {
+                     // In a real app, you might parse the redirected page or rely on server-side flashes.
+                     // For now, we'll assume a 200 or redirect implies Flask processed it.
+                    alert("Your pick has been saved successfully!"); // Simple client-side confirmation
+                    resetSelections(); // Clear selections after successful save
+                } else {
+                    // Handle non-OK status codes if the Flask route returns JSON on error
+                    let errorMsg = `Failed to save pick. Status: ${response.status}.`;
+                    try {
+                        const errorData = JSON.parse(text);
+                        if (errorData.message) errorMsg += ` Message: ${errorData.message}`;
+                    } catch (e) {
+                        // Not JSON, use raw text
+                        errorMsg += ` Response: ${text}`;
+                    }
+                    alert(errorMsg);
+                }
+
+            } catch (error) {
+                console.error('Error saving pick:', error);
+                alert(`Error saving pick: ${error.message}`);
+            }
+        });
+
+        // Reset Button Click
+        resetPickBtn.addEventListener('click', resetSelections);
+
+        // Initial display update
+        updateSelectedDisplays();
+    });
+</script>
