@@ -52,6 +52,8 @@
             margin: 0 4px;
             font-size: 1.1em;
             flex-shrink: 0;
+            cursor: pointer; /* Add pointer for clickable balls */
+            transition: all 0.2s ease-in-out; /* Smooth transition for selection */
         }
         .powerball-ball {
             background-color: #ef4444; /* Red color for powerball */
@@ -84,6 +86,23 @@
             background-color: #ef4444; /* Red color for powerball */
             color: white;
             border-color: #dc2626;
+        }
+
+        /* Styles for selected balls on the "My Jackpot Pick" page */
+        .ball.selected-white {
+            background-color: #6366f1; /* Indigo-500 */
+            color: white;
+            border-color: #4338ca; /* Indigo-700 */
+            transform: scale(1.1);
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+        }
+
+        .ball.selected-powerball {
+            background-color: #dc2626; /* Red-600 */
+            color: white;
+            border-color: #b91c1c; /* Red-700 */
+            transform: scale(1.1);
+            box-shadow: 0 0 10px rgba(220, 38, 38, 0.5);
         }
 
         /* Animations */
@@ -206,7 +225,7 @@
                     Grouped Patterns
                 </a></li>
                 <li><a href="{{ url_for('co_occurrence_analysis_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9zm0 16c-3.86 0-7-3.14-7-7s3.14-7 7-7 7 3.14 7 7-3.14 7-7 7zM10.2 7.2l-2.8-2.8-1.4 1.4 2.8 2.8c.6-.6.9-1.3.9-2.2 0-.8-.3-1.5-.9-2.2zM13.8 16.8l2.8 2.8 1.4-1.4-2.8-2.8c-.6.6-.9 1.3-.9 2.2 0 .8.3 1.5.9 2.2zM16.8 13.8l-2.8 2.8-1.4-1.4 2.8-2.8c.6-.6.9-1.3.9-2.2 0-.8-.3-1.5-.9-2.2zM7.2 10.2l2.8 2.8 1.4-1.4-2.8-2.8c-.6.6-.9 1.3-.9 2.2 0 .8.3 1.5.9 2.2z"></path></svg>
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9zm0 16c-3.86 0-7-3.14-7-7s3.14-7 7-7 7 3.14 7 7-3.14 7-7 7zM10.2 7.2l-2.8-2.8-1.4 1.4 2.8 2.8c.6-.6.9-1.3.9-2.2 0-.8-.3-1.5-.9-2.2zM13.8 16.8l2.8 2.8 1.4-1.4-2.8-2.8c-.6.6-.9 1.3-.9 2.2 0 .8.3 1.5.9 2.2zM16.8 13.8l-2.8 2.8-1.4-1.4-2.8-2.8c.6-.6.9-1.3.9-2.2 0-.8-.3-1.5-.9-2.2zM7.2 10.2l2.8 2.8 1.4-1.4-2.8-2.8c-.6.6-.9 1.3-.9 2.2 0 .8.3 1.5.9 2.2z"></path></svg>
                     Co-occurrence Analysis
                 </a></li>
                 <li><a href="{{ url_for('number_age_distribution_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
@@ -238,6 +257,12 @@
                 <li><a href="{{ url_for('ai_assistant_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-10H9v-2h2v2zm2-2h-2V7h2v3zm2-3h-2V7h2v1zm-4 4h-2v-2h2v2zm2-2h-2V9h2v1z"></path></svg>
                     AI Assistant
+                </a></li>
+                {# NEW MANUAL SELECTION SECTION #}
+                <li class="mt-4"><div class="px-3 py-1 text-gray-500 text-sm font-semibold uppercase">Manual Selection</div></li>
+                <li><a href="{{ url_for('my_jackpot_pick_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 7h-4V4c0-1.103-.897-2-2-2H8c-1.103 0-2 .897-2 2v3H4c-1.103 0-2 .897-2 2v11c0 1.103.897 2 2 2h16c1.103 0 2-.897 2-2V9c0-1.103-.897-2-2-2zM8 4h8v3H8V4zm12 16H4V9h16v11zM11 11h2v6h-2z"></path></svg>
+                    My Jackpot Pick
                 </a></li>
                 {# ORIGINAL BOTTOM LINKS #}
                 <li><a href="{{ url_for('generated_numbers_history_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
