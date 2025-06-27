@@ -70,6 +70,17 @@ ASCENDING_GEN_RANGES = [
     (60, 69)  # 60s
 ]
 
+# NEW: Sum Ranges for Grouped Sum Analysis (Corrected ranges)
+SUM_RANGES = {
+    "50-99": (50, 99),
+    "100-130": (100, 130),
+    "131-150": (131, 150),
+    "151-180": (151, 180), # Corrected range
+    "181-200": (181, 200),
+    "201-230": (201, 230),
+    "231-250": (231, 250),
+    "251-300": (251, 300) 
+}
 
 # --- Core Utility Functions (All helpers defined here) ---
 
@@ -1469,6 +1480,78 @@ def get_grouped_patterns_over_years(df_source):
     print(f"[DEBUG-GroupedPatterns] Generated {len(all_patterns_data)} grouped patterns data points.")
     return all_patterns_data
 
+# NEW FUNCTION: get_sum_trends_and_gaps_data
+def get_sum_trends_and_gaps_data(df_source):
+    """
+    Analyzes sums of white balls, identifies their last appearance dates,
+    finds missing sums, and groups sums into predefined ranges.
+    """
+    if df_source.empty:
+        return {
+            'min_possible_sum': 15,
+            'max_possible_sum': 335,
+            'appeared_sums_details': [],
+            'missing_sums': [],
+            'grouped_sums_analysis': {}
+        }
+
+    df_copy = df_source.copy()
+    
+    # Ensure Draw Date is datetime and sum columns are numeric
+    df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
+    for i in range(1, 6):
+        col = f'Number {i}'
+        if col in df_copy.columns:
+            df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce').fillna(0).astype(int)
+
+    # Calculate sum for each row
+    df_copy['Sum'] = df_copy[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].sum(axis=1)
+
+    # 1. Find last appearance date for each unique sum
+    last_appearance_by_sum = df_copy.groupby('Sum')['Draw Date_dt'].max().reset_index()
+    last_appearance_by_sum['last_drawn_date'] = last_appearance_by_sum['Draw Date_dt'].dt.strftime('%Y-%m-%d')
+    appeared_sums_details = sorted([
+        {'sum': int(row['Sum']), 'last_drawn_date': row['last_drawn_date']}
+        for _, row in last_appearance_by_sum.iterrows()
+    ], key=lambda x: x['sum'])
+
+    # 2. Determine min/max possible sums
+    min_possible_sum = 1 + 2 + 3 + 4 + 5 # Smallest possible sum for 5 distinct numbers from 1-69
+    max_possible_sum = 69 + 68 + 67 + 66 + 65 # Largest possible sum for 5 distinct numbers from 1-69
+
+    # 3. Identify missing sums
+    all_possible_sums = set(range(min_possible_sum, max_possible_sum + 1))
+    actual_appeared_sums = set(df_copy['Sum'].unique())
+    missing_sums = sorted(list(all_possible_sums - actual_appeared_sums))
+
+    # 4. Grouped Sum Analysis
+    grouped_sums_analysis = {}
+    for range_name, (range_min, range_max) in SUM_RANGES.items():
+        # Correctly calculate total possible sums within this specific range, intersecting with all_possible_sums
+        range_set = set(range(range_min, range_max + 1))
+        total_possible_in_range_actual = len(range_set.intersection(all_possible_sums))
+        
+        appeared_in_range = [s for s in appeared_sums_details if range_min <= s['sum'] <= range_max]
+        missing_in_range = [s for s in missing_sums if range_min <= s <= range_max]
+
+        grouped_sums_analysis[range_name] = {
+            'total_possible_in_range': total_possible_in_range_actual, # Use the corrected calculation
+            'appeared_in_range_count': len(appeared_in_range),
+            'missing_in_range_count': len(missing_in_range),
+            'appeared_sums_in_range': appeared_in_range, # Keep details for direct display if needed
+            'missing_sums_in_range': missing_in_range
+        }
+    
+    return {
+        'min_possible_sum': min_possible_sum,
+        'max_possible_sum': max_possible_sum,
+        'appeared_sums_details': appeared_sums_details,
+        'missing_sums': missing_sums,
+        'grouped_sums_analysis': grouped_sums_analysis
+    }
+
+
 # --- Data Initialization (Call after all helper functions are defined) ---
 def initialize_core_data():
     global df, last_draw, historical_white_ball_sets
@@ -1894,9 +1977,6 @@ def find_results_by_sum_route():
             flash("Please enter a valid number for Target Sum.", 'error')
             results = [] # Clear results if input is invalid
             target_sum_display = None # Reset display value
-    else: # GET request, no search yet or initial page load
-        results = []
-        target_sum_display = None 
     
     # Pass all necessary data to the template
     return render_template('find_results_by_sum.html', # This is the correct template for search by sum
@@ -2372,7 +2452,7 @@ def chat_with_ai_route():
         traceback.print_exc() # Print full traceback
         return jsonify({"response": f"Error parsing AI response: {e}"}), 500
     except Exception as e:
-        print(f"[AI-ERROR] An unexpected error occurred in chat_with_ai_route: {e}")
+        print(f"An unexpected error occurred in chat_with_ai_route: {e}")
         traceback.print_exc() # Print full traceback
         return jsonify({"response": f"An internal error occurred: {e}"}), 500
 
@@ -2453,3 +2533,20 @@ def save_manual_pick_route():
         print(f"Error during save_manual_pick_route: {e}")
         traceback.print_exc()
         return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
+
+# NEW ROUTE: Sum Trends and Gaps analysis
+@app.route('/sum_trends_and_gaps')
+def sum_trends_and_gaps_route():
+    if df.empty:
+        flash("Cannot display Sum Trends and Gaps: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    sum_data = get_cached_analysis('sum_trends_and_gaps', get_sum_trends_and_gaps_data, df)
+    
+    # Render the new template with the comprehensive sum data
+    return render_template('sum_trends_and_gaps.html', 
+                           min_possible_sum=sum_data['min_possible_sum'],
+                           max_possible_sum=sum_data['max_possible_sum'],
+                           appeared_sums_details=sum_data['appeared_sums_details'],
+                           missing_sums=sum_data['missing_sums'],
+                           grouped_sums_analysis=sum_data['grouped_sums_analysis'])
