@@ -63,6 +63,7 @@ NUMBER_RANGES = {
 
 # Specific ranges for the "Generate from Your Starting Pair" ascending logic
 ASCENDING_GEN_RANGES = [
+    (10, 19), # 10s
     (20, 29), # 20s
     (30, 39), # 30s
     (40, 49), # 40s
