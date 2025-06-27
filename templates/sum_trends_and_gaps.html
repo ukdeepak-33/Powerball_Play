@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Sum Trends & Gaps Analysis{% endblock %}
+
+{% block page_heading %}Sum Trends & Gaps Analysis{% endblock %}
+
+{% block content %}
+<div class="space-y-8 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Overview of Sums</h2>
+        <p class="text-gray-600 mb-2">
+            The sum of the five white balls in a Powerball draw can range from
+            <span class="font-semibold text-blue-600">{{ min_possible_sum }}</span> (1+2+3+4+5) to
+            <span class="font-semibold text-blue-600">{{ max_possible_sum }}</span> (69+68+67+66+65).
+        </p>
+        <p class="text-gray-600 mb-4">This page shows the historical appearance of all sums, groups them into ranges, and highlights sums that have never been drawn.</p>
+    </div>
+
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Sums That Have Never Appeared</h2>
+        {% if missing_sums %}
+            <div class="flex flex-wrap gap-2 mb-4">
+                {% for sum_val in missing_sums %}
+                    <span class="badge-danger">{{ sum_val }}</span>
+                {% endfor %}
+            </div>
+            <p class="text-red-700 text-sm italic">These sums have not appeared in any historical draw yet.</p>
+        {% else %}
+            <p class="text-green-700 font-medium">All possible sums have appeared at least once!</p>
+        {% endif %}
+    </div>
+
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Grouped Sums Analysis</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {% for range_name, data in grouped_sums_analysis.items() %}
+                <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2">{{ range_name }}</h3>
+                    <p class="text-gray-600">Total Possible Sums in Range: <span class="font-medium">{{ data.total_possible_in_range }}</span></p>
+                    <p class="text-gray-600">Appeared Sums: <span class="font-medium text-green-600">{{ data.appeared_in_range_count }}</span></p>
+                    <p class="text-gray-600">Missing Sums: <span class="font-medium text-red-600">{{ data.missing_in_range_count }}</span></p>
+                    
+                    {% if data.missing_sums_in_range %}
+                        <div class="mt-2 text-sm text-red-500">
+                            Missing in this group: {{ data.missing_sums_in_range | join(', ') }}
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">All Sums by Last Appearance Date</h2>
+        <p class="text-gray-600 mb-4">Each sum that has appeared, listed from lowest to highest, along with the most recent date it occurred:</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-2 gap-x-4">
+            {% for sum_detail in appeared_sums_details %}
+                <div class="text-gray-700">
+                    <span class="font-semibold text-blue-700">Sum {{ sum_detail.sum }}:</span>
+                    <span class="ml-2">{{ sum_detail.last_drawn_date }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .badge-danger {
+        @apply bg-red-100 text-red-800 text-xs font-semibold px-2.5 py-0.5 rounded-full;
+        display: inline-block; /* To allow margin/padding to work as expected */
+    }
+</style>
+{% endblock %}
