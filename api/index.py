@@ -63,7 +63,6 @@ NUMBER_RANGES = {
 
 # Specific ranges for the "Generate from Your Starting Pair" ascending logic
 ASCENDING_GEN_RANGES = [
-    (10, 19), # 10s
     (20, 29), # 20s
     (30, 39), # 30s
     (40, 49), # 40s
@@ -76,12 +75,19 @@ SUM_RANGES = {
     "50-99": (50, 99),
     "100-130": (100, 130),
     "131-150": (131, 150),
-    "151-180": (151, 180), # Corrected range
+    "151-180": (151, 180), 
     "181-200": (181, 200),
     "201-230": (201, 230),
     "231-250": (231, 250),
     "251-300": (251, 300) 
 }
+
+# NEW: Low/High split definition for white balls
+LOW_NUMBER_MAX = 34 # Numbers 1-34 are considered 'low'
+HIGH_NUMBER_MIN = 35 # Numbers 35-69 are considered 'high'
+
+# Days of the week Powerball is drawn
+POWERBALL_DRAW_DAYS = ['Monday', 'Wednesday', 'Saturday']
 
 # --- Core Utility Functions (All helpers defined here) ---
 
@@ -1481,7 +1487,6 @@ def get_grouped_patterns_over_years(df_source):
     print(f"[DEBUG-GroupedPatterns] Generated {len(all_patterns_data)} grouped patterns data points.")
     return all_patterns_data
 
-# NEW FUNCTION: get_sum_trends_and_gaps_data
 def get_sum_trends_and_gaps_data(df_source):
     """
     Analyzes sums of white balls, identifies their last appearance dates,
@@ -1551,6 +1556,112 @@ def get_sum_trends_and_gaps_data(df_source):
         'missing_sums': missing_sums,
         'grouped_sums_analysis': grouped_sums_analysis
     }
+
+# NEW/MODIFIED FUNCTION: get_weekday_draw_trends
+def get_weekday_draw_trends(df_source, group_a_numbers_def=None):
+    """
+    Analyzes various drawing trends (Low/High, Odd/Even, Consecutive, Sum, Group A)
+    based on the day of the week (Monday, Wednesday, Saturday).
+    """
+    if df_source.empty:
+        return {}
+
+    df_copy = df_source.copy()
+    df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
+
+    if df_copy.empty:
+        return {}
+
+    df_copy['Weekday'] = df_copy['Draw Date_dt'].dt.day_name()
+
+    weekday_stats = defaultdict(lambda: {
+        'total_draws': 0,
+        'total_low_balls': 0,
+        'total_high_balls': 0,
+        'total_odd_balls': 0,
+        'total_even_balls': 0,
+        'total_sum': 0,
+        'total_group_a_balls': 0,
+        'consecutive_draws_count': 0,
+        'low_high_splits': defaultdict(int),
+        'odd_even_splits': defaultdict(int)
+    })
+
+    for _, row in df_copy.iterrows():
+        day_name = row['Weekday']
+        if day_name not in POWERBALL_DRAW_DAYS:
+            continue
+        
+        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6)]) # Ensure sorted for consecutive check
+        
+        # Low/High Counts
+        low_count = sum(1 for num in white_balls if LOW_NUMBER_MAX >= num >= 1)
+        high_count = sum(1 for num in white_balls if HIGH_NUMBER_MIN <= num <= GLOBAL_WHITE_BALL_RANGE[1])
+        
+        # Odd/Even Counts
+        odd_count = sum(1 for num in white_balls if num % 2 != 0)
+        even_count = sum(1 for num in white_balls if num % 2 == 0)
+
+        # Sum of Balls
+        current_sum = sum(white_balls)
+
+        # Group A Count
+        current_group_a_count = sum(1 for num in white_balls if num in (group_a_numbers_def if group_a_numbers_def is not None else group_a))
+
+        # Consecutive Numbers Presence
+        consecutive_present = False
+        for i in range(len(white_balls) - 1):
+            if white_balls[i] + 1 == white_balls[i+1]:
+                consecutive_present = True
+                break
+
+        # Aggregate data
+        weekday_stats[day_name]['total_draws'] += 1
+        weekday_stats[day_name]['total_low_balls'] += low_count
+        weekday_stats[day_name]['total_high_balls'] += high_count
+        weekday_stats[day_name]['total_odd_balls'] += odd_count
+        weekday_stats[day_name]['total_even_balls'] += even_count
+        weekday_stats[day_name]['total_sum'] += current_sum
+        weekday_stats[day_name]['total_group_a_balls'] += current_group_a_count
+        if consecutive_present:
+            weekday_stats[day_name]['consecutive_draws_count'] += 1
+        
+        # Low/High Splits frequency
+        low_high_split_key = f"{low_count} Low / {high_count} High"
+        weekday_stats[day_name]['low_high_splits'][low_high_split_key] += 1
+
+        # Odd/Even Splits frequency
+        odd_even_split_key = f"{odd_count} Odd / {even_count} Even"
+        weekday_stats[day_name]['odd_even_splits'][odd_even_split_key] += 1
+    
+    final_results = {}
+    for day in POWERBALL_DRAW_DAYS: # Ensure results are in defined order
+        if day in weekday_stats and weekday_stats[day]['total_draws'] > 0:
+            data = weekday_stats[day]
+            total_draws = data['total_draws']
+
+            final_results[day] = {
+                'total_draws': total_draws,
+                'avg_low_balls': round(data['total_low_balls'] / total_draws, 2),
+                'avg_high_balls': round(data['total_high_balls'] / total_draws, 2),
+                'avg_odd_balls': round(data['total_odd_balls'] / total_draws, 2),
+                'avg_even_balls': round(data['total_even_balls'] / total_draws, 2),
+                'avg_sum': round(data['total_sum'] / total_draws, 2),
+                'avg_group_a_balls': round(data['total_group_a_balls'] / total_draws, 2),
+                'consecutive_present_percentage': round((data['consecutive_draws_count'] / total_draws) * 100, 2),
+                'low_high_splits': sorted([{'split': k, 'count': v} for k, v in data['low_high_splits'].items()], key=lambda item: (-item['count'], item['split'])),
+                'odd_even_splits': sorted([{'split': k, 'count': v} for k, v in data['odd_even_splits'].items()], key=lambda item: (-item['count'], item['split']))
+            }
+        else:
+            final_results[day] = { # Ensure all days are present, even if no draws or data
+                'total_draws': 0, 'avg_low_balls': 0.0, 'avg_high_balls': 0.0,
+                'avg_odd_balls': 0.0, 'avg_even_balls': 0.0, 'avg_sum': 0.0,
+                'avg_group_a_balls': 0.0, 'consecutive_present_percentage': 0.0,
+                'low_high_splits': [], 'odd_even_splits': []
+            }
+            
+    return final_results
 
 
 # --- Data Initialization (Call after all helper functions are defined) ---
@@ -2551,3 +2662,16 @@ def sum_trends_and_gaps_route():
                            appeared_sums_details=sum_data['appeared_sums_details'],
                            missing_sums=sum_data['missing_sums'],
                            grouped_sums_analysis=sum_data['grouped_sums_analysis'])
+
+# NEW/MODIFIED ROUTE: Weekday Trends (Low/High) analysis
+@app.route('/weekday_trends')
+def weekday_trends_route():
+    if df.empty:
+        flash("Cannot display Weekday Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    # Pass the global group_a to the analysis function
+    weekday_data = get_cached_analysis('weekday_all_trends', get_weekday_draw_trends, df, group_a_numbers_def=group_a)
+    
+    return render_template('weekday_trends.html', 
+                           weekday_trends=weekday_data)
