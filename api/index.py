@@ -1487,10 +1487,11 @@ def get_grouped_patterns_over_years(df_source):
     print(f"[DEBUG-GroupedPatterns] Generated {len(all_patterns_data)} grouped patterns data points.")
     return all_patterns_data
 
+# MODIFIED FUNCTION: get_sum_trends_and_gaps_data
 def get_sum_trends_and_gaps_data(df_source):
     """
     Analyzes sums of white balls, identifies their last appearance dates,
-    finds missing sums, and groups sums into predefined ranges.
+    finds missing sums, and groups sums into predefined ranges, with enhanced details.
     """
     if df_source.empty:
         return {
@@ -1515,38 +1516,67 @@ def get_sum_trends_and_gaps_data(df_source):
     df_copy['Sum'] = df_copy[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].sum(axis=1)
 
     # 1. Find last appearance date for each unique sum
-    last_appearance_by_sum = df_copy.groupby('Sum')['Draw Date_dt'].max().reset_index()
-    last_appearance_by_sum['last_drawn_date'] = last_appearance_by_sum['Draw Date_dt'].dt.strftime('%Y-%m-%d')
+    last_appearance_by_sum_df = df_copy.groupby('Sum')['Draw Date_dt'].max().reset_index()
+    last_appearance_by_sum_df['last_drawn_date'] = last_appearance_by_sum_df['Draw Date_dt'].dt.strftime('%Y-%m-%d')
+    last_drawn_dates_map = last_appearance_by_sum_df.set_index('Sum')['last_drawn_date'].to_dict()
+
+    # Get overall sum frequencies
+    sum_freq_series = df_copy['Sum'].value_counts()
+    sum_counts_map = sum_freq_series.to_dict()
+
     appeared_sums_details = sorted([
-        {'sum': int(row['Sum']), 'last_drawn_date': row['last_drawn_date']}
-        for _, row in last_appearance_by_sum.iterrows()
+        {'sum': int(s), 'last_drawn_date': last_drawn_dates_map.get(s, 'N/A'), 'count': sum_counts_map.get(s, 0)}
+        for s in sum_freq_series.index
     ], key=lambda x: x['sum'])
 
-    # 2. Determine min/max possible sums
+    # 2. Determine min/max possible sums (theoretical)
     min_possible_sum = 1 + 2 + 3 + 4 + 5 # Smallest possible sum for 5 distinct numbers from 1-69
     max_possible_sum = 69 + 68 + 67 + 66 + 65 # Largest possible sum for 5 distinct numbers from 1-69
 
-    # 3. Identify missing sums
+    # 3. Identify missing sums (theoretical range vs. actual appeared)
     all_possible_sums = set(range(min_possible_sum, max_possible_sum + 1))
     actual_appeared_sums = set(df_copy['Sum'].unique())
     missing_sums = sorted(list(all_possible_sums - actual_appeared_sums))
 
-    # 4. Grouped Sum Analysis
+    # 4. Grouped Sum Analysis Enhancement
     grouped_sums_analysis = {}
     for range_name, (range_min, range_max) in SUM_RANGES.items():
-        # Correctly calculate total possible sums within this specific range, intersecting with all_possible_sums
-        range_set = set(range(range_min, range_max + 1))
-        total_possible_in_range_actual = len(range_set.intersection(all_possible_sums))
+        # Identify all sums within this range (both appeared and missing)
+        sums_in_current_range = sorted(list(set(range(range_min, range_max + 1)).intersection(all_possible_sums)))
+
+        # Filter appeared sums for this range
+        appeared_in_range_details = [
+            {'sum': s_data['sum'], 'last_drawn_date': s_data['last_drawn_date'], 'count': s_data['count']}
+            for s_data in appeared_sums_details if range_min <= s_data['sum'] <= range_max
+        ]
         
-        appeared_in_range = [s for s in appeared_sums_details if range_min <= s['sum'] <= range_max]
-        missing_in_range = [s for s in missing_sums if range_min <= s <= range_max]
+        # Sort by count descending for most frequent, then by sum ascending for tie-breaking
+        most_frequent_sums = sorted(appeared_in_range_details, key=lambda x: (-x['count'], x['sum']))[:5]
+        
+        # Sort by count ascending for least frequent, then by sum ascending for tie-breaking
+        # Exclude sums with 0 count (already handled by missing_sums)
+        least_frequent_sums = sorted([s for s in appeared_in_range_details if s['count'] > 0], key=lambda x: (x['count'], x['sum']))[:5]
+
+        # Calculate average frequency for sums that *have* appeared in this range
+        total_freq_in_range = sum(s['count'] for s in appeared_in_range_details)
+        if appeared_in_range_details:
+            avg_freq_in_range = round(total_freq_in_range / len(appeared_in_range_details), 2)
+        else:
+            avg_freq_in_range = 0.0
+
+        # Find the latest draw date for any sum within this range
+        draw_dates_for_range = df_copy[(df_copy['Sum'] >= range_min) & (df_copy['Sum'] <= range_max)]['Draw Date_dt']
+        last_drawn_date_for_range = draw_dates_for_range.max().strftime('%Y-%m-%d') if not draw_dates_for_range.empty else 'N/A'
 
         grouped_sums_analysis[range_name] = {
-            'total_possible_in_range': total_possible_in_range_actual, # Use the corrected calculation
-            'appeared_in_range_count': len(appeared_in_range),
-            'missing_in_range_count': len(missing_in_range),
-            'appeared_sums_in_range': appeared_in_range, # Keep details for direct display if needed
-            'missing_sums_in_range': missing_in_range
+            'total_possible_in_range': len(sums_in_current_range),
+            'appeared_in_range_count': len(appeared_in_range_details),
+            'missing_in_range_count': len([s for s in missing_sums if range_min <= s <= range_max]),
+            'last_drawn_date_for_range': last_drawn_date_for_range,
+            'average_frequency_in_range': avg_freq_in_range,
+            'most_frequent_sums_in_range': most_frequent_sums,
+            'least_frequent_sums_in_range': least_frequent_sums,
+            'all_appeared_sums_in_range': appeared_in_range_details # For comprehensive display
         }
     
     return {
