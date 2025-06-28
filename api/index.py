@@ -768,7 +768,7 @@ def find_last_draw_dates_for_numbers(df_source, white_balls, powerball):
             found_pb = True
             break
     if not found_pb:
-        last_draw_dates[f"Powerball {powerball}"] = "N/A (Never Drawn)"
+            last_draw_dates[f"Powerball {powerball}"] = "N/A (Never Drawn)"
 
     return last_draw_dates
 
@@ -971,7 +971,7 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
         wb_sum = sum(white_balls)
 
         # Identify group_a numbers present in the draw
-        group_a_numbers_present = sorted([num for num in white_balls if num in group_a])
+        group_a_numbers_present = sorted([num for num in white_balls if num in (group_a_numbers_def if group_a_numbers_def is not None else group_a)])
 
         even_count = sum(1 for num in white_balls if num % 2 == 0)
         odd_count = 5 - even_count
@@ -1427,7 +1427,7 @@ def check_generated_against_history(generated_white_balls, generated_powerball, 
         elif white_matches == 0 and powerball_match == 1:
             category = "Match Powerball Only"
         
-        results["summary"][category]["count"] += 1
+        results["summary"][category]["count"] += 1 
         results["summary"][category]["draws"].append({
             "date": historical_draw_date,
             "white_balls": historical_white_balls,
@@ -1567,9 +1567,12 @@ def get_sum_trends_and_gaps_data(df_source):
 
     # 4. Grouped Sum Analysis Enhancement
     grouped_sums_analysis = {}
-    for range_name, (range_min, range_max) in SUM_RANGES.items():
-        if range_name == "Any": # Skip "Any" for grouped analysis specific data
+    # FIX: Iterate over items and explicitly check for None before unpacking
+    for range_name, range_tuple in SUM_RANGES.items():
+        if range_tuple is None: # Skip "Any" or any other None entry
             continue
+        
+        range_min, range_max = range_tuple # Now safe to unpack
         
         # Identify all sums within this range (both appeared and missing)
         sums_in_current_range = sorted(list(set(range(range_min, range_max + 1)).intersection(all_possible_sums)))
@@ -2166,7 +2169,7 @@ def find_results_by_sum_route():
                     results_df_raw = results_df_raw.sort_values(by='WhiteBallsTuple', ascending=True)
                     results_df_raw = results_df_raw.drop(columns=['WhiteBallsTuple'])
                 elif selected_sort_by == 'balls_desc':
-                    results_df_raw['WhiteBallsTuple'] = results.apply(
+                    results_df_raw['WhiteBallsTuple'] = results_df_raw.apply( # Changed to results_df_raw here
                         lambda row: tuple(sorted([
                             int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
                             int(row['Number 4']), int(row['Number 5'])
@@ -2430,9 +2433,9 @@ def update_powerball_data():
             'Draw Date': simulated_draw_date,
             'Number 1': simulated_numbers_list[0],
             'Number 2': simulated_numbers_list[1],
-            'Number 3': simulated_numbers_list[2], # Fixed index
-            'Number 4': simulated_numbers_list[3], # Fixed index
-            'Number 5': simulated_numbers_list[4], # Fixed index
+            'Number 3': simulated_numbers_list[2], 
+            'Number 4': simulated_numbers_list[3], 
+            'Number 5': simulated_numbers_list[4], 
             'Powerball': simulated_powerball
         }
         
