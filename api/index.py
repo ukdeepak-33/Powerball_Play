@@ -70,16 +70,14 @@ ASCENDING_GEN_RANGES = [
     (60, 69)  # 60s
 ]
 
-# NEW: Sum Ranges for Grouped Sum Analysis (Corrected ranges)
+# NEW: Sum Ranges for Grouped Sum Analysis (Corrected ranges based on user input)
 SUM_RANGES = {
-    "50-99": (50, 99),
-    "100-130": (100, 130),
-    "131-150": (131, 150),
-    "151-180": (151, 180), 
-    "181-200": (181, 200),
-    "201-230": (201, 230),
-    "231-250": (231, 250),
-    "251-300": (251, 300) 
+    "Any": None, # Special value for no sum filtering
+    "Zone A (60-99)": (60, 99),
+    "Zone B (100-129)": (100, 129),
+    "Zone C (130-159)": (130, 159), 
+    "Zone D (160-189)": (160, 189),
+    "Zone E (190-220)": (190, 220)
 }
 
 # NEW: Low/High split definition for white balls
@@ -191,11 +189,11 @@ def check_exact_match(white_balls):
     global historical_white_ball_sets
     return frozenset(white_balls) in historical_white_ball_sets
 
-def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, high_low_balance=None, is_simulation=False):
+def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, high_low_balance=None, selected_sum_range_tuple=None, is_simulation=False):
     if df_source.empty:
         raise ValueError("Cannot generate numbers: Historical data is empty.")
 
-    max_attempts = 1000
+    max_attempts = 2000 # Increased max attempts due to added sum constraint
     attempts = 0
     while attempts < max_attempts:
         available_numbers = [num for num in range(white_ball_range[0], white_ball_range[1] + 1) if num not in excluded_numbers]
@@ -204,6 +202,14 @@ def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice
             raise ValueError("Not enough available numbers for white balls after exclusions and range constraints.")
             
         white_balls = sorted(random.sample(available_numbers, 5))
+
+        # --- New: Sum Range Check ---
+        if selected_sum_range_tuple:
+            current_sum = sum(white_balls)
+            if not (selected_sum_range_tuple[0] <= current_sum <= selected_sum_range_tuple[1]):
+                attempts += 1
+                continue # Retry if sum is not in the desired range
+        # --- End New: Sum Range Check ---
 
         group_a_numbers = [num for num in white_balls if num in group_a]
         if len(group_a_numbers) < 2:
@@ -258,15 +264,15 @@ def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice
         
         break
     else:
-        raise ValueError("Could not generate a unique combination meeting all criteria after many attempts.")
+        raise ValueError("Could not generate a unique combination meeting all criteria after many attempts. Try adjusting filters.")
 
     return white_balls, powerball
 
-def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerball_range, excluded_numbers):
+def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerball_range, excluded_numbers, selected_sum_range_tuple=None):
     if df_source.empty:
         raise ValueError("Cannot generate numbers: Historical data is empty.")
 
-    max_attempts = 1000
+    max_attempts = 2000 # Increased max attempts due to added sum constraint
     attempts = 0
     
     valid_group_a = [num for num in group_a if white_ball_range[0] <= num <= white_ball_range[1] and num not in excluded_numbers]
@@ -295,6 +301,14 @@ def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerba
             
             white_balls = sorted(selected_from_group_a + selected_from_remaining)
             
+            # --- New: Sum Range Check ---
+            if selected_sum_range_tuple:
+                current_sum = sum(white_balls)
+                if not (selected_sum_range_tuple[0] <= current_sum <= selected_sum_range_tuple[1]):
+                    attempts += 1
+                    continue # Retry if sum is not in the desired range
+            # --- End New: Sum Range Check ---
+
             powerball = random.randint(powerball_range[0], powerball_range[1])
 
             if check_exact_match(white_balls): 
@@ -303,15 +317,18 @@ def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerba
 
             break
         except ValueError as e:
-            print(f"Attempt failed during group_a strategy: {e}. Retrying...")
+            # print(f"Attempt failed during group_a strategy: {e}. Retrying...") # For debugging
+            attempts += 1
+            continue
+        except IndexError: # Catches errors if, for example, random.choice gets an empty sequence
             attempts += 1
             continue
     else:
-        raise ValueError("Could not generate a unique combination with Group A strategy after many attempts.")
+        raise ValueError("Could not generate a unique combination with Group A strategy meeting all criteria after many attempts. Try adjusting filters.")
 
     return white_balls, powerball
 
-def generate_with_user_provided_pair(num1, num2, white_ball_range, powerball_range, excluded_numbers, df_source):
+def generate_with_user_provided_pair(num1, num2, white_ball_range, powerball_range, excluded_numbers, df_source, selected_sum_range_tuple=None):
     """
     Generates a Powerball combination starting with two user-provided white balls.
     The remaining three numbers are generated in ascending order from specific tens ranges (20s-60s).
@@ -332,7 +349,7 @@ def generate_with_user_provided_pair(num1, num2, white_ball_range, powerball_ran
 
     initial_white_balls = sorted([num1, num2]) # Ensure they are sorted
     
-    max_attempts_overall = 1000 # Max attempts for the entire 5-ball combination
+    max_attempts_overall = 2000 # Increased max attempts due to added sum constraint
     attempts_overall = 0
 
     while attempts_overall < max_attempts_overall:
@@ -356,7 +373,9 @@ def generate_with_user_provided_pair(num1, num2, white_ball_range, powerball_ran
                         break
                 
                 if start_range_idx == -1: # temp_current_min is already beyond the 60s range max (69)
-                    raise ValueError("Cannot find suitable numbers in specified ascending ranges (already past 60s range).")
+                    # This implies we can't find 3 more numbers in ascending "tens" ranges.
+                    # Instead of raising an error here, let the outer loop try again by continuing
+                    raise ValueError("Not enough space in ascending ranges to complete combination.")
 
                 # Build the pool of possible numbers for the current slot
                 eligible_ranges = ASCENDING_GEN_RANGES[start_range_idx:]
@@ -382,6 +401,14 @@ def generate_with_user_provided_pair(num1, num2, white_ball_range, powerball_ran
             # Combine user's numbers with generated numbers and sort them
             final_white_balls = sorted(initial_white_balls + candidate_white_balls_generated)
             
+            # --- New: Sum Range Check ---
+            if selected_sum_range_tuple:
+                current_sum = sum(final_white_balls)
+                if not (selected_sum_range_tuple[0] <= current_sum <= selected_sum_range_tuple[1]):
+                    attempts_overall += 1
+                    continue # Retry if sum is not in the desired range
+            # --- End New: Sum Range Check ---
+
             # Generate Powerball
             powerball = random.randint(powerball_range[0], powerball_range[1])
 
@@ -409,7 +436,7 @@ def generate_with_user_provided_pair(num1, num2, white_ball_range, powerball_ran
             attempts_overall += 1
             continue
     else:
-        raise ValueError("Could not generate a unique combination with the provided pair and ascending range constraint after many attempts.")
+        raise ValueError("Could not generate a unique combination with the provided pair and ascending range constraint meeting all criteria after many attempts. Try adjusting filters.")
 
 
 def check_historical_match(df_source, white_balls, powerball):
@@ -1541,6 +1568,9 @@ def get_sum_trends_and_gaps_data(df_source):
     # 4. Grouped Sum Analysis Enhancement
     grouped_sums_analysis = {}
     for range_name, (range_min, range_max) in SUM_RANGES.items():
+        if range_name == "Any": # Skip "Any" for grouped analysis specific data
+            continue
+        
         # Identify all sums within this range (both appeared and missing)
         sums_in_current_range = sorted(list(set(range(range_min, range_max + 1)).intersection(all_possible_sums)))
 
@@ -1762,14 +1792,15 @@ def invalidate_analysis_cache():
 @app.route('/')
 def index():
     last_draw_dict = last_draw.to_dict()
-    return render_template('index.html', last_draw=last_draw_dict)
+    # Pass SUM_RANGES to the index template
+    return render_template('index.html', last_draw=last_draw_dict, sum_ranges=SUM_RANGES)
 
 # Generation Routes (referenced directly in index.html forms)
 @app.route('/generate', methods=['POST'])
 def generate():
     if df.empty:
         flash("Cannot generate numbers: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return render_template('index.html', last_draw=last_draw.to_dict())
+        return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
 
     odd_even_choice = request.form.get('odd_even_choice', 'Any')
     combo_choice = request.form.get('combo_choice', 'No Combo')
@@ -1793,32 +1824,47 @@ def generate():
         except ValueError:
             flash("Invalid High/Low Balance format. Please enter numbers separated by space.", 'error')
 
+    # --- New: Get selected sum range ---
+    selected_sum_range_label = request.form.get('sum_range_filter', 'Any')
+    selected_sum_range_tuple = SUM_RANGES.get(selected_sum_range_label)
+    # --- End New ---
+
     white_balls = []
     powerball = None
     last_draw_dates = {}
 
     try:
-        white_balls, powerball = generate_powerball_numbers(df, group_a, odd_even_choice, combo_choice, white_ball_range_local, powerball_range_local, excluded_numbers_local, high_low_balance, is_simulation=False) # is_simulation is False for main generation
+        white_balls, powerball = generate_powerball_numbers(
+            df, group_a, odd_even_choice, combo_choice, white_ball_range_local, powerball_range_local, 
+            excluded_numbers_local, high_low_balance, selected_sum_range_tuple, is_simulation=False
+        )
         last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
     except ValueError as e:
         flash(str(e), 'error')
-        return render_template('index.html', last_draw=last_draw.to_dict())
+        return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
 
     return render_template('index.html', 
                            white_balls=white_balls, 
                            powerball=powerball, 
                            last_draw=last_draw.to_dict(), 
                            last_draw_dates=last_draw_dates,
-                           generation_type='generated')
+                           generation_type='generated',
+                           sum_ranges=SUM_RANGES, # Pass sum_ranges back
+                           selected_sum_range=selected_sum_range_label) # Pass selected sum range back for persistence
 
 
 @app.route('/generate_with_user_pair', methods=['POST'])
 def generate_with_user_pair_route():
     if df.empty:
         flash("Cannot generate with provided pair: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return render_template('index.html', last_draw=last_draw.to_dict())
+        return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
 
     user_pair_str = request.form.get('user_pair')
+    # --- New: Get selected sum range ---
+    selected_sum_range_label = request.form.get('sum_range_filter_pair', 'Any') # Unique name for this form's select
+    selected_sum_range_tuple = SUM_RANGES.get(selected_sum_range_label)
+    # --- End New ---
+
     white_balls = []
     powerball = None
     last_draw_dates = {}
@@ -1834,7 +1880,10 @@ def generate_with_user_pair_route():
         
         num1, num2 = pair_parts
 
-        white_balls, powerball = generate_with_user_provided_pair(num1, num2, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, excluded_numbers, df)
+        white_balls, powerball = generate_with_user_provided_pair(
+            num1, num2, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, 
+            excluded_numbers, df, selected_sum_range_tuple
+        )
         last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
 
         return render_template('index.html', 
@@ -1842,20 +1891,22 @@ def generate_with_user_pair_route():
                                powerball=powerball, 
                                last_draw=last_draw.to_dict(), 
                                last_draw_dates=last_draw_dates,
-                               generation_type='user_pair')
+                               generation_type='user_pair',
+                               sum_ranges=SUM_RANGES, # Pass sum_ranges back
+                               selected_sum_range=selected_sum_range_label) # Pass selected sum range back for persistence
     except ValueError as e:
         flash(str(e), 'error')
-        return render_template('index.html', last_draw=last_draw.to_dict())
+        return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
     except Exception as e:
         flash(f"An unexpected error occurred during pair-based generation: {e}", 'error')
-        return render_template('index.html', last_draw=last_draw.to_dict())
+        return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
 
 
 @app.route('/generate_group_a_strategy', methods=['POST'])
 def generate_group_a_strategy_route():
     if df.empty:
         flash("Cannot generate numbers with Group A strategy: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return render_template('index.html', last_draw=last_draw.to_dict())
+        return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
 
     num_from_group_a = int(request.form.get('num_from_group_a'))
     white_ball_min = int(request.form.get('white_ball_min', 1))
@@ -1866,23 +1917,33 @@ def generate_group_a_strategy_route():
     powerball_range_local = (powerball_min, powerball_max)
     excluded_numbers_local = [int(num.strip()) for num in request.form.get('excluded_numbers', '').split(",") if num.strip().isdigit()] if request.form.get('excluded_numbers') else []
     
+    # --- New: Get selected sum range ---
+    selected_sum_range_label = request.form.get('sum_range_filter_group_a', 'Any') # Unique name for this form's select
+    selected_sum_range_tuple = SUM_RANGES.get(selected_sum_range_label)
+    # --- End New ---
+
     white_balls = []
     powerball = None
     last_draw_dates = {}
 
     try:
-        white_balls, powerball = generate_from_group_a(df, num_from_group_a, white_ball_range_local, powerball_range_local, excluded_numbers_local)
+        white_balls, powerball = generate_from_group_a(
+            df, num_from_group_a, white_ball_range_local, powerball_range_local, 
+            excluded_numbers_local, selected_sum_range_tuple
+        )
         last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
     except ValueError as e:
         flash(str(e), 'error')
-        return render_template('index.html', last_draw=last_draw.to_dict())
+        return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
 
     return render_template('index.html', 
                            white_balls=white_balls, 
                            powerball=powerball, 
                            last_draw=last_draw.to_dict(), 
                            last_draw_dates=last_draw_dates,
-                           generation_type='group_a_strategy')
+                           generation_type='group_a_strategy',
+                           sum_ranges=SUM_RANGES, # Pass sum_ranges back
+                           selected_sum_range=selected_sum_range_label) # Pass selected sum range back for persistence
 
 @app.route('/save_official_draw', methods=['POST'])
 def save_official_draw_route():
@@ -2369,7 +2430,7 @@ def update_powerball_data():
             'Draw Date': simulated_draw_date,
             'Number 1': simulated_numbers_list[0],
             'Number 2': simulated_numbers_list[1],
-            'Number 3': simulated_numbers_list[2],
+            'Number 3': simulated_numbers_list[2], # Fixed index
             'Number 4': simulated_numbers_list[3], # Fixed index
             'Number 5': simulated_numbers_list[4], # Fixed index
             'Powerball': simulated_powerball
