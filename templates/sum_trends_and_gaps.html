@@ -1,73 +1,175 @@
 {% extends "base.html" %}
 
-{% block title %}Sum Trends & Gaps Analysis{% endblock %}
+{% block title %}Sum Trends & Gaps{% endblock %}
 
 {% block page_heading %}Sum Trends & Gaps Analysis{% endblock %}
 
 {% block content %}
 <div class="space-y-8 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Overview of Sums</h2>
-        <p class="text-gray-600 mb-2">
-            The sum of the five white balls in a Powerball draw can range from
-            <span class="font-semibold text-blue-600">{{ min_possible_sum }}</span> (1+2+3+4+5) to
-            <span class="font-semibold text-blue-600">{{ max_possible_sum }}</span> (69+68+67+66+65).
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Understanding Sum Trends & Gaps</h2>
+        <p class="text-gray-600 mb-4">
+            This analysis focuses on the sum of the five white balls drawn in each Powerball draw.
+            It identifies which sums have appeared, when they last appeared, and highlights any
+            "missing" sums that have never been drawn historically within their theoretical range.
+            We also group sums into predefined ranges to observe broader trends.
         </p>
-        <p class="text-gray-600 mb-4">This page shows the historical appearance of all sums, groups them into ranges, and highlights sums that have never been drawn.</p>
+        <p class="text-gray-600 mb-2">
+            The theoretical minimum sum for 5 white balls is {{ min_possible_sum }} (1+2+3+4+5).
+        </p>
+        <p class="text-gray-600">
+            The theoretical maximum sum for 5 white balls is {{ max_possible_sum }} (69+68+67+66+65).
+        </p>
     </div>
 
+    {# Collapsible section for Missing Sums #}
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Sums That Have Never Appeared</h2>
-        {% if missing_sums %}
-            <div class="flex flex-wrap gap-2 mb-4">
-                {% for sum_val in missing_sums %}
-                    <span class="badge-danger">{{ sum_val }}</span>
-                {% endfor %}
-            </div>
-            <p class="text-red-700 text-sm italic">These sums have not appeared in any historical draw yet.</p>
-        {% else %}
-            <p class="text-green-700 font-medium">All possible sums have appeared at least once!</p>
-        {% endif %}
+        <button class="flex justify-between items-center w-full text-left font-bold text-xl text-gray-800 focus:outline-none" onclick="toggleVisibility('missingSumsContent', 'missingSumsArrow')">
+            <span>Missing Sums (Never Drawn)</span>
+            <svg id="missingSumsArrow" class="w-6 h-6 transform rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        </button>
+        <div id="missingSumsContent" class="mt-4 hidden">
+            {% if missing_sums %}
+                <p class="text-gray-600 mb-2">There are {{ missing_sums | length }} sums that have theoretically been possible but have never appeared historically:</p>
+                <div class="flex flex-wrap gap-2 text-sm">
+                    {% for s in missing_sums %}
+                        <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full">{{ s }}</span>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-gray-500">No missing sums found. All possible sums have appeared at least once!</p>
+            {% endif %}
+        </div>
     </div>
 
+    {# Collapsible section for All Appeared Sums #}
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Grouped Sums Analysis</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <button class="flex justify-between items-center w-full text-left font-bold text-xl text-gray-800 focus:outline-none" onclick="toggleVisibility('allAppearedSumsContent', 'allAppearedSumsArrow')">
+            <span>All Appeared Sums with Last Drawn Dates</span>
+            <svg id="allAppearedSumsArrow" class="w-6 h-6 transform rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        </button>
+        <div id="allAppearedSumsContent" class="mt-4 hidden">
+            {% if appeared_sums_details %}
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white rounded-lg shadow-sm">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-800 uppercase text-sm leading-normal">
+                                <th class="py-3 px-6 text-left rounded-tl-lg">Sum</th>
+                                <th class="py-3 px-6 text-left">Occurrences</th>
+                                <th class="py-3 px-6 text-left rounded-tr-lg">Last Drawn Date</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-700 text-sm font-light">
+                            {% for detail in appeared_sums_details %}
+                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                <td class="py-3 px-6 text-left font-medium">{{ detail.sum }}</td>
+                                <td class="py-3 px-6 text-left">{{ detail.count }}</td>
+                                <td class="py-3 px-6 text-left">{{ detail.last_drawn_date }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-gray-500">No historical sums data available.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Grouped Sums Analysis Section #}
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Grouped Sums Analysis by Range</h2>
+        <p class="text-gray-600 mb-4">
+            Below, sums are grouped into predefined ranges to help identify which sum "zones" have been more active historically.
+        </p>
+
+        <div class="space-y-6">
             {% for range_name, data in grouped_sums_analysis.items() %}
-                <div class="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <h3 class="text-lg font-semibold text-gray-700 mb-2">{{ range_name }}</h3>
-                    <p class="text-gray-600">Total Possible Sums in Range: <span class="font-medium">{{ data.total_possible_in_range }}</span></p>
-                    <p class="text-gray-600">Appeared Sums: <span class="font-medium text-green-600">{{ data.appeared_in_range_count }}</span></p>
-                    <p class="text-gray-600">Missing Sums: <span class="font-medium text-red-600">{{ data.missing_in_range_count }}</span></p>
-                    
-                    {% if data.missing_sums_in_range %}
-                        <div class="mt-2 text-sm text-red-500">
-                            Missing in this group: {{ data.missing_sums_in_range | join(', ') }}
-                        </div>
-                    {% endif %}
+                <div class="border border-blue-200 rounded-lg p-4 bg-blue-50">
+                    <button class="flex justify-between items-center w-full text-left font-bold text-lg text-blue-800 focus:outline-none" onclick="toggleVisibility('{{ range_name | replace(' ', '') }}Content', '{{ range_name | replace(' ', '') }}Arrow')">
+                        <span>Sum Range: {{ range_name }}</span>
+                        <svg id="{{ range_name | replace(' ', '') }}Arrow" class="w-5 h-5 transform rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                    <div id="{{ range_name | replace(' ', '') }}Content" class="mt-3 hidden">
+                        <p class="text-gray-700 mb-1"><span class="font-semibold">Total Possible Sums in Range:</span> {{ data.total_possible_in_range }}</p>
+                        <p class="text-gray-700 mb-1"><span class="font-semibold">Appeared Sums in Range:</span> {{ data.appeared_in_range_count }}</p>
+                        <p class="text-gray-700 mb-1"><span class="font-semibold">Missing Sums in Range:</span> {{ data.missing_in_range_count }}</p>
+                        <p class="text-gray-700 mb-1"><span class="font-semibold">Average Frequency of Appeared Sums:</span> {{ data.average_frequency_in_range }} times</p>
+                        <p class="text-gray-700 mb-3"><span class="font-semibold">Last Drawn Date for this Range:</span> {{ data.last_drawn_date_for_range }}</p>
+                        
+                        {# Most Frequent Sums in Range #}
+                        <h5 class="text-md font-semibold text-gray-800 mb-2">Most Frequent Sums in {{ range_name }}:</h5>
+                        {% if data.most_frequent_sums_in_range %}
+                            <div class="overflow-x-auto mb-4">
+                                <table class="min-w-full bg-white rounded-lg shadow-sm">
+                                    <thead>
+                                        <tr class="bg-gray-100 text-gray-700 uppercase text-xs leading-normal">
+                                            <th class="py-2 px-4 text-left rounded-tl-lg">Sum</th>
+                                            <th class="py-2 px-4 text-left rounded-tr-lg">Occurrences</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="text-gray-600 text-sm font-light">
+                                        {% for s in data.most_frequent_sums_in_range %}
+                                        <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                            <td class="py-2 px-4 text-left">{{ s.sum }}</td>
+                                            <td class="py-2 px-4 text-left">{{ s.count }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="text-gray-500 mb-4">No sums have appeared in this range yet.</p>
+                        {% endif %}
+
+                        {# Least Frequent Sums in Range #}
+                        <h5 class="text-md font-semibold text-gray-800 mb-2">Least Frequent Sums in {{ range_name }} (that have appeared):</h5>
+                        {% if data.least_frequent_sums_in_range %}
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full bg-white rounded-lg shadow-sm">
+                                    <thead>
+                                        <tr class="bg-gray-100 text-gray-700 uppercase text-xs leading-normal">
+                                            <th class="py-2 px-4 text-left rounded-tl-lg">Sum</th>
+                                            <th class="py-2 px-4 text-left rounded-tr-lg">Occurrences</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="text-gray-600 text-sm font-light">
+                                        {% for s in data.least_frequent_sums_in_range %}
+                                        <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                            <td class="py-2 px-4 text-left">{{ s.sum }}</td>
+                                            <td class="py-2 px-4 text-left">{{ s.count }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="text-gray-500">All sums in this range are either highly frequent or have not appeared.</p>
+                        {% endif %}
+                    </div>
                 </div>
             {% endfor %}
         </div>
     </div>
 
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">All Sums by Last Appearance Date</h2>
-        <p class="text-gray-600 mb-4">Each sum that has appeared, listed from lowest to highest, along with the most recent date it occurred:</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-2 gap-x-4">
-            {% for sum_detail in appeared_sums_details %}
-                <div class="text-gray-700">
-                    <span class="font-semibold text-blue-700">Sum {{ sum_detail.sum }}:</span>
-                    <span class="ml-2">{{ sum_detail.last_drawn_date }}</span>
-                </div>
-            {% endfor %}
+    {% else %}
+        <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+            <p class="text-gray-500">No data available for Sum Trends & Gaps. Please ensure historical data is loaded.</p>
         </div>
-    </div>
+    {% endif %}
 </div>
 
-<style>
-    .badge-danger {
-        @apply bg-red-100 text-red-800 text-xs font-semibold px-2.5 py-0.5 rounded-full;
-        display: inline-block; /* To allow margin/padding to work as expected */
+<script>
+    function toggleVisibility(contentId, arrowId) {
+        const content = document.getElementById(contentId);
+        const arrow = document.getElementById(arrowId);
+        if (content.classList.contains('hidden')) {
+            content.classList.remove('hidden');
+            arrow.classList.remove('rotate-90');
+        } else {
+            content.classList.add('hidden');
+            arrow.classList.add('rotate-90');
+        }
     }
-</style>
+</script>
 {% endblock %}
