@@ -244,21 +244,22 @@
                                 usePointStyle: true, // Use circular points for legend items
                                 generateLabels: function(chart) {
                                     const data = chart.data;
-                                    if (data.labels.length && data.datasets.length) {
+                                    // Make sure datasets[0] and its properties exist
+                                    if (data.labels.length && data.datasets.length > 0 && data.datasets[0].backgroundColor && data.datasets[0].borderColor) {
                                         return data.labels.map(function(label, i) {
-                                            const meta = chart.getDatasetMeta(0);
-                                            const style = meta.data[i].options;
+                                            // Access colors directly from the dataset's arrays
+                                            const fillStyle = data.datasets[0].backgroundColor[i];
+                                            const strokeStyle = data.datasets[0].borderColor[i];
                                             const value = data.datasets[0].data[i];
                                             const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
                                             const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
 
                                             return {
                                                 text: `${label}: ${value} draws (${percentage}%)`,
-                                                fillStyle: style.backgroundColor,
-                                                strokeStyle: style.borderColor,
-                                                lineWidth: style.borderWidth,
-                                                // Corrected line here:
-                                                hidden: !chart.isDatasetVisible(0) || chart.getDatasetMeta(0).data[i].hidden,
+                                                fillStyle: fillStyle,
+                                                strokeStyle: strokeStyle,
+                                                lineWidth: 1, // You can set this as a fixed value or from style
+                                                hidden: !chart.isDatasetVisible(0) || (chart.getDatasetMeta(0).data[i] ? chart.getDatasetMeta(0).data[i].hidden : false),
                                                 index: i
                                             };
                                         });
