@@ -71,7 +71,7 @@
                 <input type="hidden" name="generated_white_balls" value="{{ white_balls | join(',') }}">
                 <input type="hidden" name="generated_powerball" value="{{ powerball }}">
                 <button type="submit" class="btn-secondary flex items-center px-8 py-4 text-xl rounded-full transition duration-300 ease-in-out hover:scale-105"> {# Larger, more prominent save button #}
-                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-3m-1-4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 0 00-2 2v10a2 2 0 002 2h10a2 0 002-2v-3m-1-4l-3 3m0 0l-3-3m3 3V4"></path></svg>
                     Save This Pick!
                 </button>
             </form>
@@ -94,6 +94,14 @@
                         <option value="2 Even / 3 Odd">2 Even / 3 Odd</option>
                         <option value="4 Even / 1 Odd">4 Even / 1 Odd</option>
                         <option value="1 Even / 4 Odd">1 Even / 4 Odd</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="sum_range_filter" class="form-label">Sum Range Filter:</label>
+                    <select name="sum_range_filter" id="sum_range_filter" class="form-input">
+                        {% for label, _ in sum_ranges.items() %}
+                            <option value="{{ label }}" {% if selected_sum_range == label %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
                     </select>
                 </div>
                 <div class="form-group">
@@ -134,6 +142,14 @@
                     <input type="number" name="num_from_group_a" id="num_from_group_a" min="2" max="5" value="2" class="form-input">
                 </div>
                 <div class="form-group">
+                    <label for="sum_range_filter_group_a" class="form-label">Sum Range Filter:</label>
+                    <select name="sum_range_filter_group_a" id="sum_range_filter_group_a" class="form-input">
+                        {% for label, _ in sum_ranges.items() %}
+                            <option value="{{ label }}" {% if selected_sum_range == label %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
                     <label for="excluded_numbers_group_a" class="form-label">Exclude Numbers (comma-separated):</label>
                     <input type="text" name="excluded_numbers" id="excluded_numbers_group_a" class="form-input" placeholder="e.g., 1, 7, 42">
                 </div>
@@ -149,6 +165,14 @@
                 <div class="form-group">
                     <label for="user_pair" class="form-label">Enter Two White Balls (comma-separated, e.g., 18, 19):</label>
                     <input type="text" name="user_pair" id="user_pair" class="form-input" placeholder="e.g., 18, 19">
+                </div>
+                <div class="form-group">
+                    <label for="sum_range_filter_pair" class="form-label">Sum Range Filter:</label>
+                    <select name="sum_range_filter_pair" id="sum_range_filter_pair" class="form-input">
+                        {% for label, _ in sum_ranges.items() %}
+                            <option value="{{ label }}" {% if selected_sum_range == label %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 <button type="submit" class="btn-primary w-full">Generate with Pair</button>
             </form>
@@ -330,6 +354,93 @@
         const mm = String(today.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
         const dd = String(today.getDate()).padStart(2, '0');
         document.getElementById('draw_date').value = `${yyyy}-${mm}-${dd}`;
+
+        // Preserve selected sum range filter after generation (if a generation occurred)
+        // Check for 'selected_sum_range' which is passed from the Flask route after a generation attempt.
+        const selectedSumRange = "{{ selected_sum_range if selected_sum_range is not none else 'Any' }}";
+
+        const sumRangeFilterSelect = document.getElementById('sum_range_filter');
+        if (sumRangeFilterSelect) {
+            sumRangeFilterSelect.value = selectedSumRange;
+        }
+
+        const sumRangeFilterGroupASelect = document.getElementById('sum_range_filter_group_a');
+        if (sumRangeFilterGroupASelect) {
+            sumRangeFilterGroupASelect.value = selectedSumRange;
+        }
+
+        const sumRangeFilterPairSelect = document.getElementById('sum_range_filter_pair');
+        if (sumRangeFilterPairSelect) {
+            sumRangeFilterPairSelect.value = selectedSumRange;
+        }
+
+        // Also preserve the odd/even choice for the main generator, if it was submitted
+        const oddEvenChoiceSelect = document.getElementById('odd_even_choice');
+        const selectedOddEvenChoice = "{{ request.form.get('odd_even_choice', 'Any') }}";
+        if (oddEvenChoiceSelect) {
+            oddEvenChoiceSelect.value = selectedOddEvenChoice;
+        }
+
+        // Preserve high/low balance input
+        const highLowBalanceInput = document.getElementById('high_low_balance');
+        const selectedHighLowBalance = "{{ request.form.get('high_low_balance', '') }}";
+        if (highLowBalanceInput) {
+            highLowBalanceInput.value = selectedHighLowBalance;
+        }
+        
+        // Preserve excluded numbers input
+        const excludedNumbersInput = document.getElementById('excluded_numbers');
+        const selectedExcludedNumbers = "{{ request.form.get('excluded_numbers', '') }}";
+        if (excludedNumbersInput) {
+            excludedNumbersInput.value = selectedExcludedNumbers;
+        }
+
+        // Preserve excluded numbers for Group A
+        const excludedNumbersGroupAInput = document.getElementById('excluded_numbers_group_a');
+        const selectedExcludedNumbersGroupA = "{{ request.form.get('excluded_numbers', '') }}";
+        if (excludedNumbersGroupAInput) {
+            excludedNumbersGroupAInput.value = selectedExcludedNumbersGroupA;
+        }
+
+        // Preserve min/max white ball inputs
+        const whiteBallMinInput = document.getElementById('white_ball_min');
+        const selectedWhiteBallMin = "{{ request.form.get('white_ball_min', '1') }}";
+        if (whiteBallMinInput) {
+            whiteBallMinInput.value = selectedWhiteBallMin;
+        }
+
+        const whiteBallMaxInput = document.getElementById('white_ball_max');
+        const selectedWhiteBallMax = "{{ request.form.get('white_ball_max', '69') }}";
+        if (whiteBallMaxInput) {
+            whiteBallMaxInput.value = selectedWhiteBallMax;
+        }
+
+        // Preserve min/max powerball inputs
+        const powerballMinInput = document.getElementById('powerball_min');
+        const selectedPowerballMin = "{{ request.form.get('powerball_min', '1') }}";
+        if (powerballMinInput) {
+            powerballMinInput.value = selectedPowerballMin;
+        }
+
+        const powerballMaxInput = document.getElementById('powerball_max');
+        const selectedPowerballMax = "{{ request.form.get('powerball_max', '26') }}";
+        if (powerballMaxInput) {
+            powerballMaxInput.value = selectedPowerballMax;
+        }
+
+        // Preserve num from group A input
+        const numFromGroupAInput = document.getElementById('num_from_group_a');
+        const selectedNumFromGroupA = "{{ request.form.get('num_from_group_a', '2') }}";
+        if (numFromGroupAInput) {
+            numFromGroupAInput.value = selectedNumFromGroupA;
+        }
+
+        // Preserve user pair input
+        const userPairInput = document.getElementById('user_pair');
+        const selectedUserPair = "{{ request.form.get('user_pair', '') }}";
+        if (userPairInput) {
+            userPairInput.value = selectedUserPair;
+        }
     });
 </script>
 {% endblock %}
