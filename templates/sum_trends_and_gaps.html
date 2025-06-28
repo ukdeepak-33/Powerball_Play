@@ -256,7 +256,6 @@
                                                 fillStyle: style.backgroundColor,
                                                 strokeStyle: style.borderColor,
                                                 lineWidth: style.borderWidth,
-                                                // Corrected line here:
                                                 hidden: !chart.isDatasetVisible(0) || chart.getDatasetMeta(0).data[i].hidden,
                                                 index: i
                                             };
@@ -277,10 +276,12 @@
                                 }
                             },
                             bodyFont: {
-                                family: 'Inter, sans-serif'
+                                family: 'Inter',
+                                size: 14
                             },
                             titleFont: {
-                                family: 'Inter, sans-serif'
+                                family: 'Inter',
+                                size: 16
                             },
                             padding: 10,
                             boxPadding: 4,
