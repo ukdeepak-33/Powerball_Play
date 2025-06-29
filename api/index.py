@@ -63,6 +63,7 @@ NUMBER_RANGES = {
 
 # Specific ranges for the "Generate from Your Starting Pair" ascending logic
 ASCENDING_GEN_RANGES = [
+    (10, 19), # 10s
     (20, 29), # 20s
     (30, 39), # 30s
     (40, 49), # 40s
@@ -77,7 +78,9 @@ SUM_RANGES = {
     "Zone B (100-129)": (100, 129),
     "Zone C (130-159)": (130, 159), 
     "Zone D (160-189)": (160, 189),
-    "Zone E (190-220)": (190, 220)
+    "Zone E (190-220)": (190, 220),
+    "Zone F (221-249)": (221, 249), 
+    "Zone G (250-300)": (250, 300)  
 }
 
 # NEW: Low/High split definition for white balls
