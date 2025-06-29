@@ -12,8 +12,8 @@ import numpy as np
 import traceback # Ensure this is imported for logging errors
 
 # --- Supabase Configuration ---
-# IMPORTANT: These values should ALWAYS be set as environment variables in your deployment platform (e.g., Render, Vercel).
-# The 'default' values provided here are placeholders, ONLY used if the environment variable is NOT found.
+# IMPORTANT: These values should ALWAYS be set as environment variables in your deployment platform (e.g., Render, Vercel).\
+# The 'default' values provided here are placeholders, ONLY used if the environment variable is NOT found.\
 # If running locally for testing, you can set them in your shell or a .env file.
 SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "YOUR_ACTUAL_SUPABASE_ANON_KEY_GOES_HERE") # REPLACE THIS IN YOUR ENV VARS
