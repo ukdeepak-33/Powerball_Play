@@ -937,6 +937,7 @@ def get_most_frequent_triplets(df_source): # Removed top_n parameter
     return formatted_triplets
 
 
+# MODIFIED FUNCTION SIGNATURE AND LOGIC
 def get_odd_even_split_trends(df_source, last_draw_date_str):
     print("[DEBUG-OddEvenTrends] Inside get_odd_even_split_trends function.")
     if df_source.empty or last_draw_date_str == 'N/A':
@@ -970,8 +971,8 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
         # Calculate WB_Sum
         wb_sum = sum(white_balls)
 
-        # Identify group_a numbers present in the draw
-        group_a_numbers_present = sorted([num for num in white_balls if num in (group_a_numbers_def if group_a_numbers_def is not None else group_a)])
+        # Identify group_a numbers present in the draw - now using the global group_a directly
+        group_a_numbers_present = sorted([num for num in white_balls if num in group_a])
 
         even_count = sum(1 for num in white_balls if num % 2 == 0)
         odd_count = 5 - even_count
@@ -1621,7 +1622,7 @@ def get_sum_trends_and_gaps_data(df_source):
     }
 
 # NEW/MODIFIED FUNCTION: get_weekday_draw_trends
-def get_weekday_draw_trends(df_source, group_a_numbers_def=None):
+def get_weekday_draw_trends(df_source, group_a_numbers_def=None): # Keep group_a_numbers_def as an optional parameter
     """
     Analyzes various drawing trends (Low/High, Odd/Even, Consecutive, Sum, Group A)
     based on the day of the week (Monday, Wednesday, Saturday).
@@ -1669,8 +1670,9 @@ def get_weekday_draw_trends(df_source, group_a_numbers_def=None):
         # Sum of Balls
         current_sum = sum(white_balls)
 
-        # Group A Count
-        current_group_a_count = sum(1 for num in white_balls if num in (group_a_numbers_def if group_a_numbers_def is not None else group_a))
+        # Use the provided group_a_numbers_def if it's not None, otherwise use the global group_a
+        group_a_to_use = group_a_numbers_def if group_a_numbers_def is not None else group_a
+        current_group_a_count = sum(1 for num in white_balls if num in group_a_to_use)
 
         # Consecutive Numbers Presence
         consecutive_present = False
@@ -1776,6 +1778,7 @@ def get_cached_analysis(key, compute_function, *args, **kwargs):
         return analysis_cache[key]
     
     print(f"Computing and caching '{key}'.")
+    # Pass args and kwargs directly to the compute_function
     computed_data = compute_function(*args, **kwargs)
     
     analysis_cache[key] = computed_data
@@ -2305,6 +2308,7 @@ def powerball_frequency_by_year_route():
 @app.route('/odd_even_trends')
 def odd_even_trends_route():
     last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
+    # Pass last_draw_date_str_for_cache as the second argument, correctly mapped now
     odd_even_trends = get_cached_analysis('odd_even_trends', get_odd_even_split_trends, df, last_draw_date_str_for_cache)
     return render_template('odd_even_trends.html',
                            odd_even_trends=odd_even_trends)
@@ -2764,7 +2768,10 @@ def weekday_trends_route():
         flash("Cannot display Weekday Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
-    # Pass the global group_a to the analysis function
+    # Pass df and group_a (if needed by get_weekday_draw_trends)
+    # The get_weekday_draw_trends function already accepts group_a_numbers_def=None,
+    # and it uses the global `group_a` if that parameter is not explicitly passed,
+    # or if it's passed as None. So we can just pass `df`.
     weekday_data = get_cached_analysis('weekday_all_trends', get_weekday_draw_trends, df, group_a_numbers_def=group_a)
     
     return render_template('weekday_trends.html', 
