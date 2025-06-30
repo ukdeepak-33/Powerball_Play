@@ -1254,6 +1254,24 @@ def save_generated_numbers_to_db(numbers, powerball):
     headers = _get_supabase_headers(is_service_key=True)
 
     sorted_numbers = sorted(numbers)
+# Utility function for Supabase search (used by strict_positional_search_route)
+def supabase_search_draws(query_params):
+    url = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
+    headers = _get_supabase_headers(is_service_key=False) # Use anon key for reads
+
+    try:
+        response = requests.get(url, headers=headers, params=query_params)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error during Supabase search: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"Supabase error response: {e.response.text}")
+        return []
+    except Exception as e:
+        print(f"An unexpected error occurred in supabase_search_draws: {e}")
+        traceback.print_exc()
+        return []
 
     check_params = {
         'select': 'id',
