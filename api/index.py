@@ -1224,14 +1224,18 @@ def save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb):
     if existing_draws:
         print(f"Draw for date {draw_date} already exists in {SUPABASE_TABLE_NAME}.")
         return False, f"Draw for {draw_date} already exists."
+# --- FIX START ---
+    # Collect the white balls into a list and sort them
+    sorted_white_balls = sorted([n1, n2, n3, n4, n5])
+    # --- FIX END ---
 
     new_draw_data = {
         'Draw Date': draw_date,
-        'Number 1': n1,
-        'Number 2': n2,
-        'Number 3': n3,
-        'Number 4': n4,
-        'Number 5': n5,
+        'Number 1': sorted_white_balls[0], # Use the sorted numbers
+        'Number 2': sorted_white_balls[1],
+        'Number 3': sorted_white_balls[2],
+        'Number 4': sorted_white_balls[3],
+        'Number 5': sorted_white_balls[4],
         'Powerball': pb
     }
 
