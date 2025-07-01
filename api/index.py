@@ -944,28 +944,28 @@ def get_most_frequent_triplets(df_source): # Removed top_n parameter
 def get_odd_even_split_trends(df_source, last_draw_date_str):
     print("[DEBUG-OddEvenTrends] Inside get_odd_even_split_trends function.")
     if df_source.empty or last_draw_date_str == 'N/A':
-        print("[DEBUG-OddEvenTrends] df_source is empty or last_draw_date_str is N/A. Returning empty list.")
-        return []
+        print("[DEBUG-OddEvenTrends] df_source is empty or last_draw_date_str is N/A. Returning empty dictionary.")
+        return {} # Ensure it always returns a dictionary, even if empty
 
     try:
         last_draw_date = pd.to_datetime(last_draw_date_str)
         print(f"[DEBUG-OddEvenTrends] last_draw_date: {last_draw_date}")
     except Exception as e:
-        print(f"[ERROR-OddEvenTrends] Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty list.")
-        return {}
+        print(f"[ERROR-OddEvenTrends] Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty dictionary.")
+        return {} # Ensure it always returns a dictionary, even if empty
 
     six_months_ago = last_draw_date - pd.DateOffset(months=6)
     print(f"[DEBUG-OddEvenTrends] six_months_ago: {six_months_ago}")
 
     if 'Draw Date_dt' not in df_source.columns or not pd.api.types.is_datetime64_any_dtype(df_source['Draw Date_dt']):
-        print("[ERROR-OddEvenTrends] 'Draw Date_dt' column missing or not datetime type in df_source. Returning empty list.")
-        return []
+        print("[ERROR-OddEvenTrends] 'Draw Date_dt' column missing or not datetime type in df_source. Returning empty dictionary.")
+        return {} # Ensure it always returns a dictionary, even if empty
 
     recent_data = df_source[df_source['Draw Date_dt'] >= six_months_ago].copy()
     recent_data = recent_data.sort_values(by='Draw Date_dt', ascending=False)
     if recent_data.empty:
-        print("[DEBUG-OddEvenTrends] recent_data is empty after filtering. Returning empty list.")
-        return []
+        print("[DEBUG-OddEvenTrends] recent_data is empty after filtering. Returning empty dictionary.")
+        return {} # Ensure it always returns a dictionary, even if empty
 
     trend_data = []
     for idx, row in recent_data.iterrows():
@@ -1002,8 +1002,37 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
             'group_a_numbers': group_a_numbers_present
         })
     
-    print(f"[DEBUG-OddEvenTrends] Generated {len(trend_data)} trend data points with WB_Sum and Group A numbers.")
-    return trend_data
+    # The original logic here was to return a list, but the calling function expects a dictionary.
+    # This was the source of the `AttributeError`.
+    # We need to aggregate the trend_data into a dictionary keyed by weekday.
+    final_results = defaultdict(lambda: {
+        'total_draws': 0,
+        'low_high_splits': defaultdict(int),
+        'odd_even_splits': defaultdict(int)
+    })
+
+    for draw_info in trend_data:
+        # We need the weekday for each draw. Let's re-derive it or pass it.
+        # For simplicity, assuming we only care about the overall split counts for summary
+        # Or, if we need it by day, we'd need to re-add weekday calculation here.
+        # For the AI summary, an overall count of splits is more useful.
+        
+        # Let's re-calculate weekday from draw_date for each entry in trend_data
+        draw_date_dt = pd.to_datetime(draw_info['draw_date'])
+        day_name = draw_date_dt.day_name()
+        
+        if day_name in POWERBALL_DRAW_DAYS: # Only process Powerball draw days
+            final_results[day_name]['total_draws'] += 1
+            final_results[day_name]['odd_even_splits'][draw_info['split_category']] += 1
+            # You might add other aggregations here if needed for the AI summary
+
+    # Convert defaultdicts to regular dicts for final output
+    for day in final_results:
+        final_results[day]['odd_even_splits'] = dict(final_results[day]['odd_even_splits'])
+
+    print(f"[DEBUG-OddEvenTrends] Generated {len(trend_data)} trend data points with WB_Sum and Group A numbers. Returning aggregated dictionary.")
+    return dict(final_results) # Explicitly return a dictionary
+
 
 def get_powerball_frequency_by_year(df_source, num_years=5):
     """
@@ -1774,6 +1803,9 @@ def initialize_core_data():
     except Exception as e:
         print(f"An error occurred during initial core data loading: {e}")
         traceback.print_exc()
+    finally:
+        # Invalidate the analysis cache after (re)loading core data
+        invalidate_analysis_cache() # ADDED THIS LINE HERE
 
 initialize_core_data()
 
@@ -2989,18 +3021,35 @@ def _summarize_for_ai(df_source):
         summary_parts.append("Numbers frequently drawn in recent completed months: " + ", ".join([f"{n} ({c} times)" for n, c in sorted_recent_monthly[:15]])) # Top 15
 
     # 5. Odd/Even Split Trends (Most common in last 6 months)
-    odd_even_trends = get_odd_even_split_trends(df_source, last_draw_date_str)
-    overall_odd_even_counts = defaultdict(int)
-    for day_data in odd_even_trends.values():
-        for split_info in day_data['odd_even_splits']:
-            overall_odd_even_counts[split_info['split']] += split_info['count']
+    odd_even_trends = get_cached_analysis('odd_even_trends', get_odd_even_split_trends, df_source, last_draw_date_str) # Ensure it's getting from cache/computing correctly
     
-    most_common_odd_even = sorted(overall_odd_even_counts.items(), key=lambda item: item[1], reverse=True)
-    if most_common_odd_even:
-        summary_parts.append("Most common Odd/Even splits in recent draws: " + ", ".join([f"{s} ({c} times)" for s, c in most_common_odd_even[:3]])) # Top 3
+    # ADDED DEFENSIVE CHECK HERE
+    if isinstance(odd_even_trends, dict): # Ensure it's a dictionary before calling .values()
+        overall_odd_even_counts = defaultdict(int)
+        for day_data in odd_even_trends.values():
+            # Check if 'odd_even_splits' key exists and is iterable
+            if 'odd_even_splits' in day_data and isinstance(day_data['odd_even_splits'], (dict, list)):
+                # If it's a list of dicts (as returned by get_odd_even_split_trends), iterate it
+                if isinstance(day_data['odd_even_splits'], list):
+                    for split_info in day_data['odd_even_splits']:
+                        if 'split' in split_info and 'count' in split_info:
+                            overall_odd_even_counts[split_info['split']] += split_info['count']
+                # If it's a dict (e.g., defaultdict), iterate its items
+                elif isinstance(day_data['odd_even_splits'], dict):
+                     for split_key, split_count in day_data['odd_even_splits'].items():
+                         overall_odd_even_counts[split_key] += split_count
+            else:
+                print(f"[ERROR] 'odd_even_splits' not found or not iterable in day_data: {day_data}. Skipping for this day.")
+
+        most_common_odd_even = sorted(overall_odd_even_counts.items(), key=lambda item: item[1], reverse=True)
+        if most_common_odd_even:
+            summary_parts.append("Most common Odd/Even splits in recent draws: " + ", ".join([f"{s} ({c} times)" for s, c in most_common_odd_even[:3]])) # Top 3
+    else:
+        print(f"[ERROR] Expected odd_even_trends to be a dictionary, but got {type(odd_even_trends)}. Skipping odd/even summary.")
+
 
     # 6. Sum Trends (Most frequent sum ranges)
-    sum_data = get_sum_trends_and_gaps_data(df_source)
+    sum_data = get_cached_analysis('sum_trends_and_gaps', get_sum_trends_and_gaps_data, df_source) # Ensure it's getting from cache/computing correctly
     if sum_data['grouped_sums_analysis']:
         sum_range_summaries = []
         for range_name, data in sum_data['grouped_sums_analysis'].items():
