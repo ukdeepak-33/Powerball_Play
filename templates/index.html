@@ -39,22 +39,32 @@
         {% endif %}
     </div>
 
-    {# Display Generated Numbers Section #}
-    {% if white_balls and powerball %}
+   {# Display Generated Numbers Section (Modified for multiple sets) #}
+    {% if generated_sets %}
     <div class="bg-gradient-to-br from-blue-500 to-indigo-600 p-8 rounded-2xl shadow-xl transform transition-all duration-300 hover:scale-105"> {# New vibrant styling for generated numbers #}
         <h2 class="text-3xl sm:text-4xl font-extrabold text-white mb-6 text-center animate-pulse">Your Generated Lucky Numbers!</h2>
-        <div class="flex items-center justify-center space-x-4 sm:space-x-6 mb-8">
-            {% for num in white_balls %}
-                <span class="generated-ball animate-pop-in text-5xl">{{ num }}</span> {# Base font-size for consistency #}
-            {% endfor %}
-            <span class="generated-powerball-label text-5xl font-bold text-white">PB:</span>
-            <span class="generated-powerball-ball animate-pop-in text-5xl">{{ powerball }}</span>
+        
+        {% for generated_pick in generated_sets %}
+        <div class="generated-pick-item p-4 bg-blue-50 rounded-lg border border-blue-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 mb-4 last:mb-0">
+            <div class="flex items-center space-x-2 flex-wrap justify-center sm:justify-start">
+                {% for num in generated_pick.white_balls %}
+                    <span class="generated-ball-small">{{ num }}</span> {# Use a smaller ball style for multiple picks #}
+                {% endfor %}
+                <span class="generated-powerball-label-small">PB:</span>
+                <span class="generated-powerball-ball-small">{{ generated_pick.powerball }}</span>
+            </div>
+            <form method="POST" action="{{ url_for('save_generated_pick_route') }}" class="flex-shrink-0">
+                <input type="hidden" name="generated_white_balls" value="{{ generated_pick.white_balls | join(',') }}">
+                <input type="hidden" name="generated_powerball" value="{{ generated_pick.powerball }}">
+                <button type="submit" class="btn-secondary">Save This Pick</button>
+            </form>
         </div>
+        {% endfor %}
 
-        {# Last Drawn Dates Section - integrated within the generated numbers card #}
+        {# Last Drawn Dates Section - integrated within the generated numbers card (for the LAST generated set) #}
         {% if last_draw_dates %}
         <div class="mt-8 pt-6 border-t border-blue-400 text-white text-center">
-            <h3 class="text-xl font-semibold mb-4 opacity-90">Last Drawn Dates of Your Generated Numbers:</h3>
+            <h3 class="text-xl font-semibold mb-4 opacity-90">Last Drawn Dates of the Last Generated Pick:</h3>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                 {% for ball_info, draw_date in last_draw_dates.items() %}
                     <div class="bg-blue-700 bg-opacity-30 rounded-lg p-2 flex items-center justify-center space-x-2">
@@ -65,6 +75,8 @@
             </div>
         </div>
         {% endif %}
+    </div>
+    {% endif %}
 
         <div class="mt-8 flex justify-center">
             <form action="{{ url_for('save_generated_pick_route') }}" method="post">
@@ -79,25 +91,25 @@
     </div>
     {% endif %}
 
+     {# Generate Random Numbers Card #}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {# Generate Random Numbers Card #}
-        <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+       div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
             <h2 class="text-xl font-bold mb-4 text-gray-800">Generate Random Numbers</h2>
             <form action="{{ url_for('generate') }}" method="post" class="space-y-4">
                 <div class="form-group">
                     <label for="odd_even_choice" class="form-label">Odd/Even Split:</label>
                     <select name="odd_even_choice" id="odd_even_choice" class="form-input">
-                        <option value="Any">Any</option>
-                        <option value="All Even">All Even (5 Even / 0 Odd)</option>
-                        <option value="All Odd">All Odd (0 Even / 5 Odd)</option>
-                        <option value="3 Even / 2 Odd">3 Even / 2 Odd</option>
-                        <option value="2 Even / 3 Odd">2 Even / 3 Odd</option>
-                        <option value="4 Even / 1 Odd">4 Even / 1 Odd</option>
-                        <option value="1 Even / 4 Odd">1 Even / 4 Odd</option>
+                        <option value="Any" {% if selected_odd_even_choice == 'Any' %}selected{% endif %}>Any</option>
+                        <option value="All Odd" {% if selected_odd_even_choice == 'All Odd' %}selected{% endif %}>All Odd (5 Odd / 0 Even)</option>
+                        <option value="All Even" {% if selected_odd_even_choice == 'All Even' %}selected{% endif %}>All Even (0 Odd / 5 Even)</option>
+                        <option value="3 Odd / 2 Even" {% if selected_odd_even_choice == '3 Odd / 2 Even' %}selected{% endif %}>3 Odd / 2 Even</option>
+                        <option value="2 Odd / 3 Even" {% if selected_odd_even_choice == '2 Odd / 3 Even' %}selected{% endif %}>2 Odd / 3 Even</option>
+                        <option value="4 Odd / 1 Even" {% if selected_odd_even_choice == '4 Odd / 1 Even' %}selected{% endif %}>4 Odd / 1 Even</option>
+                        <option value="1 Odd / 4 Even" {% if selected_odd_even_choice == '1 Odd / 4 Even' %}selected{% endif %}>1 Odd / 4 Even</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="sum_range_filter" class="form-label">Sum Range Filter:</label>
+                    <label for="sum_range_filter" class="form-label">Sum of White Balls Range:</label>
                     <select name="sum_range_filter" id="sum_range_filter" class="form-input">
                         {% for label, _ in sum_ranges.items() %}
                             <option value="{{ label }}" {% if selected_sum_range == label %}selected{% endif %}>{{ label }}</option>
@@ -105,28 +117,33 @@
                     </select>
                 </div>
                 <div class="form-group">
+                    <label for="num_sets_to_generate" class="form-label">Number of Sets to Generate (1-10):</label>
+                    <input type="number" id="num_sets_to_generate" name="num_sets_to_generate" min="1" max="10" value="{{ num_sets_to_generate if num_sets_to_generate is not none else 1 }}"
+                           class="form-input">
+                </div>
+                <div class="form-group">
                     <label for="high_low_balance" class="form-label">High/Low Balance (e.g., "2 3" for 2 low, 3 high):</label>
-                    <input type="text" name="high_low_balance" id="high_low_balance" class="form-input" placeholder="e.g., 2 3">
+                    <input type="text" name="high_low_balance" id="high_low_balance" class="form-input" placeholder="e.g., 2 3" value="{{ request.form.get('high_low_balance', '') }}">
                 </div>
                 <div class="form-group">
                     <label for="excluded_numbers" class="form-label">Exclude Numbers (comma-separated):</label>
-                    <input type="text" name="excluded_numbers" id="excluded_numbers" class="form-input" placeholder="e.g., 1, 7, 42">
+                    <input type="text" name="excluded_numbers" id="excluded_numbers" class="form-input" placeholder="e.g., 1, 7, 42" value="{{ request.form.get('excluded_numbers', '') }}">
                 </div>
                 <div class="form-group">
                     <label for="white_ball_min" class="form-label">White Ball Min (1-69):</label>
-                    <input type="number" name="white_ball_min" id="white_ball_min" min="1" max="69" value="1" class="form-input">
+                    <input type="number" name="white_ball_min" id="white_ball_min" min="1" max="69" value="{{ request.form.get('white_ball_min', '1') }}" class="form-input">
                 </div>
                 <div class="form-group">
                     <label for="white_ball_max" class="form-label">White Ball Max (1-69):</label>
-                    <input type="number" name="white_ball_max" id="white_ball_max" min="1" max="69" value="69" class="form-input">
+                    <input type="number" name="white_ball_max" id="white_ball_max" min="1" max="69" value="{{ request.form.get('white_ball_max', '69') }}" class="form-input">
                 </div>
                 <div class="form-group">
                     <label for="powerball_min" class="form-label">Powerball Min (1-26):</label>
-                    <input type="number" name="powerball_min" id="powerball_min" min="1" max="26" value="1" class="form-input">
+                    <input type="number" name="powerball_min" id="powerball_min" min="1" max="26" value="{{ request.form.get('powerball_min', '1') }}" class="form-input">
                 </div>
                 <div class="form-group">
                     <label for="powerball_max" class="form-label">Powerball Max (1-26):</label>
-                    <input type="number" name="powerball_max" id="powerball_max" min="1" max="26" value="26" class="form-input">
+                    <input type="number" name="powerball_max" id="powerball_max" min="1" max="26" value="{{ request.form.get('powerball_max', '26') }}" class="form-input">
                 </div>
                 <button type="submit" class="btn-primary w-full">Generate Random</button>
             </form>
@@ -262,6 +279,9 @@
         margin-left: 8px;
     }
 
+   <style>
+    /* ... existing styles ... */
+
     /* Styles for the balls in "Your Generated Lucky Numbers!" section */
     .generated-ball {
         display: inline-flex;
@@ -278,7 +298,6 @@
         font-size: 3rem; /* Adjusted for better fit */
         flex-shrink: 0;
     }
-
     .generated-powerball-ball {
         /* These properties are crucial for making it round */
         width: 80px; /* Ensure width matches .generated-ball */
@@ -298,6 +317,49 @@
         flex-shrink: 0;
         box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Consistent shadow */
     }
+
+    /* NEW: Smaller styles for multiple generated picks */
+    .generated-ball-small {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        width: 38px; /* Slightly smaller */
+        height: 38px; /* Slightly smaller */
+        background-color: #e0e7ff; /* Light blue */
+        color: #374151; /* Dark gray text */
+        border-radius: 50%;
+        font-weight: 600;
+        font-size: 1rem; /* text-base */
+        margin: 0 3px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        flex-shrink: 0;
+    }
+
+    .generated-powerball-label-small {
+        color: #ef4444; /* Red color for Powerball label */
+        font-weight: bold;
+        margin-left: 6px;
+        font-size: 1rem;
+    }
+
+    .generated-powerball-ball-small {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background-color: #fca5a5; /* Light red */
+        color: #374151;
+        font-weight: 600;
+        font-size: 1rem;
+        margin: 0 3px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        flex-shrink: 0;
+    }
+
+    /* ... rest of your styles ... */
+</style>
 
     /* Animation for generated numbers */
     @keyframes pop-in {
@@ -364,21 +426,18 @@
             sumRangeFilterSelect.value = selectedSumRange;
         }
 
-        const sumRangeFilterGroupASelect = document.getElementById('sum_range_filter_group_a');
-        if (sumRangeFilterGroupASelect) {
-            sumRangeFilterGroupASelect.value = selectedSumRange;
-        }
-
-        const sumRangeFilterPairSelect = document.getElementById('sum_range_filter_pair');
-        if (sumRangeFilterPairSelect) {
-            sumRangeFilterPairSelect.value = selectedSumRange;
-        }
-
-        // Also preserve the odd/even choice for the main generator, if it was submitted
+        // Preserve the odd/even choice for the main generator, if it was submitted
         const oddEvenChoiceSelect = document.getElementById('odd_even_choice');
-        const selectedOddEvenChoice = "{{ request.form.get('odd_even_choice', 'Any') }}";
+        const selectedOddEvenChoice = "{{ selected_odd_even_choice if selected_odd_even_choice is not none else 'Any' }}"; // Use selected_odd_even_choice directly
         if (oddEvenChoiceSelect) {
             oddEvenChoiceSelect.value = selectedOddEvenChoice;
+        }
+
+        // Preserve number of sets to generate input
+        const numSetsToGenerateInput = document.getElementById('num_sets_to_generate');
+        const selectedNumSetsToGenerate = "{{ num_sets_to_generate if num_sets_to_generate is not none else '1' }}";
+        if (numSetsToGenerateInput) {
+            numSetsToGenerateInput.value = selectedNumSetsToGenerate;
         }
 
         // Preserve high/low balance input
@@ -395,39 +454,6 @@
             excludedNumbersInput.value = selectedExcludedNumbers;
         }
 
-        // Preserve excluded numbers for Group A
-        const excludedNumbersGroupAInput = document.getElementById('excluded_numbers_group_a');
-        const selectedExcludedNumbersGroupA = "{{ request.form.get('excluded_numbers', '') }}";
-        if (excludedNumbersGroupAInput) {
-            excludedNumbersGroupAInput.value = selectedExcludedNumbersGroupA;
-        }
-
-        // Preserve min/max white ball inputs
-        const whiteBallMinInput = document.getElementById('white_ball_min');
-        const selectedWhiteBallMin = "{{ request.form.get('white_ball_min', '1') }}";
-        if (whiteBallMinInput) {
-            whiteBallMinInput.value = selectedWhiteBallMin;
-        }
-
-        const whiteBallMaxInput = document.getElementById('white_ball_max');
-        const selectedWhiteBallMax = "{{ request.form.get('white_ball_max', '69') }}";
-        if (whiteBallMaxInput) {
-            whiteBallMaxInput.value = selectedWhiteBallMax;
-        }
-
-        // Preserve min/max powerball inputs
-        const powerballMinInput = document.getElementById('powerball_min');
-        const selectedPowerballMin = "{{ request.form.get('powerball_min', '1') }}";
-        if (powerballMinInput) {
-            powerballMinInput.value = selectedPowerballMin;
-        }
-
-        const powerballMaxInput = document.getElementById('powerball_max');
-        const selectedPowerballMax = "{{ request.form.get('powerball_max', '26') }}";
-        if (powerballMaxInput) {
-            powerballMaxInput.value = selectedPowerballMax;
-        }
-
         // Preserve num from group A input
         const numFromGroupAInput = document.getElementById('num_from_group_a');
         const selectedNumFromGroupA = "{{ request.form.get('num_from_group_a', '2') }}";
@@ -441,6 +467,90 @@
         if (userPairInput) {
             userPairInput.value = selectedUserPair;
         }
+
+        // Preserve sum range for Group A strategy
+        const sumRangeFilterGroupASelect = document.getElementById('sum_range_filter_group_a');
+        const selectedSumRangeGroupA = "{{ selected_sum_range_group_a if selected_sum_range_group_a is not none else 'Any' }}";
+        if (sumRangeFilterGroupASelect) {
+            sumRangeFilterGroupASelect.value = selectedSumRangeGroupA;
+        }
+
+        // Preserve sum range for User Pair strategy
+        const sumRangeFilterPairSelect = document.getElementById('sum_range_filter_pair');
+        const selectedSumRangePair = "{{ selected_sum_range_pair if selected_sum_range_pair is not none else 'Any' }}";
+        if (sumRangeFilterPairSelect) {
+            sumRangeFilterPairSelect.value = selectedSumRangePair;
+        }
+
+        // Preserve min/max white ball inputs (for random generator)
+        const whiteBallMinInput = document.getElementById('white_ball_min');
+        const selectedWhiteBallMin = "{{ request.form.get('white_ball_min', '1') }}";
+        if (whiteBallMinInput) {
+            whiteBallMinInput.value = selectedWhiteBallMin;
+        }
+
+        const whiteBallMaxInput = document.getElementById('white_ball_max');
+        const selectedWhiteBallMax = "{{ request.form.get('white_ball_max', '69') }}";
+        if (whiteBallMaxInput) {
+            whiteBallMaxInput.value = selectedWhiteBallMax;
+        }
+
+        // Preserve min/max powerball inputs (for random generator)
+        const powerballMinInput = document.getElementById('powerball_min');
+        const selectedPowerballMin = "{{ request.form.get('powerball_min', '1') }}";
+        if (powerballMinInput) {
+            powerballMinInput.value = selectedPowerballMin;
+        }
+
+        const powerballMaxInput = document.getElementById('powerball_max');
+        const selectedPowerballMax = "{{ request.form.get('powerball_max', '26') }}";
+        if (powerballMaxInput) {
+            powerballMaxInput.value = selectedPowerballMax;
+        }
     });
+
+    async function updateData() {
+        const updateButton = document.querySelector('.btn-primary');
+        updateButton.textContent = 'Updating...';
+        updateButton.disabled = true;
+
+        try {
+            const response = await fetch('/update_powerball_data');
+            const result = await response.text(); // Get text response
+            
+            // Display flash message based on response
+            const flashContainer = document.querySelector('.flash-messages');
+            if (flashContainer) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'p-4 rounded-lg shadow-md text-sm animate-fade-in';
+                
+                if (response.ok) {
+                    messageDiv.classList.add('bg-green-100', 'text-green-700', 'border', 'border-green-200');
+                    messageDiv.innerHTML = `<p class="font-medium">${result}</p>`;
+                } else {
+                    messageDiv.classList.add('bg-red-100', 'text-red-700', 'border', 'border-red-200');
+                    messageDiv.innerHTML = `<p class="font-medium">Error: ${result}</p>`;
+                }
+                flashContainer.prepend(messageDiv); // Add to top
+            }
+
+            // Reload the page after a short delay to see updated data
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+
+        } catch (error) {
+            console.error('Error updating data:', error);
+            const flashContainer = document.querySelector('.flash-messages');
+            if (flashContainer) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'p-4 rounded-lg shadow-md text-sm bg-red-100 text-red-700 border border-red-200 animate-fade-in';
+                messageDiv.innerHTML = `<p class="font-medium">Failed to update data: ${error.message}</p>`;
+                flashContainer.prepend(messageDiv);
+            }
+            updateButton.textContent = 'Update Latest Draw (Simulated)';
+            updateButton.disabled = false;
+        }
+    }
 </script>
 {% endblock %}
