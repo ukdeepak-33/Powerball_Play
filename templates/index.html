@@ -37,9 +37,16 @@
         {% else %}
         <p class="text-gray-500">No historical draw data available.</p>
         {% endif %}
+
+        <div class="mt-4 flex flex-col sm:flex-row gap-3">
+            <button onclick="updateData()" class="btn-primary flex-1">Update Latest Draw (Simulated)</button>
+            <a href="{{ url_for('generated_numbers_history_route') }}" class="btn-secondary flex-1 text-center">View Generated Picks History</a>
+            <a href="{{ url_for('my_jackpot_pick_route') }}" class="btn-secondary flex-1 text-center">My Jackpot Pick</a>
+            <a href="{{ url_for('ai_assistant_route') }}" class="btn-secondary flex-1 text-center">AI Assistant</a>
+        </div>
     </div>
 
-   {# Display Generated Numbers Section (Modified for multiple sets) #}
+    {# Display Generated Numbers Section (Modified for multiple sets) #}
     {% if generated_sets %}
     <div class="bg-gradient-to-br from-blue-500 to-indigo-600 p-8 rounded-2xl shadow-xl transform transition-all duration-300 hover:scale-105"> {# New vibrant styling for generated numbers #}
         <h2 class="text-3xl sm:text-4xl font-extrabold text-white mb-6 text-center animate-pulse">Your Generated Lucky Numbers!</h2>
@@ -78,22 +85,9 @@
     </div>
     {% endif %}
 
-        <div class="mt-8 flex justify-center">
-            <form action="{{ url_for('save_generated_pick_route') }}" method="post">
-                <input type="hidden" name="generated_white_balls" value="{{ white_balls | join(',') }}">
-                <input type="hidden" name="generated_powerball" value="{{ powerball }}">
-                <button type="submit" class="btn-secondary flex items-center px-8 py-4 text-xl rounded-full transition duration-300 ease-in-out hover:scale-105"> {# Larger, more prominent save button #}
-                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 0 00-2 2v10a2 2 0 002 2h10a2 0 002-2v-3m-1-4l-3 3m0 0l-3-3m3 3V4"></path></svg>
-                    Save This Pick!
-                </button>
-            </form>
-        </div>
-    </div>
-    
-
-     {# Generate Random Numbers Card #}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-       div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        {# Generate Random Numbers Card #}
+        <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
             <h2 class="text-xl font-bold mb-4 text-gray-800">Generate Random Numbers</h2>
             <form action="{{ url_for('generate') }}" method="post" class="space-y-4">
                 <div class="form-group">
@@ -156,19 +150,19 @@
             <form action="{{ url_for('generate_group_a_strategy_route') }}" method="post" class="space-y-4">
                 <div class="form-group">
                     <label for="num_from_group_a" class="form-label">Numbers from Group A (min 2):</label>
-                    <input type="number" name="num_from_group_a" id="num_from_group_a" min="2" max="5" value="2" class="form-input">
+                    <input type="number" name="num_from_group_a" id="num_from_group_a" min="2" max="5" value="{{ request.form.get('num_from_group_a', '2') }}" class="form-input">
                 </div>
                 <div class="form-group">
                     <label for="sum_range_filter_group_a" class="form-label">Sum Range Filter:</label>
                     <select name="sum_range_filter_group_a" id="sum_range_filter_group_a" class="form-input">
                         {% for label, _ in sum_ranges.items() %}
-                            <option value="{{ label }}" {% if selected_sum_range == label %}selected{% endif %}>{{ label }}</option>
+                            <option value="{{ label }}" {% if selected_sum_range_group_a == label %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="excluded_numbers_group_a" class="form-label">Exclude Numbers (comma-separated):</label>
-                    <input type="text" name="excluded_numbers" id="excluded_numbers_group_a" class="form-input" placeholder="e.g., 1, 7, 42">
+                    <input type="text" name="excluded_numbers" id="excluded_numbers_group_a" class="form-input" placeholder="e.g., 1, 7, 42" value="{{ request.form.get('excluded_numbers', '') }}">
                 </div>
                 <button type="submit" class="btn-primary w-full">Generate from Group A</button>
             </form>
@@ -181,13 +175,13 @@
             <form action="{{ url_for('generate_with_user_pair_route') }}" method="post" class="space-y-4">
                 <div class="form-group">
                     <label for="user_pair" class="form-label">Enter Two White Balls (comma-separated, e.g., 18, 19):</label>
-                    <input type="text" name="user_pair" id="user_pair" class="form-input" placeholder="e.g., 18, 19">
+                    <input type="text" name="user_pair" id="user_pair" class="form-input" placeholder="e.g., 18, 19" value="{{ request.form.get('user_pair', '') }}">
                 </div>
                 <div class="form-group">
                     <label for="sum_range_filter_pair" class="form-label">Sum Range Filter:</label>
                     <select name="sum_range_filter_pair" id="sum_range_filter_pair" class="form-input">
                         {% for label, _ in sum_ranges.items() %}
-                            <option value="{{ label }}" {% if selected_sum_range == label %}selected{% endif %}>{{ label }}</option>
+                            <option value="{{ label }}" {% if selected_sum_range_pair == label %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -232,6 +226,29 @@
             </div>
             <button type="submit" class="btn-primary w-full">Save Official Draw</button>
         </form>
+    </div>
+
+    {# Navigation to Analysis Pages #}
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Explore Powerball Analysis</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <a href="{{ url_for('frequency_analysis_route') }}" class="btn-secondary text-center">Frequency Analysis</a>
+            <a href="{{ url_for('hot_cold_numbers_route') }}" class="btn-secondary text-center">Hot & Cold Numbers</a>
+            <a href="{{ url_for('monthly_white_ball_analysis_route') }}" class="btn-secondary text-center">Monthly Trends</a>
+            <a href="{{ url_for('sum_of_main_balls_route') }}" class="btn-secondary text-center">Sum of Main Balls</a>
+            <a href="{{ url_for('find_results_by_sum_route') }}" class="btn-secondary text-center">Search by Sum</a>
+            <a href="{{ url_for('simulate_multiple_draws_route') }}" class="btn-secondary text-center">Simulate Draws</a>
+            <a href="{{ url_for('number_age_distribution_route') }}" class="btn-secondary text-center">Number Age Distribution</a>
+            <a href="{{ url_for('co_occurrence_analysis_route') }}" class="btn-secondary text-center">Co-occurrence Analysis</a>
+            <a href="{{ url_for('powerball_position_frequency_route') }}" class="btn-secondary text-center">Powerball Position Frequency</a>
+            <a href="{{ url_for('powerball_frequency_by_year_route') }}" class="btn-secondary text-center">Powerball Frequency by Year</a>
+            <a href="{{ url_for('odd_even_trends_route') }}" class="btn-secondary text-center">Odd/Even Trends</a>
+            <a href="{{ url_for('consecutive_trends_route') }}" class="btn-secondary text-center">Consecutive Numbers Trends</a>
+            <a href="{{ url_for('triplets_analysis_route') }}" class="btn-secondary text-center">Triplets Analysis</a>
+            <a href="{{ url_for('grouped_patterns_analysis_route') }}" class="btn-secondary text-center">Grouped Patterns</a>
+            <a href="{{ url_for('find_results_by_first_white_ball') }}" class="btn-secondary text-center">Search by First White Ball</a>
+            <a href="{{ url_for('strict_positional_search_route') }}" class="btn-secondary text-center">Strict Positional Search</a>
+        </div>
     </div>
 </div>
 
@@ -279,9 +296,6 @@
         margin-left: 8px;
     }
 
-   <style>
-    /* ... existing styles ... */
-
     /* Styles for the balls in "Your Generated Lucky Numbers!" section */
     .generated-ball {
         display: inline-flex;
@@ -298,6 +312,7 @@
         font-size: 3rem; /* Adjusted for better fit */
         flex-shrink: 0;
     }
+
     .generated-powerball-ball {
         /* These properties are crucial for making it round */
         width: 80px; /* Ensure width matches .generated-ball */
@@ -358,9 +373,6 @@
         flex-shrink: 0;
     }
 
-    /* ... rest of your styles ... */
-</style>
-
     /* Animation for generated numbers */
     @keyframes pop-in {
         0% {
@@ -412,100 +424,86 @@
     // Set today's date as default for the draw_date input
     document.addEventListener('DOMContentLoaded', function() {
         const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
-        const dd = String(today.getDate()).padStart(2, '0');
-        document.getElementById('draw_date').value = `${yyyy}-${mm}-${dd}`;
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+        const day = String(today.getDate()).padStart(2, '0');
+        document.getElementById('draw_date').value = `${year}-${month}-${day}`;
 
         // Preserve selected sum range filter after generation (if a generation occurred)
         // Check for 'selected_sum_range' which is passed from the Flask route after a generation attempt.
-        const selectedSumRange = "{{ selected_sum_range if selected_sum_range is not none else 'Any' }}";
-
         const sumRangeFilterSelect = document.getElementById('sum_range_filter');
         if (sumRangeFilterSelect) {
-            sumRangeFilterSelect.value = selectedSumRange;
+            sumRangeFilterSelect.value = "{{ selected_sum_range if selected_sum_range is not none else 'Any' }}";
         }
 
         // Preserve the odd/even choice for the main generator, if it was submitted
         const oddEvenChoiceSelect = document.getElementById('odd_even_choice');
-        const selectedOddEvenChoice = "{{ selected_odd_even_choice if selected_odd_even_choice is not none else 'Any' }}"; // Use selected_odd_even_choice directly
         if (oddEvenChoiceSelect) {
-            oddEvenChoiceSelect.value = selectedOddEvenChoice;
+            oddEvenChoiceSelect.value = "{{ selected_odd_even_choice if selected_odd_even_choice is not none else 'Any' }}";
         }
 
         // Preserve number of sets to generate input
         const numSetsToGenerateInput = document.getElementById('num_sets_to_generate');
-        const selectedNumSetsToGenerate = "{{ num_sets_to_generate if num_sets_to_generate is not none else '1' }}";
         if (numSetsToGenerateInput) {
-            numSetsToGenerateInput.value = selectedNumSetsToGenerate;
+            numSetsToGenerateInput.value = "{{ num_sets_to_generate if num_sets_to_generate is not none else '1' }}";
         }
 
         // Preserve high/low balance input
         const highLowBalanceInput = document.getElementById('high_low_balance');
-        const selectedHighLowBalance = "{{ request.form.get('high_low_balance', '') }}";
         if (highLowBalanceInput) {
-            highLowBalanceInput.value = selectedHighLowBalance;
+            highLowBalanceInput.value = "{{ request.form.get('high_low_balance', '') }}";
         }
         
         // Preserve excluded numbers input
         const excludedNumbersInput = document.getElementById('excluded_numbers');
-        const selectedExcludedNumbers = "{{ request.form.get('excluded_numbers', '') }}";
         if (excludedNumbersInput) {
-            excludedNumbersInput.value = selectedExcludedNumbers;
+            excludedNumbersInput.value = "{{ request.form.get('excluded_numbers', '') }}";
         }
 
         // Preserve num from group A input
         const numFromGroupAInput = document.getElementById('num_from_group_a');
-        const selectedNumFromGroupA = "{{ request.form.get('num_from_group_a', '2') }}";
         if (numFromGroupAInput) {
-            numFromGroupAInput.value = selectedNumFromGroupA;
+            numFromGroupAInput.value = "{{ request.form.get('num_from_group_a', '2') }}";
         }
 
         // Preserve user pair input
         const userPairInput = document.getElementById('user_pair');
-        const selectedUserPair = "{{ request.form.get('user_pair', '') }}";
         if (userPairInput) {
-            userPairInput.value = selectedUserPair;
+            userPairInput.value = "{{ request.form.get('user_pair', '') }}";
         }
 
         // Preserve sum range for Group A strategy
         const sumRangeFilterGroupASelect = document.getElementById('sum_range_filter_group_a');
-        const selectedSumRangeGroupA = "{{ selected_sum_range_group_a if selected_sum_range_group_a is not none else 'Any' }}";
         if (sumRangeFilterGroupASelect) {
-            sumRangeFilterGroupASelect.value = selectedSumRangeGroupA;
+            sumRangeFilterGroupASelect.value = "{{ selected_sum_range_group_a if selected_sum_range_group_a is not none else 'Any' }}";
         }
 
         // Preserve sum range for User Pair strategy
         const sumRangeFilterPairSelect = document.getElementById('sum_range_filter_pair');
-        const selectedSumRangePair = "{{ selected_sum_range_pair if selected_sum_range_pair is not none else 'Any' }}";
         if (sumRangeFilterPairSelect) {
-            sumRangeFilterPairSelect.value = selectedSumRangePair;
+            sumRangeFilterPairSelect.value = "{{ selected_sum_range_pair if selected_sum_range_pair is not none else 'Any' }}";
         }
 
         // Preserve min/max white ball inputs (for random generator)
         const whiteBallMinInput = document.getElementById('white_ball_min');
-        const selectedWhiteBallMin = "{{ request.form.get('white_ball_min', '1') }}";
         if (whiteBallMinInput) {
-            whiteBallMinInput.value = selectedWhiteBallMin;
+            whiteBallMinInput.value = "{{ request.form.get('white_ball_min', '1') }}";
         }
 
         const whiteBallMaxInput = document.getElementById('white_ball_max');
-        const selectedWhiteBallMax = "{{ request.form.get('white_ball_max', '69') }}";
         if (whiteBallMaxInput) {
-            whiteBallMaxInput.value = selectedWhiteBallMax;
+            whiteBallMaxInput.value = "{{ request.form.get('white_ball_max', '69') }}";
         }
 
         // Preserve min/max powerball inputs (for random generator)
         const powerballMinInput = document.getElementById('powerball_min');
-        const selectedPowerballMin = "{{ request.form.get('powerball_min', '1') }}";
         if (powerballMinInput) {
-            powerballMinInput.value = selectedPowerballMin;
+            powerballMinInput.value = "{{ request.form.get('powerball_min', '1') }}";
         }
 
         const powerballMaxInput = document.getElementById('powerball_max');
-        const selectedPowerballMax = "{{ request.form.get('powerball_max', '26') }}";
         if (powerballMaxInput) {
-            powerballMaxInput.value = selectedPowerballMax;
+            powerballMaxInput.value = "{{ request.form.get('powerball_max', '26') }}";
         }
     });
 
