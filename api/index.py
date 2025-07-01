@@ -944,35 +944,39 @@ def get_most_frequent_triplets(df_source): # Removed top_n parameter
 def get_odd_even_split_trends(df_source, last_draw_date_str):
     print("[DEBUG-OddEvenTrends] Inside get_odd_even_split_trends function.")
     if df_source.empty or last_draw_date_str == 'N/A':
-        print("[DEBUG-OddEvenTrends] df_source is empty or last_draw_date_str is N/A. Returning empty dictionary.")
-        return {} # Ensure it always returns a dictionary, even if empty
+        print("[DEBUG-OddEvenTrends] df_source is empty or last_draw_date_str is N/A. Returning empty list.")
+        return []
 
     try:
         last_draw_date = pd.to_datetime(last_draw_date_str)
         print(f"[DEBUG-OddEvenTrends] last_draw_date: {last_draw_date}")
     except Exception as e:
-        print(f"[ERROR-OddEvenTrends] Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty dictionary.")
-        return {} # Ensure it always returns a dictionary, even if empty
+        print(f"[ERROR-OddEvenTrends] Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty list.")
+        return {}
 
     six_months_ago = last_draw_date - pd.DateOffset(months=6)
     print(f"[DEBUG-OddEvenTrends] six_months_ago: {six_months_ago}")
 
     if 'Draw Date_dt' not in df_source.columns or not pd.api.types.is_datetime64_any_dtype(df_source['Draw Date_dt']):
-        print("[ERROR-OddEvenTrends] 'Draw Date_dt' column missing or not datetime type in df_source. Returning empty dictionary.")
-        return {} # Ensure it always returns a dictionary, even if empty
+        print("[ERROR-OddEvenTrends] 'Draw Date_dt' column missing or not datetime type in df_source. Returning empty list.")
+        return []
 
     recent_data = df_source[df_source['Draw Date_dt'] >= six_months_ago].copy()
     recent_data = recent_data.sort_values(by='Draw Date_dt', ascending=False)
     if recent_data.empty:
-        print("[DEBUG-OddEvenTrends] recent_data is empty after filtering. Returning empty dictionary.")
-        return {} # Ensure it always returns a dictionary, even if empty
+        print("[DEBUG-OddEvenTrends] recent_data is empty after filtering. Returning empty list.")
+        return []
 
-    # Use a defaultdict to aggregate splits by category for the last 6 months
-    overall_odd_even_counts = defaultdict(int)
-
+    trend_data = []
     for idx, row in recent_data.iterrows():
         white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])]
         
+        # Calculate WB_Sum
+        wb_sum = sum(white_balls)
+
+        # Identify group_a numbers present in the draw - now using the global group_a directly
+        group_a_numbers_present = sorted([num for num in white_balls if num in group_a])
+
         even_count = sum(1 for num in white_balls if num % 2 == 0)
         odd_count = 5 - even_count
 
@@ -991,12 +995,15 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
         elif odd_count == 2 and even_count == 3:
             split_category = "2 Odd / 3 Even"
         
-        overall_odd_even_counts[split_category] += 1
+        trend_data.append({
+            'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
+            'split_category': split_category,
+            'wb_sum': wb_sum,
+            'group_a_numbers': group_a_numbers_present
+        })
     
-    # Convert defaultdict to a regular dictionary for return
-    print(f"[DEBUG-OddEvenTrends] Generated overall odd/even split counts. Returning aggregated dictionary.")
-    return dict(overall_odd_even_counts) # Explicitly return a dictionary of counts
-
+    print(f"[DEBUG-OddEvenTrends] Generated {len(trend_data)} trend data points with WB_Sum and Group A numbers.")
+    return trend_data
 
 def get_powerball_frequency_by_year(df_source, num_years=5):
     """
@@ -1244,6 +1251,786 @@ def save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb):
         print(f"Failed to insert manual draw. Status: {insert_response.status_code}, Response: {insert_response.text}")
         return False, f"Error saving official draw: {insert_response.status_code} - {insert_response.text}"
 
+def save_generated_numbers_to_db(numbers, powerball):
+    """
+    Saves a generated Powerball combination to the 'generated_powerball_numbers' table.
+    Ensures the combination is unique before saving.
+    """
+    url = f"{SUPABASE_PROJECT_URL}/rest/v1/{GENERATED_NUMBERS_TABLE_NAME}"
+    headers = _get_supabase_headers(is_service_key=True)
+
+    sorted_numbers = sorted(numbers)
+
+    check_params = {
+        'select': 'id',
+        'number_1': f'eq.{sorted_numbers[0]}',
+        'number_2': f'eq.{sorted_numbers[1]}',
+        'number_3': f'eq.{sorted_numbers[2]}',
+        'number_4': f'eq.{sorted_numbers[3]}',
+        'number_5': f'eq.{sorted_numbers[4]}',
+        'powerball': f'eq.{powerball}'
+    }
+    check_response = requests.get(url, headers=headers, params=check_params)
+    check_response.raise_for_status()
+    existing_combinations = check_response.json()
+
+    if existing_combinations:
+        print(f"Combination {sorted_numbers} + {powerball} already exists in {GENERATED_NUMBERS_TABLE_NAME}.")
+        return False, f"This exact combination ({', '.join(map(str, sorted_numbers))} + {powerball}) has already been saved."
+
+    new_generated_data = {
+        'number_1': sorted_numbers[0],
+        'number_2': sorted_numbers[1],
+        'number_3': sorted_numbers[2],
+        'number_4': sorted_numbers[3],
+        'number_5': sorted_numbers[4],
+        'powerball': powerball,
+        'generated_date': datetime.now().isoformat()
+    }
+
+    insert_response = requests.post(url, headers=headers, data=json.dumps(new_generated_data))
+    insert_response.raise_for_status()
+
+    if insert_response.status_code == 201:
+        print(f"Successfully inserted generated numbers: {new_generated_data}")
+        return True, "Generated numbers saved successfully!"
+    else:
+        print(f"Failed to insert generated numbers. Status: {insert_response.status_code}, Response: {insert_response.text}")
+        return False, f"Error saving generated numbers: {insert_response.status_code} - {insert_response.text}"
+
+def get_generated_numbers_history():
+    """
+    Fetches all generated Powerball numbers and groups them by date, sorted by date descending.
+    """
+    all_data = []
+    offset = 0
+    limit = 1000
+
+    try:
+        url = f"{SUPABASE_PROJECT_URL}/rest/v1/{GENERATED_NUMBERS_TABLE_NAME}"
+        headers = _get_supabase_headers(is_service_key=False)
+        
+        while True:
+            params = {
+                'select': 'generated_date,number_1,number_2,number_3,number_4,number_5,powerball',
+                'order': 'generated_date.desc',
+                'offset': offset,
+                'limit': limit
+            }
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            
+            chunk = response.json()
+            if not chunk:
+                break
+            all_data.extend(chunk)
+            offset += limit
+
+        if not all_data:
+            print("No generated numbers fetched from Supabase.")
+            return {}
+
+        grouped_data = defaultdict(list)
+        for record in all_data:
+            gen_dt = datetime.fromisoformat(record['generated_date'].replace('Z', '+00:00'))
+            date_key = gen_dt.strftime('%Y-%m-%d')
+            
+            formatted_time = gen_dt.strftime('%I:%M %p')
+
+            generated_balls = sorted([
+                int(record['number_1']), int(record['number_2']), int(record['number_3']),
+                int(record['number_4']), int(record['number_5'])
+            ])
+            
+            grouped_data[date_key].append({
+                'time': formatted_time,
+                'white_balls': generated_balls,
+                'powerball': int(record['powerball'])
+            })
+        
+        sorted_grouped_data = dict(sorted(grouped_data.items(), key=lambda item: item[0], reverse=True))
+
+        return sorted_grouped_data
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error during Supabase data fetch request for generated numbers: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"Supabase response content: {e.response.text}")
+        return {}
+    except json.JSONDecodeError as e:
+        print(f"Error decoding JSON response for generated numbers from Supabase: {e}")
+        if 'response' in locals() and response is not None:
+            print(f"Response content that failed JSON decode: {response.text}")
+        return {}
+    except Exception as e:
+        print(f"An unexpected error occurred in get_generated_numbers_history: {e}")
+        import traceback
+        traceback.print_exc()
+        return {}
+
+
+def check_generated_against_history(generated_white_balls, generated_powerball, df_historical):
+    """
+    Checks a generated Powerball number against historical official draws from the last two years
+    and returns match counts and details.
+    """
+    # Initialize the results dictionary correctly
+    results = {
+        "generated_balls": generated_white_balls,
+        "generated_powerball": generated_powerball,
+        "summary": {
+            "Match 5 White Balls + Powerball": {"count": 0, "draws": []},
+            "Match 5 White Balls Only": {"count": 0, "draws": []},
+            "Match 4 White Balls + Powerball": {"count": 0, "draws": []},
+            "Match 4 White Balls Only": {"count": 0, "draws": []},
+            "Match 3 White Balls + Powerball": {"count": 0, "draws": []},
+            "Match 3 White Balls Only": {"count": 0, "draws": []},
+            "Match 2 White Balls + Powerball": {"count": 0, "draws": []},
+            "Match 1 White Ball + Powerball": {"count": 0, "draws": []},
+            "Match Powerball Only": {"count": 0, "draws": []},
+            "No Match": {"count": 0, "draws": []}
+        }
+    }
+
+    if df_historical.empty:
+        return results
+
+    two_years_ago = datetime.now() - timedelta(days=2 * 365)
+    recent_historical_data = df_historical[df_historical['Draw Date_dt'] >= two_years_ago].copy()
+
+    if recent_historical_data.empty:
+        return results
+
+    gen_white_set = set(generated_white_balls)
+
+    for index, row in recent_historical_data.iterrows():
+        historical_white_balls = sorted([
+            int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+            int(row['Number 4']), int(row['Number 5'])
+        ])
+        historical_powerball = int(row['Powerball'])
+        historical_draw_date = row['Draw Date']
+
+        hist_white_set = set(historical_white_balls)
+
+        white_matches = len(gen_white_set.intersection(hist_white_set))
+
+        powerball_match = 1 if generated_powerball == historical_powerball else 0
+
+        category = "No Match"
+        if white_matches == 5 and powerball_match == 1:
+            category = "Match 5 White Balls + Powerball"
+        elif white_matches == 5 and powerball_match == 0:
+            category = "Match 5 White Balls Only"
+        elif white_matches == 4 and powerball_match == 1:
+            category = "Match 4 White Balls + Powerball"
+        elif white_matches == 4 and powerball_match == 0:
+            category = "Match 4 White Balls Only"
+        elif white_matches == 3 and powerball_match == 1:
+            category = "Match 3 White Balls + Powerball"
+        elif white_matches == 3 and powerball_match == 0:
+            category = "Match 3 White Balls Only"
+        elif white_matches == 2 and powerball_match == 1:
+            category = "Match 2 White Balls + Powerball"
+        elif white_matches == 1 and powerball_match == 1:
+            category = "Match 1 White Ball + Powerball"
+        elif white_matches == 0 and powerball_match == 1:
+            category = "Match Powerball Only"
+        
+        results["summary"][category]["count"] += 1 
+        results["summary"][category]["draws"].append({
+            "date": historical_draw_date,
+            "white_balls": historical_white_balls,
+            "powerball": historical_powerball
+        })
+    
+    for category in results["summary"]:
+        results["summary"][category]["draws"].sort(key=lambda x: x['date'], reverse=True)
+
+    return results
+
+
+def get_grouped_patterns_over_years(df_source):
+    if df_source.empty:
+        print("[DEBUG-GroupedPatterns] df_source is empty. Returning empty list.")
+        return []
+
+    df_source_copy = df_source.copy()
+    if 'Draw Date_dt' not in df_source_copy.columns:
+        df_source_copy['Draw Date_dt'] = pd.to_datetime(df_source_copy['Draw Date'], errors='coerce')
+    df_source_copy = df_source_copy.dropna(subset=['Draw Date_dt'])
+    
+    if df_source_copy.empty:
+        print("[DEBUG-GroupedPatterns] df_source_copy is empty after datetime conversion. Returning empty list.")
+        return []
+
+    # Ensure white ball columns are numeric
+    for i in range(1, 6):
+        col = f'Number {i}'
+        if col in df_source_copy.columns:
+            df_source_copy[col] = pd.to_numeric(df_source_copy[col], errors='coerce').fillna(0).astype(int)
+        else:
+            print(f"[WARN-GroupedPatterns] Column '{col}' not found in DataFrame for pattern analysis.")
+
+
+    all_patterns_data = []
+    
+    # Iterate through unique years
+    for year in sorted(df_source_copy['Draw Date_dt'].dt.year.unique()):
+        yearly_df = df_source_copy[df_source_copy['Draw Date_dt'].dt.year == year]
+        
+        # Store counts for pairs and triplets for the current year
+        year_pairs_counts = defaultdict(int)
+        year_triplets_counts = defaultdict(int)
+
+        for _, row in yearly_df.iterrows():
+            # Get white balls, ensuring they are integers and handling potential NaNs after conversion
+            white_balls = [int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])]
+            
+            for range_name, (min_val, max_val) in NUMBER_RANGES.items():
+                numbers_in_current_range = sorted([num for num in white_balls if min_val <= num <= max_val])
+                
+                if len(numbers_in_current_range) >= 2:
+                    for pair in combinations(numbers_in_current_range, 2):
+                        year_pairs_counts[(range_name, tuple(sorted(pair)))] += 1
+                
+                if len(numbers_in_current_range) >= 3:
+                    for triplet in combinations(numbers_in_current_range, 3):
+                        year_triplets_counts[(range_name, tuple(sorted(triplet)))] += 1
+        
+        # Add to main results list
+        for (range_name, pattern), count in year_pairs_counts.items():
+            all_patterns_data.append({
+                "year": int(year),
+                "range": range_name,
+                "type": "Pair",
+                "pattern": list(pattern),
+                "count": int(count)
+            })
+        
+        for (range_name, pattern), count in year_triplets_counts.items():
+            all_patterns_data.append({
+                "year": int(year),
+                "range": range_name,
+                "type": "Triplet",
+                "pattern": list(pattern),
+                "count": int(count)
+            })
+
+    # Sort by count descending, then by year, then by range, then by pattern
+    # Convert pattern lists to strings for consistent sorting as a secondary key if counts are equal
+    all_patterns_data.sort(key=lambda x: (x['count'], x['year'], x['range'], str(x['pattern'])), reverse=True)
+    
+    print(f"[DEBUG-GroupedPatterns] Generated {len(all_patterns_data)} grouped patterns data points.")
+    return all_patterns_data
+
+# MODIFIED FUNCTION: get_sum_trends_and_gaps_data
+def get_sum_trends_and_gaps_data(df_source):
+    """
+    Analyzes sums of white balls, identifies their last appearance dates,
+    finds missing sums, and groups sums into predefined ranges, with enhanced details.
+    """
+    if df_source.empty:
+        return {
+            'min_possible_sum': 15,
+            'max_possible_sum': 335,
+            'appeared_sums_details': [],
+            'missing_sums': [],
+            'grouped_sums_analysis': {}
+        }
+
+    df_copy = df_source.copy()
+    
+    # Ensure Draw Date is datetime and sum columns are numeric
+    df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
+    for i in range(1, 6):
+        col = f'Number {i}'
+        if col in df_copy.columns:
+            df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce').fillna(0).astype(int)
+
+    # Calculate sum for each row
+    df_copy['Sum'] = df_copy[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].sum(axis=1)
+
+    # 1. Find last appearance date for each unique sum
+    last_appearance_by_sum_df = df_copy.groupby('Sum')['Draw Date_dt'].max().reset_index()
+    last_appearance_by_sum_df['last_drawn_date'] = last_appearance_by_sum_df['Draw Date_dt'].dt.strftime('%Y-%m-%d')
+    last_drawn_dates_map = last_appearance_by_sum_df.set_index('Sum')['last_drawn_date'].to_dict()
+
+    # Get overall sum frequencies
+    sum_freq_series = df_copy['Sum'].value_counts()
+    sum_counts_map = sum_freq_series.to_dict()
+
+    appeared_sums_details = sorted([
+        {'sum': int(s), 'last_drawn_date': last_drawn_dates_map.get(s, 'N/A'), 'count': sum_counts_map.get(s, 0)}
+        for s in sum_freq_series.index
+    ], key=lambda x: x['sum'])
+
+    # 2. Determine min/max possible sums (theoretical)
+    min_possible_sum = 1 + 2 + 3 + 4 + 5 # Smallest possible sum for 5 distinct numbers from 1-69
+    max_possible_sum = 69 + 68 + 67 + 66 + 65 # Largest possible sum for 5 distinct numbers from 1-69
+
+    # 3. Identify missing sums (theoretical range vs. actual appeared)
+    all_possible_sums = set(range(min_possible_sum, max_possible_sum + 1))
+    actual_appeared_sums = set(df_copy['Sum'].unique())
+    missing_sums = sorted(list(all_possible_sums - actual_appeared_sums))
+
+    # 4. Grouped Sum Analysis Enhancement
+    grouped_sums_analysis = {}
+    # FIX: Iterate over items and explicitly check for None before unpacking
+    for range_name, range_tuple in SUM_RANGES.items():
+        if range_tuple is None: # Skip "Any" or any other None entry
+            continue
+        
+        range_min, range_max = range_tuple # Now safe to unpack
+        
+        # Identify all sums within this range (both appeared and missing)
+        sums_in_current_range = sorted(list(set(range(range_min, range_max + 1)).intersection(all_possible_sums)))
+
+        # Filter appeared sums for this range
+        appeared_in_range_details = [
+            {'sum': s_data['sum'], 'last_drawn_date': s_data['last_drawn_date'], 'count': s_data['count']}
+            for s_data in appeared_sums_details if range_min <= s_data['sum'] <= range_max
+        ]
+        
+        # Sort by count descending for most frequent, then by sum ascending for tie-breaking
+        most_frequent_sums = sorted(appeared_in_range_details, key=lambda x: (-x['count'], x['sum']))[:5]
+        
+        # Sort by count ascending for least frequent, then by sum ascending for tie-breaking
+        # Exclude sums with 0 count (already handled by missing_sums)
+        least_frequent_sums = sorted([s for s in appeared_in_range_details if s['count'] > 0], key=lambda x: (x['count'], x['sum']))[:5]
+
+        # Calculate average frequency for sums that *have* appeared in this range
+        total_freq_in_range = sum(s['count'] for s in appeared_in_range_details)
+        if appeared_in_range_details:
+            avg_freq_in_range = round(total_freq_in_range / len(appeared_in_range_details), 2)
+        else:
+            avg_freq_in_range = 0.0
+
+        # Find the latest draw date for any sum within this range
+        draw_dates_for_range = df_copy[(df_copy['Sum'] >= range_min) & (df_copy['Sum'] <= range_max)]['Draw Date_dt']
+        last_drawn_date_for_range = draw_dates_for_range.max().strftime('%Y-%m-%d') if not draw_dates_for_range.empty else 'N/A'
+
+        grouped_sums_analysis[range_name] = {
+            'total_possible_in_range': len(sums_in_current_range),
+            'appeared_in_range_count': len(appeared_in_range_details),
+            'missing_in_range_count': len([s for s in missing_sums if range_min <= s <= range_max]),
+            'last_drawn_date_for_range': last_drawn_date_for_range,
+            'average_frequency_in_range': avg_freq_in_range,
+            'most_frequent_sums_in_range': most_frequent_sums,
+            'least_frequent_sums_in_range': least_frequent_sums,
+            'all_appeared_sums_in_range': appeared_in_range_details # For comprehensive display
+        }
+    
+    return {
+        'min_possible_sum': min_possible_sum,
+        'max_possible_sum': max_possible_sum,
+        'appeared_sums_details': appeared_sums_details,
+        'missing_sums': missing_sums,
+        'grouped_sums_analysis': grouped_sums_analysis
+    }
+
+# NEW/MODIFIED FUNCTION: get_weekday_draw_trends
+def get_weekday_draw_trends(df_source, group_a_numbers_def=None): # Keep group_a_numbers_def as an optional parameter
+    """
+    Analyzes various drawing trends (Low/High, Odd/Even, Consecutive, Sum, Group A)
+    based on the day of the week (Monday, Wednesday, Saturday).
+    """
+    if df_source.empty:
+        return {}
+
+    df_copy = df_source.copy()
+    df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
+
+    if df_copy.empty:
+        return {}
+
+    df_copy['Weekday'] = df_copy['Draw Date_dt'].dt.day_name()
+
+    weekday_stats = defaultdict(lambda: {
+        'total_draws': 0,
+        'total_low_balls': 0,
+        'total_high_balls': 0,
+        'total_odd_balls': 0,
+        'total_even_balls': 0,
+        'total_sum': 0,
+        'total_group_a_balls': 0,
+        'consecutive_draws_count': 0,
+        'low_high_splits': defaultdict(int),
+        'odd_even_splits': defaultdict(int)
+    })
+
+    for _, row in df_copy.iterrows():
+        day_name = row['Weekday']
+        if day_name not in POWERBALL_DRAW_DAYS:
+            continue
+        
+        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6)]) # Ensure sorted for consecutive check
+        
+        # Low/High Counts
+        low_count = sum(1 for num in white_balls if LOW_NUMBER_MAX >= num >= 1)
+        high_count = sum(1 for num in white_balls if HIGH_NUMBER_MIN <= num <= GLOBAL_WHITE_BALL_RANGE[1])
+        
+        # Odd/Even Counts
+        odd_count = sum(1 for num in white_balls if num % 2 != 0)
+        even_count = sum(1 for num in white_balls if num % 2 == 0)
+
+        # Sum of Balls
+        current_sum = sum(white_balls)
+
+        # Use the provided group_a_numbers_def if it's not None, otherwise use the global group_a
+        group_a_to_use = group_a_numbers_def if group_a_numbers_def is not None else group_a
+        current_group_a_count = sum(1 for num in white_balls if num in group_a_to_use)
+
+        # Consecutive Numbers Presence
+        consecutive_present = False
+        for i in range(len(white_balls) - 1):
+            if white_balls[i] + 1 == white_balls[i+1]:
+                consecutive_present = True
+                break
+
+        # Aggregate data
+        weekday_stats[day_name]['total_draws'] += 1
+        weekday_stats[day_name]['total_low_balls'] += low_count
+        weekday_stats[day_name]['total_high_balls'] += high_count
+        weekday_stats[day_name]['total_odd_balls'] += odd_count
+        weekday_stats[day_name]['total_even_balls'] += even_count
+        weekday_stats[day_name]['total_sum'] += current_sum
+        weekday_stats[day_name]['total_group_a_balls'] += current_group_a_count
+        if consecutive_present:
+            weekday_stats[day_name]['consecutive_draws_count'] += 1
+        
+        # Low/High Splits frequency
+        low_high_split_key = f"{low_count} Low / {high_count} High"
+        weekday_stats[day_name]['low_high_splits'][low_high_split_key] += 1
+
+        # Odd/Even Splits frequency
+        odd_even_split_key = f"{odd_count} Odd / {even_count} Even"
+        weekday_stats[day_name]['odd_even_splits'][odd_even_split_key] += 1
+    
+    final_results = {}
+    for day in POWERBALL_DRAW_DAYS: # Ensure results are in defined order
+        if day in weekday_stats and weekday_stats[day]['total_draws'] > 0:
+            data = weekday_stats[day]
+            total_draws = data['total_draws']
+
+            final_results[day] = {
+                'total_draws': total_draws,
+                'avg_low_balls': round(data['total_low_balls'] / total_draws, 2),
+                'avg_high_balls': round(data['total_high_balls'] / total_draws, 2),
+                'avg_odd_balls': round(data['total_odd_balls'] / total_draws, 2),
+                'avg_even_balls': round(data['total_even_balls'] / total_draws, 2),
+                'avg_sum': round(data['total_sum'] / total_draws, 2),
+                'avg_group_a_balls': round(data['total_group_a_balls'] / total_draws, 2),
+                'consecutive_present_percentage': round((data['consecutive_draws_count'] / total_draws) * 100, 2),
+                'low_high_splits': sorted([{'split': k, 'count': v} for k, v in data['low_high_splits'].items()], key=lambda item: (-item['count'], item['split'])),
+                'odd_even_splits': sorted([{'split': k, 'count': v} for k, v in data['odd_even_splits'].items()], key=lambda item: (-item['count'], item['split']))
+            }
+        else:
+            final_results[day] = { # Ensure all days are present, even if no draws or data
+                'total_draws': 0, 'avg_low_balls': 0.0, 'avg_high_balls': 0.0,
+                'avg_odd_balls': 0.0, 'avg_even_balls': 0.0, 'avg_sum': 0.0,
+                'avg_group_a_balls': 0.0, 'consecutive_present_percentage': 0.0,
+                'low_high_splits': [], 'odd_even_splits': []
+            }
+            
+    return final_results
+
+
+# --- Data Initialization (Call after all helper functions are defined) ---
+def initialize_core_data():
+    global df, last_draw, historical_white_ball_sets
+    print("Attempting to load core historical data...")
+    try:
+        df_temp = load_historical_data_from_supabase()
+        if not df_temp.empty:
+            df = df_temp
+            last_draw = get_last_draw(df)
+            # Ensure last_draw has 'Numbers' formatted for display
+            if not last_draw.empty and 'Draw Date_dt' in last_draw and pd.notna(last_draw['Draw Date_dt']):
+                last_draw['Draw Date'] = last_draw['Draw Date_dt'].strftime('%Y-%m-%d')
+            else:
+                 last_draw['Draw Date'] = 'N/A' # Fallback for display if datetime conversion fails
+            
+            # Populate historical_white_ball_sets
+            historical_white_ball_sets.clear() # Clear existing set before repopulating
+            for _, row in df.iterrows():
+                white_balls_tuple = tuple(sorted([
+                    int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), 
+                    int(row['Number 4']), int(row['Number 5'])
+                ]))
+                historical_white_ball_sets.add(frozenset(white_balls_tuple))
+
+            print("Core historical data loaded successfully.")
+        else:
+            print("Core historical data is empty after loading. df remains empty.")
+            # Set default N/A for last_draw if no data is found
+            last_draw = pd.Series({
+                'Draw Date': 'N/A', 'Number 1': 'N/A', 'Number 2': 'N/A',
+                'Number 3': 'N/A', 'Number 4': 'N/A', 'Number 5': 'N/A', 'Powerball': 'N/A',
+                'Numbers': ['N/A', 'N/A', 'N/A', 'N/A', 'N/A']
+            }, dtype='object')
+    except Exception as e:
+        print(f"An error occurred during initial core data loading: {e}")
+        traceback.print_exc()
+
+initialize_core_data()
+
+
+# --- Analysis Cache Management ---
+def get_cached_analysis(key, compute_function, *args, **kwargs):
+    global analysis_cache, last_analysis_cache_update
+    
+    if key in analysis_cache and (datetime.now() - last_analysis_cache_update).total_seconds() < CACHE_EXPIRATION_SECONDS:
+        print(f"Serving '{key}' from cache.")
+        return analysis_cache[key]
+    
+    print(f"Computing and caching '{key}'.")
+    # Pass args and kwargs directly to the compute_function
+    computed_data = compute_function(*args, **kwargs)
+    
+    analysis_cache[key] = computed_data
+    last_analysis_cache_update = datetime.now()
+    return computed_data
+
+def invalidate_analysis_cache():
+    global analysis_cache, last_analysis_cache_update
+    analysis_cache = {}
+    last_analysis_cache_update = datetime.min
+    print("Analysis cache invalidated.")
+
+
+# --- Flask Routes (Ordered for Dependency - all UI-facing routes first, then API routes) ---
+
+# Core home page route
+@app.route('/')
+def index():
+    last_draw_dict = last_draw.to_dict()
+    # Pass SUM_RANGES and default selected values for the new dropdowns
+    return render_template('index.html', 
+                           last_draw=last_draw_dict, 
+                           sum_ranges=SUM_RANGES,
+                           selected_odd_even_choice="Any", # Default for initial load
+                           selected_sum_range="Any", # Default for initial load
+                           num_sets_to_generate=1 # Default for initial load
+                          )
+
+# Generation Routes (referenced directly in index.html forms)
+@app.route('/generate', methods=['POST'])
+def generate():
+    if df.empty:
+        flash("Cannot generate numbers: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
+
+    odd_even_choice = request.form.get('odd_even_choice', 'Any')
+    # combo_choice is not used in generate_powerball_numbers, but kept for consistency if needed later
+    combo_choice = request.form.get('combo_choice', 'No Combo') 
+    
+    white_ball_min = int(request.form.get('white_ball_min', 1))
+    white_ball_max = int(request.form.get('white_ball_max', 69))
+    white_ball_range_local = (white_ball_min, white_ball_max)
+    
+    powerball_min = int(request.form.get('powerball_min', 1))
+    powerball_max = int(request.form.get('powerball_max', 26))
+    powerball_range_local = (powerball_min, powerball_max)
+    
+    excluded_numbers_local = [int(num.strip()) for num in request.form.get('excluded_numbers', '').split(",") if num.strip().isdigit()] if request.form.get('excluded_numbers') else []
+    
+    high_low_balance_str = request.form.get('high_low_balance', '')
+    high_low_balance = None
+    if high_low_balance_str:
+        try:
+            parts = [int(num.strip()) for num in high_low_balance_str.split() if num.strip().isdigit()]
+            if len(parts) == 2:
+                high_low_balance = tuple(parts)
+            else:
+                flash("High/Low Balance input must be two numbers separated by space (e.g., '2 3').", 'error')
+        except ValueError:
+            flash("Invalid High/Low Balance format. Please enter numbers separated by space.", 'error')
+
+    # Get selected sum range
+    selected_sum_range_label = request.form.get('sum_range_filter', 'Any')
+    selected_sum_range_tuple = SUM_RANGES.get(selected_sum_range_label)
+
+    # Get number of sets to generate
+    num_sets_to_generate_str = request.form.get('num_sets_to_generate', '1')
+    try:
+        num_sets_to_generate = int(num_sets_to_generate_str)
+        if not (1 <= num_sets_to_generate <= 10):
+            flash("Number of sets to generate must be between 1 and 10.", 'error')
+            num_sets_to_generate = 1 # Reset to default
+    except ValueError:
+        flash("Invalid number of sets. Please enter an integer.", 'error')
+        num_sets_to_generate = 1 # Reset to default
+
+    generated_sets = []
+    last_draw_dates = {} # To store last draw dates for the *last* generated set
+
+    for i in range(num_sets_to_generate):
+        try:
+            white_balls, powerball = generate_powerball_numbers(
+                df, group_a, odd_even_choice, combo_choice, white_ball_range_local, powerball_range_local, 
+                excluded_numbers_local, high_low_balance, selected_sum_range_tuple, is_simulation=False
+            )
+            generated_sets.append({'white_balls': white_balls, 'powerball': powerball})
+            
+            # For simplicity, we'll show last draw dates for the *last* generated set
+            if i == num_sets_to_generate - 1:
+                last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
+
+        except ValueError as e:
+            flash(f"Error generating set {i+1}: {str(e)}", 'error')
+            # If an error occurs, stop generating further sets for this request
+            break 
+        except Exception as e:
+            flash(f"An unexpected error occurred during generation of set {i+1}: {e}", 'error')
+            break
+
+    return render_template('index.html', 
+                           generated_sets=generated_sets, # Pass the list of generated sets
+                           last_draw=last_draw.to_dict(), 
+                           last_draw_dates=last_draw_dates,
+                           generation_type='generated',
+                           sum_ranges=SUM_RANGES, 
+                           selected_sum_range=selected_sum_range_label, # Persist selection
+                           selected_odd_even_choice=odd_even_choice, # Persist selection
+                           num_sets_to_generate=num_sets_to_generate # Persist selection
+                          )
+
+
+@app.route('/generate_with_user_pair', methods=['POST'])
+def generate_with_user_pair_route():
+    if df.empty:
+        flash("Cannot generate with provided pair: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
+
+    user_pair_str = request.form.get('user_pair')
+    # --- New: Get selected sum range ---
+    selected_sum_range_label = request.form.get('sum_range_filter_pair', 'Any') # Unique name for this form's select
+    selected_sum_range_tuple = SUM_RANGES.get(selected_sum_range_label)
+    # --- End New ---
+
+    white_balls = []
+    powerball = None
+    last_draw_dates = {}
+
+    try:
+        if not user_pair_str:
+            raise ValueError("Please enter two numbers for the starting pair.")
+        
+        # Use a regex or more robust split if needed, but for 'X, Y' split(',') is fine
+        pair_parts = [int(num.strip()) for num in user_pair_str.split(',') if num.strip().isdigit()]
+        if len(pair_parts) != 2:
+            raise ValueError("Please enter exactly two numbers for the pair, separated by a comma (e.g., '18, 19').")
+        
+        num1, num2 = pair_parts
+
+        white_balls, powerball = generate_with_user_provided_pair(
+            num1, num2, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, 
+            excluded_numbers, df, selected_sum_range_tuple
+        )
+        last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
+
+        # For consistency, return a list of generated sets, even if it's just one
+        generated_sets = [{'white_balls': white_balls, 'powerball': powerball}]
+
+        return render_template('index.html', 
+                               generated_sets=generated_sets, # Pass the list of generated sets
+                               powerball=powerball, 
+                               last_draw=last_draw.to_dict(), 
+                               last_draw_dates=last_draw_dates,
+                               generation_type='user_pair',
+                               sum_ranges=SUM_RANGES, # Pass sum_ranges back
+                               selected_sum_range_pair=selected_sum_range_label) # Pass selected sum range back for persistence
+    except ValueError as e:
+        flash(str(e), 'error')
+        return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
+    except Exception as e:
+        flash(f"An unexpected error occurred during pair-based generation: {e}", 'error')
+        return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
+
+
+@app.route('/generate_group_a_strategy', methods=['POST'])
+def generate_group_a_strategy_route():
+    if df.empty:
+        flash("Cannot generate numbers with Group A strategy: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
+
+    num_from_group_a = int(request.form.get('num_from_group_a'))
+    white_ball_min = int(request.form.get('white_ball_min', 1))
+    white_ball_max = int(request.form.get('white_ball_max', 69))
+    white_ball_range_local = (white_ball_min, white_ball_max)
+    powerball_min = int(request.form.get('powerball_min', 1))
+    powerball_max = int(request.form.get('powerball_max', 26))
+    powerball_range_local = (powerball_min, powerball_max)
+    excluded_numbers_local = [int(num.strip()) for num in request.form.get('excluded_numbers', '').split(",") if num.strip().isdigit()] if request.form.get('excluded_numbers') else []
+    
+    # --- New: Get selected sum range ---
+    selected_sum_range_label = request.form.get('sum_range_filter_group_a', 'Any') # Unique name for this form's select
+    selected_sum_range_tuple = SUM_RANGES.get(selected_sum_range_label)
+    # --- End New ---
+
+    white_balls = []
+    powerball = None
+    last_draw_dates = {}
+
+    try:
+        white_balls, powerball = generate_from_group_a(
+            df, num_from_group_a, white_ball_range_local, powerball_range_local, 
+            excluded_numbers_local, selected_sum_range_tuple
+        )
+        # For consistency, return a list of generated sets, even if it's just one
+        generated_sets = [{'white_balls': white_balls, 'powerball': powerball}]
+
+        last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
+    except ValueError as e:
+        flash(str(e), 'error')
+        return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
+
+    return render_template('index.html', 
+                           generated_sets=generated_sets, # Pass the list of generated sets
+                           powerball=powerball, 
+                           last_draw=last_draw.to_dict(), 
+                           last_draw_dates=last_draw_dates,
+                           generation_type='group_a_strategy',
+                           sum_ranges=SUM_RANGES, # Pass sum_ranges back
+                           selected_sum_range_group_a=selected_sum_range_label) # Pass selected sum range back for persistence
+
+@app.route('/save_official_draw', methods=['POST'])
+def save_official_draw_route():
+    try:
+        draw_date = request.form.get('draw_date')
+        n1 = int(request.form.get('n1'))
+        n2 = int(request.form.get('n2'))
+        n3 = int(request.form.get('n3'))
+        n4 = int(request.form.get('n4'))
+        n5 = int(request.form.get('n5'))
+        pb = int(request.form.get('pb'))
+
+        if not (1 <= n1 <= 69 and 1 <= n2 <= 69 and 1 <= n3 <= 69 and 1 <= n4 <= 69 and 1 <= n5 <= 69 and 1 <= pb <= 26):
+            flash("White balls must be between 1-69 and Powerball between 1-26.", 'error')
+            return redirect(url_for('index'))
+        
+        submitted_white_balls = sorted([n1, n2, n3, n4, n5])
+        if len(set(submitted_white_balls)) != 5:
+            flash("White ball numbers must be unique within a single draw.", 'error')
+            return redirect(url_for('index'))
+
+        success, message = save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb)
+        if success:
+            flash(message, 'info')
+            initialize_core_data()
+            invalidate_analysis_cache()
+        else:
+            flash(message, 'error')
+    except ValueError:
+        flash("Invalid input. Please ensure all numbers and date are correctly entered.", 'error')
+    except Exception as e:
+        flash(f"An error occurred: {e}", 'error')
+    return redirect(url_for('index'))
+
+# This is the correct and only definition for save_generated_numbers_to_db
 def save_generated_numbers_to_db(numbers, powerball):
     """
     Saves a generated Powerball combination to the 'generated_powerball_numbers' table.
@@ -2202,24 +2989,18 @@ def _summarize_for_ai(df_source):
         summary_parts.append("Numbers frequently drawn in recent completed months: " + ", ".join([f"{n} ({c} times)" for n, c in sorted_recent_monthly[:15]])) # Top 15
 
     # 5. Odd/Even Split Trends (Most common in last 6 months)
-    # Ensure get_odd_even_split_trends returns a dictionary of counts
-    odd_even_trends_data = get_cached_analysis('odd_even_trends', get_odd_even_split_trends, df_source, last_draw_date_str) 
+    odd_even_trends = get_odd_even_split_trends(df_source, last_draw_date_str)
+    overall_odd_even_counts = defaultdict(int)
+    for day_data in odd_even_trends.values():
+        for split_info in day_data['odd_even_splits']:
+            overall_odd_even_counts[split_info['split']] += split_info['count']
     
-    # Now, odd_even_trends_data is expected to be a dictionary like {'split_category': count}
-    # We need to aggregate across all days if get_odd_even_split_trends returns stats per day.
-    # The current `get_odd_even_split_trends` already returns an aggregated dictionary, so we can use it directly.
-    
-    if isinstance(odd_even_trends_data, dict) and odd_even_trends_data:
-        # Create a list of (split_category, count) pairs from the dictionary
-        most_common_odd_even = sorted(odd_even_trends_data.items(), key=lambda item: item[1], reverse=True)
-        if most_common_odd_even:
-            summary_parts.append("Most common Odd/Even splits in recent draws (last 6 months): " + ", ".join([f"{s} ({c} times)" for s, c in most_common_odd_even[:3]])) # Top 3
-    else:
-        print(f"[DEBUG] No odd/even trend data or unexpected format for summary.")
-
+    most_common_odd_even = sorted(overall_odd_even_counts.items(), key=lambda item: item[1], reverse=True)
+    if most_common_odd_even:
+        summary_parts.append("Most common Odd/Even splits in recent draws: " + ", ".join([f"{s} ({c} times)" for s, c in most_common_odd_even[:3]])) # Top 3
 
     # 6. Sum Trends (Most frequent sum ranges)
-    sum_data = get_cached_analysis('sum_trends_and_gaps', get_sum_trends_and_gaps_data, df_source) # Ensure it's getting from cache/computing correctly
+    sum_data = get_sum_trends_and_gaps_data(df_source)
     if sum_data['grouped_sums_analysis']:
         sum_range_summaries = []
         for range_name, data in sum_data['grouped_sums_analysis'].items():
