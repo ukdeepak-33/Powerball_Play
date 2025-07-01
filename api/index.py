@@ -1212,6 +1212,7 @@ def save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb):
     """
     Saves a manually entered official Powerball draw to the 'powerball_draws' table.
     Checks for existence of the draw date to prevent duplicates.
+    Ensures white balls are stored in ascending order.
     """
     url = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
     headers = _get_supabase_headers(is_service_key=True)
@@ -1224,7 +1225,8 @@ def save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb):
     if existing_draws:
         print(f"Draw for date {draw_date} already exists in {SUPABASE_TABLE_NAME}.")
         return False, f"Draw for {draw_date} already exists."
-# --- FIX START ---
+
+    # --- FIX START ---
     # Collect the white balls into a list and sort them
     sorted_white_balls = sorted([n1, n2, n3, n4, n5])
     # --- FIX END ---
@@ -1258,24 +1260,6 @@ def save_generated_numbers_to_db(numbers, powerball):
     headers = _get_supabase_headers(is_service_key=True)
 
     sorted_numbers = sorted(numbers)
-# Utility function for Supabase search (used by strict_positional_search_route)
-def supabase_search_draws(query_params):
-    url = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
-    headers = _get_supabase_headers(is_service_key=False) # Use anon key for reads
-
-    try:
-        response = requests.get(url, headers=headers, params=query_params)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error during Supabase search: {e}")
-        if hasattr(e, 'response') and e.response is not None:
-            print(f"Supabase error response: {e.response.text}")
-        return []
-    except Exception as e:
-        print(f"An unexpected error occurred in supabase_search_draws: {e}")
-        traceback.print_exc()
-        return []
 
     check_params = {
         'select': 'id',
@@ -1823,8 +1807,14 @@ def invalidate_analysis_cache():
 @app.route('/')
 def index():
     last_draw_dict = last_draw.to_dict()
-    # Pass SUM_RANGES to the index template
-    return render_template('index.html', last_draw=last_draw_dict, sum_ranges=SUM_RANGES)
+    # Pass SUM_RANGES and default selected values for the new dropdowns
+    return render_template('index.html', 
+                           last_draw=last_draw_dict, 
+                           sum_ranges=SUM_RANGES,
+                           selected_odd_even_choice="Any", # Default for initial load
+                           selected_sum_range="Any", # Default for initial load
+                           num_sets_to_generate=1 # Default for initial load
+                          )
 
 # Generation Routes (referenced directly in index.html forms)
 @app.route('/generate', methods=['POST'])
@@ -1834,13 +1824,17 @@ def generate():
         return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
 
     odd_even_choice = request.form.get('odd_even_choice', 'Any')
-    combo_choice = request.form.get('combo_choice', 'No Combo')
+    # combo_choice is not used in generate_powerball_numbers, but kept for consistency if needed later
+    combo_choice = request.form.get('combo_choice', 'No Combo') 
+    
     white_ball_min = int(request.form.get('white_ball_min', 1))
     white_ball_max = int(request.form.get('white_ball_max', 69))
     white_ball_range_local = (white_ball_min, white_ball_max)
+    
     powerball_min = int(request.form.get('powerball_min', 1))
     powerball_max = int(request.form.get('powerball_max', 26))
     powerball_range_local = (powerball_min, powerball_max)
+    
     excluded_numbers_local = [int(num.strip()) for num in request.form.get('excluded_numbers', '').split(",") if num.strip().isdigit()] if request.form.get('excluded_numbers') else []
     
     high_low_balance_str = request.form.get('high_low_balance', '')
@@ -1855,33 +1849,54 @@ def generate():
         except ValueError:
             flash("Invalid High/Low Balance format. Please enter numbers separated by space.", 'error')
 
-    # --- New: Get selected sum range ---
+    # Get selected sum range
     selected_sum_range_label = request.form.get('sum_range_filter', 'Any')
     selected_sum_range_tuple = SUM_RANGES.get(selected_sum_range_label)
-    # --- End New ---
 
-    white_balls = []
-    powerball = None
-    last_draw_dates = {}
-
+    # Get number of sets to generate
+    num_sets_to_generate_str = request.form.get('num_sets_to_generate', '1')
     try:
-        white_balls, powerball = generate_powerball_numbers(
-            df, group_a, odd_even_choice, combo_choice, white_ball_range_local, powerball_range_local, 
-            excluded_numbers_local, high_low_balance, selected_sum_range_tuple, is_simulation=False
-        )
-        last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
-    except ValueError as e:
-        flash(str(e), 'error')
-        return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
+        num_sets_to_generate = int(num_sets_to_generate_str)
+        if not (1 <= num_sets_to_generate <= 10):
+            flash("Number of sets to generate must be between 1 and 10.", 'error')
+            num_sets_to_generate = 1 # Reset to default
+    except ValueError:
+        flash("Invalid number of sets. Please enter an integer.", 'error')
+        num_sets_to_generate = 1 # Reset to default
+
+    generated_sets = []
+    last_draw_dates = {} # To store last draw dates for the *last* generated set
+
+    for i in range(num_sets_to_generate):
+        try:
+            white_balls, powerball = generate_powerball_numbers(
+                df, group_a, odd_even_choice, combo_choice, white_ball_range_local, powerball_range_local, 
+                excluded_numbers_local, high_low_balance, selected_sum_range_tuple, is_simulation=False
+            )
+            generated_sets.append({'white_balls': white_balls, 'powerball': powerball})
+            
+            # For simplicity, we'll show last draw dates for the *last* generated set
+            if i == num_sets_to_generate - 1:
+                last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
+
+        except ValueError as e:
+            flash(f"Error generating set {i+1}: {str(e)}", 'error')
+            # If an error occurs, stop generating further sets for this request
+            break 
+        except Exception as e:
+            flash(f"An unexpected error occurred during generation of set {i+1}: {e}", 'error')
+            break
 
     return render_template('index.html', 
-                           white_balls=white_balls, 
-                           powerball=powerball, 
+                           generated_sets=generated_sets, # Pass the list of generated sets
                            last_draw=last_draw.to_dict(), 
                            last_draw_dates=last_draw_dates,
                            generation_type='generated',
-                           sum_ranges=SUM_RANGES, # Pass sum_ranges back
-                           selected_sum_range=selected_sum_range_label) # Pass selected sum range back for persistence
+                           sum_ranges=SUM_RANGES, 
+                           selected_sum_range=selected_sum_range_label, # Persist selection
+                           selected_odd_even_choice=odd_even_choice, # Persist selection
+                           num_sets_to_generate=num_sets_to_generate # Persist selection
+                          )
 
 
 @app.route('/generate_with_user_pair', methods=['POST'])
@@ -1917,14 +1932,17 @@ def generate_with_user_pair_route():
         )
         last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
 
+        # For consistency, return a list of generated sets, even if it's just one
+        generated_sets = [{'white_balls': white_balls, 'powerball': powerball}]
+
         return render_template('index.html', 
-                               white_balls=white_balls, 
+                               generated_sets=generated_sets, # Pass the list of generated sets
                                powerball=powerball, 
                                last_draw=last_draw.to_dict(), 
                                last_draw_dates=last_draw_dates,
                                generation_type='user_pair',
                                sum_ranges=SUM_RANGES, # Pass sum_ranges back
-                               selected_sum_range=selected_sum_range_label) # Pass selected sum range back for persistence
+                               selected_sum_range_pair=selected_sum_range_label) # Pass selected sum range back for persistence
     except ValueError as e:
         flash(str(e), 'error')
         return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
@@ -1962,19 +1980,22 @@ def generate_group_a_strategy_route():
             df, num_from_group_a, white_ball_range_local, powerball_range_local, 
             excluded_numbers_local, selected_sum_range_tuple
         )
+        # For consistency, return a list of generated sets, even if it's just one
+        generated_sets = [{'white_balls': white_balls, 'powerball': powerball}]
+
         last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
     except ValueError as e:
         flash(str(e), 'error')
         return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
 
     return render_template('index.html', 
-                           white_balls=white_balls, 
+                           generated_sets=generated_sets, # Pass the list of generated sets
                            powerball=powerball, 
                            last_draw=last_draw.to_dict(), 
                            last_draw_dates=last_draw_dates,
                            generation_type='group_a_strategy',
                            sum_ranges=SUM_RANGES, # Pass sum_ranges back
-                           selected_sum_range=selected_sum_range_label) # Pass selected sum range back for persistence
+                           selected_sum_range_group_a=selected_sum_range_label) # Pass selected sum range back for persistence
 
 @app.route('/save_official_draw', methods=['POST'])
 def save_official_draw_route():
@@ -2009,6 +2030,7 @@ def save_official_draw_route():
         flash(f"An error occurred: {e}", 'error')
     return redirect(url_for('index'))
 
+# This is the correct and only definition for save_generated_numbers_to_db
 def save_generated_numbers_to_db(numbers, powerball):
     """
     Saves a generated Powerball combination to the 'generated_powerball_numbers' table.
@@ -2411,6 +2433,120 @@ def find_results_by_first_white_ball():
                            white_ball_number=white_ball_number_display,
                            selected_sort_by=selected_sort_by)
 
+# Utility function for Supabase search (used by strict_positional_search_route)
+def supabase_search_draws(query_params):
+    url = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
+    headers = _get_supabase_headers(is_service_key=False) # Use anon key for reads
+
+    try:
+        response = requests.get(url, headers=headers, params=query_params)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error during Supabase search: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"Supabase error response: {e.response.text}")
+        return []
+    except Exception as e:
+        print(f"An unexpected error occurred in supabase_search_draws: {e}")
+        traceback.print_exc()
+        return []
+
+# Strict Positional Search Route
+@app.route('/strict_positional_search', methods=['GET', 'POST'])
+def strict_positional_search_route():
+    entered_numbers = {
+        'white_ball_1': '', 'white_ball_2': '', 'white_ball_3': '', 
+        'white_ball_4': '', 'white_ball_5': '', 'powerball_pos': ''
+    }
+    search_results = []
+    total_results = 0
+    
+    if request.method == 'POST':
+        # Retrieve form data
+        entered_numbers['white_ball_1'] = request.form.get('white_ball_1', '').strip()
+        entered_numbers['white_ball_2'] = request.form.get('white_ball_2', '').strip()
+        entered_numbers['white_ball_3'] = request.form.get('white_ball_3', '').strip()
+        entered_numbers['white_ball_4'] = request.form.get('white_ball_4', '').strip()
+        entered_numbers['white_ball_5'] = request.form.get('white_ball_5', '').strip()
+        entered_numbers['powerball_pos'] = request.form.get('powerball_pos', '').strip()
+
+        if df.empty:
+            flash("Historical data not loaded or is empty. Please check Supabase connection before searching.", 'error')
+            return render_template('strict_positional_search.html', 
+                                   entered_numbers=entered_numbers, 
+                                   search_results=[],
+                                   total_results=0)
+
+        # Build query parameters for Supabase
+        query_params = {'select': 'Draw Date,Number 1,Number 2,Number 3,Number 4,Number 5,Powerball'}
+        filter_count = 0
+
+        for i in range(1, 6):
+            key = f'white_ball_{i}'
+            col_name = f'Number {i}'
+            if entered_numbers[key]:
+                try:
+                    num = int(entered_numbers[key])
+                    if not (1 <= num <= 69):
+                        flash(f"White ball {i} must be between 1 and 69. Please correct your input.", 'error')
+                        return render_template('strict_positional_search.html', 
+                                               entered_numbers=entered_numbers, 
+                                               search_results=[],
+                                               total_results=0)
+                    query_params[col_name] = f'eq.{num}'
+                    filter_count += 1
+                except ValueError:
+                    flash(f"White ball {i} must be a valid number. Please correct your input.", 'error')
+                    return render_template('strict_positional_search.html', 
+                                           entered_numbers=entered_numbers, 
+                                           search_results=[],
+                                           total_results=0)
+
+        if entered_numbers['powerball_pos']:
+            try:
+                pb_num = int(entered_numbers['powerball_pos'])
+                if not (1 <= pb_num <= 26):
+                    flash("Powerball must be between 1 and 26. Please correct your input.", 'error')
+                    return render_template('strict_positional_search.html', 
+                                           entered_numbers=entered_numbers, 
+                                           search_results=[],
+                                           total_results=0)
+                query_params['Powerball'] = f'eq.{pb_num}'
+                filter_count += 1
+            except ValueError:
+                flash("Powerball must be a valid number. Please correct your input.", 'error')
+                return render_template('strict_positional_search.html', 
+                                       entered_numbers=entered_numbers, 
+                                       search_results=[],
+                                       total_results=0)
+        
+        if filter_count == 0:
+            flash("Please enter at least one number to perform a search.", 'info')
+            return render_template('strict_positional_search.html', 
+                                   entered_numbers=entered_numbers, 
+                                   search_results=[],
+                                   total_results=0)
+
+        # Perform the search using the utility function
+        draws = supabase_search_draws(query_params)
+
+        if draws:
+            search_results = sorted(draws, key=lambda x: x.get('Draw Date', ''), reverse=True)
+            total_results = len(search_results)
+            if total_results == 0:
+                flash("No draws found matching your criteria.", 'info')
+            else:
+                flash(f"Found {total_results} draw(s) matching your criteria.", 'success')
+        else:
+            flash("Error fetching data from Supabase. Please try again later.", 'error')
+
+    return render_template('strict_positional_search.html', 
+                           entered_numbers=entered_numbers, 
+                           search_results=search_results,
+                           total_results=total_results)
+
+
 @app.route('/generated_numbers_history')
 def generated_numbers_history_route():
     generated_history = get_cached_analysis('generated_history', get_generated_numbers_history)
@@ -2801,96 +2937,3 @@ def weekday_trends_route():
     
     return render_template('weekday_trends.html', 
                            weekday_trends=weekday_data)
-    # NEW ROUTE: Strict Positional Search
-@app.route('/strict_positional_search', methods=['GET', 'POST'])
-def strict_positional_search_route():
-    entered_numbers = {
-        'white_ball_1': '', 'white_ball_2': '', 'white_ball_3': '', 
-        'white_ball_4': '', 'white_ball_5': '', 'powerball_pos': ''
-    }
-    search_results = []
-    total_results = 0
-    
-    if request.method == 'POST':
-        # Retrieve form data
-        entered_numbers['white_ball_1'] = request.form.get('white_ball_1', '').strip()
-        entered_numbers['white_ball_2'] = request.form.get('white_ball_2', '').strip()
-        entered_numbers['white_ball_3'] = request.form.get('white_ball_3', '').strip()
-        entered_numbers['white_ball_4'] = request.form.get('white_ball_4', '').strip()
-        entered_numbers['white_ball_5'] = request.form.get('white_ball_5', '').strip()
-        entered_numbers['powerball_pos'] = request.form.get('powerball_pos', '').strip()
-
-        if df.empty:
-            flash("Historical data not loaded or is empty. Please check Supabase connection before searching.", 'error')
-            return render_template('strict_positional_search.html', 
-                                   entered_numbers=entered_numbers, 
-                                   search_results=[],
-                                   total_results=0)
-
-        # Build query parameters for Supabase
-        query_params = {'select': 'Draw Date,Number 1,Number 2,Number 3,Number 4,Number 5,Powerball'}
-        filter_count = 0
-
-        for i in range(1, 6):
-            key = f'white_ball_{i}'
-            col_name = f'Number {i}'
-            if entered_numbers[key]:
-                try:
-                    num = int(entered_numbers[key])
-                    if not (1 <= num <= 69):
-                        flash(f"White ball {i} must be between 1 and 69. Please correct your input.", 'error')
-                        return render_template('strict_positional_search.html', 
-                                               entered_numbers=entered_numbers, 
-                                               search_results=[],
-                                               total_results=0)
-                    query_params[col_name] = f'eq.{num}'
-                    filter_count += 1
-                except ValueError:
-                    flash(f"White ball {i} must be a valid number. Please correct your input.", 'error')
-                    return render_template('strict_positional_search.html', 
-                                           entered_numbers=entered_numbers, 
-                                           search_results=[],
-                                           total_results=0)
-
-        if entered_numbers['powerball_pos']:
-            try:
-                pb_num = int(entered_numbers['powerball_pos'])
-                if not (1 <= pb_num <= 26):
-                    flash("Powerball must be between 1 and 26. Please correct your input.", 'error')
-                    return render_template('strict_positional_search.html', 
-                                           entered_numbers=entered_numbers, 
-                                           search_results=[],
-                                           total_results=0)
-                query_params['Powerball'] = f'eq.{pb_num}'
-                filter_count += 1
-            except ValueError:
-                flash("Powerball must be a valid number. Please correct your input.", 'error')
-                return render_template('strict_positional_search.html', 
-                                       entered_numbers=entered_numbers, 
-                                       search_results=[],
-                                       total_results=0)
-        
-        if filter_count == 0:
-            flash("Please enter at least one number to perform a search.", 'info')
-            return render_template('strict_positional_search.html', 
-                                   entered_numbers=entered_numbers, 
-                                   search_results=[],
-                                   total_results=0)
-
-        # Perform the search using the utility function
-        draws = supabase_search_draws(query_params)
-
-        if draws:
-            search_results = sorted(draws, key=lambda x: x.get('Draw Date', ''), reverse=True)
-            total_results = len(search_results)
-            if total_results == 0:
-                flash("No draws found matching your criteria.", 'info')
-            else:
-                flash(f"Found {total_results} draw(s) matching your criteria.", 'success')
-        else:
-            flash("Error fetching data from Supabase. Please try again later.", 'error')
-
-    return render_template('strict_positional_search.html', 
-                           entered_numbers=entered_numbers, 
-                           search_results=search_results,
-                           total_results=total_results)
