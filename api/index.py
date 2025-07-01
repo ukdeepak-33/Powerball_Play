@@ -2937,3 +2937,212 @@ def weekday_trends_route():
     
     return render_template('weekday_trends.html', 
                            weekday_trends=weekday_data)
+
+# --- NEW SMART GENERATOR ROUTE AND HELPER FUNCTIONS ---
+
+def _summarize_for_ai(df_source):
+    """
+    Summarizes key Powerball trends for the AI to use in generating smart picks.
+    """
+    if df_source.empty:
+        return "No historical data available for analysis."
+
+    summary_parts = []
+
+    # 1. Hot and Cold Numbers (last 1 year)
+    last_draw_date_str = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else datetime.now().strftime('%Y-%m-%d')
+    hot_nums, cold_nums = hot_cold_numbers(df_source, last_draw_date_str)
+    
+    if hot_nums:
+        summary_parts.append("Hot Numbers (most frequent in last year): " + ", ".join([f"{n['Number']} ({n['Frequency']} times)" for n in hot_nums[:10]])) # Top 10
+    if cold_nums:
+        summary_parts.append("Cold Numbers (least frequent in last year): " + ", ".join([f"{n['Number']} ({n['Frequency']} times)" for n in cold_nums[:10]])) # Top 10
+
+    # 2. Co-occurrence (Top 5 pairs)
+    co_occurrence_data, _ = get_co_occurrence_matrix(df_source)
+    sorted_co_occurrence = sorted(co_occurrence_data, key=lambda x: x['count'], reverse=True)
+    if sorted_co_occurrence:
+        summary_parts.append("Top 5 Co-occurring Pairs: " + ", ".join([f"({p['x']}, {p['y']}) - {p['count']} times" for p in sorted_co_occurrence[:5]]))
+
+    # 3. Number Age (Coldest by age - top 10 oldest)
+    _, detailed_ages = get_number_age_distribution(df_source)
+    # Filter for white balls only for age, sort by age descending
+    white_ball_ages = sorted([d for d in detailed_ages if d['type'] == 'White Ball'], key=lambda x: x['age'], reverse=True)
+    powerball_ages = sorted([d for d in detailed_ages if d['type'] == 'Powerball'], key=lambda x: x['age'], reverse=True)
+    
+    if white_ball_ages:
+        summary_parts.append("White Balls with longest 'miss streak' (coldest by age): " + ", ".join([f"{n['number']} (missed {n['age']} draws)" for n in white_ball_ages[:10]]))
+    if powerball_ages:
+        summary_parts.append("Powerballs with longest 'miss streak' (coldest by age): " + ", ".join([f"{n['number']} (missed {n['age']} draws)" for n in powerball_ages[:5]])) # Top 5 Powerballs
+
+    # 4. Monthly Trends (Numbers frequently drawn in the last 3 completed months)
+    monthly_trends_data = get_monthly_white_ball_analysis_data(df_source, num_months_for_top_display=3)
+    recent_monthly_numbers = defaultdict(int)
+    for month_data in monthly_trends_data['monthly_data']:
+        # Only consider completed months for trends for AI, not current partial month
+        if not month_data['is_current_month']:
+            for wb_info in month_data['drawn_white_balls_with_counts']:
+                recent_monthly_numbers[wb_info['number']] += wb_info['count'] # Aggregate counts
+    
+    sorted_recent_monthly = sorted(recent_monthly_numbers.items(), key=lambda item: item[1], reverse=True)
+    if sorted_recent_monthly:
+        summary_parts.append("Numbers frequently drawn in recent completed months: " + ", ".join([f"{n} ({c} times)" for n, c in sorted_recent_monthly[:15]])) # Top 15
+
+    # 5. Odd/Even Split Trends (Most common in last 6 months)
+    odd_even_trends = get_odd_even_split_trends(df_source, last_draw_date_str)
+    overall_odd_even_counts = defaultdict(int)
+    for day_data in odd_even_trends.values():
+        for split_info in day_data['odd_even_splits']:
+            overall_odd_even_counts[split_info['split']] += split_info['count']
+    
+    most_common_odd_even = sorted(overall_odd_even_counts.items(), key=lambda item: item[1], reverse=True)
+    if most_common_odd_even:
+        summary_parts.append("Most common Odd/Even splits in recent draws: " + ", ".join([f"{s} ({c} times)" for s, c in most_common_odd_even[:3]])) # Top 3
+
+    # 6. Sum Trends (Most frequent sum ranges)
+    sum_data = get_sum_trends_and_gaps_data(df_source)
+    if sum_data['grouped_sums_analysis']:
+        sum_range_summaries = []
+        for range_name, data in sum_data['grouped_sums_analysis'].items():
+            if data['most_frequent_sums_in_range']:
+                top_sums_str = ", ".join([f"{s['sum']} ({s['count']} times)" for s in data['most_frequent_sums_in_range']])
+                sum_range_summaries.append(f"{range_name} (Top sums: {top_sums_str})")
+        if sum_range_summaries:
+            summary_parts.append("Key Sum Range Trends: " + "; ".join(sum_range_summaries))
+
+    return "\n".join(summary_parts)
+
+
+@app.route('/generate_smart_picks', methods=['POST'])
+def generate_smart_picks_route():
+    if df.empty:
+        return jsonify({"error": "Historical data not loaded or is empty. Cannot generate smart picks."}), 500
+
+    num_sets_str = request.json.get('num_sets', '1')
+    try:
+        num_sets = int(num_sets_str)
+        if not (1 <= num_sets <= 5): # Limiting to 5 sets for AI generation to manage response size/time
+            return jsonify({"error": "Number of smart picks must be between 1 and 5."}), 400
+    except ValueError:
+        return jsonify({"error": "Invalid number of sets requested."}), 400
+
+    # 1. Summarize historical data for the AI
+    historical_summary = _summarize_for_ai(df)
+    
+    # 2. Construct the prompt for Gemini
+    prompt = f"""
+    You are an expert Powerball Lottery number generator AI.
+    Your task is to generate {num_sets} unique sets of Powerball numbers based on the provided historical analysis.
+    Each set must consist of 5 unique white ball numbers (from 1 to 69) and 1 Powerball number (from 1 to 26).
+    The 5 white ball numbers in each set must be sorted in ascending order.
+    
+    Here is a summary of recent Powerball historical data and trends:
+    ---
+    {historical_summary}
+    ---
+    
+    Based on this data, generate {num_sets} unique sets of Powerball numbers.
+    Prioritize numbers that are "hot" or "frequently drawn in recent months".
+    Consider co-occurring pairs from the "Top 5 Co-occurring Pairs" list.
+    Avoid numbers that are consistently "cold" or have a very long "miss streak" (high age).
+    If a sum range trend is strong, try to align the sum of white balls with those ranges.
+    Ensure that each generated set of 5 white balls (excluding the Powerball) has NOT appeared historically.
+    
+    Return the generated numbers in a JSON array format, like this:
+    [
+      {{"white_balls": [N1, N2, N3, N4, N5], "powerball": PB}},
+      {{"white_balls": [N1, N2, N3, N4, N5], "powerball": PB}}
+    ]
+    """
+
+    chat_history = []
+    chat_history.append({"role": "user", "parts": [{"text": prompt}]})
+
+    try:
+        apiKey = "" # Canvas runtime will inject the key.
+        apiUrl = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}"
+
+        payload = {
+            "contents": chat_history,
+            "generationConfig": {
+                "temperature": 0.9, # Higher temperature for more creative/diverse picks
+                "topK": 40,
+                "topP": 0.95,
+                "responseMimeType": "application/json", # Crucial for structured output
+                "responseSchema": { # Define the expected JSON schema
+                    "type": "ARRAY",
+                    "items": {
+                        "type": "OBJECT",
+                        "properties": {
+                            "white_balls": {
+                                "type": "ARRAY",
+                                "items": {"type": "INTEGER", "minimum": 1, "maximum": 69},
+                                "minItems": 5,
+                                "maxItems": 5
+                            },
+                            "powerball": {"type": "INTEGER", "minimum": 1, "maximum": 26}
+                        },
+                        "required": ["white_balls", "powerball"]
+                    }
+                }
+            },
+            "safetySettings": [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            ]
+        }
+        
+        response = requests.post(apiUrl, headers={'Content-Type': 'application/json'}, data=json.dumps(payload))
+        response.raise_for_status() # Raise an exception for HTTP errors
+
+        result = response.json()
+        
+        # Parse the JSON response from the AI
+        if result and result.get('candidates') and len(result['candidates']) > 0 and \
+           result['candidates'][0].get('content') and result['candidates'][0]['content'].get('parts') and \
+           len(result['candidates'][0]['content']['parts']) > 0:
+            
+            ai_generated_json_str = result['candidates'][0]['content']['parts'][0]['text']
+            # The API returns a string that needs to be parsed as JSON
+            ai_generated_picks = json.loads(ai_generated_json_str)
+            
+            final_smart_picks = []
+            for pick in ai_generated_picks:
+                white_balls = sorted(list(set(pick['white_balls']))) # Ensure uniqueness and sort
+                powerball = pick['powerball']
+
+                # Basic validation for AI-generated numbers
+                if len(white_balls) == 5 and all(1 <= n <= 69 for n in white_balls) and \
+                   1 <= powerball <= 26:
+                    
+                    # Check if this exact white ball combination has appeared historically
+                    if not check_exact_match(white_balls):
+                        final_smart_picks.append({'white_balls': white_balls, 'powerball': powerball})
+                        if len(final_smart_picks) >= num_sets: # Stop if we have enough unique, non-historical sets
+                            break
+                    else:
+                        print(f"AI suggested historical match, skipping: {white_balls}")
+                else:
+                    print(f"AI suggested invalid numbers, skipping: {pick}")
+
+            if not final_smart_picks:
+                return jsonify({"error": "AI could not generate unique, valid, non-historical picks based on criteria. Try again."}), 500
+            
+            return jsonify({"success": True, "smart_picks": final_smart_picks})
+        else:
+            return jsonify({"error": "AI did not return valid content."}), 500
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error calling Gemini API for smart picks: {e}")
+        traceback.print_exc()
+        return jsonify({"error": f"Error communicating with AI: {e}"}), 500
+    except json.JSONDecodeError as e:
+        print(f"JSON decoding error from Gemini API response for smart picks: {e}. Raw response was: {response.text}")
+        traceback.print_exc()
+        return jsonify({"error": f"Error parsing AI response: {e}"}), 500
+    except Exception as e:
+        print(f"An unexpected error occurred in generate_smart_picks_route: {e}")
+        traceback.print_exc()
+        return jsonify({"error": f"An internal error occurred: {e}"}), 500
