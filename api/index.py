@@ -1004,10 +1004,7 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
     
     print(f"[DEBUG-OddEvenTrends] Generated {len(trend_data)} trend data points with WB_Sum and Group A numbers.")
     return trend_data
-    print("[DEBUG] Sample row in trend_data:", trend_data[0])
-
-    #return {row["draw_date"]: row for row in trend_data}
-
+    
 def get_powerball_frequency_by_year(df_source, num_years=5):
     """
     Calculates the frequency of each Powerball number per year for the last `num_years`.
