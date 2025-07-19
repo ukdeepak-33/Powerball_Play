@@ -783,7 +783,8 @@ def get_number_age_distribution(df_source):
     'Age at pick' is the number of draws missed between its previous and current appearance.
     """
     if df_source.empty:
-        return [], [], {} # Return empty lists/dict for all outputs
+        # Return empty lists/dict for all outputs, including new separated age counts
+        return [], [], [], {}
 
     df_source['Draw Date_dt'] = pd.to_datetime(df_source['Draw Date'])
     # Ensure the DataFrame is sorted by date for accurate age calculation
@@ -794,18 +795,17 @@ def get_number_age_distribution(df_source):
     draw_date_to_index = {date: i for i, date in enumerate(all_unique_draw_dates)}
     
     detailed_ages = [] # For current age (miss streak)
-    historical_ages_at_pick = defaultdict(list) # For ages at each historical pick
+    historical_ages_at_pick = defaultdict(list) # For ages at each historical pick, using composite keys
 
     # --- White Balls (1-69) ---
+    white_ball_age_counts = [] # New list for white ball age distribution
+    
     for num_val in range(1, 70):
         # Filter draws where the current white ball appeared
-        # Use .isin() for efficiency with multiple columns
         cols_to_check = [f'Number {i}' for i in range(1, 6)]
-        # Filter for rows where num_val is present in any of the white ball columns
-        # Ensure numbers are integers before comparison
         num_val_appearances_df = df_sorted[
             df_sorted[cols_to_check].apply(lambda row: num_val in row.astype(int).tolist(), axis=1)
-        ].copy() # Use .copy() to avoid SettingWithCopyWarning
+        ].copy()
 
         last_appearance_date = None
         last_appearance_date_str = "N/A"
@@ -815,32 +815,31 @@ def get_number_age_distribution(df_source):
             last_appearance_date = num_val_appearances_df['Draw Date_dt'].max()
             last_appearance_date_str = last_appearance_date.strftime('%Y-%m-%d')
             
-            # Current miss streak: number of draws after its last appearance
             current_draw_index = draw_date_to_index[last_appearance_date]
             miss_streak_count = len(all_unique_draw_dates) - 1 - current_draw_index
             
             detailed_ages.append({'number': int(num_val), 'type': 'White Ball', 'age': miss_streak_count, 'last_drawn_date': last_appearance_date_str})
         else:
-            # If never drawn, age is the total number of unique draws
-            detailed_ages.append({'number': int(num_val), 'type': 'White Ball', 'age': len(all_unique_draw_dates), 'last_drawn_date': last_appearance_date_str})
+            miss_streak_count = len(all_unique_draw_dates) # If never drawn, age is total draws
+            detailed_ages.append({'number': int(num_val), 'type': 'White Ball', 'age': miss_streak_count, 'last_drawn_date': last_appearance_date_str})
 
-        # Calculate historical 'age at pick'
+        # Calculate historical 'age at pick' for White Balls
         if not num_val_appearances_df.empty:
             previous_draw_date = None
             for _, row in num_val_appearances_df.sort_values(by='Draw Date_dt', ascending=True).iterrows():
                 current_draw_date = row['Draw Date_dt']
                 
                 if previous_draw_date is None:
-                    # First appearance of this number in the dataset
-                    historical_ages_at_pick[num_val].append(0)
+                    historical_ages_at_pick[f"White Ball_{num_val}"].append(0)
                 else:
-                    # Calculate missed draws between previous and current appearance
                     missed_draws = draw_date_to_index[current_draw_date] - draw_date_to_index[previous_draw_date] - 1
-                    historical_ages_at_pick[num_val].append(missed_draws)
+                    historical_ages_at_pick[f"White Ball_{num_val}"].append(missed_draws)
                 
                 previous_draw_date = current_draw_date
 
     # --- Powerballs (1-26) ---
+    powerball_age_counts = [] # New list for powerball age distribution
+
     for num_val in range(1, 27):
         num_val_appearances_df = df_sorted[df_sorted['Powerball'].astype(int) == num_val].copy()
 
@@ -857,31 +856,38 @@ def get_number_age_distribution(df_source):
 
             detailed_ages.append({'number': int(num_val), 'type': 'Powerball', 'age': miss_streak_count, 'last_drawn_date': last_appearance_date_str})
         else:
-            detailed_ages.append({'number': int(num_val), 'type': 'Powerball', 'age': len(all_unique_draw_dates), 'last_drawn_date': last_appearance_date_str})
+            miss_streak_count = len(all_unique_draw_dates) # If never drawn, age is total draws
+            detailed_ages.append({'number': int(num_val), 'type': 'Powerball', 'age': miss_streak_count, 'last_drawn_date': last_appearance_date_str})
 
-        # Calculate historical 'age at pick'
+        # Calculate historical 'age at pick' for Powerballs
         if not num_val_appearances_df.empty:
             previous_draw_date = None
             for _, row in num_val_appearances_df.sort_values(by='Draw Date_dt', ascending=True).iterrows():
                 current_draw_date = row['Draw Date_dt']
                 
                 if previous_draw_date is None:
-                    historical_ages_at_pick[num_val].append(0)
+                    historical_ages_at_pick[f"Powerball_{num_val}"].append(0)
                 else:
                     missed_draws = draw_date_to_index[current_draw_date] - draw_date_to_index[previous_draw_date] - 1
-                    historical_ages_at_pick[num_val].append(missed_draws)
+                    historical_ages_at_pick[f"Powerball_{num_val}"].append(missed_draws)
                 
                 previous_draw_date = current_draw_date
 
-    # Prepare age counts for the chart (this is for the *current* age distribution)
-    all_miss_streaks_only = [item['age'] for item in detailed_ages]
-    age_counts = pd.Series(all_miss_streaks_only).value_counts().sort_index()
-    age_counts_list = [{'age': int(age), 'count': int(count)} for age, count in age_counts.items()]
+    # Populate white_ball_age_counts and powerball_age_counts from detailed_ages
+    wb_ages_only = [item['age'] for item in detailed_ages if item['type'] == 'White Ball']
+    pb_ages_only = [item['age'] for item in detailed_ages if item['type'] == 'Powerball']
+
+    wb_age_counts_series = pd.Series(wb_ages_only).value_counts().sort_index()
+    white_ball_age_counts = [{'age': int(age), 'count': int(count)} for age, count in wb_age_counts_series.items()]
+
+    pb_age_counts_series = pd.Series(pb_ages_only).value_counts().sort_index()
+    powerball_age_counts = [{'age': int(age), 'count': int(count)} for age, count in pb_age_counts_series.items()]
     
     # Sort detailed_ages by number for consistent display
-    detailed_ages.sort(key=lambda x: x['number'])
+    detailed_ages.sort(key=lambda x: (x['type'], x['number'])) # Sort by type then number
 
-    return age_counts_list, detailed_ages, historical_ages_at_pick
+    # Now returns 4 values
+    return white_ball_age_counts, powerball_age_counts, detailed_ages, historical_ages_at_pick
 
 
 def get_co_occurrence_matrix(df_source):
@@ -2375,12 +2381,13 @@ def simulate_multiple_draws_route():
 
 @app.route('/number_age_distribution')
 def number_age_distribution_route():
-    # Now get_cached_analysis will return three values
-    number_age_counts, detailed_number_ages, historical_ages_at_pick = get_cached_analysis('number_age_distribution', get_number_age_distribution, df)
+    # Now get_cached_analysis will return four values
+    white_ball_age_counts, powerball_age_counts, detailed_number_ages, historical_ages_at_pick = get_cached_analysis('number_age_distribution', get_number_age_distribution, df)
     
-    # Pass all three to the template
+    # Pass all four to the template
     return render_template('number_age_distribution.html',
-                           number_age_data=number_age_counts,
+                           white_ball_age_data=white_ball_age_counts, # New for white balls chart
+                           powerball_age_data=powerball_age_counts, # New for powerballs chart
                            detailed_number_ages=detailed_number_ages,
                            historical_ages_at_pick=historical_ages_at_pick)
 
@@ -3018,7 +3025,7 @@ def _summarize_for_ai(df_source):
         summary_parts.append("Top 5 Co-occurring Pairs: " + ", ".join([f"({p['x']}, {p['y']}) - {p['count']} times" for p in sorted_co_occurrence[:5]]))
 
     # 3. Number Age (Coldest by age - top 10 oldest)
-    _, detailed_ages, _ = get_number_age_distribution(df_source) # Now unpack 3 values
+    _, _, detailed_ages, _ = get_number_age_distribution(df_source) # Now unpack 4 values
     # Filter for white balls only for age, sort by age descending
     white_ball_ages = sorted([d for d in detailed_ages if d['type'] == 'White Ball'], key=lambda x: x['age'], reverse=True)
     powerball_ages = sorted([d for d in detailed_ages if d['type'] == 'Powerball'], key=lambda x: x['age'], reverse=True)
