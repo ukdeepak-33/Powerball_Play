@@ -410,7 +410,7 @@ def generate_with_user_provided_pair(num1, num2, white_ball_range, powerball_ran
                 if not (selected_sum_range_tuple[0] <= current_sum <= selected_sum_range_tuple[1]):
                     attempts_overall += 1
                     continue # Retry if sum is not in the desired range
-            # --- End New: Sum Range Check ---
+            # --- End New ---
 
             # Generate Powerball
             powerball = random.randint(powerball_range[0], powerball_range[1])
@@ -775,58 +775,114 @@ def find_last_draw_dates_for_numbers(df_source, white_balls, powerball):
 
     return last_draw_dates
 
+# MODIFIED FUNCTION: get_number_age_distribution
 def get_number_age_distribution(df_source):
-    if df_source.empty: return [], []
+    """
+    Calculates the current 'age' (miss streak) for each number (white ball and powerball)
+    and also the historical 'age at pick' for each time a number was drawn.
+    'Age at pick' is the number of draws missed between its previous and current appearance.
+    """
+    if df_source.empty:
+        return [], [], {} # Return empty lists/dict for all outputs
+
     df_source['Draw Date_dt'] = pd.to_datetime(df_source['Draw Date'])
-    all_draw_dates = sorted(df_source['Draw Date_dt'].drop_duplicates().tolist())
+    # Ensure the DataFrame is sorted by date for accurate age calculation
+    df_sorted = df_source.sort_values(by='Draw Date_dt', ascending=True).reset_index(drop=True)
     
-    detailed_ages = []
+    # Get all unique draw dates and map them to their chronological index
+    all_unique_draw_dates = sorted(df_sorted['Draw Date_dt'].drop_duplicates().tolist())
+    draw_date_to_index = {date: i for i, date in enumerate(all_unique_draw_dates)}
     
-    for i in range(1, 70):
+    detailed_ages = [] # For current age (miss streak)
+    historical_ages_at_pick = defaultdict(list) # For ages at each historical pick
+
+    # --- White Balls (1-69) ---
+    for num_val in range(1, 70):
+        # Filter draws where the current white ball appeared
+        # Use .isin() for efficiency with multiple columns
+        cols_to_check = [f'Number {i}' for i in range(1, 6)]
+        # Filter for rows where num_val is present in any of the white ball columns
+        # Ensure numbers are integers before comparison
+        num_val_appearances_df = df_sorted[
+            df_sorted[cols_to_check].apply(lambda row: num_val in row.astype(int).tolist(), axis=1)
+        ].copy() # Use .copy() to avoid SettingWithCopyWarning
+
         last_appearance_date = None
-        last_appearance_date_str = "N/A" # Default to N/A
-        temp_df_filtered = df_source[(df_source['Number 1'].astype(int) == i) | (df_source['Number 2'].astype(int) == i) |
-                              (df_source['Number 3'].astype(int) == i) | (df_source['Number 4'].astype(int) == i) |
-                              (df_source['Number 5'].astype(int) == i)]
+        last_appearance_date_str = "N/A"
         
-        if not temp_df_filtered.empty:
-            last_appearance_date = temp_df_filtered['Draw Date_dt'].max()
+        # Calculate current age (miss streak)
+        if not num_val_appearances_df.empty:
+            last_appearance_date = num_val_appearances_df['Draw Date_dt'].max()
             last_appearance_date_str = last_appearance_date.strftime('%Y-%m-%d')
-
-        miss_streak_count = 0
-        if last_appearance_date is not None:
-            # We need to correctly count missed draws based on *all* unique draw dates
-            # subsequent to the last appearance date.
-            draw_dates_after_last_appearance = [d for d in all_draw_dates if d > last_appearance_date]
-            miss_streak_count = len(draw_dates_after_last_appearance)
-
-            detailed_ages.append({'number': int(i), 'type': 'White Ball', 'age': miss_streak_count, 'last_drawn_date': last_appearance_date_str})
+            
+            # Current miss streak: number of draws after its last appearance
+            current_draw_index = draw_date_to_index[last_appearance_date]
+            miss_streak_count = len(all_unique_draw_dates) - 1 - current_draw_index
+            
+            detailed_ages.append({'number': int(num_val), 'type': 'White Ball', 'age': miss_streak_count, 'last_drawn_date': last_appearance_date_str})
         else:
-            # If never drawn, age is the total number of draws
-            detailed_ages.append({'number': int(i), 'type': 'White Ball', 'age': len(all_draw_dates), 'last_drawn_date': last_appearance_date_str})
+            # If never drawn, age is the total number of unique draws
+            detailed_ages.append({'number': int(num_val), 'type': 'White Ball', 'age': len(all_unique_draw_dates), 'last_drawn_date': last_appearance_date_str})
 
-    for i in range(1, 27):
+        # Calculate historical 'age at pick'
+        if not num_val_appearances_df.empty:
+            previous_draw_date = None
+            for _, row in num_val_appearances_df.sort_values(by='Draw Date_dt', ascending=True).iterrows():
+                current_draw_date = row['Draw Date_dt']
+                
+                if previous_draw_date is None:
+                    # First appearance of this number in the dataset
+                    historical_ages_at_pick[num_val].append(0)
+                else:
+                    # Calculate missed draws between previous and current appearance
+                    missed_draws = draw_date_to_index[current_draw_date] - draw_date_to_index[previous_draw_date] - 1
+                    historical_ages_at_pick[num_val].append(missed_draws)
+                
+                previous_draw_date = current_draw_date
+
+    # --- Powerballs (1-26) ---
+    for num_val in range(1, 27):
+        num_val_appearances_df = df_sorted[df_sorted['Powerball'].astype(int) == num_val].copy()
+
         last_appearance_date = None
-        last_appearance_date_str = "N/A" # Default to N/A
-        temp_df_filtered = df_source[df_source['Powerball'].astype(int) == i]
-        if not temp_df_filtered.empty:
-            last_appearance_date = temp_df_filtered['Draw Date_dt'].max()
+        last_appearance_date_str = "N/A"
+
+        # Calculate current age (miss streak)
+        if not num_val_appearances_df.empty:
+            last_appearance_date = num_val_appearances_df['Draw Date_dt'].max()
             last_appearance_date_str = last_appearance_date.strftime('%Y-%m-%d')
+            
+            current_draw_index = draw_date_to_index[last_appearance_date]
+            miss_streak_count = len(all_unique_draw_dates) - 1 - current_draw_index
 
-        miss_streak_count = 0
-        if last_appearance_date is not None:
-            draw_dates_after_last_appearance = [d for d in all_draw_dates if d > last_appearance_date]
-            miss_streak_count = len(draw_dates_after_last_appearance)
-
-            detailed_ages.append({'number': int(i), 'type': 'Powerball', 'age': miss_streak_count, 'last_drawn_date': last_appearance_date_str})
+            detailed_ages.append({'number': int(num_val), 'type': 'Powerball', 'age': miss_streak_count, 'last_drawn_date': last_appearance_date_str})
         else:
-            detailed_ages.append({'number': int(i), 'type': 'Powerball', 'age': len(all_draw_dates), 'last_drawn_date': last_appearance_date_str})
+            detailed_ages.append({'number': int(num_val), 'type': 'Powerball', 'age': len(all_unique_draw_dates), 'last_drawn_date': last_appearance_date_str})
 
+        # Calculate historical 'age at pick'
+        if not num_val_appearances_df.empty:
+            previous_draw_date = None
+            for _, row in num_val_appearances_df.sort_values(by='Draw Date_dt', ascending=True).iterrows():
+                current_draw_date = row['Draw Date_dt']
+                
+                if previous_draw_date is None:
+                    historical_ages_at_pick[num_val].append(0)
+                else:
+                    missed_draws = draw_date_to_index[current_draw_date] - draw_date_to_index[previous_draw_date] - 1
+                    historical_ages_at_pick[num_val].append(missed_draws)
+                
+                previous_draw_date = current_draw_date
+
+    # Prepare age counts for the chart (this is for the *current* age distribution)
     all_miss_streaks_only = [item['age'] for item in detailed_ages]
     age_counts = pd.Series(all_miss_streaks_only).value_counts().sort_index()
     age_counts_list = [{'age': int(age), 'count': int(count)} for age, count in age_counts.items()]
     
-    return age_counts_list, detailed_ages
+    # Sort detailed_ages by number for consistent display
+    detailed_ages.sort(key=lambda x: x['number'])
+
+    return age_counts_list, detailed_ages, historical_ages_at_pick
+
 
 def get_co_occurrence_matrix(df_source):
     if df_source.empty: return [], 0
@@ -944,39 +1000,35 @@ def get_most_frequent_triplets(df_source): # Removed top_n parameter
 def get_odd_even_split_trends(df_source, last_draw_date_str):
     print("[DEBUG-OddEvenTrends] Inside get_odd_even_split_trends function.")
     if df_source.empty or last_draw_date_str == 'N/A':
-        print("[DEBUG-OddEvenTrends] df_source is empty or last_draw_date_str is N/A. Returning empty list.")
-        return []
+        print("[DEBUG-OddEvenTrends] df_source is empty or last_draw_date_str is N/A. Returning empty dictionary.")
+        return {} # Ensure it always returns a dictionary, even if empty
 
     try:
         last_draw_date = pd.to_datetime(last_draw_date_str)
         print(f"[DEBUG-OddEvenTrends] last_draw_date: {last_draw_date}")
     except Exception as e:
-        print(f"[ERROR-OddEvenTrends] Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty list.")
-        return {}
+        print(f"[ERROR-OddEvenTrends] Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty dictionary.")
+        return {} # Ensure it always returns a dictionary, even if empty
 
     six_months_ago = last_draw_date - pd.DateOffset(months=6)
     print(f"[DEBUG-OddEvenTrends] six_months_ago: {six_months_ago}")
 
     if 'Draw Date_dt' not in df_source.columns or not pd.api.types.is_datetime64_any_dtype(df_source['Draw Date_dt']):
-        print("[ERROR-OddEvenTrends] 'Draw Date_dt' column missing or not datetime type in df_source. Returning empty list.")
-        return []
+        print("[ERROR-OddEvenTrends] 'Draw Date_dt' column missing or not datetime type in df_source. Returning empty dictionary.")
+        return {} # Ensure it always returns a dictionary, even if empty
 
     recent_data = df_source[df_source['Draw Date_dt'] >= six_months_ago].copy()
     recent_data = recent_data.sort_values(by='Draw Date_dt', ascending=False)
     if recent_data.empty:
-        print("[DEBUG-OddEvenTrends] recent_data is empty after filtering. Returning empty list.")
-        return []
+        print("[DEBUG-OddEvenTrends] recent_data is empty after filtering. Returning empty dictionary.")
+        return {} # Ensure it always returns a dictionary, even if empty
 
-    trend_data = []
+    # Use a defaultdict to aggregate splits by category for the last 6 months
+    overall_odd_even_counts = defaultdict(int)
+
     for idx, row in recent_data.iterrows():
         white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])]
         
-        # Calculate WB_Sum
-        wb_sum = sum(white_balls)
-
-        # Identify group_a numbers present in the draw - now using the global group_a directly
-        group_a_numbers_present = sorted([num for num in white_balls if num in group_a])
-
         even_count = sum(1 for num in white_balls if num % 2 == 0)
         odd_count = 5 - even_count
 
@@ -995,16 +1047,13 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
         elif odd_count == 2 and even_count == 3:
             split_category = "2 Odd / 3 Even"
         
-        trend_data.append({
-            'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
-            'split_category': split_category,
-            'wb_sum': wb_sum,
-            'group_a_numbers': group_a_numbers_present
-        })
+        overall_odd_even_counts[split_category] += 1
     
-    print(f"[DEBUG-OddEvenTrends] Generated {len(trend_data)} trend data points with WB_Sum and Group A numbers.")
-    return trend_data
-    
+    # Convert defaultdict to a regular dictionary for return
+    print(f"[DEBUG-OddEvenTrends] Generated overall odd/even split counts. Returning aggregated dictionary.")
+    return dict(overall_odd_even_counts) # Explicitly return a dictionary of counts
+
+
 def get_powerball_frequency_by_year(df_source, num_years=5):
     """
     Calculates the frequency of each Powerball number per year for the last `num_years`.
@@ -1775,8 +1824,6 @@ def initialize_core_data():
         print(f"An error occurred during initial core data loading: {e}")
         traceback.print_exc()
 
-initialize_core_data()
-
 
 # --- Analysis Cache Management ---
 def get_cached_analysis(key, compute_function, *args, **kwargs):
@@ -1799,6 +1846,8 @@ def invalidate_analysis_cache():
     analysis_cache = {}
     last_analysis_cache_update = datetime.min
     print("Analysis cache invalidated.")
+
+initialize_core_data() # Call initialize_core_data AFTER invalidate_analysis_cache is defined.
 
 
 # --- Flask Routes (Ordered for Dependency - all UI-facing routes first, then API routes) ---
@@ -2326,10 +2375,14 @@ def simulate_multiple_draws_route():
 
 @app.route('/number_age_distribution')
 def number_age_distribution_route():
-    number_age_counts, detailed_number_ages = get_cached_analysis('number_age_distribution', get_number_age_distribution, df)
+    # Now get_cached_analysis will return three values
+    number_age_counts, detailed_number_ages, historical_ages_at_pick = get_cached_analysis('number_age_distribution', get_number_age_distribution, df)
+    
+    # Pass all three to the template
     return render_template('number_age_distribution.html',
                            number_age_data=number_age_counts,
-                           detailed_number_ages=detailed_number_ages)
+                           detailed_number_ages=detailed_number_ages,
+                           historical_ages_at_pick=historical_ages_at_pick)
 
 @app.route('/co_occurrence_analysis')
 def co_occurrence_analysis_route():
@@ -2965,7 +3018,7 @@ def _summarize_for_ai(df_source):
         summary_parts.append("Top 5 Co-occurring Pairs: " + ", ".join([f"({p['x']}, {p['y']}) - {p['count']} times" for p in sorted_co_occurrence[:5]]))
 
     # 3. Number Age (Coldest by age - top 10 oldest)
-    _, detailed_ages = get_number_age_distribution(df_source)
+    _, detailed_ages, _ = get_number_age_distribution(df_source) # Now unpack 3 values
     # Filter for white balls only for age, sort by age descending
     white_ball_ages = sorted([d for d in detailed_ages if d['type'] == 'White Ball'], key=lambda x: x['age'], reverse=True)
     powerball_ages = sorted([d for d in detailed_ages if d['type'] == 'Powerball'], key=lambda x: x['age'], reverse=True)
@@ -2989,18 +3042,24 @@ def _summarize_for_ai(df_source):
         summary_parts.append("Numbers frequently drawn in recent completed months: " + ", ".join([f"{n} ({c} times)" for n, c in sorted_recent_monthly[:15]])) # Top 15
 
     # 5. Odd/Even Split Trends (Most common in last 6 months)
-    odd_even_trends = get_odd_even_split_trends(df_source, last_draw_date_str)
-    overall_odd_even_counts = defaultdict(int)
-    for day_data in odd_even_trends.values():
-        for split_info in day_data['odd_even_splits']:
-            overall_odd_even_counts[split_info['split']] += split_info['count']
+    # Ensure get_odd_even_split_trends returns a dictionary of counts
+    odd_even_trends_data = get_cached_analysis('odd_even_trends', get_odd_even_split_trends, df_source, last_draw_date_str) 
     
-    most_common_odd_even = sorted(overall_odd_even_counts.items(), key=lambda item: item[1], reverse=True)
-    if most_common_odd_even:
-        summary_parts.append("Most common Odd/Even splits in recent draws: " + ", ".join([f"{s} ({c} times)" for s, c in most_common_odd_even[:3]])) # Top 3
+    # Now, odd_even_trends_data is expected to be a dictionary like {'split_category': count}
+    # We need to aggregate across all days if get_odd_even_split_trends returns stats per day.
+    # The current `get_odd_even_split_trends` already returns an aggregated dictionary, so we can use it directly.
+    
+    if isinstance(odd_even_trends_data, dict) and odd_even_trends_data:
+        # Create a list of (split_category, count) pairs from the dictionary
+        most_common_odd_even = sorted(odd_even_trends_data.items(), key=lambda item: item[1], reverse=True)
+        if most_common_odd_even:
+            summary_parts.append("Most common Odd/Even splits in recent draws (last 6 months): " + ", ".join([f"{s} ({c} times)" for s, c in most_common_odd_even[:3]])) # Top 3
+    else:
+        print(f"[DEBUG] No odd/even trend data or unexpected format for summary.")
+
 
     # 6. Sum Trends (Most frequent sum ranges)
-    sum_data = get_sum_trends_and_gaps_data(df_source)
+    sum_data = get_cached_analysis('sum_trends_and_gaps', get_sum_trends_and_gaps_data, df_source) # Ensure it's getting from cache/computing correctly
     if sum_data['grouped_sums_analysis']:
         sum_range_summaries = []
         for range_name, data in sum_data['grouped_sums_analysis'].items():
@@ -3146,3 +3205,4 @@ def generate_smart_picks_route():
         print(f"An unexpected error occurred in generate_smart_picks_route: {e}")
         traceback.print_exc()
         return jsonify({"error": f"An internal error occurred: {e}"}), 500
+
