@@ -5,57 +5,70 @@
 {% block page_heading %}Draws Since Last Appearance (Number Age Distribution){% endblock %}
 
 {% block content %}
-<div class="chart-container">
-    <h2 class="text-xl font-semibold mb-4 text-gray-800">Age Distribution of All Balls (Current Miss Streak)</h2>
-    {% if number_age_data %}
-        <div id="numberAgeChart"></div>
-    {% else %}
-        <p class="text-gray-500">No number age distribution data available to display chart.</p>
-    {% endif %}
-</div>
+<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {# White Ball Age Distribution Chart #}
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">White Ball Age Distribution (Current Miss Streak)</h2>
+        {% if white_ball_age_data %}
+            <div id="whiteBallAgeChart"></div>
+        {% else %}
+            <p class="text-gray-500">No white ball age distribution data available to display chart.</p>
+        {% endif %}
+    </div>
 
-<div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200 mt-8">
-    <h3 class="text-2xl font-bold mb-4 text-gray-800">Detailed Ball Ages & Historical Pick Ages</h3>
-    
-    {% if detailed_number_ages %}
-    <div class="mb-4 flex flex-col sm:flex-row sm:justify-between sm:items-center">
-        <button id="sortByAgeBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-full focus:outline-none focus:shadow-outline transition duration-200 ease-in-out mb-2 sm:mb-0">
-            Sort by Current Age (Longest First)
-        </button>
-        <span class="text-sm text-gray-600">
-            "Age at Pick" shows draws missed *before* each historical appearance (0 = picked in consecutive draw).
-        </span>
+    {# Powerball Age Distribution Chart #}
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200 mt-8">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Powerball Age Distribution (Current Miss Streak)</h2>
+        {% if powerball_age_data %}
+            <div id="powerballAgeChart"></div>
+        {% else %}
+            <p class="text-gray-500">No Powerball age distribution data available to display chart.</p>
+        {% endif %}
     </div>
-    <div class="overflow-x-auto shadow-md rounded-lg">
-        <table class="min-w-full divide-y divide-gray-200" id="detailedAgesTable">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Number</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" data-sort="age">Current Age (Draws Missed) <span class="ml-1 text-gray-400">↑↓</span></th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Drawn Date</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Historical Ages at Pick (Last 15)</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-                {# Data will be rendered by JavaScript #}
-            </tbody>
-        </table>
+
+    {# Detailed Ball Ages Table #}
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200 mt-8">
+        <h3 class="text-2xl font-bold mb-4 text-gray-800">Detailed Ball Ages & Historical Pick Ages</h3>
+        
+        {% if detailed_number_ages %}
+        <div class="mb-4 flex flex-col sm:flex-row sm:justify-between sm:items-center">
+            <button id="sortByAgeBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-full focus:outline-none focus:shadow-outline transition duration-200 ease-in-out mb-2 sm:mb-0">
+                Sort by Current Age (Longest First)
+            </button>
+            <span class="text-sm text-gray-600 text-right">
+                "Age at Pick" shows draws missed *before* each historical appearance (0 = picked in consecutive draw).
+            </span>
+        </div>
+        <div class="overflow-x-auto shadow-md rounded-lg">
+            <table class="min-w-full divide-y divide-gray-200" id="detailedAgesTable">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Number</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" data-sort="age">Current Age (Draws Missed) <span class="ml-1 text-gray-400">↑↓</span></th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Drawn Date</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Historical Ages at Pick (Last 15)</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {# Data will be rendered by JavaScript #}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-gray-500">No detailed number age data available.</p>
+        {% endif %}
     </div>
-    {% else %}
-    <p class="text-gray-500">No detailed number age data available.</p>
-    {% endif %}
 </div>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
 <script src="https://d3js.org/d3.v7.min.js"></script>
-{# Removed: <script src="{{ url_for('static', filename='js/d3_charts.js') }}"></script> #}
 
 <script>
     // --- D3 Chart Function (Embedded) ---
-    function drawBarChart(data, elementId, xKey, yKey, title, xLabel, yLabel) {
+    function drawBarChart(data, elementId, xKey, yKey, title, xLabel, yLabel, yDomainMax = null) {
         const margin = { top: 40, right: 30, bottom: 60, left: 70 };
         const container = d3.select("#" + elementId);
         const containerWidth = container.node().getBoundingClientRect().width;
@@ -84,8 +97,9 @@
             .style("text-anchor", "end");
 
         // Y axis
+        // Use yDomainMax if provided, otherwise calculate from data
         const y = d3.scaleLinear()
-            .domain([0, d3.max(data, d => d[yKey])])
+            .domain([0, yDomainMax || d3.max(data, d => d[yKey])])
             .range([height, 0]);
 
         svg.append("g")
@@ -125,22 +139,39 @@
 
 
     document.addEventListener('DOMContentLoaded', function() {
-        var numberAgeData = [];
-        {% if number_age_data %}
+        // --- White Ball Age Chart ---
+        var whiteBallAgeData = [];
+        {% if white_ball_age_data %}
             try {
-                numberAgeData = {{ number_age_data | tojson | safe }};
+                whiteBallAgeData = {{ white_ball_age_data | tojson | safe }};
             } catch (e) {
-                console.error("Error parsing numberAgeData JSON for chart:", e);
-                numberAgeData = [];
+                console.error("Error parsing whiteBallAgeData JSON for chart:", e);
+                whiteBallAgeData = [];
             }
         {% endif %}
-        console.log("[D3 Debug] number_age_distribution.html - numberAgeData (for chart):", numberAgeData);
+        console.log("[D3 Debug] number_age_distribution.html - whiteBallAgeData (for chart):", whiteBallAgeData);
+        whiteBallAgeData.sort((a, b) => a.age - b.age); // Sort data by age for consistent chart display
+        drawBarChart(whiteBallAgeData, "whiteBallAgeChart", "age", "count", "White Ball Age Distribution", "Draws Missed", "Number of White Balls");
 
-        // Sort data by age for consistent chart display
-        numberAgeData.sort((a, b) => a.age - b.age);
+        // --- Powerball Age Chart ---
+        var powerballAgeData = [];
+        {% if powerball_age_data %}
+            try {
+                powerballAgeData = {{ powerball_age_data | tojson | safe }};
+            } catch (e) {
+                console.error("Error parsing powerballAgeData JSON for chart:", e);
+                powerballAgeData = [];
+            }
+        {% endif %}
+        console.log("[D3 Debug] number_age_distribution.html - powerballAgeData (for chart):", powerballAgeData);
+        powerballAgeData.sort((a, b) => a.age - b.age); // Sort data by age for consistent chart display
+        // For Powerball chart, we might want a fixed Y domain or one tailored to its range
+        // Max Y value for Powerball ages can be significantly lower than White Balls
+        const maxPowerballAge = d3.max(powerballAgeData, d => d.count) || 1; // Ensure at least 1 for domain
+        drawBarChart(powerballAgeData, "powerballAgeChart", "age", "count", "Powerball Age Distribution", "Draws Missed", "Number of Powerballs", maxPowerballAge * 1.2); // Add some buffer
 
-        drawBarChart(numberAgeData, "numberAgeChart", "age", "count", "Draws Since Last Appearance", "Draws Missed", "Number of Balls");
 
+        // --- Detailed Ball Ages Table ---
         var detailedNumberAges = [];
         {% if detailed_number_ages %}
             try {
@@ -180,13 +211,17 @@
                 // Last Drawn Date
                 row.insertCell().textContent = ball.last_drawn_date !== 'N/A' ? ball.last_drawn_date : 'Never Drawn';
 
-                // Historical Ages at Pick
+                // Historical Ages at Pick - CORRECTED KEY ACCESS
                 const historicalAgesCell = row.insertCell();
-                const ages = historicalAgesAtPick[ball.number];
+                // Construct the key using both type and number
+                const key = `${ball.type}_${ball.number}`; 
+                const ages = historicalAgesAtPick[key];
+
                 if (ages && ages.length > 0) {
                     // Display the last 15 ages, or fewer if not available
                     const agesToDisplay = ages.slice(Math.max(0, ages.length - 15));
                     historicalAgesCell.textContent = agesToDisplay.join(', ');
+                    historicalAgesCell.classList.add('whitespace-normal'); // Allow text to wrap
                 } else {
                     historicalAgesCell.textContent = 'N/A';
                 }
