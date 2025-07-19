@@ -51,8 +51,79 @@
 {% block scripts %}
 {{ super() }}
 <script src="https://d3js.org/d3.v7.min.js"></script>
-<script src="{{ url_for('static', filename='js/d3_charts.js') }}"></script>
+{# Removed: <script src="{{ url_for('static', filename='js/d3_charts.js') }}"></script> #}
+
 <script>
+    // --- D3 Chart Function (Embedded) ---
+    function drawBarChart(data, elementId, xKey, yKey, title, xLabel, yLabel) {
+        const margin = { top: 40, right: 30, bottom: 60, left: 70 };
+        const container = d3.select("#" + elementId);
+        const containerWidth = container.node().getBoundingClientRect().width;
+        const width = containerWidth - margin.left - margin.right;
+        const height = 400 - margin.top - margin.bottom;
+
+        container.html(""); // Clear previous chart
+
+        const svg = container.append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // X axis
+        const x = d3.scaleBand()
+            .range([0, width])
+            .domain(data.map(d => d[xKey]))
+            .padding(0.2);
+
+        svg.append("g")
+            .attr("transform", `translate(0,${height})`)
+            .call(d3.axisBottom(x))
+            .selectAll("text")
+            .attr("transform", "translate(-10,0)rotate(-45)")
+            .style("text-anchor", "end");
+
+        // Y axis
+        const y = d3.scaleLinear()
+            .domain([0, d3.max(data, d => d[yKey])])
+            .range([height, 0]);
+
+        svg.append("g")
+            .call(d3.axisLeft(y));
+
+        // Bars
+        svg.selectAll("mybar")
+            .data(data)
+            .enter()
+            .append("rect")
+            .attr("x", d => x(d[xKey]))
+            .attr("y", d => y(d[yKey]))
+            .attr("width", x.bandwidth())
+            .attr("height", d => height - y(d[yKey]))
+            .attr("fill", "#6B46C1"); // Tailwind indigo-600 equivalent
+
+        // Labels
+        svg.append("text")
+            .attr("x", width / 2)
+            .attr("y", 0 - (margin.top / 2))
+            .attr("text-anchor", "middle")
+            .style("font-size", "1.2em")
+            .style("font-weight", "bold")
+            .text(title);
+
+        svg.append("text")
+            .attr("text-anchor", "middle")
+            .attr("transform", `translate(${width / 2},${height + margin.bottom - 10})`)
+            .text(xLabel);
+
+        svg.append("text")
+            .attr("text-anchor", "middle")
+            .attr("transform", `translate(${-margin.left + 20},${height / 2})rotate(-90)`)
+            .text(yLabel);
+    }
+    // --- End D3 Chart Function ---
+
+
     document.addEventListener('DOMContentLoaded', function() {
         var numberAgeData = [];
         {% if number_age_data %}
@@ -137,7 +208,7 @@
                 sortByAgeBtn.textContent = 'Sort by Current Age (Longest First)';
                 isSortedAscending = true;
             }
-            renderTable(detailedNumberAages);
+            renderTable(detailedNumberAges);
         });
     });
 </script>
