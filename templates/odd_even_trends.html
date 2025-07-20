@@ -1,47 +1,37 @@
 {% extends "base.html" %}
 
-{% block title %}Odd/Even Split Trends{% endblock %}
+{% block title %}Odd/Even Trends{% endblock %}
 
 {% block page_heading %}Odd/Even Split Trends (Last 6 Months){% endblock %}
 
 {% block content %}
-<div class="card p-6 bg-white rounded-lg shadow-lg">
-    <h2 class="text-2xl font-bold mb-4 text-gray-800">Recent Odd/Even Splits by Draw Date</h2>
-    <p class="text-gray-700 mb-4">This table shows the odd/even distribution of white balls for each draw over the last six months. "Odd/Even Split" refers to the count of odd vs. even white balls (e.g., 3 Odd / 2 Even). It also includes the sum of the white balls and any numbers from your predefined 'Group A' that appeared in the draw.</p>
+<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Overall Odd/Even Splits in Last 6 Months</h2>
+        <p class="text-gray-600 mb-6">This table shows the frequency of different odd/even combinations for the 5 white balls in draws over the last 6 months.</p>
 
-    {% if odd_even_trends %}
-        <div class="overflow-x-auto">
-            <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
-                <thead class="bg-gray-100">
+        {% if odd_even_trends %}
+        <div class="overflow-x-auto shadow-md rounded-lg">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Draw Date</th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Odd/Even Split</th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">WB Sum</th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Group A Numbers</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Odd/Even Split</th>
+                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Count</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for trend in odd_even_trends %}
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for split_data in odd_even_trends %}
                     <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ trend.draw_date }}</td>
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ trend.split_category }}</td>
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ trend.wb_sum }}</td>
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
-                            {% if trend.group_a_numbers %}
-                                {{ trend.group_a_numbers | join(', ') }}
-                            {% else %}
-                                None
-                            {% endif %}
-                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ split_data.split }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">{{ split_data.count }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-    {% else %}
-        <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
-            No odd/even split trend data available for the last 6 months.
-        </div>
-    {% endif %}
+        {% else %}
+        <p class="text-gray-500">No odd/even trends data available for the last 6 months. Please ensure historical data is loaded.</p>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}
