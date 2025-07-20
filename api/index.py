@@ -441,6 +441,8 @@ def generate_with_user_provided_pair(num1, num2, white_ball_range, powerball_ran
     else:
         raise ValueError("Could not generate a unique combination with the provided pair and ascending range constraint meeting all criteria after many attempts. Try adjusting filters.")
 
+    return white_balls, powerball
+
 
 def check_historical_match(df_source, white_balls, powerball):
     if df_source.empty: return None
@@ -1002,34 +1004,33 @@ def get_most_frequent_triplets(df_source): # Removed top_n parameter
     return formatted_triplets
 
 
-# MODIFIED FUNCTION SIGNATURE AND LOGIC
+# MODIFIED FUNCTION: get_odd_even_split_trends (Updated to return sorted list of dicts)
 def get_odd_even_split_trends(df_source, last_draw_date_str):
     print("[DEBUG-OddEvenTrends] Inside get_odd_even_split_trends function.")
     if df_source.empty or last_draw_date_str == 'N/A':
-        print("[DEBUG-OddEvenTrends] df_source is empty or last_draw_date_str is N/A. Returning empty dictionary.")
-        return {} # Ensure it always returns a dictionary, even if empty
+        print("[DEBUG-OddEvenTrends] df_source is empty or last_draw_date_str is N/A. Returning empty list.")
+        return [] # Return empty list to match new expected format
 
     try:
         last_draw_date = pd.to_datetime(last_draw_date_str)
         print(f"[DEBUG-OddEvenTrends] last_draw_date: {last_draw_date}")
     except Exception as e:
-        print(f"[ERROR-OddEvenTrends] Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty dictionary.")
-        return {} # Ensure it always returns a dictionary, even if empty
+        print(f"[ERROR-OddEvenTrends] Failed to convert last_draw_date_str '{last_draw_date_str}' to datetime: {e}. Returning empty list.")
+        return [] # Return empty list
 
     six_months_ago = last_draw_date - pd.DateOffset(months=6)
     print(f"[DEBUG-OddEvenTrends] six_months_ago: {six_months_ago}")
 
     if 'Draw Date_dt' not in df_source.columns or not pd.api.types.is_datetime64_any_dtype(df_source['Draw Date_dt']):
-        print("[ERROR-OddEvenTrends] 'Draw Date_dt' column missing or not datetime type in df_source. Returning empty dictionary.")
-        return {} # Ensure it always returns a dictionary, even if empty
+        print("[ERROR-OddEvenTrends] 'Draw Date_dt' column missing or not datetime type in df_source. Returning empty list.")
+        return [] # Return empty list
 
     recent_data = df_source[df_source['Draw Date_dt'] >= six_months_ago].copy()
     recent_data = recent_data.sort_values(by='Draw Date_dt', ascending=False)
     if recent_data.empty:
-        print("[DEBUG-OddEvenTrends] recent_data is empty after filtering. Returning empty dictionary.")
-        return {} # Ensure it always returns a dictionary, even if empty
+        print("[DEBUG-OddEvenTrends] recent_data is empty after filtering. Returning empty list.")
+        return [] # Return empty list
 
-    # Use a defaultdict to aggregate splits by category for the last 6 months
     overall_odd_even_counts = defaultdict(int)
 
     for idx, row in recent_data.iterrows():
@@ -1038,7 +1039,7 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
         even_count = sum(1 for num in white_balls if num % 2 == 0)
         odd_count = 5 - even_count
 
-        split_category = "Other"
+        split_category = "Other" # Default for unhandled combinations
 
         if odd_count == 5:
             split_category = "All Odd"
@@ -1055,9 +1056,15 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
         
         overall_odd_even_counts[split_category] += 1
     
-    # Convert defaultdict to a regular dictionary for return
-    print(f"[DEBUG-OddEvenTrends] Generated overall odd/even split counts. Returning aggregated dictionary.")
-    return dict(overall_odd_even_counts) # Explicitly return a dictionary of counts
+    # Convert defaultdict to a sorted list of dictionaries
+    # Sort by count descending, then by split category for consistent order
+    sorted_odd_even_splits = sorted(
+        [{'split': k, 'count': v} for k, v in overall_odd_even_counts.items()], 
+        key=lambda item: (-item['count'], item['split'])
+    )
+    
+    print(f"[DEBUG-OddEvenTrends] Generated overall odd/even split counts. Returning sorted list: {sorted_odd_even_splits}")
+    return sorted_odd_even_splits
 
 
 def get_powerball_frequency_by_year(df_source, num_years=5):
@@ -3139,46 +3146,46 @@ def simulate_multiple_draws_route():
 # @app.route('/winning_probability', methods=['GET', 'POST'])
 # def winning_probability_route():
 #     current_white_ball_range = GLOBAL_WHITE_BALL_RANGE
-#     current_powerball_range = GLOBAL_POWERBALL_RANGE
+# #     current_powerball_range = GLOBAL_POWERBALL_RANGE
     
-#     if request.method == 'POST':
-#         try:
-#             wb_min = int(request.form.get('white_ball_min', GLOBAL_WHITE_BALL_RANGE[0]))
-#             wb_max = int(request.form.get('white_ball_max', GLOBAL_WHITE_BALL_RANGE[1]))
-#             pb_min = int(request.form.get('powerball_min', GLOBAL_POWERBALL_RANGE[0]))
-#             pb_max = int(request.form.get('powerball_max', GLOBAL_POWERBALL_RANGE[1]))
+# #     if request.method == 'POST':
+# #         try:
+# #             wb_min = int(request.form.get('white_ball_min', GLOBAL_WHITE_BALL_RANGE[0]))
+# #             wb_max = int(request.form.get('white_ball_max', GLOBAL_WHITE_BALL_RANGE[1]))
+# #             pb_min = int(request.form.get('powerball_min', GLOBAL_POWERBALL_RANGE[0]))
+# #             pb_max = int(request.form.get('powerball_max', GLOBAL_POWERBALL_RANGE[1]))
 
-#             if not (1 <= wb_min <= wb_max <= 69 and 1 <= pb_min <= pb_max <= 26):
-#                 flash("Invalid range inputs. White ball range must be 1-69 and Powerball 1-26, and min <= max.", 'error')
-#                 wb_min, wb_max = GLOBAL_WHITE_BALL_RANGE
-#                 pb_min, pb_max = GLOBAL_POWERBALL_RANGE
+# #             if not (1 <= wb_min <= wb_max <= 69 and 1 <= pb_min <= pb_max <= 26):
+# #                 flash("Invalid range inputs. White ball range must be 1-69 and Powerball 1-26, and min <= max.", 'error')
+# #                 wb_min, wb_max = GLOBAL_WHITE_BALL_RANGE
+# #                 pb_min, pb_max = GLOBAL_POWERBALL_RANGE
             
-#             current_white_ball_range = (wb_min, wb_max)
-#             current_powerball_range = (pb_min, pb_max)
+# #             current_white_ball_range = (wb_min, wb_max)
+# #             current_powerball_range = (pb_min, pb_max)
 
-#         except ValueError:
-#             flash("Invalid number format for range inputs. Please enter integers.", 'error')
-#             current_white_ball_range = GLOBAL_WHITE_BALL_RANGE
-#             current_powerball_range = GLOBAL_POWERBALL_RANGE
+# #         except ValueError:
+# #             flash("Invalid number format for range inputs. Please enter integers.", 'error')
+# #             current_white_ball_range = GLOBAL_WHITE_BALL_RANGE
+# #             current_powerball_range = GLOBAL_POWERBALL_RANGE
     
-#     cache_key = f"winning_probability_{current_white_ball_range[0]}-{current_white_ball_range[1]}_{current_powerball_range[0]}-{current_powerball_range[1]}"
+# #     cache_key = f"winning_probability_{current_white_ball_range[0]}-{current_white_ball_range[1]}_{current_powerball_range[0]}-{current_powerball_range[1]}"
     
-#     probability_1_in_x, probability_percentage = get_cached_analysis(
-#         cache_key, winning_probability, current_white_ball_range, current_powerball_range
-#     )
+# #     probability_1_in_x, probability_percentage = get_cached_analysis(
+# #         cache_key, winning_probability, current_white_ball_range, current_powerball_range
+# #     )
 
-#     return render_template('winning_probability.html', 
-#                            probability_1_in_x=probability_1_in_x, 
-#                            probability_percentage=probability_percentage,
-#                            white_ball_range=current_white_ball_range,
-#                            powerball_range=current_powerball_range)
+# #     return render_template('winning_probability.html', 
+# #                            probability_1_in_x=probability_1_in_x, 
+# #                            probability_percentage=probability_percentage,
+# #                            white_ball_range=current_white_ball_range,
+# #                            powerball_range=current_powerball_range)
 
-# Commented out as requested
-# @app.route('/partial_match_probabilities')
-# def partial_match_probabilities_route():
-#     probabilities = get_cached_analysis('partial_match_probabilities', partial_match_probabilities, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE)
-#     return render_template('partial_match_probabilities.html', 
-#                            probabilities=probabilities)
+# # Commented out as requested
+# # @app.route('/partial_match_probabilities')
+# # def partial_match_probabilities_route():
+# #     probabilities = get_cached_analysis('partial_match_probabilities', partial_match_probabilities, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE)
+# #     return render_template('partial_match_probabilities.html', 
+# #                            probabilities=probabilities)
 
 @app.route('/number_age_distribution')
 def number_age_distribution_route():
@@ -3216,7 +3223,7 @@ def powerball_frequency_by_year_route():
 @app.route('/odd_even_trends')
 def odd_even_trends_route():
     last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
-    # Pass last_draw_date_str_for_cache as the second argument, correctly mapped now
+    # The get_odd_even_split_trends function now returns a list of dictionaries.
     odd_even_trends = get_cached_analysis('odd_even_trends', get_odd_even_split_trends, df, last_draw_date_str_for_cache)
     return render_template('odd_even_trends.html',
                            odd_even_trends=odd_even_trends)
@@ -3884,15 +3891,11 @@ def _summarize_for_ai(df_source):
     # Ensure get_odd_even_split_trends returns a dictionary of counts
     odd_even_trends_data = get_cached_analysis('odd_even_trends', get_odd_even_split_trends, df_source, last_draw_date_str) 
     
-    # Now, odd_even_trends_data is expected to be a dictionary like {'split_category': count}
-    # We need to aggregate across all days if get_odd_even_split_trends returns stats per day.
-    # The current `get_odd_even_split_trends` already returns an aggregated dictionary, so we can use it directly.
-    
-    if isinstance(odd_even_trends_data, dict) and odd_even_trends_data:
-        # Create a list of (split_category, count) pairs from the dictionary
-        most_common_odd_even = sorted(odd_even_trends_data.items(), key=lambda item: item[1], reverse=True)
-        if most_common_odd_even:
-            summary_parts.append("Most common Odd/Even splits in recent draws (last 6 months): " + ", ".join([f"{s} ({c} times)" for s, c in most_common_odd_even[:3]])) # Top 3
+    # Now, odd_even_trends_data is expected to be a list of dictionaries like [{'split': '3 Odd / 2 Even', 'count': 10}]
+    if isinstance(odd_even_trends_data, list) and odd_even_trends_data:
+        # Take the top 3 splits from the already sorted list
+        top_odd_even_splits_str = ", ".join([f"{s['split']} ({s['count']} times)" for s in odd_even_trends_data[:3]])
+        summary_parts.append(f"Most common Odd/Even splits in recent draws (last 6 months): {top_odd_even_splits_str}")
     else:
         print(f"[DEBUG] No odd/even trend data or unexpected format for summary.")
 
