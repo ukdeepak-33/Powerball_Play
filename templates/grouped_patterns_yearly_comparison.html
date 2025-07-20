@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Grouped Patterns Yearly Comparison{% endblock %}
+
+{% block page_heading %}Grouped Patterns Yearly Comparison{% endblock %}
+
+{% block content %}
+<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <h1 class="text-3xl font-extrabold text-gray-900 text-center mb-6">Grouped Patterns Yearly View</h1>
+
+    {# Range Selection Form #}
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <form action="{{ url_for('grouped_patterns_yearly_comparison_route') }}" method="POST" class="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+            <label for="number_range_select" class="text-lg font-semibold text-gray-700">Select Number Range:</label>
+            <select id="number_range_select" name="selected_range" class="block w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                {% for key, value in number_ranges.items() %}
+                    <option value="{{ key }}" {% if key == selected_range %}selected{% endif %}>
+                        {{ key }} {% if value %}({{ value[0] }}-{{ value[1] }}){% endif %}
+                    </option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-full focus:outline-none focus:shadow-outline transition duration-200 ease-in-out">
+                View Patterns
+            </button>
+        </form>
+    </div>
+
+    {# Yearly Patterns Section #}
+    <div class="space-y-8">
+        {% if yearly_patterns_data %}
+            {% for year_data in yearly_patterns_data %}
+                <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800">{{ year_data.year }} Patterns in {{ selected_range }} Range</h2>
+                    <p class="text-gray-600 mb-4">Total Unique Patterns found in {{ selected_range }} for {{ year_data.year }}: <span class="font-bold text-lg">{{ year_data.total_unique_patterns }}</span></p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 class="text-xl font-semibold mb-2 text-gray-700">Pairs:</h3>
+                            {% if year_data.pairs %}
+                                <ul class="list-disc list-inside text-gray-800 space-y-1">
+                                    {% for pair in year_data.pairs %}
+                                        <li>({{ pair.pattern | join(', ') }}) - {{ pair.count }} time{% if pair.count != 1 %}s{% endif %}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <p class="text-gray-500">No pairs found for this year in this range.</p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-semibold mb-2 text-gray-700">Triplets:</h3>
+                            {% if year_data.triplets %}
+                                <ul class="list-disc list-inside text-gray-800 space-y-1">
+                                    {% for triplet in year_data.triplets %}
+                                        <li>({{ triplet.pattern | join(', ') }}) - {{ triplet.count }} time{% if triplet.count != 1 %}s{% endif %}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <p class="text-gray-500">No triplets found for this year in this range.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200 text-center">
+                <p class="text-gray-600">No grouped pattern data available for the selected range and last 5 years. Please try selecting a different range or ensure historical data is loaded.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
