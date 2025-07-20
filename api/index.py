@@ -940,7 +940,6 @@ def get_most_frequent_triplets(df_source): # Removed top_n parameter
     return formatted_triplets
 
 
-# REVERTED TO PREVIOUS LOGIC FOR ODD/EVEN TRENDS
 def get_odd_even_split_trends(df_source, last_draw_date_str):
     print("[DEBUG-OddEvenTrends] Inside get_odd_even_split_trends function.")
     if df_source.empty or last_draw_date_str == 'N/A':
@@ -1738,6 +1737,74 @@ def get_weekday_draw_trends(df_source, group_a_numbers_def=None): # Keep group_a
             
     return final_results
 
+# NEW HELPER FUNCTION: _get_yearly_patterns_for_range
+def _get_yearly_patterns_for_range(df_source, selected_range_name, num_years=5):
+    """
+    Analyzes grouped patterns (pairs and triplets) within a specific number range
+    for the last 'num_years', returning yearly counts and lists of patterns.
+    """
+    if df_source.empty:
+        return []
+
+    df_copy = df_source.copy()
+    df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
+    
+    if df_copy.empty:
+        return []
+
+    # Ensure white ball columns are numeric
+    for i in range(1, 6):
+        col = f'Number {i}'
+        if col in df_copy.columns:
+            df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce').fillna(0).astype(int)
+
+    current_year = datetime.now().year
+    years_to_analyze = sorted([y for y in range(current_year - num_years + 1, current_year + 1)], reverse=True) # Most recent first
+
+    yearly_pattern_data = []
+
+    # Get the min/max values for the selected range
+    range_min, range_max = NUMBER_RANGES.get(selected_range_name, (1, 69)) # Default to full range if not found
+
+    for year in years_to_analyze:
+        yearly_df = df_copy[df_copy['Draw Date_dt'].dt.year == year]
+        
+        year_pairs_counts = defaultdict(int)
+        year_triplets_counts = defaultdict(int)
+        total_unique_patterns_in_year = set() # To count unique patterns for the year
+
+        for _, row in yearly_df.iterrows():
+            white_balls = [int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])]
+            
+            # Filter numbers to be within the selected range
+            numbers_in_current_range = sorted([num for num in white_balls if range_min <= num <= range_max])
+            
+            if len(numbers_in_current_range) >= 2:
+                for pair in combinations(numbers_in_current_range, 2):
+                    year_pairs_counts[tuple(sorted(pair))] += 1
+                    total_unique_patterns_in_year.add(('pair', tuple(sorted(pair))))
+            
+            if len(numbers_in_current_range) >= 3:
+                for triplet in combinations(numbers_in_current_range, 3):
+                    year_triplets_counts[tuple(sorted(triplet))] += 1
+                    total_unique_patterns_in_year.add(('triplet', tuple(sorted(triplet))))
+        
+        # Format pairs and triplets for the year
+        formatted_pairs = sorted([{'pattern': list(p), 'count': c} for p, c in year_pairs_counts.items()], 
+                                 key=lambda x: (-x['count'], str(x['pattern']))) # Sort by count desc, then pattern asc
+        formatted_triplets = sorted([{'pattern': list(t), 'count': c} for t, c in year_triplets_counts.items()],
+                                  key=lambda x: (-x['count'], str(x['pattern']))) # Sort by count desc, then pattern asc
+
+        yearly_pattern_data.append({
+            'year': int(year),
+            'total_unique_patterns': len(total_unique_patterns_in_year),
+            'pairs': formatted_pairs,
+            'triplets': formatted_triplets
+        })
+    
+    return yearly_pattern_data
+
 
 # --- Data Initialization (Call after all helper functions are defined) ---
 def initialize_core_data():
@@ -1776,8 +1843,6 @@ def initialize_core_data():
         print(f"An error occurred during initial core data loading: {e}")
         traceback.print_exc()
 
-initialize_core_data()
-
 
 # --- Analysis Cache Management ---
 def get_cached_analysis(key, compute_function, *args, **kwargs):
@@ -1800,6 +1865,8 @@ def invalidate_analysis_cache():
     analysis_cache = {}
     last_analysis_cache_update = datetime.min
     print("Analysis cache invalidated.")
+
+initialize_core_data() # Call initialize_core_data AFTER invalidate_analysis_cache is defined.
 
 
 # --- Flask Routes (Ordered for Dependency - all UI-facing routes first, then API routes) ---
@@ -3185,3 +3252,4 @@ def generate_smart_picks_route():
         print(f"An unexpected error occurred in generate_smart_picks_route: {e}")
         traceback.print_exc()
         return jsonify({"error": f"An internal error occurred: {e}"}), 500
+
