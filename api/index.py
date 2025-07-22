@@ -92,6 +92,11 @@ HIGH_NUMBER_MIN = 35 # Numbers 35-69 are considered 'high'
 # Days of the week Powerball is drawn
 POWERBALL_DRAW_DAYS = ['Monday', 'Wednesday', 'Saturday']
 
+# NEW: Boundary Pairs to Analyze
+BOUNDARY_PAIRS_TO_ANALYZE = [
+    (9, 10), (19, 20), (29, 30), (39, 40), (49, 50), (59, 60)
+]
+
 # --- Core Utility Functions (All helpers defined here) ---
 
 def _get_supabase_headers(is_service_key=False):
@@ -1822,47 +1827,83 @@ def _get_yearly_patterns_for_range(df_source, selected_range_name, num_years=5):
     
     return yearly_pattern_data
 
-# NEW FUNCTION: get_boundary_crossing_pairs_trends
-def get_boundary_crossing_pairs_trends(df_source, last_draw_date_str):
+# MODIFIED FUNCTION: get_boundary_crossing_pairs_trends
+def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
     """
-    Analyzes the occurrence of pairs that cross decade boundaries (e.g., 9-10, 19-20).
-    """
-    if df_source.empty or last_draw_date_str == 'N/A':
-        return []
-
-    try:
-        last_draw_date = pd.to_datetime(last_draw_date_str)
-    except Exception:
-        return []
-
-    six_months_ago = last_draw_date - pd.DateOffset(months=6)
-    recent_data = df_source[df_source['Draw Date_dt'] >= six_months_ago].copy()
-    recent_data = recent_data.sort_values(by='Draw Date_dt', ascending=False)
-
-    if recent_data.empty:
-        return []
-
-    boundary_pairs_to_check = [
-        (9, 10), (19, 20), (29, 30), (39, 40), (49, 50), (59, 60)
-    ]
+    Analyzes the occurrence of boundary crossing pairs across all historical data,
+    aggregating counts by year for all pairs and providing yearly data for a selected pair.
     
-    trend_data = []
-    for idx, row in recent_data.iterrows():
-        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6)])
+    Args:
+        df_source (pd.DataFrame): The historical Powerball data.
+        selected_pair_tuple (tuple, optional): A specific boundary pair (e.g., (9, 10))
+                                               to get yearly counts for. Defaults to None.
+
+    Returns:
+        dict: A dictionary containing:
+            - 'all_boundary_patterns_summary': List of {'pattern': [n1, n2], 'total_count': X}
+            - 'yearly_data_for_selected_pattern': List of {'year': Y, 'count': C} for the selected pair
+            - 'all_years_in_data': List of all unique years in the dataset.
+    """
+    if df_source.empty:
+        return {
+            'all_boundary_patterns_summary': [],
+            'yearly_data_for_selected_pattern': [],
+            'all_years_in_data': []
+        }
+
+    df_copy = df_source.copy()
+    if 'Draw Date_dt' not in df_copy.columns:
+        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
+    
+    if df_copy.empty:
+        return {
+            'all_boundary_patterns_summary': [],
+            'yearly_data_for_selected_pattern': [],
+            'all_years_in_data': []
+        }
+
+    # Ensure white ball columns are numeric
+    for i in range(1, 6):
+        col = f'Number {i}'
+        if col in df_copy.columns:
+            df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce').fillna(0).astype(int)
+
+    # Dictionary to store counts of each boundary pair per year
+    yearly_boundary_pair_counts = defaultdict(lambda: defaultdict(int)) # {year: {pair_tuple: count}}
+    overall_boundary_pair_counts = defaultdict(int) # {pair_tuple: total_count}
+
+    all_years = sorted(df_copy['Draw Date_dt'].dt.year.unique().tolist())
+
+    for _, row in df_copy.iterrows():
+        year = row['Draw Date_dt'].year
+        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
         current_draw_pairs = set(combinations(white_balls, 2))
         
-        found_boundary_pairs = []
-        for bp in boundary_pairs_to_check:
+        for bp in BOUNDARY_PAIRS_TO_ANALYZE:
             if bp in current_draw_pairs:
-                found_boundary_pairs.append(list(bp))
-        
-        trend_data.append({
-            'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
-            'boundary_pairs_present': "Yes" if found_boundary_pairs else "No",
-            'pairs_found': found_boundary_pairs
-        })
+                yearly_boundary_pair_counts[year][bp] += 1
+                overall_boundary_pair_counts[bp] += 1
     
-    return trend_data
+    # Format overall summary
+    all_boundary_patterns_summary = sorted([
+        {'pattern': list(p), 'total_count': c} for p, c in overall_boundary_pair_counts.items()
+    ], key=lambda x: (-x['total_count'], str(x['pattern'])))
+
+    # Format yearly data for the selected pattern
+    yearly_data_for_selected_pattern = []
+    if selected_pair_tuple:
+        for year in all_years:
+            count = yearly_boundary_pair_counts[year].get(selected_pair_tuple, 0)
+            yearly_data_for_selected_pattern.append({'year': int(year), 'count': int(count)})
+        yearly_data_for_selected_pattern.sort(key=lambda x: x['year']) # Sort by year ascending
+
+    return {
+        'all_boundary_patterns_summary': all_boundary_patterns_summary,
+        'yearly_data_for_selected_pattern': yearly_data_for_selected_pattern,
+        'all_years_in_data': all_years
+    }
+
 
 # NEW FUNCTION: get_special_patterns_analysis
 def get_special_patterns_analysis(df_source):
@@ -2638,20 +2679,48 @@ def grouped_patterns_yearly_comparison_route():
                            number_ranges=NUMBER_RANGES, # Pass all ranges for the dropdown
                            selected_range=selected_range_label) # Pass the selected range back for persistence
 
-# NEW ROUTE: Boundary Crossing Pairs Trends
-@app.route('/boundary_crossing_pairs_trends')
+# MODIFIED ROUTE: Boundary Crossing Pairs Trends
+@app.route('/boundary_crossing_pairs_trends', methods=['GET', 'POST'])
 def boundary_crossing_pairs_trends_route():
     if df.empty:
         flash("Cannot display Boundary Crossing Pairs Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
-    last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
-    boundary_trends = get_cached_analysis('boundary_crossing_pairs_trends', get_boundary_crossing_pairs_trends, df, last_draw_date_str_for_cache)
-    
-    return render_template('boundary_crossing_pairs_trends.html',
-                           boundary_trends=boundary_trends)
+    selected_pair = request.form.get('selected_pair') # Will be a string like "9, 10"
+    selected_pair_tuple = None
+    if selected_pair:
+        try:
+            parts = [int(p.strip()) for p in selected_pair.split(',')]
+            if len(parts) == 2:
+                selected_pair_tuple = tuple(sorted(parts))
+        except ValueError:
+            flash("Invalid pair format. Please select a valid pair from the dropdown.", 'error')
+            selected_pair = None # Reset to avoid errors in template
 
-# NEW ROUTE: Special Patterns Analysis
+    # Pass the selected_pair_tuple to the analysis function
+    boundary_trends_data = get_cached_analysis(
+        f'boundary_crossing_trends_{selected_pair}', # Cache key depends on selected pair
+        get_boundary_crossing_pairs_trends, 
+        df, 
+        selected_pair_tuple
+    )
+    
+    # Extract data for rendering
+    all_boundary_patterns_summary = boundary_trends_data['all_boundary_patterns_summary']
+    yearly_data_for_selected_pattern = boundary_trends_data['yearly_data_for_selected_pattern']
+    all_years_in_data = boundary_trends_data['all_years_in_data']
+
+    # Convert BOUNDARY_PAIRS_TO_ANALYZE to list of strings for dropdown
+    boundary_pairs_for_dropdown = [f"{p[0]}, {p[1]}" for p in BOUNDARY_PAIRS_TO_ANALYZE]
+
+    return render_template('boundary_crossing_pairs_trends.html',
+                           all_boundary_patterns_summary=all_boundary_patterns_summary,
+                           yearly_data_for_selected_pattern=yearly_data_for_selected_pattern,
+                           all_years_in_data=all_years_in_data,
+                           boundary_pairs_for_dropdown=boundary_pairs_for_dropdown,
+                           selected_pair=selected_pair) # Pass back for persistence in dropdown
+
+# NEW FUNCTION: get_special_patterns_analysis
 @app.route('/special_patterns_analysis')
 def special_patterns_analysis_route():
     if df.empty:
@@ -2987,7 +3056,7 @@ def analyze_generated_historical_matches_route():
         generated_white_balls_str = data.get('generated_white_balls')
         generated_powerball_str = data.get('generated_powerball')
 
-        if not generated_white_balls_str or not generated_powerball_str: 
+        if not generated_white_balls_str or not powerball_str: 
             return jsonify({"success": False, "error": "Missing generated_white_balls or generated_powerball"}), 400
 
         generated_white_balls = sorted([int(x.strip()) for x in generated_white_balls_str.split(',') if x.strip().isdigit()])
