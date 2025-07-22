@@ -829,6 +829,34 @@ def _get_last_drawn_date_for_single_number(df_source, number):
 
     return "N/A" # If number never appeared
 
+# NEW HELPER FUNCTION: To get the last drawn date for a pattern (co-occurrence)
+def _get_last_co_occurrence_date_for_pattern(df_source, pattern_numbers):
+    """
+    Finds the last drawn date where all numbers in the `pattern_numbers` tuple/list
+    appeared together in the white balls of a single draw.
+    """
+    if df_source.empty or not pattern_numbers:
+        return "N/A"
+
+    # Ensure 'Draw Date_dt' is present and sorted
+    if 'Draw Date_dt' not in df_source.columns:
+        df_source['Draw Date_dt'] = pd.to_datetime(df_source['Draw Date'], errors='coerce')
+        df_source = df_source.dropna(subset=['Draw Date_dt'])
+        if df_source.empty: return "N/A"
+
+    # Convert pattern_numbers to a set for efficient lookup
+    pattern_set = frozenset(pattern_numbers)
+
+    # Iterate backwards from the most recent draw
+    for _, row in df_source.sort_values(by='Draw Date_dt', ascending=False).iterrows():
+        draw_white_balls = frozenset([int(row[f'Number {i}']) for i in range(1, 6)])
+        
+        # Check if all numbers in the pattern are present in the current draw's white balls
+        if pattern_set.issubset(draw_white_balls):
+            return row['Draw Date'] # Return the date of the most recent co-occurrence
+            
+    return "N/A" # If the pattern never appeared together
+
 def get_number_age_distribution(df_source):
     if df_source.empty: return [], []
     df_source['Draw Date_dt'] = pd.to_datetime(df_source['Draw Date'])
@@ -1865,7 +1893,7 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
     """
     Analyzes the occurrence of boundary crossing pairs across all historical data,
     aggregating counts by year for all pairs and providing yearly data for a selected pair.
-    Includes last drawn date for each number in the patterns.
+    Includes the last drawn date for the co-occurrence of the pattern.
     
     Args:
         df_source (pd.DataFrame): The historical Powerball data.
@@ -1874,7 +1902,7 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
 
     Returns:
         dict: A dictionary containing:
-            - 'all_boundary_patterns_summary': List of {'pattern': [{'number': N, 'last_drawn': D}, ...], 'total_count': X}
+            - 'all_boundary_patterns_summary': List of {'pattern_numbers': [n1, n2], 'total_count': X, 'last_co_occurrence': D}
             - 'yearly_data_for_selected_pattern': List of {'year': Y, 'count': C} for the selected pair
             - 'all_years_in_data': List of all unique years in the dataset.
     """
@@ -1919,18 +1947,16 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
                 yearly_boundary_pair_counts[year][bp] += 1
                 overall_boundary_pair_counts[bp] += 1
     
-    # Format overall summary, including last drawn dates for each number in the pair
+    # Format overall summary, including last co-occurrence date for the pair
     all_boundary_patterns_summary = []
-    for pair, count in overall_boundary_pair_counts.items():
-        pattern_with_dates = []
-        for num in pair:
-            last_drawn = _get_last_drawn_date_for_single_number(df_source, num)
-            pattern_with_dates.append({'number': num, 'last_drawn': last_drawn})
+    for pair_tuple, count in overall_boundary_pair_counts.items():
+        last_co_occurrence = _get_last_co_occurrence_date_for_pattern(df_source, pair_tuple)
         all_boundary_patterns_summary.append({
-            'pattern': pattern_with_dates,
-            'total_count': int(count)
+            'pattern_numbers': list(pair_tuple),
+            'total_count': int(count),
+            'last_co_occurrence': last_co_occurrence
         })
-    all_boundary_patterns_summary.sort(key=lambda x: (-x['total_count'], str([n['number'] for n in x['pattern']])))
+    all_boundary_patterns_summary.sort(key=lambda x: (-x['total_count'], str(x['pattern_numbers'])))
 
 
     # Format yearly data for the selected pattern
@@ -1956,7 +1982,7 @@ def get_special_patterns_analysis(df_source):
     - Tens-apart pairs (e.g., 10,20; 55,65)
     - Same last digit patterns (e.g., 9,19,29; 8,28,48,58)
     - Repeating digit numbers (e.g., 11,22,33)
-    Includes last drawn date for each number in the patterns.
+    Includes the last drawn date for the co-occurrence of the pattern.
     """
     if df_source.empty:
         return {
@@ -2039,33 +2065,24 @@ def get_special_patterns_analysis(df_source):
                     repeating_digit_counts[pattern_combo] += 1
 
 
-    # Format results for output, including last drawn dates for each number in the pattern
+    # Format results for output, including last co-occurrence date for the pattern
     formatted_tens_apart = []
     for pattern_tuple, count in tens_apart_counts.items():
-        pattern_with_dates = []
-        for num in pattern_tuple:
-            last_drawn = _get_last_drawn_date_for_single_number(df_source, num)
-            pattern_with_dates.append({'number': num, 'last_drawn': last_drawn})
-        formatted_tens_apart.append({'pattern': pattern_with_dates, 'count': int(count)})
-    formatted_tens_apart.sort(key=lambda x: (-x['count'], str([n['number'] for n in x['pattern']])))
+        last_co_occurrence = _get_last_co_occurrence_date_for_pattern(df_source, pattern_tuple)
+        formatted_tens_apart.append({'pattern_numbers': list(pattern_tuple), 'count': int(count), 'last_co_occurrence': last_co_occurrence})
+    formatted_tens_apart.sort(key=lambda x: (-x['count'], str(x['pattern_numbers'])))
 
     formatted_same_last_digit = []
     for pattern_tuple, count in same_last_digit_counts.items():
-        pattern_with_dates = []
-        for num in pattern_tuple:
-            last_drawn = _get_last_drawn_date_for_single_number(df_source, num)
-            pattern_with_dates.append({'number': num, 'last_drawn': last_drawn})
-        formatted_same_last_digit.append({'pattern': pattern_with_dates, 'count': int(count)})
-    formatted_same_last_digit.sort(key=lambda x: (-x['count'], str([n['number'] for n in x['pattern']])))
+        last_co_occurrence = _get_last_co_occurrence_date_for_pattern(df_source, pattern_tuple)
+        formatted_same_last_digit.append({'pattern_numbers': list(pattern_tuple), 'count': int(count), 'last_co_occurrence': last_co_occurrence})
+    formatted_same_last_digit.sort(key=lambda x: (-x['count'], str(x['pattern_numbers'])))
 
     formatted_repeating_digit = []
     for pattern_tuple, count in repeating_digit_counts.items():
-        pattern_with_dates = []
-        for num in pattern_tuple:
-            last_drawn = _get_last_drawn_date_for_single_number(df_source, num)
-            pattern_with_dates.append({'number': num, 'last_drawn': last_drawn})
-        formatted_repeating_digit.append({'pattern': pattern_with_dates, 'count': int(count)})
-    formatted_repeating_digit.sort(key=lambda x: (-x['count'], str([n['number'] for n in x['pattern']])))
+        last_co_occurrence = _get_last_co_occurrence_date_for_pattern(df_source, pattern_tuple)
+        formatted_repeating_digit.append({'pattern_numbers': list(pattern_tuple), 'count': int(count), 'last_co_occurrence': last_co_occurrence})
+    formatted_repeating_digit.sort(key=lambda x: (-x['count'], str(x['pattern_numbers'])))
 
     return {
         'tens_apart_patterns': formatted_tens_apart,
@@ -3138,7 +3155,7 @@ def analyze_generated_historical_matches_route():
         return jsonify({
             "success": True,
             "generated_numbers_for_analysis": generated_white_balls,
-            "generated_powerball_for_analysis": generated_powerball,
+            "generated_powerball_for_powerball": generated_powerball, # Corrected key name
             "match_summary": historical_match_results['summary']
         })
 
