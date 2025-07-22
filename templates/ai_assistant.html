@@ -65,16 +65,17 @@
             messageDiv.classList.add('flex', sender === 'user' ? 'justify-end' : 'justify-start');
             
             const messageBubble = document.createElement('div');
-            messageBubble.classList.add(
-                'p-3', 'rounded-lg', 'max-w-[80%]', 'shadow-sm',
-                sender === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'
-            );
+            messageBubble.classList.add('p-3', 'rounded-lg', 'max-w-[80%]', 'shadow-sm');
+            if (sender === 'user') {
+            messageBubble.classList.add('bg-blue-600', 'text-white');
+            } else {
+            messageBubble.classList.add('bg-gray-200', 'text-gray-800');
+            }
             messageBubble.textContent = message;
             messageDiv.appendChild(messageBubble);
             chatHistory.appendChild(messageDiv);
             chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
         }
-
         // Function to send message to AI
         async function sendMessage() {
             const message = userInput.value.trim();
