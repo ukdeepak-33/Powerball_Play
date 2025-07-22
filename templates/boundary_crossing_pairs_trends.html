@@ -2,46 +2,197 @@
 
 {% block title %}Boundary Crossing Pairs Trends{% endblock %}
 
-{% block page_heading %}Boundary Crossing Pairs Trends (Last 6 Months){% endblock %}
+{% block page_heading %}Boundary Crossing Pairs Trends{% endblock %}
 
 {% block content %}
-<div class="card p-6 bg-white rounded-xl shadow-lg">
-    <h2 class="text-2xl font-bold mb-4 text-gray-800">Recent Boundary Crossing Pairs</h2>
-    <p class="text-gray-700 mb-4">This table shows draws from the last six months where "boundary crossing" pairs appeared. These are pairs of numbers like (9, 10), (19, 20), (29, 30), (39, 40), (49, 50), and (59, 60), which span across traditional decade groupings.</p>
+<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="card p-6 bg-white rounded-xl shadow-lg mb-8">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Boundary Crossing Pairs Analysis</h2>
+        <p class="text-gray-700 mb-6">This page analyzes "boundary crossing" pairs, which are numbers that span across traditional decade groupings (e.g., 9-10, 19-20). You can see their overall frequency and select a specific pair to view its yearly trend.</p>
 
-    {% if boundary_trends %}
-        <div class="overflow-x-auto">
-            <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
-                <thead class="bg-gray-100">
+        <h3 class="text-xl font-semibold mb-4 text-gray-800">Overall Frequency of Boundary Pairs</h3>
+        {% if all_boundary_patterns_summary %}
+        <div class="overflow-x-auto shadow-md rounded-lg mb-8">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Draw Date</th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Boundary Pairs Present?</th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Pairs Found</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pair</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Occurrences</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for trend in boundary_trends %}
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for pattern in all_boundary_patterns_summary %}
                     <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ trend.draw_date }}</td>
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ trend.boundary_pairs_present }}</td>
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
-                            {% if trend.pairs_found %}
-                                {% for pair in trend.pairs_found %}
-                                    ({{ pair | join(', ') }}){% if not loop.last %}, {% endif %}
-                                {% endfor %}
-                            {% else %}
-                                None
-                            {% endif %}
-                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">({{ pattern.pattern | join(', ') }})</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pattern.total_count }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-    {% else %}
-        <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
-            No boundary crossing pairs data available for the last 6 months.
+        {% else %}
+        <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 mb-8">
+            No overall boundary crossing pairs data available.
         </div>
-    {% endif %}
+        {% endif %}
+
+        <h3 class="text-xl font-semibold mb-4 text-gray-800">Yearly Trends for a Specific Boundary Pair</h3>
+        <form method="POST" action="{{ url_for('boundary_crossing_pairs_trends_route') }}" class="mb-6 flex flex-col sm:flex-row items-start sm:items-end space-y-4 sm:space-y-0 sm:space-x-4">
+            <div class="form-group flex-grow w-full sm:w-auto">
+                <label for="selected_pair" class="form-label">Select a Boundary Pair:</label>
+                <select id="selected_pair" name="selected_pair" class="form-input">
+                    {% for pair_str in boundary_pairs_for_dropdown %}
+                        <option value="{{ pair_str }}" {% if selected_pair == pair_str %}selected{% endif %}>({{ pair_str }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn-primary">View Yearly Trend</button>
+        </form>
+
+        {% if selected_pair %}
+            <div class="card p-6 bg-white rounded-xl shadow-lg mb-8">
+                <h4 class="text-xl font-semibold mb-4 text-gray-800">Yearly Occurrences of ({{ selected_pair }})</h4>
+                {% if yearly_data_for_selected_pattern %}
+                    <div class="chart-container mb-6">
+                        <canvas id="yearlyPairChart"></canvas>
+                    </div>
+
+                    <h5 class="text-lg font-semibold mb-3 text-gray-700">Detailed Yearly Data for ({{ selected_pair }})</h5>
+                    <div class="overflow-x-auto shadow-md rounded-lg">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Year</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Occurrences</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {% for data in yearly_data_for_selected_pattern %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ data.year }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ data.count }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
+                        No yearly data available for the selected pair ({{ selected_pair }}).
+                    </div>
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-800">
+                Select a boundary pair from the dropdown above to view its yearly trend.
+            </div>
+        {% endif %}
+    </div>
 </div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const yearlyData = {{ yearly_data_for_selected_pattern | tojson }};
+        const selectedPair = "{{ selected_pair }}";
+
+        if (yearlyData && yearlyData.length > 0) {
+            const years = yearlyData.map(d => d.year);
+            const counts = yearlyData.map(d => d.count);
+
+            const ctx = document.getElementById('yearlyPairChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: years,
+                    datasets: [{
+                        label: `Occurrences of (${selectedPair}) per Year`,
+                        data: counts,
+                        backgroundColor: 'rgba(99, 102, 241, 0.6)', // Indigo-500 with opacity
+                        borderColor: 'rgba(79, 70, 229, 1)', // Indigo-600
+                        borderWidth: 1,
+                        borderRadius: 5, // Rounded bars
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `Yearly Occurrences of (${selectedPair})`,
+                            font: {
+                                size: 18,
+                                weight: 'bold',
+                                family: 'Inter, sans-serif'
+                            },
+                            color: '#374151'
+                        },
+                        legend: {
+                            display: false // No need for legend with single dataset
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += context.parsed.y + ' times';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Year',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold',
+                                    family: 'Inter, sans-serif'
+                                },
+                                color: '#4b5563'
+                            },
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Occurrences',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold',
+                                    family: 'Inter, sans-serif'
+                                },
+                                color: '#4b5563'
+                            },
+                            ticks: {
+                                precision: 0 // Ensure integer ticks for counts
+                            }
+                        }
+                    },
+                    layout: {
+                        padding: {
+                            left: 10,
+                            right: 10,
+                            top: 10,
+                            bottom: 10
+                        }
+                    }
+                }
+            });
+        }
+    });
+</script>
 {% endblock %}
