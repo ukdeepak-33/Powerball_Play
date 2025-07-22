@@ -14,7 +14,9 @@ import traceback # Ensure this is imported for logging errors
 # --- Supabase Configuration ---
 # IMPORTANT: These values should ALWAYS be set as environment variables in your deployment platform (e.g., Render, Vercel).\
 # The 'default' values provided here are placeholders, ONLY used if the environment variable is NOT found.\
-# If running locally for testing, you can set them in your shell or a .env file.
+# If running locally for testing, you can set them in your shell or a .env file.\
+# You should replace "YOUR_ACTUAL_SUPABASE_ANON_KEY_GOES_HERE" and "YOUR_ACTUAL_SUPABASE_SERVICE_ROLE_KEY_GOES_HERE"
+# with your actual Supabase keys in your deployment environment variables.
 SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "YOUR_ACTUAL_SUPABASE_ANON_KEY_GOES_HERE") # REPLACE THIS IN YOUR ENV VARS
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_ACTUAL_SUPABASE_SERVICE_ROLE_KEY_GOES_HERE") # REPLACE THIS IN YOUR ENV VARS
@@ -1240,10 +1242,8 @@ def save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb):
         print(f"Draw for date {draw_date} already exists in {SUPABASE_TABLE_NAME}.")
         return False, f"Draw for {draw_date} already exists."
 
-    # --- FIX START ---
     # Collect the white balls into a list and sort them
     sorted_white_balls = sorted([n1, n2, n3, n4, n5])
-    # --- FIX END ---
 
     new_draw_data = {
         'Draw Date': draw_date,
@@ -1482,7 +1482,8 @@ def get_grouped_patterns_over_years(df_source):
     for i in range(1, 6):
         col = f'Number {i}'
         if col in df_source_copy.columns:
-            df_source_copy[col] = pd.to_numeric(df_copy[col], errors='coerce').fillna(0).astype(int)
+            # CORRECTED LINE: Ensure we are operating on df_source_copy[col] on both sides
+            df_source_copy[col] = pd.to_numeric(df_source_copy[col], errors='coerce').fillna(0).astype(int)
         else:
             print(f"[WARN-GroupedPatterns] Column '{col}' not found in DataFrame for pattern analysis.")
 
@@ -1772,6 +1773,8 @@ def _get_yearly_patterns_for_range(df_source, selected_range_name, num_years=5):
         col = f'Number {i}'
         if col in df_copy.columns:
             df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce').fillna(0).astype(int)
+        else:
+            print(f"[WARN-GroupedPatterns] Column '{col}' not found in DataFrame for pattern analysis.")
 
     current_year = datetime.now().year
     years_to_analyze = sorted([y for y in range(current_year - num_years + 1, current_year + 1)], reverse=True) # Most recent first
@@ -1885,28 +1888,22 @@ def get_special_patterns_analysis(df_source):
     # Define the patterns we are looking for
     # Tens-apart: (N, N+10), (N, N+20), ..., (N, N+50)
     all_tens_apart_pairs = set()
-    for n1 in range(1, 60):
+    for n1 in range(1, 60): # Max n1 for N+10 is 59, for N+50 is 19
         for diff in [10, 20, 30, 40, 50]:
             n2 = n1 + diff
             if n2 <= 69:
                 all_tens_apart_pairs.add(tuple(sorted((n1, n2))))
 
     # Same last digit: groups of numbers ending in the same digit
-    # We'll consider groups of 3 or more for significance
-    same_last_digit_groups = defaultdict(list)
+    # We'll generate all possible numbers for each last digit, then check combinations
+    # Example: numbers ending in 9: [9, 19, 29, 39, 49, 59, 69]
+    same_last_digit_groups_full = defaultdict(list)
     for i in range(1, 70):
         last_digit = i % 10
-        same_last_digit_groups[last_digit].append(i)
+        same_last_digit_groups_full[last_digit].append(i)
     
-    # Filter for groups with at least 3 numbers
-    significant_same_last_digit_patterns = [
-        tuple(g) for g in same_last_digit_groups.values() if len(g) >= 3
-    ]
-    
-    # Repeating digits: groups like 11,22,33
+    # Repeating digits: numbers like 11, 22, 33
     repeating_digit_numbers = [11, 22, 33, 44, 55, 66]
-    all_repeating_digit_triplets = set(combinations(repeating_digit_numbers, 3))
-    all_repeating_digit_pairs = set(combinations(repeating_digit_numbers, 2))
 
 
     for idx, row in df_source.iterrows():
@@ -1919,30 +1916,42 @@ def get_special_patterns_analysis(df_source):
             if sorted_pair in all_tens_apart_pairs:
                 tens_apart_counts[sorted_pair] += 1
 
-        # Check for Same Last Digit Patterns
-        for group in significant_same_last_digit_patterns:
-            # Check if at least 3 numbers from this group are in the current draw
-            intersection = white_ball_set.intersection(set(group))
-            if len(intersection) >= 3:
-                # Store the actual subset found in the draw
-                same_last_digit_counts[tuple(sorted(list(intersection)))] += 1
+        # Check for Same Last Digit Patterns (groups of 2 or more)
+        for last_digit, full_group_numbers in same_last_digit_groups_full.items():
+            # Find intersection of current draw and the full group for this last digit
+            intersection_with_draw = white_ball_set.intersection(set(full_group_numbers))
+            
+            # Consider patterns of 2 or more numbers with the same last digit
+            if len(intersection_with_draw) >= 2:
+                for pattern_combo in combinations(sorted(list(intersection_with_draw)), 2): # Check for pairs
+                    same_last_digit_counts[pattern_combo] += 1
+                if len(intersection_with_draw) >= 3: # Check for triplets
+                    for pattern_combo in combinations(sorted(list(intersection_with_draw)), 3):
+                        same_last_digit_counts[pattern_combo] += 1
+                if len(intersection_with_draw) >= 4: # Check for quads
+                    for pattern_combo in combinations(sorted(list(intersection_with_draw)), 4):
+                        same_last_digit_counts[pattern_combo] += 1
+                if len(intersection_with_draw) >= 5: # Check for quints
+                    for pattern_combo in combinations(sorted(list(intersection_with_draw)), 5):
+                        same_last_digit_counts[pattern_combo] += 1
 
-        # Check for Repeating Digit Patterns (Triplets and Pairs)
-        for triplet in all_repeating_digit_triplets:
-            if set(triplet).issubset(white_ball_set):
-                repeating_digit_counts[tuple(sorted(triplet))] += 1
-        
-        for pair in all_repeating_digit_pairs:
-            if set(pair).issubset(white_ball_set):
-                # Only count pairs if a triplet wasn't found (to avoid double counting for the same numbers)
-                # This logic can be refined based on desired specificity
-                is_part_of_triplet = False
-                for triplet in all_repeating_digit_triplets:
-                    if set(pair).issubset(set(triplet)) and set(triplet).issubset(white_ball_set):
-                        is_part_of_triplet = True
-                        break
-                if not is_part_of_triplet:
-                    repeating_digit_counts[tuple(sorted(pair))] += 1
+
+        # Check for Repeating Digit Patterns (groups of 2 or more)
+        # Filter repeating_digit_numbers that are actually in the current draw
+        drawn_repeating_digits = [n for n in repeating_digit_numbers if n in white_ball_set]
+
+        if len(drawn_repeating_digits) >= 2:
+            for pattern_combo in combinations(sorted(drawn_repeating_digits), 2): # Pairs
+                repeating_digit_counts[pattern_combo] += 1
+            if len(drawn_repeating_digits) >= 3: # Triplets
+                for pattern_combo in combinations(sorted(drawn_repeating_digits), 3):
+                    repeating_digit_counts[pattern_combo] += 1
+            if len(drawn_repeating_digits) >= 4: # Quads
+                for pattern_combo in combinations(sorted(drawn_repeating_digits), 4):
+                    repeating_digit_counts[pattern_combo] += 1
+            if len(drawn_repeating_digits) >= 5: # Quints
+                for pattern_combo in combinations(sorted(drawn_repeating_digits), 5):
+                    repeating_digit_counts[pattern_combo] += 1
 
 
     # Format results for output
@@ -2249,7 +2258,6 @@ def save_official_draw_route():
         flash(f"An error occurred: {e}", 'error')
     return redirect(url_for('index'))
 
-# This is the correct and only definition for save_generated_numbers_to_db
 def save_generated_numbers_to_db(numbers, powerball):
     """
     Saves a generated Powerball combination to the 'generated_powerball_numbers' table.
