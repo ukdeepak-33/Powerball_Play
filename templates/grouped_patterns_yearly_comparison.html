@@ -6,63 +6,67 @@
 
 {% block content %}
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <h1 class="text-3xl font-extrabold text-gray-900 text-center mb-6">Grouped Patterns Yearly View</h1>
-
-    {# Range Selection Form #}
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <form action="{{ url_for('grouped_patterns_yearly_comparison_route') }}" method="POST" class="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-            <label for="number_range_select" class="text-lg font-semibold text-gray-700">Select Number Range:</label>
-            <select id="number_range_select" name="selected_range" class="block w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                {% for key, value in number_ranges.items() %}
-                    <option value="{{ key }}" {% if key == selected_range %}selected{% endif %}>
-                        {{ key }} {% if value %}({{ value[0] }}-{{ value[1] }}){% endif %}
-                    </option>
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Compare Patterns by Year</h2>
+        <p class="text-gray-700 mb-6">Select a number range to see the most frequent pairs and triplets within that range, year by year, for the last 5 years. This helps identify how patterns in specific number groups have changed over time.</p>
+
+        <form method="POST" action="{{ url_for('grouped_patterns_yearly_comparison_route') }}" class="mb-8 flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
+            <label for="selected_range" class="font-medium text-gray-700 whitespace-nowrap">Select Number Range:</label>
+            <select id="selected_range" name="selected_range" class="form-select mt-1 block w-full sm:w-auto rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                {% for range_name, range_tuple in number_ranges.items() %}
+                    <option value="{{ range_name }}" {% if selected_range == range_name %}selected{% endif %}>{{ range_name }} ({{ range_tuple[0] }}-{{ range_tuple[1] }})</option>
                 {% endfor %}
             </select>
-            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-full focus:outline-none focus:shadow-outline transition duration-200 ease-in-out">
-                View Patterns
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200 ease-in-out w-full sm:w-auto">
+                Show Comparison
             </button>
         </form>
-    </div>
 
-    {# Yearly Patterns Section #}
-    <div class="space-y-8">
         {% if yearly_patterns_data %}
-            {% for year_data in yearly_patterns_data %}
-                <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-                    <h2 class="text-2xl font-bold mb-4 text-gray-800">{{ year_data.year }} Patterns in {{ selected_range }} Range</h2>
-                    <p class="text-gray-600 mb-4">Total Unique Patterns found in {{ selected_range }} for {{ year_data.year }}: <span class="font-bold text-lg">{{ year_data.total_unique_patterns }}</span></p>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <h3 class="text-xl font-semibold mb-2 text-gray-700">Pairs:</h3>
-                            {% if year_data.pairs %}
-                                <ul class="list-disc list-inside text-gray-800 space-y-1">
-                                    {% for pair in year_data.pairs %}
-                                        <li>({{ pair.pattern | join(', ') }}) - {{ pair.count }} time{% if pair.count != 1 %}s{% endif %}</li>
-                                    {% endfor %}
-                                </ul>
-                            {% else %}
-                                <p class="text-gray-500">No pairs found for this year in this range.</p>
-                            {% endif %}
-                        </div>
-                        <div>
-                            <h3 class="text-xl font-semibold mb-2 text-gray-700">Triplets:</h3>
-                            {% if year_data.triplets %}
-                                <ul class="list-disc list-inside text-gray-800 space-y-1">
-                                    {% for triplet in year_data.triplets %}
-                                        <li>({{ triplet.pattern | join(', ') }}) - {{ triplet.count }} time{% if triplet.count != 1 %}s{% endif %}</li>
-                                    {% endfor %}
-                                </ul>
-                            {% else %}
-                                <p class="text-gray-500">No triplets found for this year in this range.</p>
-                            {% endif %}
+            <h3 class="text-xl font-semibold mb-6 text-gray-800">Patterns in {{ selected_range }} ({{ number_ranges[selected_range][0] }}-{{ number_ranges[selected_range][1] }})</h3>
+            
+            {# Changed to responsive grid for side-by-side layout #}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"> {# This div will arrange cards in a responsive grid #}
+                {% for year_data in yearly_patterns_data %}
+                    <div class="bg-gray-50 p-6 rounded-xl shadow-md border border-gray-200">
+                        <h4 class="text-lg font-bold mb-4 text-gray-700">Year: {{ year_data.year }}</h4>
+                        <p class="text-sm text-gray-600 mb-4">Total Unique Patterns Found: {{ year_data.total_unique_patterns }}</p>
+
+                        <div class="grid grid-cols-1 gap-6"> {# Inner grid for pairs/triplets, still stacking vertically within each year card #}
+                            {# Pairs Section #}
+                            <div>
+                                <h5 class="text-md font-semibold mb-3 text-gray-700">Most Frequent Pairs</h5>
+                                {% if year_data.pairs %}
+                                    <ul class="list-disc list-inside space-y-1 text-sm text-gray-800">
+                                        {% for pair in year_data.pairs %}
+                                            <li>{{ pair.pattern | join(', ') }} ({{ pair.count }} times)</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <p class="text-sm text-gray-500">No pairs found in this range for {{ year_data.year }}.</p>
+                                {% endif %}
+                            </div>
+
+                            {# Triplets Section #}
+                            <div>
+                                <h5 class="text-md font-semibold mb-3 text-gray-700">Most Frequent Triplets</h5>
+                                {% if year_data.triplets %}
+                                    <ul class="list-disc list-inside space-y-1 text-sm text-gray-800">
+                                        {% for triplet in year_data.triplets %}
+                                            <li>{{ triplet.pattern | join(', ') }} ({{ triplet.count }} times)</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <p class="text-sm text-gray-500">No triplets found in this range for {{ year_data.year }}.</p>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
-                </div>
-            {% endfor %}
+                {% endfor %}
+            </div>
         {% else %}
-            <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200 text-center">
-                <p class="text-gray-600">No grouped pattern data available for the selected range and last 5 years. Please try selecting a different range or ensure historical data is loaded.</p>
+            <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
+                No grouped patterns data available for the selected range or years.
             </div>
         {% endif %}
     </div>
