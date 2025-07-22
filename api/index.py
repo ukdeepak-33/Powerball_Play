@@ -796,6 +796,39 @@ def find_last_draw_dates_for_numbers(df_source, white_balls, powerball):
 
     return last_draw_dates
 
+# NEW HELPER FUNCTION: To get the last drawn date for a single number
+def _get_last_drawn_date_for_single_number(df_source, number):
+    """
+    Finds the last drawn date for a single given number (white ball or powerball).
+    """
+    if df_source.empty:
+        return "N/A"
+
+    # Ensure 'Draw Date_dt' is present and sorted
+    if 'Draw Date_dt' not in df_source.columns:
+        df_source['Draw Date_dt'] = pd.to_datetime(df_source['Draw Date'], errors='coerce')
+        df_source = df_source.dropna(subset=['Draw Date_dt'])
+        if df_source.empty: return "N/A" # Handle case where conversion fails
+
+    sorted_df = df_source.sort_values(by='Draw Date_dt', ascending=False)
+
+    # Check white ball columns
+    for col_idx in range(1, 6):
+        col_name = f'Number {col_idx}'
+        if col_name in sorted_df.columns:
+            # Filter rows where the number appears in this white ball position
+            matching_rows = sorted_df[sorted_df[col_name].astype(int) == number]
+            if not matching_rows.empty:
+                return matching_rows['Draw Date'].iloc[0] # Return the most recent date
+
+    # Check powerball column
+    if 'Powerball' in sorted_df.columns:
+        matching_rows_pb = sorted_df[sorted_df['Powerball'].astype(int) == number]
+        if not matching_rows_pb.empty:
+            return matching_rows_pb['Draw Date'].iloc[0] # Return the most recent date
+
+    return "N/A" # If number never appeared
+
 def get_number_age_distribution(df_source):
     if df_source.empty: return [], []
     df_source['Draw Date_dt'] = pd.to_datetime(df_source['Draw Date'])
@@ -841,7 +874,7 @@ def get_number_age_distribution(df_source):
 
             detailed_ages.append({'number': int(i), 'type': 'Powerball', 'age': miss_streak_count, 'last_drawn_date': last_appearance_date_str})
         else:
-            detailed_ages.append({'number': int(i), 'type': 'Powerball', 'age': len(all_draw_dates), 'last_drawn_date': last_appearance_date_str})
+            detailed_ages.append({'number': int(i), 'type': 'Powerball', 'age': len(all_draw_dates), 'last_drawn_date': len(all_draw_dates)}) # Changed to len(all_draw_dates) for consistency if never drawn
 
     all_miss_streaks_only = [item['age'] for item in detailed_ages]
     age_counts = pd.Series(all_miss_streaks_only).value_counts().sort_index()
@@ -1832,6 +1865,7 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
     """
     Analyzes the occurrence of boundary crossing pairs across all historical data,
     aggregating counts by year for all pairs and providing yearly data for a selected pair.
+    Includes last drawn date for each number in the patterns.
     
     Args:
         df_source (pd.DataFrame): The historical Powerball data.
@@ -1840,7 +1874,7 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
 
     Returns:
         dict: A dictionary containing:
-            - 'all_boundary_patterns_summary': List of {'pattern': [n1, n2], 'total_count': X}
+            - 'all_boundary_patterns_summary': List of {'pattern': [{'number': N, 'last_drawn': D}, ...], 'total_count': X}
             - 'yearly_data_for_selected_pattern': List of {'year': Y, 'count': C} for the selected pair
             - 'all_years_in_data': List of all unique years in the dataset.
     """
@@ -1885,10 +1919,19 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
                 yearly_boundary_pair_counts[year][bp] += 1
                 overall_boundary_pair_counts[bp] += 1
     
-    # Format overall summary
-    all_boundary_patterns_summary = sorted([
-        {'pattern': list(p), 'total_count': c} for p, c in overall_boundary_pair_counts.items()
-    ], key=lambda x: (-x['total_count'], str(x['pattern'])))
+    # Format overall summary, including last drawn dates for each number in the pair
+    all_boundary_patterns_summary = []
+    for pair, count in overall_boundary_pair_counts.items():
+        pattern_with_dates = []
+        for num in pair:
+            last_drawn = _get_last_drawn_date_for_single_number(df_source, num)
+            pattern_with_dates.append({'number': num, 'last_drawn': last_drawn})
+        all_boundary_patterns_summary.append({
+            'pattern': pattern_with_dates,
+            'total_count': int(count)
+        })
+    all_boundary_patterns_summary.sort(key=lambda x: (-x['total_count'], str([n['number'] for n in x['pattern']])))
+
 
     # Format yearly data for the selected pattern
     yearly_data_for_selected_pattern = []
@@ -1905,7 +1948,7 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
     }
 
 
-# NEW FUNCTION: get_special_patterns_analysis
+# MODIFIED FUNCTION: get_special_patterns_analysis
 def get_special_patterns_analysis(df_source):
     """
     Analyzes the occurrence of various 'special' number patterns across all historical data.
@@ -1913,6 +1956,7 @@ def get_special_patterns_analysis(df_source):
     - Tens-apart pairs (e.g., 10,20; 55,65)
     - Same last digit patterns (e.g., 9,19,29; 8,28,48,58)
     - Repeating digit numbers (e.g., 11,22,33)
+    Includes last drawn date for each number in the patterns.
     """
     if df_source.empty:
         return {
@@ -1995,10 +2039,33 @@ def get_special_patterns_analysis(df_source):
                     repeating_digit_counts[pattern_combo] += 1
 
 
-    # Format results for output
-    formatted_tens_apart = sorted([{'pattern': list(p), 'count': c} for p, c in tens_apart_counts.items()], key=lambda x: (-x['count'], str(x['pattern'])))
-    formatted_same_last_digit = sorted([{'pattern': list(p), 'count': c} for p, c in same_last_digit_counts.items()], key=lambda x: (-x['count'], str(x['pattern'])))
-    formatted_repeating_digit = sorted([{'pattern': list(p), 'count': c} for p, c in repeating_digit_counts.items()], key=lambda x: (-x['count'], str(x['pattern'])))
+    # Format results for output, including last drawn dates for each number in the pattern
+    formatted_tens_apart = []
+    for pattern_tuple, count in tens_apart_counts.items():
+        pattern_with_dates = []
+        for num in pattern_tuple:
+            last_drawn = _get_last_drawn_date_for_single_number(df_source, num)
+            pattern_with_dates.append({'number': num, 'last_drawn': last_drawn})
+        formatted_tens_apart.append({'pattern': pattern_with_dates, 'count': int(count)})
+    formatted_tens_apart.sort(key=lambda x: (-x['count'], str([n['number'] for n in x['pattern']])))
+
+    formatted_same_last_digit = []
+    for pattern_tuple, count in same_last_digit_counts.items():
+        pattern_with_dates = []
+        for num in pattern_tuple:
+            last_drawn = _get_last_drawn_date_for_single_number(df_source, num)
+            pattern_with_dates.append({'number': num, 'last_drawn': last_drawn})
+        formatted_same_last_digit.append({'pattern': pattern_with_dates, 'count': int(count)})
+    formatted_same_last_digit.sort(key=lambda x: (-x['count'], str([n['number'] for n in x['pattern']])))
+
+    formatted_repeating_digit = []
+    for pattern_tuple, count in repeating_digit_counts.items():
+        pattern_with_dates = []
+        for num in pattern_tuple:
+            last_drawn = _get_last_drawn_date_for_single_number(df_source, num)
+            pattern_with_dates.append({'number': num, 'last_drawn': last_drawn})
+        formatted_repeating_digit.append({'pattern': pattern_with_dates, 'count': int(count)})
+    formatted_repeating_digit.sort(key=lambda x: (-x['count'], str([n['number'] for n in x['pattern']])))
 
     return {
         'tens_apart_patterns': formatted_tens_apart,
@@ -2487,13 +2554,13 @@ def find_results_by_sum_route():
                     results_df_raw = results_df_raw.sort_values(by='WhiteBallsTuple', ascending=True)
                     results_df_raw = results_df_raw.drop(columns=['WhiteBallsTuple'])
                 elif selected_sort_by == 'balls_desc':
-                    results_df_raw['WhiteBallsTuple'] = results_df_raw.apply( # Changed to results_df_raw here
+                    results_df_raw['WhiteBallsTuple'] = results.apply( # Changed to results_df_raw here
                         lambda row: tuple(sorted([
                             int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
                             int(row['Number 4']), int(row['Number 5'])
                         ])), axis=1
                     )
-                    results_df_raw = results_df_raw.sort_values(by='WhiteBallsTuple', ascending=False)
+                    results_df_raw = results.sort_values(by='WhiteBallsTuple', ascending=False)
                     results_df_raw = results_df_raw.drop(columns=['WhiteBallsTuple'])
 
             results = results_df_raw.to_dict('records')
