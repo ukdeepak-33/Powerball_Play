@@ -8,12 +8,12 @@
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="card p-6 bg-white rounded-xl shadow-lg">
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Special Number Patterns</h2>
-        <p class="text-gray-700 mb-6">This page analyzes historical draws for specific "special" number patterns that might be of interest, such as numbers that are a multiple of 10 apart, numbers sharing the same last digit, or repeating digit numbers.</p>
+        <p class="text-gray-700 mb-6">This page analyzes historical draws for specific "special" number patterns that might be of interest, such as numbers that are a multiple of 10 apart, numbers sharing the same last digit, or repeating digit numbers. Click "Show All" to expand the full list for each category.</p>
 
         {# Tens-Apart Patterns Section #}
         <div class="mb-8">
             <h3 class="text-xl font-semibold mb-4 text-gray-800">Tens-Apart Patterns (e.g., 10, 20; 55, 65)</h3>
-            <p class="text-gray-700 mb-4">These are pairs of white balls where one number is exactly 10, 20, 30, 40, or 50 greater than the other (e.g., 10 and 20, or 55 and 65). This table shows the most frequently occurring such pairs.</p>
+            <p class="text-gray-700 mb-4">These are pairs of white balls where one number is exactly 10, 20, 30, 40, or 50 greater than the other. This table shows the most frequently occurring such pairs.</p>
             {% if special_patterns_data.tens_apart_patterns %}
                 <div class="overflow-x-auto shadow-md rounded-lg">
                     <table class="min-w-full divide-y divide-gray-200">
@@ -23,9 +23,9 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Count</th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
+                        <tbody class="bg-white divide-y divide-gray-200" id="tensApartTableBody">
                             {% for pattern in special_patterns_data.tens_apart_patterns %}
-                                <tr class="hover:bg-gray-50">
+                                <tr class="hover:bg-gray-50 {% if loop.index > 10 %}hidden{% endif %}"> {# Initially hide rows beyond the first 10 #}
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">({{ pattern.pattern | join(', ') }})</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pattern.count }}</td>
                                 </tr>
@@ -33,6 +33,11 @@
                         </tbody>
                     </table>
                 </div>
+                {% if special_patterns_data.tens_apart_patterns | length > 10 %}
+                <div class="text-center mt-4">
+                    <button id="tensApartToggleBtn" class="btn-secondary">Show All ({{ special_patterns_data.tens_apart_patterns | length }} entries)</button>
+                </div>
+                {% endif %}
             {% else %}
                 <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
                     No tens-apart patterns found.
@@ -43,7 +48,7 @@
         {# Same Last Digit Patterns Section #}
         <div class="mb-8">
             <h3 class="text-xl font-semibold mb-4 text-gray-800">Same Last Digit Patterns (e.g., 9, 19, 29; 8, 28, 48, 58)</h3>
-            <p class="text-gray-700 mb-4">These patterns consist of two or more white balls that share the same last digit (e.g., 9, 19, 29, or 8, 28, 48, 58). This table lists the most frequent occurrences of these vertical patterns.</p>
+            <p class="text-gray-700 mb-4">These patterns consist of two or more white balls that share the same last digit. This table lists the most frequent occurrences of these vertical patterns.</p>
             {% if special_patterns_data.same_last_digit_patterns %}
                 <div class="overflow-x-auto shadow-md rounded-lg">
                     <table class="min-w-full divide-y divide-gray-200">
@@ -53,9 +58,9 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Count</th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
+                        <tbody class="bg-white divide-y divide-gray-200" id="sameLastDigitTableBody">
                             {% for pattern in special_patterns_data.same_last_digit_patterns %}
-                                <tr class="hover:bg-gray-50">
+                                <tr class="hover:bg-gray-50 {% if loop.index > 10 %}hidden{% endif %}"> {# Initially hide rows beyond the first 10 #}
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">({{ pattern.pattern | join(', ') }})</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pattern.count }}</td>
                                 </tr>
@@ -63,6 +68,11 @@
                         </tbody>
                     </table>
                 </div>
+                {% if special_patterns_data.same_last_digit_patterns | length > 10 %}
+                <div class="text-center mt-4">
+                    <button id="sameLastDigitToggleBtn" class="btn-secondary">Show All ({{ special_patterns_data.same_last_digit_patterns | length }} entries)</button>
+                </div>
+                {% endif %}
             {% else %}
                 <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
                     No same last digit patterns found.
@@ -83,9 +93,9 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Count</th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
+                        <tbody class="bg-white divide-y divide-gray-200" id="repeatingDigitTableBody">
                             {% for pattern in special_patterns_data.repeating_digit_patterns %}
-                                <tr class="hover:bg-gray-50">
+                                <tr class="hover:bg-gray-50 {% if loop.index > 10 %}hidden{% endif %}"> {# Initially hide rows beyond the first 10 #}
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">({{ pattern.pattern | join(', ') }})</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pattern.count }}</td>
                                 </tr>
@@ -93,6 +103,11 @@
                         </tbody>
                     </table>
                 </div>
+                {% if special_patterns_data.repeating_digit_patterns | length > 10 %}
+                <div class="text-center mt-4">
+                    <button id="repeatingDigitToggleBtn" class="btn-secondary">Show All ({{ special_patterns_data.repeating_digit_patterns | length }} entries)</button>
+                </div>
+                {% endif %}
             {% else %}
                 <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
                     No repeating digit patterns found.
@@ -101,4 +116,59 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Function to toggle visibility of table rows
+        function setupToggle(buttonId, tableBodyId, initialShowCount) {
+            const toggleBtn = document.getElementById(buttonId);
+            const tableBody = document.getElementById(tableBodyId);
+            if (!toggleBtn || !tableBody) return; // Exit if elements not found
+
+            const rows = Array.from(tableBody.children);
+            let isExpanded = false;
+
+            // Initial state based on hidden class
+            rows.forEach((row, index) => {
+                if (index >= initialShowCount) {
+                    row.classList.add('hidden');
+                } else {
+                    row.classList.remove('hidden');
+                }
+            });
+
+            toggleBtn.addEventListener('click', function() {
+                isExpanded = !isExpanded;
+                rows.forEach((row, index) => {
+                    if (index >= initialShowCount) {
+                        if (isExpanded) {
+                            row.classList.remove('hidden');
+                        } else {
+                            row.classList.add('hidden');
+                        }
+                    }
+                });
+
+                if (isExpanded) {
+                    toggleBtn.textContent = 'Show Less';
+                    // Optional: Add max-height and overflow-y for internal scrolling
+                    tableBody.parentElement.style.maxHeight = '400px'; // Example max height
+                    tableBody.parentElement.style.overflowY = 'auto';
+                } else {
+                    toggleBtn.textContent = `Show All (${rows.length} entries)`;
+                    tableBody.parentElement.style.maxHeight = ''; // Remove max height
+                    tableBody.parentElement.style.overflowY = '';
+                }
+            });
+        }
+
+        // Setup for each table
+        setupToggle('tensApartToggleBtn', 'tensApartTableBody', 10);
+        setupToggle('sameLastDigitToggleBtn', 'sameLastDigitTableBody', 10);
+        setupToggle('repeatingDigitToggleBtn', 'repeatingDigitTableBody', 10);
+    });
+</script>
 {% endblock %}
