@@ -442,11 +442,25 @@ def generate_with_user_provided_pair(num1, num2, white_ball_range, powerball_ran
         raise ValueError("Could not generate a unique combination with the provided pair and ascending range constraint meeting all criteria after many attempts. Try adjusting filters.")
 
 
-def check_historical_match(df_source, white_balls, powerball):
-    if df_source.empty: return None
-    for _, row in df_source.iterrows():
-        historical_white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])]
+def check_historical_match(white_balls, powerball):
+    """
+    Checks if the given white_balls combination and powerball exactly matches any historical draw.
+    Uses the precomputed global historical_white_ball_sets for efficient lookup of white balls.
+    Then checks powerball against the matching white ball draws.
+    """
+    global df # Access the global DataFrame
+    if df.empty: return None
+
+    # First, check if the white ball combination exists in the set
+    if frozenset(white_balls) not in historical_white_ball_sets:
+        return None # White ball combination not found historically
+
+    # If white ball combination exists, then check the full draw (white balls + powerball)
+    # This is less efficient than the set lookup, but it's only done if the white balls match.
+    for _, row in df.iterrows():
+        historical_white_balls = sorted([int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])])
         historical_powerball = int(row['Powerball'])
+        
         if set(white_balls) == set(historical_white_balls) and powerball == historical_powerball:
             return row['Draw Date']
     return None
@@ -1468,7 +1482,7 @@ def get_grouped_patterns_over_years(df_source):
     for i in range(1, 6):
         col = f'Number {i}'
         if col in df_source_copy.columns:
-            df_source_copy[col] = pd.to_numeric(df_source_copy[col], errors='coerce').fillna(0).astype(int)
+            df_source_copy[col] = pd.to_numeric(df_copy[col], errors='coerce').fillna(0).astype(int)
         else:
             print(f"[WARN-GroupedPatterns] Column '{col}' not found in DataFrame for pattern analysis.")
 
@@ -1804,6 +1818,143 @@ def _get_yearly_patterns_for_range(df_source, selected_range_name, num_years=5):
         })
     
     return yearly_pattern_data
+
+# NEW FUNCTION: get_boundary_crossing_pairs_trends
+def get_boundary_crossing_pairs_trends(df_source, last_draw_date_str):
+    """
+    Analyzes the occurrence of pairs that cross decade boundaries (e.g., 9-10, 19-20).
+    """
+    if df_source.empty or last_draw_date_str == 'N/A':
+        return []
+
+    try:
+        last_draw_date = pd.to_datetime(last_draw_date_str)
+    except Exception:
+        return []
+
+    six_months_ago = last_draw_date - pd.DateOffset(months=6)
+    recent_data = df_source[df_source['Draw Date_dt'] >= six_months_ago].copy()
+    recent_data = recent_data.sort_values(by='Draw Date_dt', ascending=False)
+
+    if recent_data.empty:
+        return []
+
+    boundary_pairs_to_check = [
+        (9, 10), (19, 20), (29, 30), (39, 40), (49, 50), (59, 60)
+    ]
+    
+    trend_data = []
+    for idx, row in recent_data.iterrows():
+        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6)])
+        current_draw_pairs = set(combinations(white_balls, 2))
+        
+        found_boundary_pairs = []
+        for bp in boundary_pairs_to_check:
+            if bp in current_draw_pairs:
+                found_boundary_pairs.append(list(bp))
+        
+        trend_data.append({
+            'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
+            'boundary_pairs_present': "Yes" if found_boundary_pairs else "No",
+            'pairs_found': found_boundary_pairs
+        })
+    
+    return trend_data
+
+# NEW FUNCTION: get_special_patterns_analysis
+def get_special_patterns_analysis(df_source):
+    """
+    Analyzes the occurrence of various 'special' number patterns across all historical data.
+    These include:
+    - Tens-apart pairs (e.g., 10,20; 55,65)
+    - Same last digit patterns (e.g., 9,19,29; 8,28,48,58)
+    - Repeating digit numbers (e.g., 11,22,33)
+    """
+    if df_source.empty:
+        return {
+            'tens_apart_patterns': [],
+            'same_last_digit_patterns': [],
+            'repeating_digit_patterns': []
+        }
+
+    # Initialize counts for each pattern type
+    tens_apart_counts = defaultdict(int)
+    same_last_digit_counts = defaultdict(int)
+    repeating_digit_counts = defaultdict(int)
+
+    # Define the patterns we are looking for
+    # Tens-apart: (N, N+10), (N, N+20), ..., (N, N+50)
+    all_tens_apart_pairs = set()
+    for n1 in range(1, 60):
+        for diff in [10, 20, 30, 40, 50]:
+            n2 = n1 + diff
+            if n2 <= 69:
+                all_tens_apart_pairs.add(tuple(sorted((n1, n2))))
+
+    # Same last digit: groups of numbers ending in the same digit
+    # We'll consider groups of 3 or more for significance
+    same_last_digit_groups = defaultdict(list)
+    for i in range(1, 70):
+        last_digit = i % 10
+        same_last_digit_groups[last_digit].append(i)
+    
+    # Filter for groups with at least 3 numbers
+    significant_same_last_digit_patterns = [
+        tuple(g) for g in same_last_digit_groups.values() if len(g) >= 3
+    ]
+    
+    # Repeating digits: groups like 11,22,33
+    repeating_digit_numbers = [11, 22, 33, 44, 55, 66]
+    all_repeating_digit_triplets = set(combinations(repeating_digit_numbers, 3))
+    all_repeating_digit_pairs = set(combinations(repeating_digit_numbers, 2))
+
+
+    for idx, row in df_source.iterrows():
+        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6)])
+        white_ball_set = set(white_balls)
+        
+        # Check for Tens-Apart Patterns
+        for pair in combinations(white_balls, 2):
+            sorted_pair = tuple(sorted(pair))
+            if sorted_pair in all_tens_apart_pairs:
+                tens_apart_counts[sorted_pair] += 1
+
+        # Check for Same Last Digit Patterns
+        for group in significant_same_last_digit_patterns:
+            # Check if at least 3 numbers from this group are in the current draw
+            intersection = white_ball_set.intersection(set(group))
+            if len(intersection) >= 3:
+                # Store the actual subset found in the draw
+                same_last_digit_counts[tuple(sorted(list(intersection)))] += 1
+
+        # Check for Repeating Digit Patterns (Triplets and Pairs)
+        for triplet in all_repeating_digit_triplets:
+            if set(triplet).issubset(white_ball_set):
+                repeating_digit_counts[tuple(sorted(triplet))] += 1
+        
+        for pair in all_repeating_digit_pairs:
+            if set(pair).issubset(white_ball_set):
+                # Only count pairs if a triplet wasn't found (to avoid double counting for the same numbers)
+                # This logic can be refined based on desired specificity
+                is_part_of_triplet = False
+                for triplet in all_repeating_digit_triplets:
+                    if set(pair).issubset(set(triplet)) and set(triplet).issubset(white_ball_set):
+                        is_part_of_triplet = True
+                        break
+                if not is_part_of_triplet:
+                    repeating_digit_counts[tuple(sorted(pair))] += 1
+
+
+    # Format results for output
+    formatted_tens_apart = sorted([{'pattern': list(p), 'count': c} for p, c in tens_apart_counts.items()], key=lambda x: (-x['count'], str(x['pattern'])))
+    formatted_same_last_digit = sorted([{'pattern': list(p), 'count': c} for p, c in same_last_digit_counts.items()], key=lambda x: (-x['count'], str(x['pattern'])))
+    formatted_repeating_digit = sorted([{'pattern': list(p), 'count': c} for p, c in repeating_digit_counts.items()], key=lambda x: (-x['count'], str(x['pattern'])))
+
+    return {
+        'tens_apart_patterns': formatted_tens_apart,
+        'same_last_digit_patterns': formatted_same_last_digit,
+        'repeating_digit_patterns': formatted_repeating_digit
+    }
 
 
 # --- Data Initialization (Call after all helper functions are defined) ---
@@ -2478,6 +2629,31 @@ def grouped_patterns_yearly_comparison_route():
                            yearly_patterns_data=yearly_patterns_data,
                            number_ranges=NUMBER_RANGES, # Pass all ranges for the dropdown
                            selected_range=selected_range_label) # Pass the selected range back for persistence
+
+# NEW ROUTE: Boundary Crossing Pairs Trends
+@app.route('/boundary_crossing_pairs_trends')
+def boundary_crossing_pairs_trends_route():
+    if df.empty:
+        flash("Cannot display Boundary Crossing Pairs Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
+    boundary_trends = get_cached_analysis('boundary_crossing_pairs_trends', get_boundary_crossing_pairs_trends, df, last_draw_date_str_for_cache)
+    
+    return render_template('boundary_crossing_pairs_trends.html',
+                           boundary_trends=boundary_trends)
+
+# NEW ROUTE: Special Patterns Analysis
+@app.route('/special_patterns_analysis')
+def special_patterns_analysis_route():
+    if df.empty:
+        flash("Cannot display Special Patterns Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    special_patterns_data = get_cached_analysis('special_patterns_analysis', get_special_patterns_analysis, df)
+    
+    return render_template('special_patterns_analysis.html',
+                           special_patterns_data=special_patterns_data)
 
 
 @app.route('/find_results_by_first_white_ball', methods=['GET', 'POST'])
