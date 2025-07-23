@@ -835,26 +835,39 @@ def _get_last_co_occurrence_date_for_pattern(df_source, pattern_numbers):
     Finds the last drawn date where all numbers in the `pattern_numbers` tuple/list
     appeared together in the white balls of a single draw.
     """
+    print(f"[DEBUG-CoOccurDate] Checking last co-occurrence for pattern: {pattern_numbers}")
     if df_source.empty or not pattern_numbers:
+        print("[DEBUG-CoOccurDate] df_source is empty or pattern_numbers is empty. Returning N/A.")
         return "N/A"
 
+    df_copy = df_source.copy() # Work on a copy to avoid SettingWithCopyWarning
     # Ensure 'Draw Date_dt' is present and sorted
-    if 'Draw Date_dt' not in df_source.columns:
-        df_source['Draw Date_dt'] = pd.to_datetime(df_source['Draw Date'], errors='coerce')
-        df_source = df_source.dropna(subset=['Draw Date_dt'])
-        if df_source.empty: return "N/A"
+    if 'Draw Date_dt' not in df_copy.columns:
+        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+        df_copy = df_copy.dropna(subset=['Draw Date_dt'])
+        if df_copy.empty: 
+            print("[DEBUG-CoOccurDate] df_copy empty after datetime conversion. Returning N/A.")
+            return "N/A"
 
     # Convert pattern_numbers to a set for efficient lookup
     pattern_set = frozenset(pattern_numbers)
 
     # Iterate backwards from the most recent draw
-    for _, row in df_source.sort_values(by='Draw Date_dt', ascending=False).iterrows():
-        draw_white_balls = frozenset([int(row[f'Number {i}']) for i in range(1, 6)])
+    for idx, row in df_copy.sort_values(by='Draw Date_dt', ascending=False).iterrows():
+        # Ensure white ball columns are numeric and handle potential NaNs
+        try:
+            draw_white_balls = frozenset([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+        except ValueError as e:
+            print(f"[ERROR-CoOccurDate] Error converting white ball numbers to int for row {idx}: {row.to_dict()}. Error: {e}")
+            traceback.print_exc()
+            continue # Skip this row if conversion fails
         
         # Check if all numbers in the pattern are present in the current draw's white balls
         if pattern_set.issubset(draw_white_balls):
+            print(f"[DEBUG-CoOccurDate] Found co-occurrence for {pattern_numbers} on {row['Draw Date']}.")
             return row['Draw Date'] # Return the date of the most recent co-occurrence
             
+    print(f"[DEBUG-CoOccurDate] Pattern {pattern_numbers} never co-occurred. Returning N/A.")
     return "N/A" # If the pattern never appeared together
 
 def get_number_age_distribution(df_source):
@@ -1828,7 +1841,8 @@ def _get_yearly_patterns_for_range(df_source, selected_range_name, num_years=5):
         return []
 
     df_copy = df_source.copy()
-    df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    if 'Draw Date_dt' not in df_copy.columns:
+        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
     df_copy = df_copy.dropna(subset=['Draw Date_dt'])
     
     if df_copy.empty:
@@ -1906,7 +1920,9 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
             - 'yearly_data_for_selected_pattern': List of {'year': Y, 'count': C} for the selected pair
             - 'all_years_in_data': List of all unique years in the dataset.
     """
+    print("[DEBUG-BoundaryTrends] Starting get_boundary_crossing_pairs_trends.")
     if df_source.empty:
+        print("[DEBUG-BoundaryTrends] df_source is empty. Returning empty data.")
         return {
             'all_boundary_patterns_summary': [],
             'yearly_data_for_selected_pattern': [],
@@ -1919,6 +1935,7 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
     df_copy = df_copy.dropna(subset=['Draw Date_dt'])
     
     if df_copy.empty:
+        print("[DEBUG-BoundaryTrends] df_copy empty after datetime conversion. Returning empty data.")
         return {
             'all_boundary_patterns_summary': [],
             'yearly_data_for_selected_pattern': [],
@@ -1930,6 +1947,8 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
         col = f'Number {i}'
         if col in df_copy.columns:
             df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce').fillna(0).astype(int)
+        else:
+            print(f"[WARN-BoundaryTrends] Column '{col}' not found in DataFrame for pattern analysis.")
 
     # Dictionary to store counts of each boundary pair per year
     yearly_boundary_pair_counts = defaultdict(lambda: defaultdict(int)) # {year: {pair_tuple: count}}
@@ -1937,7 +1956,7 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
 
     all_years = sorted(df_copy['Draw Date_dt'].dt.year.unique().tolist())
 
-    for _, row in df_copy.iterrows():
+    for idx, row in df_copy.iterrows():
         year = row['Draw Date_dt'].year
         white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
         current_draw_pairs = set(combinations(white_balls, 2))
@@ -1950,23 +1969,37 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
     # Format overall summary, including last co-occurrence date for the pair
     all_boundary_patterns_summary = []
     for pair_tuple, count in overall_boundary_pair_counts.items():
-        last_co_occurrence = _get_last_co_occurrence_date_for_pattern(df_source, pair_tuple)
-        all_boundary_patterns_summary.append({
-            'pattern_numbers': list(pair_tuple),
-            'total_count': int(count),
-            'last_co_occurrence': last_co_occurrence
-        })
+        try:
+            last_co_occurrence = _get_last_co_occurrence_date_for_pattern(df_source, pair_tuple)
+            all_boundary_patterns_summary.append({
+                'pattern_numbers': list(pair_tuple),
+                'total_count': int(count),
+                'last_co_occurrence': last_co_occurrence
+            })
+        except Exception as e:
+            print(f"[ERROR-BoundaryTrends] Error processing pair {pair_tuple}: {e}")
+            traceback.print_exc()
+            all_boundary_patterns_summary.append({ # Add with error info
+                'pattern_numbers': list(pair_tuple),
+                'total_count': int(count),
+                'last_co_occurrence': f"Error: {e}"
+            })
+
     all_boundary_patterns_summary.sort(key=lambda x: (-x['total_count'], str(x['pattern_numbers'])))
+    print(f"[DEBUG-BoundaryTrends] Generated {len(all_boundary_patterns_summary)} summary entries.")
 
 
     # Format yearly data for the selected pattern
     yearly_data_for_selected_pattern = []
     if selected_pair_tuple:
+        print(f"[DEBUG-BoundaryTrends] Processing yearly data for selected pair: {selected_pair_tuple}")
         for year in all_years:
             count = yearly_boundary_pair_counts[year].get(selected_pair_tuple, 0)
             yearly_data_for_selected_pattern.append({'year': int(year), 'count': int(count)})
         yearly_data_for_selected_pattern.sort(key=lambda x: x['year']) # Sort by year ascending
+        print(f"[DEBUG-BoundaryTrends] Generated {len(yearly_data_for_selected_pattern)} yearly data points for selected pair.")
 
+    print("[DEBUG-BoundaryTrends] Finished get_boundary_crossing_pairs_trends.")
     return {
         'all_boundary_patterns_summary': all_boundary_patterns_summary,
         'yearly_data_for_selected_pattern': yearly_data_for_selected_pattern,
@@ -1984,7 +2017,9 @@ def get_special_patterns_analysis(df_source):
     - Repeating digit numbers (e.g., 11,22,33)
     Includes the last drawn date for the co-occurrence of the pattern.
     """
+    print("[DEBUG-SpecialPatterns] Starting get_special_patterns_analysis.")
     if df_source.empty:
+        print("[DEBUG-SpecialPatterns] df_source is empty. Returning empty data.")
         return {
             'tens_apart_patterns': [],
             'same_last_digit_patterns': [],
@@ -2016,74 +2051,103 @@ def get_special_patterns_analysis(df_source):
     # Repeating digits: numbers like 11, 22, 33
     repeating_digit_numbers = [11, 22, 33, 44, 55, 66]
 
-
+    print("[DEBUG-SpecialPatterns] Iterating through historical draws to find patterns.")
     for idx, row in df_source.iterrows():
-        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6)])
-        white_ball_set = set(white_balls)
-        
-        # Check for Tens-Apart Patterns
-        for pair in combinations(white_balls, 2):
-            sorted_pair = tuple(sorted(pair))
-            if sorted_pair in all_tens_apart_pairs:
-                tens_apart_counts[sorted_pair] += 1
-
-        # Check for Same Last Digit Patterns (groups of 2 or more)
-        for last_digit, full_group_numbers in same_last_digit_groups_full.items():
-            # Find intersection of current draw and the full group for this last digit
-            intersection_with_draw = white_ball_set.intersection(set(full_group_numbers))
+        try:
+            white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6)])
+            white_ball_set = set(white_balls)
             
-            # Consider patterns of 2 or more numbers with the same last digit
-            if len(intersection_with_draw) >= 2:
-                for pattern_combo in combinations(sorted(list(intersection_with_draw)), 2): # Check for pairs
-                    same_last_digit_counts[pattern_combo] += 1
-                if len(intersection_with_draw) >= 3: # Check for triplets
-                    for pattern_combo in combinations(sorted(list(intersection_with_draw)), 3):
+            # Check for Tens-Apart Patterns
+            for pair in combinations(white_balls, 2):
+                sorted_pair = tuple(sorted(pair))
+                if sorted_pair in all_tens_apart_pairs:
+                    tens_apart_counts[sorted_pair] += 1
+
+            # Check for Same Last Digit Patterns (groups of 2 or more)
+            for last_digit, full_group_numbers in same_last_digit_groups_full.items():
+                # Find intersection of current draw and the full group for this last digit
+                intersection_with_draw = white_ball_set.intersection(set(full_group_numbers))
+                
+                # Consider patterns of 2 or more numbers with the same last digit
+                if len(intersection_with_draw) >= 2:
+                    for pattern_combo in combinations(sorted(list(intersection_with_draw)), 2): # Check for pairs
                         same_last_digit_counts[pattern_combo] += 1
-                if len(intersection_with_draw) >= 4: # Check for quads
-                    for pattern_combo in combinations(sorted(list(intersection_with_draw)), 4):
-                        same_last_digit_counts[pattern_combo] += 1
-                if len(intersection_with_draw) >= 5: # Check for quints
-                    for pattern_combo in combinations(sorted(list(intersection_with_draw)), 5):
-                        same_last_digit_counts[pattern_combo] += 1
+                    if len(intersection_with_draw) >= 3: # Check for triplets
+                        for pattern_combo in combinations(sorted(list(intersection_with_draw)), 3):
+                            same_last_digit_counts[pattern_combo] += 1
+                    if len(intersection_with_draw) >= 4: # Check for quads
+                        for pattern_combo in combinations(sorted(list(intersection_with_draw)), 4):
+                            same_last_digit_counts[pattern_combo] += 1
+                    if len(intersection_with_draw) >= 5: # Check for quints
+                        for pattern_combo in combinations(sorted(list(intersection_with_draw)), 5):
+                            same_last_digit_counts[pattern_combo] += 1
 
 
-        # Check for Repeating Digit Patterns (groups of 2 or more)
-        # Filter repeating_digit_numbers that are actually in the current draw
-        drawn_repeating_digits = [n for n in repeating_digit_numbers if n in white_ball_set]
+            # Check for Repeating Digit Patterns (groups of 2 or more)
+            # Filter repeating_digit_numbers that are actually in the current draw
+            drawn_repeating_digits = [n for n in repeating_digit_numbers if n in white_ball_set]
 
-        if len(drawn_repeating_digits) >= 2:
-            for pattern_combo in combinations(sorted(drawn_repeating_digits), 2): # Pairs
-                repeating_digit_counts[pattern_combo] += 1
-            if len(drawn_repeating_digits) >= 3: # Triplets
-                for pattern_combo in combinations(sorted(drawn_repeating_digits), 3):
+            if len(drawn_repeating_digits) >= 2:
+                for pattern_combo in combinations(sorted(drawn_repeating_digits), 2): # Pairs
                     repeating_digit_counts[pattern_combo] += 1
-            if len(drawn_repeating_digits) >= 4: # Quads
-                for pattern_combo in combinations(sorted(drawn_repeating_digits), 4):
-                    repeating_digit_counts[pattern_combo] += 1
-            if len(drawn_repeating_digits) >= 5: # Quints
-                for pattern_combo in combinations(sorted(drawn_repeating_digits), 5):
-                    repeating_digit_counts[pattern_combo] += 1
+                if len(drawn_repeating_digits) >= 3: # Triplets
+                    for pattern_combo in combinations(sorted(drawn_repeating_digits), 3):
+                        repeating_digit_counts[pattern_combo] += 1
+                if len(drawn_repeating_digits) >= 4: # Quads
+                    for pattern_combo in combinations(sorted(drawn_repeating_digits), 4):
+                        repeating_digit_counts[pattern_combo] += 1
+                if len(drawn_repeating_digits) >= 5: # Quints
+                    for pattern_combo in combinations(sorted(drawn_repeating_digits), 5):
+                        repeating_digit_counts[pattern_combo] += 1
+        except Exception as e:
+            print(f"[ERROR-SpecialPatterns] Error processing draw row {idx}: {row.to_dict()}. Error: {e}")
+            traceback.print_exc()
+            continue # Skip to next row if error occurs in this row's processing
 
 
     # Format results for output, including last co-occurrence date for the pattern
     formatted_tens_apart = []
+    print("[DEBUG-SpecialPatterns] Formatting Tens-Apart patterns.")
     for pattern_tuple, count in tens_apart_counts.items():
-        last_co_occurrence = _get_last_co_occurrence_date_for_pattern(df_source, pattern_tuple)
-        formatted_tens_apart.append({'pattern_numbers': list(pattern_tuple), 'count': int(count), 'last_co_occurrence': last_co_occurrence})
+        try:
+            last_co_occurrence = _get_last_co_occurrence_date_for_pattern(df_source, pattern_tuple)
+            formatted_tens_apart.append({'pattern_numbers': list(pattern_tuple), 'count': int(count), 'last_co_occurrence': last_co_occurrence})
+        except Exception as e:
+            print(f"[ERROR-SpecialPatterns] Error getting co-occurrence date for Tens-Apart pattern {pattern_tuple}: {e}")
+            traceback.print_exc()
+            formatted_tens_apart.append({'pattern_numbers': list(pattern_tuple), 'count': int(count), 'last_co_occurrence': f"Error: {e}"})
     formatted_tens_apart.sort(key=lambda x: (-x['count'], str(x['pattern_numbers'])))
+    print(f"[DEBUG-SpecialPatterns] Formatted {len(formatted_tens_apart)} Tens-Apart patterns.")
+
 
     formatted_same_last_digit = []
+    print("[DEBUG-SpecialPatterns] Formatting Same Last Digit patterns.")
     for pattern_tuple, count in same_last_digit_counts.items():
-        last_co_occurrence = _get_last_co_occurrence_date_for_pattern(df_source, pattern_tuple)
-        formatted_same_last_digit.append({'pattern_numbers': list(pattern_tuple), 'count': int(count), 'last_co_occurrence': last_co_occurrence})
+        try:
+            last_co_occurrence = _get_last_co_occurrence_date_for_pattern(df_source, pattern_tuple)
+            formatted_same_last_digit.append({'pattern_numbers': list(pattern_tuple), 'count': int(count), 'last_co_occurrence': last_co_occurrence})
+        except Exception as e:
+            print(f"[ERROR-SpecialPatterns] Error getting co-occurrence date for Same Last Digit pattern {pattern_tuple}: {e}")
+            traceback.print_exc()
+            formatted_same_last_digit.append({'pattern_numbers': list(pattern_tuple), 'count': int(count), 'last_co_occurrence': f"Error: {e}"})
     formatted_same_last_digit.sort(key=lambda x: (-x['count'], str(x['pattern_numbers'])))
+    print(f"[DEBUG-SpecialPatterns] Formatted {len(formatted_same_last_digit)} Same Last Digit patterns.")
+
 
     formatted_repeating_digit = []
+    print("[DEBUG-SpecialPatterns] Formatting Repeating Digit patterns.")
     for pattern_tuple, count in repeating_digit_counts.items():
-        last_co_occurrence = _get_last_co_occurrence_date_for_pattern(df_source, pattern_tuple)
-        formatted_repeating_digit.append({'pattern_numbers': list(pattern_tuple), 'count': int(count), 'last_co_occurrence': last_co_occurrence})
+        try:
+            last_co_occurrence = _get_last_co_occurrence_date_for_pattern(df_source, pattern_tuple)
+            formatted_repeating_digit.append({'pattern_numbers': list(pattern_tuple), 'count': int(count), 'last_co_occurrence': last_co_occurrence})
+        except Exception as e:
+            print(f"[ERROR-SpecialPatterns] Error getting co-occurrence date for Repeating Digit pattern {pattern_tuple}: {e}")
+            traceback.print_exc()
+            formatted_repeating_digit.append({'pattern_numbers': list(pattern_tuple), 'count': int(count), 'last_co_occurrence': f"Error: {e}"})
     formatted_repeating_digit.sort(key=lambda x: (-x['count'], str(x['pattern_numbers'])))
+    print(f"[DEBUG-SpecialPatterns] Formatted {len(formatted_repeating_digit)} Repeating Digit patterns.")
 
+    print("[DEBUG-SpecialPatterns] Finished get_special_patterns_analysis.")
     return {
         'tens_apart_patterns': formatted_tens_apart,
         'same_last_digit_patterns': formatted_same_last_digit,
@@ -2807,14 +2871,22 @@ def boundary_crossing_pairs_trends_route():
 # NEW FUNCTION: get_special_patterns_analysis
 @app.route('/special_patterns_analysis')
 def special_patterns_analysis_route():
+    print("[ROUTE-SpecialPatterns] Route accessed.")
     if df.empty:
         flash("Cannot display Special Patterns Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        print("[ROUTE-SpecialPatterns] df is empty, redirecting.")
         return redirect(url_for('index'))
     
-    special_patterns_data = get_cached_analysis('special_patterns_analysis', get_special_patterns_analysis, df)
-    
-    return render_template('special_patterns_analysis.html',
-                           special_patterns_data=special_patterns_data)
+    try:
+        special_patterns_data = get_cached_analysis('special_patterns_analysis', get_special_patterns_analysis, df)
+        print("[ROUTE-SpecialPatterns] Data fetched for rendering.")
+        return render_template('special_patterns_analysis.html',
+                               special_patterns_data=special_patterns_data)
+    except Exception as e:
+        print(f"[ROUTE-SpecialPatterns] An error occurred in special_patterns_analysis_route: {e}")
+        traceback.print_exc()
+        flash(f"An error occurred while loading special patterns: {e}", 'error')
+        return redirect(url_for('index'))
 
 
 @app.route('/find_results_by_first_white_ball', methods=['GET', 'POST'])
