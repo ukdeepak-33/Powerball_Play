@@ -30,7 +30,7 @@
 
         <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
             <button id="analyzePickBtn" class="btn-primary w-full sm:w-auto">Analyze My Pick</button>
-            <button id="saveMyPickBtn" class="btn-primary w-full sm:w-auto">Save My Pick</button> {# NEW SAVE BUTTON #}
+            <button id="saveMyPickBtn" class="btn-primary w-full sm:w-auto">Save My Pick</button>
             <button id="resetSelectionBtn" class="btn-secondary w-full sm:w-auto">Reset Selection</button>
         </div>
 
@@ -76,7 +76,7 @@
         const whiteBallsContainer = document.getElementById('whiteBallsContainer');
         const powerballContainer = document.getElementById('powerballContainer');
         const analyzePickBtn = document.getElementById('analyzePickBtn');
-        const saveMyPickBtn = document.getElementById('saveMyPickBtn'); // NEW
+        const saveMyPickBtn = document.getElementById('saveMyPickBtn');
         const resetSelectionBtn = document.getElementById('resetSelectionBtn');
         const selectedNumbersDisplay = document.getElementById('selectedNumbersDisplay');
         const displayWhiteBalls = document.getElementById('displayWhiteBalls');
@@ -85,7 +85,7 @@
         const loadingIndicator = document.getElementById('loadingIndicator');
         const matchSummary = document.querySelector('#matchSummary ul');
         const lastDrawnDatesList = document.querySelector('#lastDrawnDates ul');
-        const saveMessageDiv = document.getElementById('saveMessage'); // NEW
+        const saveMessageDiv = document.getElementById('saveMessage');
 
         let selectedWhiteBalls = new Set();
         let selectedPowerball = null;
@@ -121,9 +121,9 @@
             analysisResults.classList.add('hidden');
             matchSummary.innerHTML = ''; // Clear previous analysis
             lastDrawnDatesList.innerHTML = ''; // Clear previous analysis
-            saveMessageDiv.classList.add('hidden'); // NEW: Clear save message
-            saveMessageDiv.textContent = ''; // NEW
-            saveMessageDiv.className = 'mt-4 p-3 rounded-lg text-sm hidden'; // NEW: Reset classes
+            saveMessageDiv.classList.add('hidden');
+            saveMessageDiv.textContent = '';
+            saveMessageDiv.className = 'mt-4 p-3 rounded-lg text-sm hidden';
         };
 
         // Helper to show messages
@@ -140,7 +140,7 @@
             setTimeout(() => {
                 saveMessageDiv.classList.add('hidden');
                 saveMessageDiv.textContent = '';
-                saveMessageDiv.className = 'mt-4 p-3 rounded-lg text-sm hidden'; // Reset classes
+                saveMessageDiv.className = 'mt-4 p-3 rounded-lg text-sm hidden';
             }, 5000);
         };
 
@@ -226,12 +226,16 @@
                 // Display match summary
                 const summary = data.match_summary;
                 for (const category in summary) {
+                    // EXCLUDE "No Match" category
+                    if (category === "No Match") {
+                        continue; // Skip this iteration if the category is "No Match"
+                    }
+
                     const count = summary[category].count;
-                    const draws = summary[category].draws; // This will be an array of matching draws
+                    const draws = summary[category].draws;
                     
                     let listItemText = `${category}: ${count} time(s)`;
                     if (count > 0 && draws.length > 0) {
-                        // Concatenate dates for display for each category
                         const drawDates = draws.map(d => d.date).join(', ');
                         listItemText += ` (Last drawn: ${drawDates})`;
                     }
@@ -261,7 +265,7 @@
             }
         });
 
-        // NEW: Save button click handler
+        // Save button click handler
         saveMyPickBtn.addEventListener('click', async () => {
             if (selectedWhiteBalls.size !== 5 || selectedPowerball === null) {
                 showMessage('Please select exactly 5 white balls and 1 Powerball to save your pick.', 'error');
@@ -272,7 +276,7 @@
             const powerballNumber = selectedPowerball;
 
             try {
-                const response = await fetch('/save_manual_pick', { // New endpoint
+                const response = await fetch('/save_manual_pick', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
