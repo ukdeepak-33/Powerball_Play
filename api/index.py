@@ -3,7 +3,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 import random
 from itertools import combinations
 import math
-import os
+import os # Added for environment variable access
 from collections import defaultdict
 from datetime import datetime, timedelta
 import requests
@@ -37,6 +37,10 @@ last_draw = pd.Series(dtype='object')
 
 # Set to store all historical white ball combinations for fast lookup
 historical_white_ball_sets = set() 
+
+# NEW: Global lookup for white ball combinations to their latest draw date
+# Key: frozenset of 5 white balls, Value: latest draw date string
+white_ball_co_occurrence_lookup = {}
 
 # Cache for precomputed analysis data
 analysis_cache = {}
@@ -92,10 +96,11 @@ HIGH_NUMBER_MIN = 35 # Numbers 35-69 are considered 'high'
 # Days of the week Powerball is drawn
 POWERBALL_DRAW_DAYS = ['Monday', 'Wednesday', 'Saturday']
 
-# NEW: Boundary Pairs to Analyze
-BOUNDARY_PAIRS_TO_ANALYZE = [
-    (9, 10), (19, 20), (29, 30), (39, 40), (49, 50), (59, 60)
-]
+# --- Gemini API Configuration ---
+# IMPORTANT: This should be set as an environment variable in your deployment platform (e.g., Render, Vercel).
+# The 'default' value provided here is a placeholder, ONLY used if the environment variable is NOT found.
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
 
 # --- Core Utility Functions (All helpers defined here) ---
 
@@ -796,6 +801,73 @@ def find_last_draw_dates_for_numbers(df_source, white_balls, powerball):
 
     return last_draw_dates
 
+# NEW HELPER FUNCTION: To get the last drawn date for a single number
+def _get_last_drawn_date_for_single_number(df_source, number):
+    """
+    Finds the last drawn date for a single given number (white ball or powerball).
+    """
+    if df_source.empty:
+        return "N/A"
+
+    # Ensure 'Draw Date_dt' is present and sorted
+    if 'Draw Date_dt' not in df_source.columns:
+        df_source['Draw Date_dt'] = pd.to_datetime(df_source['Draw Date'], errors='coerce')
+        df_source = df_source.dropna(subset=['Draw Date_dt'])
+        if df_source.empty: return "N/A" # Handle case where conversion fails
+
+    sorted_df = df_source.sort_values(by='Draw Date_dt', ascending=False)
+
+    # Check white ball columns
+    for col_idx in range(1, 6):
+        col_name = f'Number {col_idx}'
+        if col_name in sorted_df.columns:
+            # Filter rows where the number appears in this white ball position
+            matching_rows = sorted_df[sorted_df[col_name].astype(int) == number]
+            if not matching_rows.empty:
+                return matching_rows['Draw Date'].iloc[0] # Return the most recent date
+
+    # Check powerball column
+    if 'Powerball' in sorted_df.columns:
+        matching_rows_pb = sorted_df[sorted_df['Powerball'].astype(int) == number]
+        if not matching_rows_pb.empty:
+            return matching_rows_pb['Draw Date'].iloc[0] # Return the most recent date
+
+    return "N/A" # If number never appeared
+
+# MODIFIED HELPER FUNCTION: To get the last drawn date for a pattern (co-occurrence)
+def _get_last_co_occurrence_date_for_pattern(df_source, pattern_numbers):
+    """
+    Finds the last drawn date where all numbers in the `pattern_numbers` tuple/list
+    appeared together in the white balls of a single draw, using the pre-built lookup.
+    """
+    # print(f"[DEBUG-CoOccurDate] Checking last co-occurrence for pattern: {pattern_numbers}")
+    if not pattern_numbers:
+        # print("[DEBUG-CoOccurDate] pattern_numbers is empty. Returning N/A.")
+        return "N/A"
+
+    # Convert pattern_numbers to a frozenset for efficient subset checking
+    target_pattern_set = frozenset(pattern_numbers)
+
+    latest_date = "N/A"
+    latest_datetime = datetime.min
+
+    # Iterate through the pre-built white_ball_co_occurrence_lookup
+    # This lookup contains frozensets of 5 white balls and their latest draw date.
+    for historical_white_balls_set, draw_date_str in white_ball_co_occurrence_lookup.items():
+        # Check if the target pattern is a subset of the historical white balls set
+        if target_pattern_set.issubset(historical_white_balls_set):
+            try:
+                current_draw_datetime = datetime.strptime(draw_date_str, '%Y-%m-%d')
+                if current_draw_datetime > latest_datetime:
+                    latest_datetime = current_draw_datetime
+                    latest_date = draw_date_str
+            except ValueError:
+                # Handle cases where draw_date_str might be "N/A" or malformed
+                pass
+                
+    # print(f"[DEBUG-CoOccurDate] Found last co-occurrence for {pattern_numbers} on {latest_date}.")
+    return latest_date # If the pattern never appeared together, it remains "N/A"
+
 def get_number_age_distribution(df_source):
     if df_source.empty: return [], []
     df_source['Draw Date_dt'] = pd.to_datetime(df_source['Draw Date'])
@@ -841,7 +913,7 @@ def get_number_age_distribution(df_source):
 
             detailed_ages.append({'number': int(i), 'type': 'Powerball', 'age': miss_streak_count, 'last_drawn_date': last_appearance_date_str})
         else:
-            detailed_ages.append({'number': int(i), 'type': 'Powerball', 'age': len(all_draw_dates), 'last_drawn_date': last_appearance_date_str})
+            detailed_ages.append({'number': int(i), 'type': 'Powerball', 'age': len(all_draw_dates), 'last_drawn_date': len(all_draw_dates)}) # Changed to len(all_draw_dates) for consistency if never drawn
 
     all_miss_streaks_only = [item['age'] for item in detailed_ages]
     age_counts = pd.Series(all_miss_streaks_only).value_counts().sort_index()
@@ -1694,7 +1766,7 @@ def get_weekday_draw_trends(df_source, group_a_numbers_def=None): # Keep group_a
         
         # Odd/Even Counts
         odd_count = sum(1 for num in white_balls if num % 2 != 0)
-        even_count = sum(1 for num in white_balls if num % 2 == 0)
+        even_count = 5 - odd_count
 
         # Sum of Balls
         current_sum = sum(white_balls)
@@ -1767,7 +1839,8 @@ def _get_yearly_patterns_for_range(df_source, selected_range_name, num_years=5):
         return []
 
     df_copy = df_source.copy()
-    df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    if 'Draw Date_dt' not in df_copy.columns:
+        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
     df_copy = df_copy.dropna(subset=['Draw Date_dt'])
     
     if df_copy.empty:
@@ -1827,189 +1900,10 @@ def _get_yearly_patterns_for_range(df_source, selected_range_name, num_years=5):
     
     return yearly_pattern_data
 
-# MODIFIED FUNCTION: get_boundary_crossing_pairs_trends
-def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
-    """
-    Analyzes the occurrence of boundary crossing pairs across all historical data,
-    aggregating counts by year for all pairs and providing yearly data for a selected pair.
-    
-    Args:
-        df_source (pd.DataFrame): The historical Powerball data.
-        selected_pair_tuple (tuple, optional): A specific boundary pair (e.g., (9, 10))
-                                               to get yearly counts for. Defaults to None.
-
-    Returns:
-        dict: A dictionary containing:
-            - 'all_boundary_patterns_summary': List of {'pattern': [n1, n2], 'total_count': X}
-            - 'yearly_data_for_selected_pattern': List of {'year': Y, 'count': C} for the selected pair
-            - 'all_years_in_data': List of all unique years in the dataset.
-    """
-    if df_source.empty:
-        return {
-            'all_boundary_patterns_summary': [],
-            'yearly_data_for_selected_pattern': [],
-            'all_years_in_data': []
-        }
-
-    df_copy = df_source.copy()
-    if 'Draw Date_dt' not in df_copy.columns:
-        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
-    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
-    
-    if df_copy.empty:
-        return {
-            'all_boundary_patterns_summary': [],
-            'yearly_data_for_selected_pattern': [],
-            'all_years_in_data': []
-        }
-
-    # Ensure white ball columns are numeric
-    for i in range(1, 6):
-        col = f'Number {i}'
-        if col in df_copy.columns:
-            df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce').fillna(0).astype(int)
-
-    # Dictionary to store counts of each boundary pair per year
-    yearly_boundary_pair_counts = defaultdict(lambda: defaultdict(int)) # {year: {pair_tuple: count}}
-    overall_boundary_pair_counts = defaultdict(int) # {pair_tuple: total_count}
-
-    all_years = sorted(df_copy['Draw Date_dt'].dt.year.unique().tolist())
-
-    for _, row in df_copy.iterrows():
-        year = row['Draw Date_dt'].year
-        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
-        current_draw_pairs = set(combinations(white_balls, 2))
-        
-        for bp in BOUNDARY_PAIRS_TO_ANALYZE:
-            if bp in current_draw_pairs:
-                yearly_boundary_pair_counts[year][bp] += 1
-                overall_boundary_pair_counts[bp] += 1
-    
-    # Format overall summary
-    all_boundary_patterns_summary = sorted([
-        {'pattern': list(p), 'total_count': c} for p, c in overall_boundary_pair_counts.items()
-    ], key=lambda x: (-x['total_count'], str(x['pattern'])))
-
-    # Format yearly data for the selected pattern
-    yearly_data_for_selected_pattern = []
-    if selected_pair_tuple:
-        for year in all_years:
-            count = yearly_boundary_pair_counts[year].get(selected_pair_tuple, 0)
-            yearly_data_for_selected_pattern.append({'year': int(year), 'count': int(count)})
-        yearly_data_for_selected_pattern.sort(key=lambda x: x['year']) # Sort by year ascending
-
-    return {
-        'all_boundary_patterns_summary': all_boundary_patterns_summary,
-        'yearly_data_for_selected_pattern': yearly_data_for_selected_pattern,
-        'all_years_in_data': all_years
-    }
-
-
-# NEW FUNCTION: get_special_patterns_analysis
-def get_special_patterns_analysis(df_source):
-    """
-    Analyzes the occurrence of various 'special' number patterns across all historical data.
-    These include:
-    - Tens-apart pairs (e.g., 10,20; 55,65)
-    - Same last digit patterns (e.g., 9,19,29; 8,28,48,58)
-    - Repeating digit numbers (e.g., 11,22,33)
-    """
-    if df_source.empty:
-        return {
-            'tens_apart_patterns': [],
-            'same_last_digit_patterns': [],
-            'repeating_digit_patterns': []
-        }
-
-    # Initialize counts for each pattern type
-    tens_apart_counts = defaultdict(int)
-    same_last_digit_counts = defaultdict(int)
-    repeating_digit_counts = defaultdict(int)
-
-    # Define the patterns we are looking for
-    # Tens-apart: (N, N+10), (N, N+20), ..., (N, N+50)
-    all_tens_apart_pairs = set()
-    for n1 in range(1, 60): # Max n1 for N+10 is 59, for N+50 is 19
-        for diff in [10, 20, 30, 40, 50]:
-            n2 = n1 + diff
-            if n2 <= 69:
-                all_tens_apart_pairs.add(tuple(sorted((n1, n2))))
-
-    # Same last digit: groups of numbers ending in the same digit
-    # We'll generate all possible numbers for each last digit, then check combinations
-    # Example: numbers ending in 9: [9, 19, 29, 39, 49, 59, 69]
-    same_last_digit_groups_full = defaultdict(list)
-    for i in range(1, 70):
-        last_digit = i % 10
-        same_last_digit_groups_full[last_digit].append(i)
-    
-    # Repeating digits: numbers like 11, 22, 33
-    repeating_digit_numbers = [11, 22, 33, 44, 55, 66]
-
-
-    for idx, row in df_source.iterrows():
-        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6)])
-        white_ball_set = set(white_balls)
-        
-        # Check for Tens-Apart Patterns
-        for pair in combinations(white_balls, 2):
-            sorted_pair = tuple(sorted(pair))
-            if sorted_pair in all_tens_apart_pairs:
-                tens_apart_counts[sorted_pair] += 1
-
-        # Check for Same Last Digit Patterns (groups of 2 or more)
-        for last_digit, full_group_numbers in same_last_digit_groups_full.items():
-            # Find intersection of current draw and the full group for this last digit
-            intersection_with_draw = white_ball_set.intersection(set(full_group_numbers))
-            
-            # Consider patterns of 2 or more numbers with the same last digit
-            if len(intersection_with_draw) >= 2:
-                for pattern_combo in combinations(sorted(list(intersection_with_draw)), 2): # Check for pairs
-                    same_last_digit_counts[pattern_combo] += 1
-                if len(intersection_with_draw) >= 3: # Check for triplets
-                    for pattern_combo in combinations(sorted(list(intersection_with_draw)), 3):
-                        same_last_digit_counts[pattern_combo] += 1
-                if len(intersection_with_draw) >= 4: # Check for quads
-                    for pattern_combo in combinations(sorted(list(intersection_with_draw)), 4):
-                        same_last_digit_counts[pattern_combo] += 1
-                if len(intersection_with_draw) >= 5: # Check for quints
-                    for pattern_combo in combinations(sorted(list(intersection_with_draw)), 5):
-                        same_last_digit_counts[pattern_combo] += 1
-
-
-        # Check for Repeating Digit Patterns (groups of 2 or more)
-        # Filter repeating_digit_numbers that are actually in the current draw
-        drawn_repeating_digits = [n for n in repeating_digit_numbers if n in white_ball_set]
-
-        if len(drawn_repeating_digits) >= 2:
-            for pattern_combo in combinations(sorted(drawn_repeating_digits), 2): # Pairs
-                repeating_digit_counts[pattern_combo] += 1
-            if len(drawn_repeating_digits) >= 3: # Triplets
-                for pattern_combo in combinations(sorted(drawn_repeating_digits), 3):
-                    repeating_digit_counts[pattern_combo] += 1
-            if len(drawn_repeating_digits) >= 4: # Quads
-                for pattern_combo in combinations(sorted(drawn_repeating_digits), 4):
-                    repeating_digit_counts[pattern_combo] += 1
-            if len(drawn_repeating_digits) >= 5: # Quints
-                for pattern_combo in combinations(sorted(drawn_repeating_digits), 5):
-                    repeating_digit_counts[pattern_combo] += 1
-
-
-    # Format results for output
-    formatted_tens_apart = sorted([{'pattern': list(p), 'count': c} for p, c in tens_apart_counts.items()], key=lambda x: (-x['count'], str(x['pattern'])))
-    formatted_same_last_digit = sorted([{'pattern': list(p), 'count': c} for p, c in same_last_digit_counts.items()], key=lambda x: (-x['count'], str(x['pattern'])))
-    formatted_repeating_digit = sorted([{'pattern': list(p), 'count': c} for p, c in repeating_digit_counts.items()], key=lambda x: (-x['count'], str(x['pattern'])))
-
-    return {
-        'tens_apart_patterns': formatted_tens_apart,
-        'same_last_digit_patterns': formatted_same_last_digit,
-        'repeating_digit_patterns': formatted_repeating_digit
-    }
-
 
 # --- Data Initialization (Call after all helper functions are defined) ---
 def initialize_core_data():
-    global df, last_draw, historical_white_ball_sets
+    global df, last_draw, historical_white_ball_sets, white_ball_co_occurrence_lookup
     print("Attempting to load core historical data...")
     try:
         df_temp = load_historical_data_from_supabase()
@@ -2022,16 +1916,24 @@ def initialize_core_data():
             else:
                  last_draw['Draw Date'] = 'N/A' # Fallback for display if datetime conversion fails
             
-            # Populate historical_white_ball_sets
+            # Populate historical_white_ball_sets and white_ball_co_occurrence_lookup
             historical_white_ball_sets.clear() # Clear existing set before repopulating
+            white_ball_co_occurrence_lookup.clear() # Clear existing lookup
             for _, row in df.iterrows():
                 white_balls_tuple = tuple(sorted([
                     int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), 
                     int(row['Number 4']), int(row['Number 5'])
                 ]))
-                historical_white_ball_sets.add(frozenset(white_balls_tuple))
+                frozenset_white_balls = frozenset(white_balls_tuple)
+                historical_white_ball_sets.add(frozenset_white_balls)
+                
+                # Store the latest draw date for this specific combination of 5 white balls
+                current_draw_date = row['Draw Date']
+                if frozenset_white_balls not in white_ball_co_occurrence_lookup or \
+                   datetime.strptime(current_draw_date, '%Y-%m-%d') > datetime.strptime(white_ball_co_occurrence_lookup[frozenset_white_balls], '%Y-%m-%d'):
+                    white_ball_co_occurrence_lookup[frozenset_white_balls] = current_draw_date
 
-            print("Core historical data loaded successfully.")
+            print("Core historical data loaded successfully and co-occurrence lookup populated.")
         else:
             print("Core historical data is empty after loading. df remains empty.")
             # Set default N/A for last_draw if no data is found
@@ -2679,59 +2581,6 @@ def grouped_patterns_yearly_comparison_route():
                            number_ranges=NUMBER_RANGES, # Pass all ranges for the dropdown
                            selected_range=selected_range_label) # Pass the selected range back for persistence
 
-# MODIFIED ROUTE: Boundary Crossing Pairs Trends
-@app.route('/boundary_crossing_pairs_trends', methods=['GET', 'POST'])
-def boundary_crossing_pairs_trends_route():
-    if df.empty:
-        flash("Cannot display Boundary Crossing Pairs Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return redirect(url_for('index'))
-    
-    selected_pair = request.form.get('selected_pair') # Will be a string like "9, 10"
-    selected_pair_tuple = None
-    if selected_pair:
-        try:
-            parts = [int(p.strip()) for p in selected_pair.split(',')]
-            if len(parts) == 2:
-                selected_pair_tuple = tuple(sorted(parts))
-        except ValueError:
-            flash("Invalid pair format. Please select a valid pair from the dropdown.", 'error')
-            selected_pair = None # Reset to avoid errors in template
-
-    # Pass the selected_pair_tuple to the analysis function
-    boundary_trends_data = get_cached_analysis(
-        f'boundary_crossing_trends_{selected_pair}', # Cache key depends on selected pair
-        get_boundary_crossing_pairs_trends, 
-        df, 
-        selected_pair_tuple
-    )
-    
-    # Extract data for rendering
-    all_boundary_patterns_summary = boundary_trends_data['all_boundary_patterns_summary']
-    yearly_data_for_selected_pattern = boundary_trends_data['yearly_data_for_selected_pattern']
-    all_years_in_data = boundary_trends_data['all_years_in_data']
-
-    # Convert BOUNDARY_PAIRS_TO_ANALYZE to list of strings for dropdown
-    boundary_pairs_for_dropdown = [f"{p[0]}, {p[1]}" for p in BOUNDARY_PAIRS_TO_ANALYZE]
-
-    return render_template('boundary_crossing_pairs_trends.html',
-                           all_boundary_patterns_summary=all_boundary_patterns_summary,
-                           yearly_data_for_selected_pattern=yearly_data_for_selected_pattern,
-                           all_years_in_data=all_years_in_data,
-                           boundary_pairs_for_dropdown=boundary_pairs_for_dropdown,
-                           selected_pair=selected_pair) # Pass back for persistence in dropdown
-
-# NEW FUNCTION: get_special_patterns_analysis
-@app.route('/special_patterns_analysis')
-def special_patterns_analysis_route():
-    if df.empty:
-        flash("Cannot display Special Patterns Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return redirect(url_for('index'))
-    
-    special_patterns_data = get_cached_analysis('special_patterns_analysis', get_special_patterns_analysis, df)
-    
-    return render_template('special_patterns_analysis.html',
-                           special_patterns_data=special_patterns_data)
-
 
 @app.route('/find_results_by_first_white_ball', methods=['GET', 'POST'])
 def find_results_by_first_white_ball():
@@ -3056,7 +2905,7 @@ def analyze_generated_historical_matches_route():
         generated_white_balls_str = data.get('generated_white_balls')
         generated_powerball_str = data.get('generated_powerball')
 
-        if not generated_white_balls_str or not powerball_str: 
+        if not generated_white_balls_str or not generated_powerball_str: # Corrected variable name
             return jsonify({"success": False, "error": "Missing generated_white_balls or generated_powerball"}), 400
 
         generated_white_balls = sorted([int(x.strip()) for x in generated_white_balls_str.split(',') if x.strip().isdigit()])
@@ -3071,7 +2920,7 @@ def analyze_generated_historical_matches_route():
         return jsonify({
             "success": True,
             "generated_numbers_for_analysis": generated_white_balls,
-            "generated_powerball_for_analysis": generated_powerball,
+            "generated_powerball_for_powerball": generated_powerball, # Corrected key name
             "match_summary": historical_match_results['summary']
         })
 
@@ -3124,8 +2973,8 @@ def chat_with_ai_route():
     print(f"[AI-DEBUG] Chat history payload to Gemini: {json.dumps(chat_history, indent=2)}")
 
     try:
-        apiKey = "" # Leave this empty, Canvas runtime will inject the key.
-        apiUrl = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}"
+        # Use the GEMINI_API_KEY from environment variable
+        apiUrl = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
 
         payload = {
             "contents": chat_history,
@@ -3418,8 +3267,8 @@ def generate_smart_picks_route():
     chat_history.append({"role": "user", "parts": [{"text": prompt}]})
 
     try:
-        apiKey = "" # Canvas runtime will inject the key.
-        apiUrl = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}"
+        # Use the GEMINI_API_KEY from environment variable
+        apiUrl = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
 
         payload = {
             "contents": chat_history,
