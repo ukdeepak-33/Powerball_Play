@@ -2,7 +2,7 @@
 
 {% block title %}Powerball Analysis{% endblock %}
 
-{% block page_heading %}Powerball Analysis & Generation{% endblock %}
+{% block page_heading %}Powerball Number Generator & Analysis{% endblock %}
 
 {% block content %}
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8"> {# Added max-width and padding for better layout #}
@@ -51,22 +51,30 @@
     <div class="bg-gradient-to-br from-blue-500 to-indigo-600 p-8 rounded-2xl shadow-xl transform transition-all duration-300 hover:scale-105"> {# New vibrant styling for generated numbers #}
         <h2 class="text-3xl sm:text-4xl font-extrabold text-white mb-6 text-center animate-pulse">Your Generated Lucky Numbers!</h2>
         
-        {% for generated_pick in generated_sets %}
-        <div class="generated-pick-item p-4 bg-blue-50 rounded-lg border border-blue-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 mb-4 last:mb-0">
-            <div class="flex items-center space-x-2 flex-wrap justify-center sm:justify-start">
-                {% for num in generated_pick.white_balls %}
-                    <span class="generated-ball-small">{{ num }}</span> {# Use a smaller ball style for multiple picks #}
-                {% endfor %}
-                <span class="generated-powerball-label-small">PB:</span>
-                <span class="generated-powerball-ball-small">{{ generated_pick.powerball }}</span>
+        <div id="randomGeneratedPicksContainer">
+            {% for generated_pick in generated_sets %}
+            <div class="generated-pick-item p-4 bg-blue-50 rounded-lg border border-blue-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 mb-4 last:mb-0"
+                 data-white-balls="{{ generated_pick.white_balls | join(',') }}"
+                 data-powerball="{{ generated_pick.powerball }}">
+                <div class="flex items-center space-x-2 flex-wrap justify-center sm:justify-start">
+                    {% for num in generated_pick.white_balls %}
+                        <span class="generated-ball-small">{{ num }}</span> {# Use a smaller ball style for multiple picks #}
+                    {% endfor %}
+                    <span class="generated-powerball-label-small">PB:</span>
+                    <span class="generated-powerball-ball-small">{{ generated_pick.powerball }}</span>
+                </div>
+                <form method="POST" action="{{ url_for('save_generated_pick_route') }}" class="flex-shrink-0">
+                    <input type="hidden" name="generated_white_balls" value="{{ generated_pick.white_balls | join(',') }}">
+                    <input type="hidden" name="generated_powerball" value="{{ generated_pick.powerball }}">
+                    <button type="submit" class="btn-secondary">Save This Pick</button>
+                </form>
             </div>
-            <form method="POST" action="{{ url_for('save_generated_pick_route') }}" class="flex-shrink-0">
-                <input type="hidden" name="generated_white_balls" value="{{ generated_pick.white_balls | join(',') }}">
-                <input type="hidden" name="generated_powerball" value="{{ generated_pick.powerball }}">
-                <button type="submit" class="btn-secondary">Save This Pick</button>
-            </form>
+            {% endfor %}
         </div>
-        {% endfor %}
+        
+        <div class="mt-6 text-center">
+            <button id="saveAllRandomGeneratedPicksBtn" class="btn-primary w-full md:w-auto">Save All Generated Picks</button>
+        </div>
 
         {# Last Drawn Dates Section - integrated within the generated numbers card (for the LAST generated set) #}
         {% if last_draw_dates %}
@@ -245,6 +253,9 @@
 
         <div id="smartPicksResults" class="mt-8 space-y-6 animate-pop-in">
             {# Smart generated picks will be inserted here by JavaScript #}
+        </div>
+        <div id="smartPicksSaveAllActions" class="mt-4 hidden text-center">
+            <button id="saveAllSmartPicksBtn" class="btn-primary w-full md:w-auto">Save All Smart Picks</button>
         </div>
     </div>
 
@@ -587,17 +598,93 @@
         }
     }
 
+    // Helper function to display messages (similar to Flask flash)
+    function displayMessage(message, type = 'info') {
+        const messageContainer = document.createElement('div');
+        messageContainer.className = `p-4 rounded-lg shadow-md text-sm mb-4 animate-fade-in ${
+            type === 'error' ? 'bg-red-100 text-red-700 border border-red-200' :
+            type === 'success' ? 'bg-green-100 text-green-700 border border-green-200' :
+            'bg-blue-100 text-blue-700 border border-blue-200'
+        }`;
+        messageContainer.innerHTML = `<p class="font-medium">${message}</p>`;
+        const flashMessagesDiv = document.querySelector('.flash-messages');
+        if (flashMessagesDiv) {
+            flashMessagesDiv.prepend(messageContainer);
+        } else {
+            // If .flash-messages doesn't exist, create it at the top of content block
+            const newFlashContainer = document.createElement('div');
+            newFlashContainer.className = 'flash-messages space-y-3';
+            newFlashContainer.prepend(messageContainer);
+            document.querySelector('.space-y-8.max-w-6xl.mx-auto').prepend(newFlashContainer);
+        }
+        setTimeout(() => messageContainer.remove(), 5000); // Auto-hide after 5 seconds
+    }
+
+    // Function to save multiple picks to the backend
+    async function saveMultiplePicks(picksArray) {
+        if (picksArray.length === 0) {
+            displayMessage('No picks found to save.', 'info');
+            return;
+        }
+
+        try {
+            const response = await fetch('/save_multiple_generated_picks', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ picks: picksArray }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                displayMessage(data.message, 'success');
+            } else {
+                displayMessage(data.message || 'Failed to save picks.', 'error');
+                if (data.details) {
+                    data.details.forEach(detail => console.warn(detail)); // Log individual failures
+                }
+            }
+        } catch (error) {
+            console.error('Error saving picks:', error);
+            displayMessage('An unexpected error occurred while saving picks. Please try again.', 'error');
+        }
+    }
+
+    // --- Randomly Generated Numbers - Save All Button Logic ---
+    const saveAllRandomGeneratedPicksBtn = document.getElementById('saveAllRandomGeneratedPicksBtn');
+    if (saveAllRandomGeneratedPicksBtn) {
+        saveAllRandomGeneratedPicksBtn.addEventListener('click', function() {
+            const allGeneratedPickItems = document.querySelectorAll('#randomGeneratedPicksContainer .generated-pick-item');
+            const picksToSave = [];
+            allGeneratedPickItems.forEach(item => {
+                const whiteBallsStr = item.dataset.whiteBalls;
+                const powerballStr = item.dataset.powerball;
+                if (whiteBallsStr && powerballStr) {
+                    picksToSave.push({
+                        white_balls: whiteBallsStr.split(',').map(Number),
+                        powerball: Number(powerballStr)
+                    });
+                }
+            });
+            saveMultiplePicks(picksToSave);
+        });
+    }
+
     // --- Smart Generator JavaScript Logic ---
     document.getElementById('generateSmartPicksBtn').addEventListener('click', async function() {
         const btn = this;
         const loadingDiv = document.getElementById('smartPicksLoading');
         const resultsDiv = document.getElementById('smartPicksResults');
         const numSetsInput = document.getElementById('num_smart_sets');
+        const saveAllSmartPicksActions = document.getElementById('smartPicksSaveAllActions');
 
         btn.disabled = true;
         btn.textContent = 'Generating...';
         loadingDiv.classList.remove('hidden');
         resultsDiv.innerHTML = ''; // Clear previous results
+        saveAllSmartPicksActions.classList.add('hidden'); // Hide save all button initially
 
         const numSets = numSetsInput.value;
 
@@ -617,7 +704,9 @@
                     let htmlContent = '<h3 class="text-xl font-bold text-white mb-4">AI Suggested Picks:</h3>';
                     data.smart_picks.forEach(pick => {
                         htmlContent += `
-                            <div class="generated-pick-item p-4 bg-blue-50 rounded-lg border border-blue-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 mb-4 last:mb-0">
+                            <div class="generated-pick-item p-4 bg-blue-50 rounded-lg border border-blue-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 mb-4 last:mb-0"
+                                 data-white-balls="${pick.white_balls.join(',')}"
+                                 data-powerball="${pick.powerball}">
                                 <div class="flex items-center space-x-2 flex-wrap justify-center sm:justify-start">
                                     ${pick.white_balls.map(num => `<span class="generated-ball-small">${num}</span>`).join('')}
                                     <span class="generated-powerball-label-small">PB:</span>
@@ -633,23 +722,47 @@
                     });
                     resultsDiv.innerHTML = htmlContent;
                     resultsDiv.classList.add('bg-gradient-to-br', 'from-blue-500', 'to-indigo-600', 'p-8', 'rounded-2xl', 'shadow-xl'); // Apply gradient background
+                    saveAllSmartPicksActions.classList.remove('hidden'); // Show save all button
                 } else {
                     resultsDiv.innerHTML = '<p class="text-white text-center">No smart picks could be generated at this time. Please try again.</p>';
                     resultsDiv.classList.remove('bg-gradient-to-br', 'from-blue-500', 'to-indigo-600', 'p-8', 'rounded-2xl', 'shadow-xl'); // Remove gradient if no results
+                    saveAllSmartPicksActions.classList.add('hidden');
                 }
             } else {
                 resultsDiv.innerHTML = `<p class="text-red-300 text-center">Error: ${data.error || 'Failed to generate smart picks.'}</p>`;
                 resultsDiv.classList.remove('bg-gradient-to-br', 'from-blue-500', 'to-indigo-600', 'p-8', 'rounded-2xl', 'shadow-xl'); // Remove gradient on error
+                saveAllSmartPicksActions.classList.add('hidden');
             }
         } catch (error) {
             console.error('Error generating smart picks:', error);
             resultsDiv.innerHTML = `<p class="text-red-300 text-center">An unexpected error occurred: ${error.message}</p>`;
             resultsDiv.classList.remove('bg-gradient-to-br', 'from-blue-500', 'to-indigo-600', 'p-8', 'rounded-2xl', 'shadow-xl'); // Remove gradient on error
+            saveAllSmartPicksActions.classList.add('hidden');
         } finally {
             btn.disabled = false;
             btn.textContent = 'Generate Smart Picks';
             loadingDiv.classList.add('hidden');
         }
     });
+
+    // --- Smart Generated Numbers - Save All Button Logic ---
+    const saveAllSmartPicksBtn = document.getElementById('saveAllSmartPicksBtn');
+    if (saveAllSmartPicksBtn) {
+        saveAllSmartPicksBtn.addEventListener('click', function() {
+            const allSmartPickItems = document.querySelectorAll('#smartPicksResults .generated-pick-item');
+            const picksToSave = [];
+            allSmartPickItems.forEach(item => {
+                const whiteBallsStr = item.dataset.whiteBalls;
+                const powerballStr = item.dataset.powerball;
+                if (whiteBallsStr && powerballStr) {
+                    picksToSave.push({
+                        white_balls: whiteBallsStr.split(',').map(Number),
+                        powerball: Number(powerballStr)
+                    });
+                }
+            });
+            saveMultiplePicks(picksToSave);
+        });
+    }
 </script>
 {% endblock %}
