@@ -8,7 +8,7 @@
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="card p-6 bg-white rounded-xl shadow-lg mb-8">
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Boundary Crossing Pairs Analysis</h2>
-        <p class="text-gray-700 mb-6">This page analyzes "boundary crossing" pairs, which are numbers that span across traditional decade groupings (e.g., 9-10, 19-20). You can see their overall frequency and select a specific pair to view its yearly trend. The "Last Co-occurrence Date" column indicates the most recent date when *all* numbers in that specific pair appeared together in the same draw.</p>
+        <p class="text-gray-700 mb-6">This page analyzes "boundary crossing" pairs, which are numbers that span across traditional decade groupings (e.g., 9-10, 19-20). You can see their overall frequency and select a specific pair to view its yearly trend.</p>
 
         <h3 class="text-xl font-semibold mb-4 text-gray-800">Overall Frequency of Boundary Pairs</h3>
         {% if all_boundary_patterns_summary %}
@@ -18,17 +18,13 @@
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pair</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Occurrences</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Co-occurrence Date</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                    {% for pattern_data in all_boundary_patterns_summary %}
+                    {% for pattern in all_boundary_patterns_summary %}
                     <tr class="hover:bg-gray-50">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            ({{ pattern_data.pattern_numbers | join(', ') }})
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pattern_data.total_count }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pattern_data.last_co_occurrence }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">({{ pattern.pattern | join(', ') }})</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pattern.total_count }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
