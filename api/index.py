@@ -38,6 +38,10 @@ last_draw = pd.Series(dtype='object')
 # Set to store all historical white ball combinations for fast lookup
 historical_white_ball_sets = set() 
 
+# NEW: Global lookup for white ball combinations to their latest draw date
+# Key: frozenset of 5 white balls, Value: latest draw date string
+white_ball_co_occurrence_lookup = {}
+
 # Cache for precomputed analysis data
 analysis_cache = {}
 last_analysis_cache_update = datetime.min # Initialize with the earliest possible datetime
@@ -147,7 +151,7 @@ def load_historical_data_from_supabase():
         df_loaded = df_loaded.dropna(subset=['Draw Date_dt'])
 
         numeric_cols = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Powerball']
-        for col in numeric_cols:
+        for col in numeric_loaded.columns:
             if col in df_loaded.columns:
                 df_loaded[col] = pd.to_numeric(df_loaded[col], errors='coerce')
                 df_loaded[col] = df_loaded[col].fillna(0).astype(int)
@@ -829,46 +833,39 @@ def _get_last_drawn_date_for_single_number(df_source, number):
 
     return "N/A" # If number never appeared
 
-# NEW HELPER FUNCTION: To get the last drawn date for a pattern (co-occurrence)
+# MODIFIED HELPER FUNCTION: To get the last drawn date for a pattern (co-occurrence)
 def _get_last_co_occurrence_date_for_pattern(df_source, pattern_numbers):
     """
     Finds the last drawn date where all numbers in the `pattern_numbers` tuple/list
-    appeared together in the white balls of a single draw.
+    appeared together in the white balls of a single draw, using the pre-built lookup.
     """
-    print(f"[DEBUG-CoOccurDate] Checking last co-occurrence for pattern: {pattern_numbers}")
-    if df_source.empty or not pattern_numbers:
-        print("[DEBUG-CoOccurDate] df_source is empty or pattern_numbers is empty. Returning N/A.")
+    # print(f"[DEBUG-CoOccurDate] Checking last co-occurrence for pattern: {pattern_numbers}")
+    if not pattern_numbers:
+        # print("[DEBUG-CoOccurDate] pattern_numbers is empty. Returning N/A.")
         return "N/A"
 
-    df_copy = df_source.copy() # Work on a copy to avoid SettingWithCopyWarning
-    # Ensure 'Draw Date_dt' is present and sorted
-    if 'Draw Date_dt' not in df_copy.columns:
-        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
-        df_copy = df_copy.dropna(subset=['Draw Date_dt'])
-        if df_copy.empty: 
-            print("[DEBUG-CoOccurDate] df_copy empty after datetime conversion. Returning N/A.")
-            return "N/A"
+    # Convert pattern_numbers to a frozenset for efficient subset checking
+    target_pattern_set = frozenset(pattern_numbers)
 
-    # Convert pattern_numbers to a set for efficient lookup
-    pattern_set = frozenset(pattern_numbers)
+    latest_date = "N/A"
+    latest_datetime = datetime.min
 
-    # Iterate backwards from the most recent draw
-    for idx, row in df_copy.sort_values(by='Draw Date_dt', ascending=False).iterrows():
-        # Ensure white ball columns are numeric and handle potential NaNs
-        try:
-            draw_white_balls = frozenset([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
-        except ValueError as e:
-            print(f"[ERROR-CoOccurDate] Error converting white ball numbers to int for row {idx}: {row.to_dict()}. Error: {e}")
-            traceback.print_exc()
-            continue # Skip this row if conversion fails
-        
-        # Check if all numbers in the pattern are present in the current draw's white balls
-        if pattern_set.issubset(draw_white_balls):
-            print(f"[DEBUG-CoOccurDate] Found co-occurrence for {pattern_numbers} on {row['Draw Date']}.")
-            return row['Draw Date'] # Return the date of the most recent co-occurrence
-            
-    print(f"[DEBUG-CoOccurDate] Pattern {pattern_numbers} never co-occurred. Returning N/A.")
-    return "N/A" # If the pattern never appeared together
+    # Iterate through the pre-built white_ball_co_occurrence_lookup
+    # This lookup contains frozensets of 5 white balls and their latest draw date.
+    for historical_white_balls_set, draw_date_str in white_ball_co_occurrence_lookup.items():
+        # Check if the target pattern is a subset of the historical white balls set
+        if target_pattern_set.issubset(historical_white_balls_set):
+            try:
+                current_draw_datetime = datetime.strptime(draw_date_str, '%Y-%m-%d')
+                if current_draw_datetime > latest_datetime:
+                    latest_datetime = current_draw_datetime
+                    latest_date = draw_date_str
+            except ValueError:
+                # Handle cases where draw_date_str might be "N/A" or malformed
+                pass
+                
+    # print(f"[DEBUG-CoOccurDate] Found last co-occurrence for {pattern_numbers} on {latest_date}.")
+    return latest_date # If the pattern never appeared together, it remains "N/A"
 
 def get_number_age_distribution(df_source):
     if df_source.empty: return [], []
@@ -2032,73 +2029,46 @@ def get_special_patterns_analysis(df_source):
     repeating_digit_counts = defaultdict(int)
 
     # Define the patterns we are looking for
-    # Tens-apart: (N, N+10), (N, N+20), ..., (N, N+50)
     all_tens_apart_pairs = set()
-    for n1 in range(1, 60): # Max n1 for N+10 is 59, for N+50 is 19
+    for n1 in range(1, 60):
         for diff in [10, 20, 30, 40, 50]:
             n2 = n1 + diff
             if n2 <= 69:
                 all_tens_apart_pairs.add(tuple(sorted((n1, n2))))
 
-    # Same last digit: groups of numbers ending in the same digit
-    # We'll generate all possible numbers for each last digit, then check combinations
-    # Example: numbers ending in 9: [9, 19, 29, 39, 49, 59, 69]
-    same_last_digit_groups_full = defaultdict(list)
-    for i in range(1, 70):
-        last_digit = i % 10
-        same_last_digit_groups_full[last_digit].append(i)
-    
-    # Repeating digits: numbers like 11, 22, 33
     repeating_digit_numbers = [11, 22, 33, 44, 55, 66]
 
     print("[DEBUG-SpecialPatterns] Iterating through historical draws to find patterns.")
     for idx, row in df_source.iterrows():
         try:
-            white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6)])
-            white_ball_set = set(white_balls)
-            
+            white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+            white_ball_set = frozenset(white_balls) # Use frozenset for efficient lookups
+
             # Check for Tens-Apart Patterns
             for pair in combinations(white_balls, 2):
                 sorted_pair = tuple(sorted(pair))
                 if sorted_pair in all_tens_apart_pairs:
                     tens_apart_counts[sorted_pair] += 1
 
-            # Check for Same Last Digit Patterns (groups of 2 or more)
-            for last_digit, full_group_numbers in same_last_digit_groups_full.items():
-                # Find intersection of current draw and the full group for this last digit
-                intersection_with_draw = white_ball_set.intersection(set(full_group_numbers))
-                
-                # Consider patterns of 2 or more numbers with the same last digit
-                if len(intersection_with_draw) >= 2:
-                    for pattern_combo in combinations(sorted(list(intersection_with_draw)), 2): # Check for pairs
-                        same_last_digit_counts[pattern_combo] += 1
-                    if len(intersection_with_draw) >= 3: # Check for triplets
-                        for pattern_combo in combinations(sorted(list(intersection_with_draw)), 3):
-                            same_last_digit_counts[pattern_combo] += 1
-                    if len(intersection_with_draw) >= 4: # Check for quads
-                        for pattern_combo in combinations(sorted(list(intersection_with_draw)), 4):
-                            same_last_digit_counts[pattern_combo] += 1
-                    if len(intersection_with_draw) >= 5: # Check for quints
-                        for pattern_combo in combinations(sorted(list(intersection_with_draw)), 5):
-                            same_last_digit_counts[pattern_combo] += 1
+            # Check for Same Last Digit Patterns (groups of 2 or more from the draw)
+            # Instead of combinations, identify the actual group present in the draw
+            last_digit_groups_in_draw = defaultdict(list)
+            for num in white_balls:
+                last_digit_groups_in_draw[num % 10].append(num)
 
+            for last_digit, group_numbers in last_digit_groups_in_draw.items():
+                if len(group_numbers) >= 2:
+                    # Sort the group numbers to ensure consistent key for defaultdict
+                    sorted_group = tuple(sorted(group_numbers))
+                    same_last_digit_counts[sorted_group] += 1
 
-            # Check for Repeating Digit Patterns (groups of 2 or more)
-            # Filter repeating_digit_numbers that are actually in the current draw
+            # Check for Repeating Digit Patterns (groups of 2 or more from the draw)
             drawn_repeating_digits = [n for n in repeating_digit_numbers if n in white_ball_set]
-
             if len(drawn_repeating_digits) >= 2:
-                for pattern_combo in combinations(sorted(drawn_repeating_digits), 2): # Pairs
-                    repeating_digit_counts[pattern_combo] += 1
-                if len(drawn_repeating_digits) >= 3: # Triplets
-                    for pattern_combo in combinations(sorted(drawn_repeating_digits), 3):
-                        repeating_digit_counts[pattern_combo] += 1
-                if len(drawn_repeating_digits) >= 4: # Quads
-                    for pattern_combo in combinations(sorted(drawn_repeating_digits), 4):
-                        repeating_digit_counts[pattern_combo] += 1
-                if len(drawn_repeating_digits) >= 5: # Quints
-                    for pattern_combo in combinations(sorted(drawn_repeating_digits), 5):
-                        repeating_digit_counts[pattern_combo] += 1
+                # Sort the repeating digits group for consistent key
+                sorted_repeating_group = tuple(sorted(drawn_repeating_digits))
+                repeating_digit_counts[sorted_repeating_group] += 1
+
         except Exception as e:
             print(f"[ERROR-SpecialPatterns] Error processing draw row {idx}: {row.to_dict()}. Error: {e}")
             traceback.print_exc()
@@ -2157,7 +2127,7 @@ def get_special_patterns_analysis(df_source):
 
 # --- Data Initialization (Call after all helper functions are defined) ---
 def initialize_core_data():
-    global df, last_draw, historical_white_ball_sets
+    global df, last_draw, historical_white_ball_sets, white_ball_co_occurrence_lookup
     print("Attempting to load core historical data...")
     try:
         df_temp = load_historical_data_from_supabase()
@@ -2170,16 +2140,24 @@ def initialize_core_data():
             else:
                  last_draw['Draw Date'] = 'N/A' # Fallback for display if datetime conversion fails
             
-            # Populate historical_white_ball_sets
+            # Populate historical_white_ball_sets and white_ball_co_occurrence_lookup
             historical_white_ball_sets.clear() # Clear existing set before repopulating
+            white_ball_co_occurrence_lookup.clear() # Clear existing lookup
             for _, row in df.iterrows():
                 white_balls_tuple = tuple(sorted([
                     int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), 
                     int(row['Number 4']), int(row['Number 5'])
                 ]))
-                historical_white_ball_sets.add(frozenset(white_balls_tuple))
+                frozenset_white_balls = frozenset(white_balls_tuple)
+                historical_white_ball_sets.add(frozenset_white_balls)
+                
+                # Store the latest draw date for this specific combination of 5 white balls
+                current_draw_date = row['Draw Date']
+                if frozenset_white_balls not in white_ball_co_occurrence_lookup or \
+                   datetime.strptime(current_draw_date, '%Y-%m-%d') > datetime.strptime(white_ball_co_occurrence_lookup[frozenset_white_balls], '%Y-%m-%d'):
+                    white_ball_co_occurrence_lookup[frozenset_white_balls] = current_draw_date
 
-            print("Core historical data loaded successfully.")
+            print("Core historical data loaded successfully and co-occurrence lookup populated.")
         else:
             print("Core historical data is empty after loading. df remains empty.")
             # Set default N/A for last_draw if no data is found
