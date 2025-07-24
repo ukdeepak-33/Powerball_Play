@@ -24,9 +24,10 @@
             <p class="mt-2">Loading historical data...</p>
         </div>
 
-        <div id="chartContainer" class="mb-8 p-4 bg-gray-50 rounded-lg shadow-inner hidden">
+        {# ADDED 'relative h-80' to chartContainer and changed canvas to 'h-full' #}
+        <div id="chartContainer" class="mb-8 p-4 bg-gray-50 rounded-lg shadow-inner hidden relative h-80">
             <h3 class="text-xl font-semibold text-gray-800 mb-4 text-center">Frequency of White Ball <span id="selectedBallNumber">--</span> by Year</h3>
-            <canvas id="yearlyFrequencyChart" class="w-full h-80"></canvas>
+            <canvas id="yearlyFrequencyChart" class="w-full h-full"></canvas>
         </div>
 
         <div id="tableContainer" class="overflow-x-auto hidden">
