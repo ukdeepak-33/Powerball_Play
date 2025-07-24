@@ -54,8 +54,9 @@
         const yearlyFrequencyChartCanvas = document.getElementById('yearlyFrequencyChart');
 
         // Data passed from Flask, parsed from JSON
-        const allYearlyFreqData = JSON.parse('{{ yearly_freq_json | tojson | safe }}');
-        const years = {{ years | tojson | safe }}; // List of years for labels
+        // REMOVED | safe - This is the fix for the JSON parsing error
+        const allYearlyFreqData = JSON.parse('{{ yearly_freq_json | tojson }}'); 
+        const years = {{ years | tojson }}; // Also removed | safe here for consistency
 
         let yearlyChart; // To hold the Chart.js instance
 
