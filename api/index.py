@@ -1634,7 +1634,7 @@ def _get_yearly_patterns_for_range(df_source, selected_range_name): # Removed nu
         for _, row in yearly_df.iterrows():
             white_balls = [int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])]
             
-            numbers_in_current_range = sorted([num for num in white_balls if range_min <= num <= range_max])
+            numbers_in_current_range = sorted([num for num in white_balls if min_val <= num <= max_val])
             
             if len(numbers_in_current_range) >= 2:
                 for pair in combinations(numbers_in_current_range, 2):
@@ -1804,7 +1804,7 @@ def get_white_ball_frequency_by_period(df_source, period_type='year', start_year
     {'period_label': 'YYYY QX' or 'YYYY Hx' or 'YYYY', 'frequency': count} dictionaries.
     """
     if df_source.empty:
-        return {}
+        return {}, []
 
     df_copy = df_source.copy()
     if 'Draw Date_dt' not in df_copy.columns:
@@ -1812,7 +1812,7 @@ def get_white_ball_frequency_by_period(df_source, period_type='year', start_year
     df_copy = df_copy.dropna(subset=['Draw Date_dt'])
 
     if df_copy.empty:
-        return {}
+        return {}, []
 
     current_year = datetime.now().year
     years_to_analyze = range(start_year, current_year + 1)
@@ -1903,16 +1903,19 @@ def initialize_core_data():
 def get_cached_analysis(key, compute_function, *args, **kwargs):
     global analysis_cache, last_analysis_cache_update
     
-    # Create a unique cache key based on function name and args/kwargs
-    # This ensures different periods or ranges get different cache entries
-    cache_key_full = f"{key}_{json.dumps(args)}_{json.dumps(kwargs)}"
+    # Filter out DataFrame objects from args/kwargs for JSON serialization in cache key
+    # The actual compute_function will still receive all original args/kwargs
+    serializable_args = [arg for arg in args if not isinstance(arg, pd.DataFrame)]
+    serializable_kwargs = {k: v for k, v in kwargs.items() if not isinstance(v, pd.DataFrame)}
+
+    cache_key_full = f"{key}_{json.dumps(serializable_args)}_{json.dumps(serializable_kwargs)}"
 
     if cache_key_full in analysis_cache and (datetime.now() - last_analysis_cache_update).total_seconds() < CACHE_EXPIRATION_SECONDS:
         print(f"Serving '{cache_key_full}' from cache.")
         return analysis_cache[cache_key_full]
     
     print(f"Computing and caching '{cache_key_full}'.")
-    computed_data = compute_function(*args, **kwargs)
+    computed_data = compute_function(*args, **kwargs) # Pass original args/kwargs to the compute function
     
     analysis_cache[cache_key_full] = computed_data
     last_analysis_cache_update = datetime.now()
@@ -1972,7 +1975,7 @@ def _summarize_for_ai(df_source):
     recent_monthly_numbers_wb = defaultdict(int)
     for wb_num, periods_data in monthly_trends_data.items():
         for period_info in periods_data:
-            recent_monthly_numbers_wb[wb_num] += period_info['frequency']
+            recent_monthly_numbers_wb[wb_info['number']] += period_info['frequency']
 
     sorted_recent_monthly_wb = sorted(recent_monthly_numbers_wb.items(), key=lambda item: item[1], reverse=True)
     if sorted_recent_monthly_wb:
@@ -2311,6 +2314,7 @@ def save_multiple_generated_picks_route():
 
 @app.route('/frequency_analysis')
 def frequency_analysis_route():
+    # Pass df directly to the function, not for cache key serialization
     white_ball_freq_list, powerball_freq_list = get_cached_analysis('freq_analysis', frequency_analysis, df)
     return render_template('frequency_analysis.html', 
                            white_ball_freq=white_ball_freq_list, 
@@ -2319,6 +2323,7 @@ def frequency_analysis_route():
 @app.route('/hot_cold_numbers')
 def hot_cold_numbers_route():
     last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
+    # Pass df directly to the function, not for cache key serialization
     hot_numbers_list, cold_numbers_list = get_cached_analysis('hot_cold_numbers', hot_cold_numbers, df, last_draw_date_str_for_cache)
     
     return render_template('hot_cold_numbers.html', 
@@ -2333,6 +2338,7 @@ def monthly_white_ball_analysis_route():
     
     last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
 
+    # Pass df directly to the function, not for cache key serialization
     monthly_trends_data = get_cached_analysis(
         'monthly_trends_and_streaks', 
         get_monthly_white_ball_analysis_data, 
@@ -2352,6 +2358,7 @@ def sum_of_main_balls_route():
         flash("Cannot display Sum of Main Balls Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
+    # Pass df directly to the function, not for cache key serialization
     sums_data_df, sum_freq_list, min_sum, max_sum, avg_sum = get_cached_analysis('sum_of_main_balls_data', sum_of_main_balls, df)
     
     sums_data = sums_data_df.to_dict('records') 
@@ -2460,6 +2467,7 @@ def simulate_multiple_draws_route():
 
 @app.route('/number_age_distribution')
 def number_age_distribution_route():
+    # Pass df directly to the function, not for cache key serialization
     number_age_counts, detailed_number_ages = get_cached_analysis('number_age_distribution', get_number_age_distribution, df)[:2]
     return render_template('number_age_distribution.html',
                            number_age_data=number_age_counts,
@@ -2467,6 +2475,7 @@ def number_age_distribution_route():
 
 @app.route('/co_occurrence_analysis')
 def co_occurrence_analysis_route():
+    # Pass df directly to the function, not for cache key serialization
     co_occurrence_data, max_co_occurrence = get_cached_analysis('co_occurrence_analysis', get_co_occurrence_matrix, df)
     return render_template('co_occurrence_analysis.html',
                            co_occurrence_data=co_occurrence_data,
@@ -2474,6 +2483,7 @@ def co_occurrence_analysis_route():
 
 @app.route('/powerball_position_frequency')
 def powerball_position_frequency_route():
+    # Pass df directly to the function, not for cache key serialization
     powerball_position_data = get_cached_analysis('powerball_position_frequency', get_powerball_position_frequency, df)
     return render_template('powerball_position_frequency.html',
                            powerball_position_data=powerball_position_data)
@@ -2481,6 +2491,7 @@ def powerball_position_frequency_route():
 @app.route('/powerball_frequency_by_year')
 def powerball_frequency_by_year_route():
     # Removed num_years parameter from get_powerball_frequency_by_year call
+    # Pass df directly to the function, not for cache key serialization
     yearly_pb_freq_data, years = get_cached_analysis('yearly_pb_freq', get_powerball_frequency_by_year, df)
     return render_template('powerball_frequency_by_year.html',
                            yearly_pb_freq_data=yearly_pb_freq_data,
@@ -2489,6 +2500,7 @@ def powerball_frequency_by_year_route():
 @app.route('/odd_even_trends')
 def odd_even_trends_route():
     last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
+    # Pass df directly to the function, not for cache key serialization
     odd_even_trends = get_cached_analysis('odd_even_trends', get_odd_even_split_trends, df, last_draw_date_str_for_cache)
     return render_template('odd_even_trends.html',
                            odd_even_trends=odd_even_trends)
@@ -2496,18 +2508,21 @@ def odd_even_trends_route():
 @app.route('/consecutive_trends')
 def consecutive_trends_route():
     last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
+    # Pass df directly to the function, not for cache key serialization
     consecutive_trends = get_cached_analysis('consecutive_trends', get_consecutive_numbers_trends, df, last_draw_date_str_for_cache)
     return render_template('consecutive_trends.html',
                            consecutive_trends=consecutive_trends)
 
 @app.route('/triplets_analysis')
 def triplets_analysis_route():
+    # Pass df directly to the function, not for cache key serialization
     triplets_data = get_cached_analysis('triplets_analysis', get_most_frequent_triplets, df) 
     return render_template('triplets_analysis.html',
                            triplets_data=triplets_data)
 
 @app.route('/grouped_patterns_analysis')
 def grouped_patterns_analysis_route():
+    # Pass df directly to the function, not for cache key serialization
     patterns_data = get_cached_analysis('grouped_patterns', get_grouped_patterns_over_years, df)
     return render_template('grouped_patterns_analysis.html', patterns_data=patterns_data)
 
@@ -2526,6 +2541,7 @@ def grouped_patterns_yearly_comparison_route():
     cache_key = f'yearly_patterns_{selected_range_label}'
     
     # Removed num_years parameter from _get_yearly_patterns_for_range call
+    # Pass df directly to the function, not for cache key serialization
     yearly_patterns_data = get_cached_analysis(
         cache_key,
         _get_yearly_patterns_for_range,
@@ -2555,6 +2571,7 @@ def boundary_crossing_pairs_trends_route():
             flash("Invalid pair format. Please select a valid pair from the dropdown.", 'error')
             selected_pair = None 
 
+    # Pass df directly to the function, not for cache key serialization
     boundary_trends_data = get_cached_analysis(
         f'boundary_crossing_trends_{selected_pair}', 
         get_boundary_crossing_pairs_trends, 
@@ -2581,6 +2598,7 @@ def special_patterns_analysis_route():
         flash("Cannot display Special Patterns Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
+    # Pass df directly to the function, not for cache key serialization
     special_patterns_data = get_cached_analysis('special_patterns_analysis', get_special_patterns_analysis, df)
     
     return render_template('special_patterns_analysis.html',
@@ -3065,6 +3083,7 @@ def sum_trends_and_gaps_route():
         flash("Cannot display Sum Trends and Gaps: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
+    # Pass df directly to the function, not for cache key serialization
     sum_data = get_cached_analysis('sum_trends_and_gaps', get_sum_trends_and_gaps_data, df)
     
     return render_template('sum_trends_and_gaps.html', 
@@ -3080,6 +3099,7 @@ def weekday_trends_route():
         flash("Cannot display Weekday Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
+    # Pass df directly to the function, not for cache key serialization
     weekday_data = get_cached_analysis('weekday_all_trends', get_weekday_draw_trends, df, group_a_numbers_def=group_a)
     
     return render_template('weekday_trends.html', 
@@ -3107,6 +3127,7 @@ def api_white_ball_trends_route():
     period_type = request.args.get('period', 'year') # Default to 'year'
 
     # Cache the data based on the period type
+    # Pass df directly to the function, not for cache key serialization
     white_ball_data, period_labels = get_cached_analysis(
         f'white_ball_frequency_{period_type}', 
         get_white_ball_frequency_by_period, 
