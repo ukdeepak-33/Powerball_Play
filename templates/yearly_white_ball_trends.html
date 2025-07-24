@@ -19,12 +19,17 @@
             </select>
         </div>
 
-        <div id="chartContainer" class="mb-8 p-4 bg-gray-50 rounded-lg shadow-inner">
+        <div id="loadingIndicator" class="text-center text-blue-600 hidden">
+            <div class="spinner"></div>
+            <p class="mt-2">Loading historical data...</p>
+        </div>
+
+        <div id="chartContainer" class="mb-8 p-4 bg-gray-50 rounded-lg shadow-inner hidden">
             <h3 class="text-xl font-semibold text-gray-800 mb-4 text-center">Frequency of White Ball <span id="selectedBallNumber">--</span> by Year</h3>
             <canvas id="yearlyFrequencyChart" class="w-full h-80"></canvas>
         </div>
 
-        <div id="tableContainer" class="overflow-x-auto">
+        <div id="tableContainer" class="overflow-x-auto hidden">
             <h3 class="text-xl font-semibold text-gray-800 mb-4 text-center">Detailed Yearly Frequency for White Ball <span id="selectedBallNumberTable">--</span></h3>
             <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
                 <thead class="bg-gray-100">
@@ -38,8 +43,29 @@
                 </tbody>
             </table>
         </div>
+        <div id="errorMessage" class="p-4 bg-red-100 text-red-700 border border-red-200 rounded-lg hidden">
+            <p>Error loading data. Please try again later.</p>
+        </div>
     </div>
 </div>
+
+<style>
+    /* Spinner for loading state */
+    .spinner {
+        border: 4px solid rgba(0, 0, 0, 0.1);
+        border-left-color: #3b82f6; /* Blue-500 */
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
 {% endblock %}
 
 {% block scripts %}
@@ -52,11 +78,13 @@
         const selectedBallNumberTableSpan = document.getElementById('selectedBallNumberTable');
         const yearlyFrequencyTableBody = document.getElementById('yearlyFrequencyTableBody');
         const yearlyFrequencyChartCanvas = document.getElementById('yearlyFrequencyChart');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const chartContainer = document.getElementById('chartContainer');
+        const tableContainer = document.getElementById('tableContainer');
+        const errorMessage = document.getElementById('errorMessage');
 
-        // Data passed from Flask, parsed from JSON
-        // REMOVED | safe - This is the fix for the JSON parsing error
-        const allYearlyFreqData = JSON.parse('{{ yearly_freq_json | tojson }}'); 
-        const years = {{ years | tojson }}; // Also removed | safe here for consistency
+        let allYearlyFreqData = {}; // Will be populated by AJAX
+        const years = {{ years | tojson }}; // Years still passed from Flask for labels
 
         let yearlyChart; // To hold the Chart.js instance
 
@@ -154,13 +182,41 @@
             }
         }
 
+        // Function to fetch data from the API
+        async function fetchYearlyData() {
+            loadingIndicator.classList.remove('hidden');
+            chartContainer.classList.add('hidden');
+            tableContainer.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/yearly_white_ball_data');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                allYearlyFreqData = await response.json();
+                
+                // Once data is loaded, update display for the initially selected ball
+                updateDisplay(parseInt(whiteBallSelect.value));
+
+                chartContainer.classList.remove('hidden');
+                tableContainer.classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Error fetching yearly white ball data:', error);
+                errorMessage.classList.remove('hidden');
+            } finally {
+                loadingIndicator.classList.add('hidden');
+            }
+        }
+
         // Event listener for dropdown change
         whiteBallSelect.addEventListener('change', (event) => {
             updateDisplay(parseInt(event.target.value));
         });
 
-        // Initial display when the page loads (for the first number in the dropdown)
-        updateDisplay(parseInt(whiteBallSelect.value));
+        // Initial data fetch when the page loads
+        fetchYearlyData();
     });
 </script>
 {% endblock %}
