@@ -1622,6 +1622,7 @@ def _get_yearly_patterns_for_range(df_source, selected_range_name): # Removed nu
 
     yearly_pattern_data = []
 
+    # Correct variable names here: use range_min, range_max
     range_min, range_max = NUMBER_RANGES.get(selected_range_name, (1, 69)) 
 
     for year in years_to_analyze:
@@ -1634,7 +1635,8 @@ def _get_yearly_patterns_for_range(df_source, selected_range_name): # Removed nu
         for _, row in yearly_df.iterrows():
             white_balls = [int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])]
             
-            numbers_in_current_range = sorted([num for num in white_balls if min_val <= num <= max_val])
+            # Corrected line: use range_min and range_max
+            numbers_in_current_range = sorted([num for num in white_balls if range_min <= num <= range_max])
             
             if len(numbers_in_current_range) >= 2:
                 for pair in combinations(numbers_in_current_range, 2):
@@ -1975,7 +1977,8 @@ def _summarize_for_ai(df_source):
     recent_monthly_numbers_wb = defaultdict(int)
     for wb_num, periods_data in monthly_trends_data.items():
         for period_info in periods_data:
-            recent_monthly_numbers_wb[wb_info['number']] += period_info['frequency']
+            # Corrected: period_info['number'] is not present here. It should be wb_num
+            recent_monthly_numbers_wb[wb_num] += period_info['frequency']
 
     sorted_recent_monthly_wb = sorted(recent_monthly_numbers_wb.items(), key=lambda item: item[1], reverse=True)
     if sorted_recent_monthly_wb:
