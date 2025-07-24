@@ -965,13 +965,13 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
     
     return trend_data
     
-def get_powerball_frequency_by_year(df_source, num_years=5):
+def get_powerball_frequency_by_year(df_source): # Removed num_years param
     if df_source.empty:
         return [], []
 
     current_year = datetime.now().year
-    
-    years = [y for y in range(current_year - num_years + 1, current_year + 1)]
+    # Always analyze from 2017 up to the current year
+    years = [y for y in range(2017, current_year + 1)]
 
     if 'Draw Date_dt' not in df_source.columns or not pd.api.types.is_datetime64_any_dtype(df_source['Draw Date_dt']):
         df_source['Draw Date_dt'] = pd.to_datetime(df_source['Draw Date'], errors='coerce')
@@ -1597,7 +1597,7 @@ def get_weekday_draw_trends(df_source, group_a_numbers_def=None):
             
     return final_results
 
-def _get_yearly_patterns_for_range(df_source, selected_range_name, num_years=5):
+def _get_yearly_patterns_for_range(df_source, selected_range_name): # Removed num_years param
     if df_source.empty:
         return []
 
@@ -1617,7 +1617,8 @@ def _get_yearly_patterns_for_range(df_source, selected_range_name, num_years=5):
             pass
 
     current_year = datetime.now().year
-    years_to_analyze = sorted([y for y in range(current_year - num_years + 1, current_year + 1)], reverse=True) 
+    # Always analyze from 2017 up to the current year
+    years_to_analyze = range(2017, current_year + 1) 
 
     yearly_pattern_data = []
 
@@ -1796,11 +1797,11 @@ def get_special_patterns_analysis(df_source):
         'repeating_digit_patterns': formatted_repeating_digit
     }
 
-def get_yearly_white_ball_frequency(df_source, start_year=2017):
+def get_white_ball_frequency_by_period(df_source, period_type='year', start_year=2017):
     """
-    Calculates the frequency of each white ball (1-69) per year from start_year to current year.
+    Calculates the frequency of each white ball (1-69) per specified period (year, half_year, quarter).
     Returns a dictionary where keys are white ball numbers and values are lists of
-    {'year': YYYY, 'frequency': count} dictionaries.
+    {'period_label': 'YYYY QX' or 'YYYY Hx' or 'YYYY', 'frequency': count} dictionaries.
     """
     if df_source.empty:
         return {}
@@ -1816,27 +1817,46 @@ def get_yearly_white_ball_frequency(df_source, start_year=2017):
     current_year = datetime.now().year
     years_to_analyze = range(start_year, current_year + 1)
 
-    # Initialize a nested dictionary for all white balls and all years
-    yearly_freq_data = {wb: {year: 0 for year in years_to_analyze} for wb in range(1, 70)}
+    # Filter data to only include relevant years
+    df_filtered_years = df_copy[df_copy['Draw Date_dt'].dt.year.isin(years_to_analyze)].copy()
+
+    # Determine period_label based on period_type
+    if period_type == 'year':
+        df_filtered_years['period_label'] = df_filtered_years['Draw Date_dt'].dt.year.astype(str)
+    elif period_type == 'half_year':
+        df_filtered_years['half'] = (df_filtered_years['Draw Date_dt'].dt.month - 1) // 6 + 1
+        df_filtered_years['period_label'] = df_filtered_years['Draw Date_dt'].dt.year.astype(str) + ' H' + df_filtered_years['half'].astype(str)
+    elif period_type == 'quarter':
+        df_filtered_years['period_label'] = df_filtered_years['Draw Date_dt'].dt.year.astype(str) + ' Q' + df_filtered_years['Draw Date_dt'].dt.quarter.astype(str)
+    else:
+        # Default to year if an invalid period_type is provided
+        df_filtered_years['period_label'] = df_filtered_years['Draw Date_dt'].dt.year.astype(str)
+        period_type = 'year' # Reset period_type to 'year' for consistent behavior
+
+    # Get all unique period labels in chronological order
+    all_period_labels = sorted(df_filtered_years['period_label'].unique().tolist())
+
+    # Initialize a nested dictionary for all white balls and all periods
+    # We need to ensure all possible white balls (1-69) are present for each period
+    period_freq_data = {wb: {label: 0 for label in all_period_labels} for wb in range(1, 70)}
 
     # Iterate through each draw and populate frequencies
-    for _, row in df_copy.iterrows():
-        draw_year = row['Draw Date_dt'].year
-        if draw_year in years_to_analyze:
-            white_balls = [int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])]
-            for wb in white_balls:
-                if 1 <= wb <= 69: # Ensure number is within valid range
-                    yearly_freq_data[wb][draw_year] += 1
+    for _, row in df_filtered_years.iterrows():
+        period_label = row['period_label']
+        white_balls = [int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])]
+        for wb in white_balls:
+            if 1 <= wb <= 69: # Ensure number is within valid range
+                period_freq_data[wb][period_label] += 1
     
     # Format the data for JSON/template
     formatted_data = {}
-    for wb_num, year_counts in yearly_freq_data.items():
+    for wb_num, period_counts in period_freq_data.items():
         formatted_data[wb_num] = sorted([
-            {'year': year, 'frequency': count} 
-            for year, count in year_counts.items()
-        ], key=lambda x: x['year'])
+            {'period_label': label, 'frequency': count} 
+            for label, count in period_counts.items()
+        ], key=lambda x: x['period_label']) # Sort by period label for chronological order
         
-    return formatted_data
+    return formatted_data, all_period_labels # Also return all_period_labels for frontend chart axes
 
 
 def initialize_core_data():
@@ -1883,14 +1903,18 @@ def initialize_core_data():
 def get_cached_analysis(key, compute_function, *args, **kwargs):
     global analysis_cache, last_analysis_cache_update
     
-    if key in analysis_cache and (datetime.now() - last_analysis_cache_update).total_seconds() < CACHE_EXPIRATION_SECONDS:
-        print(f"Serving '{key}' from cache.")
-        return analysis_cache[key]
+    # Create a unique cache key based on function name and args/kwargs
+    # This ensures different periods or ranges get different cache entries
+    cache_key_full = f"{key}_{json.dumps(args)}_{json.dumps(kwargs)}"
+
+    if cache_key_full in analysis_cache and (datetime.now() - last_analysis_cache_update).total_seconds() < CACHE_EXPIRATION_SECONDS:
+        print(f"Serving '{cache_key_full}' from cache.")
+        return analysis_cache[cache_key_full]
     
-    print(f"Computing and caching '{key}'.")
+    print(f"Computing and caching '{cache_key_full}'.")
     computed_data = compute_function(*args, **kwargs)
     
-    analysis_cache[key] = computed_data
+    analysis_cache[cache_key_full] = computed_data
     last_analysis_cache_update = datetime.now()
     return computed_data
 
@@ -1942,23 +1966,17 @@ def _summarize_for_ai(df_source):
         summary_parts.append("Powerballs with longest 'miss streak' (coldest by age): " + ", ".join([f"{n['number']} (missed {n['age']} draws)" for n in powerball_ages[:5]])) 
 
     # 5. Monthly Trends (Recent Activity)
-    monthly_trends_data = get_monthly_white_ball_analysis_data(df_source, num_months_for_top_display=6) # Look at last 6 months
+    # Using the new flexible function for monthly trends for AI summary
+    monthly_trends_data, _ = get_white_ball_frequency_by_period(df_source, period_type='half_year', start_year=datetime.now().year - 1) # Last 2 half-years for "recent"
+    
     recent_monthly_numbers_wb = defaultdict(int)
-    recent_monthly_numbers_pb = defaultdict(int)
-
-    for month_data in monthly_trends_data['monthly_data']:
-        if not month_data['is_current_month']: # Only consider completed months for trends
-            for wb_info in month_data['drawn_white_balls_with_counts']:
-                recent_monthly_numbers_wb[wb_info['number']] += wb_info['count'] 
-            for pb_info in month_data['top_powerballs']:
-                recent_monthly_numbers_pb[pb_info['number']] += pb_info['count']
+    for wb_num, periods_data in monthly_trends_data.items():
+        for period_info in periods_data:
+            recent_monthly_numbers_wb[wb_num] += period_info['frequency']
 
     sorted_recent_monthly_wb = sorted(recent_monthly_numbers_wb.items(), key=lambda item: item[1], reverse=True)
     if sorted_recent_monthly_wb:
-        summary_parts.append("White Balls frequently drawn in recent completed months: " + ", ".join([f"{n} ({c} times)" for n, c in sorted_recent_monthly_wb[:15]])) 
-    sorted_recent_monthly_pb = sorted(recent_monthly_numbers_pb.items(), key=lambda item: item[1], reverse=True)
-    if sorted_recent_monthly_pb:
-        summary_parts.append("Powerballs frequently drawn in recent completed months: " + ", ".join([f"{n} ({c} times)" for n, c in sorted_recent_monthly_pb[:5]])) 
+        summary_parts.append("White Balls frequently drawn in recent half-years: " + ", ".join([f"{n} ({c} times)" for n, c in sorted_recent_monthly_wb[:15]])) 
 
     # 6. Odd/Even Split Trends
     odd_even_trends_list = get_odd_even_split_trends(df_source, last_draw_date_str) 
@@ -2462,7 +2480,8 @@ def powerball_position_frequency_route():
 
 @app.route('/powerball_frequency_by_year')
 def powerball_frequency_by_year_route():
-    yearly_pb_freq_data, years = get_cached_analysis('yearly_pb_freq', get_powerball_frequency_by_year, df, num_years=7)
+    # Removed num_years parameter from get_powerball_frequency_by_year call
+    yearly_pb_freq_data, years = get_cached_analysis('yearly_pb_freq', get_powerball_frequency_by_year, df)
     return render_template('powerball_frequency_by_year.html',
                            yearly_pb_freq_data=yearly_pb_freq_data,
                            years=years)
@@ -2506,12 +2525,12 @@ def grouped_patterns_yearly_comparison_route():
 
     cache_key = f'yearly_patterns_{selected_range_label}'
     
+    # Removed num_years parameter from _get_yearly_patterns_for_range call
     yearly_patterns_data = get_cached_analysis(
         cache_key,
         _get_yearly_patterns_for_range,
         df,
-        selected_range_label,
-        num_years=5 
+        selected_range_label
     )
 
     return render_template('grouped_patterns_yearly_comparison.html',
@@ -3072,20 +3091,32 @@ def yearly_white_ball_trends_route():
         flash("Cannot display Yearly White Ball Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
-    # Get the list of years for the dropdown/chart labels
+    # Get the list of years for the dropdown/chart labels (up to current year + 1 for future-proofing)
     current_year = datetime.now().year
     years_for_display = list(range(2017, current_year + 1))
 
     return render_template('yearly_white_ball_trends.html',
-                           years=years_for_display) # Pass years, but not the full JSON data
+                           years=years_for_display) # Pass years for initial dropdown values
 
-@app.route('/api/yearly_white_ball_data')
-def api_yearly_white_ball_data_route():
+# Renamed from /api/yearly_white_ball_data
+@app.route('/api/white_ball_trends')
+def api_white_ball_trends_route():
     if df.empty:
         return jsonify({"error": "Historical data not loaded or is empty."}), 500
     
-    # Cache the full yearly frequency data for all white balls
-    yearly_freq_all_white_balls = get_cached_analysis('yearly_white_ball_frequency_all', get_yearly_white_ball_frequency, df, start_year=2017)
+    period_type = request.args.get('period', 'year') # Default to 'year'
+
+    # Cache the data based on the period type
+    white_ball_data, period_labels = get_cached_analysis(
+        f'white_ball_frequency_{period_type}', 
+        get_white_ball_frequency_by_period, 
+        df, 
+        period_type=period_type, 
+        start_year=2017
+    )
     
-    return jsonify(yearly_freq_all_white_balls)
+    return jsonify({
+        'data': white_ball_data,
+        'period_labels': period_labels
+    })
 
