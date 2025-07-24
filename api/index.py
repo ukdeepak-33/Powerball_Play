@@ -1796,6 +1796,48 @@ def get_special_patterns_analysis(df_source):
         'repeating_digit_patterns': formatted_repeating_digit
     }
 
+def get_yearly_white_ball_frequency(df_source, start_year=2017):
+    """
+    Calculates the frequency of each white ball (1-69) per year from start_year to current year.
+    Returns a dictionary where keys are white ball numbers and values are lists of
+    {'year': YYYY, 'frequency': count} dictionaries.
+    """
+    if df_source.empty:
+        return {}
+
+    df_copy = df_source.copy()
+    if 'Draw Date_dt' not in df_copy.columns:
+        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
+
+    if df_copy.empty:
+        return {}
+
+    current_year = datetime.now().year
+    years_to_analyze = range(start_year, current_year + 1)
+
+    # Initialize a nested dictionary for all white balls and all years
+    yearly_freq_data = {wb: {year: 0 for year in years_to_analyze} for wb in range(1, 70)}
+
+    # Iterate through each draw and populate frequencies
+    for _, row in df_copy.iterrows():
+        draw_year = row['Draw Date_dt'].year
+        if draw_year in years_to_analyze:
+            white_balls = [int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])]
+            for wb in white_balls:
+                if 1 <= wb <= 69: # Ensure number is within valid range
+                    yearly_freq_data[wb][draw_year] += 1
+    
+    # Format the data for JSON/template
+    formatted_data = {}
+    for wb_num, year_counts in yearly_freq_data.items():
+        formatted_data[wb_num] = sorted([
+            {'year': year, 'frequency': count} 
+            for year, count in year_counts.items()
+        ], key=lambda x: x['year'])
+        
+    return formatted_data
+
 
 def initialize_core_data():
     global df, last_draw, historical_white_ball_sets, white_ball_co_occurrence_lookup
@@ -1877,7 +1919,7 @@ def _summarize_for_ai(df_source):
     if hot_nums:
         summary_parts.append("Hot Numbers (most frequent in last year): " + ", ".join([f"{n['Number']} ({n['Frequency']} times)" for n in hot_nums[:10]])) 
     if cold_nums:
-        summary_parts.append("Cold Numbers (least frequent in last year): " + ", ".join([f"{n['Number']} ({n['Frequency']} times)" for n in cold_nums[:10]])) 
+        summary_parts.append("Cold Numbers (least frequent in last year): " + ", ".join([f"{n['Number']} (missed {n['Frequency']} draws)" for n in cold_nums[:10]])) # Changed to 'missed draws' for cold
 
     # 3. Co-occurring Pairs and Triplets
     co_occurrence_data, _ = get_co_occurrence_matrix(df_source)
@@ -2874,7 +2916,7 @@ def analyze_generated_historical_matches_route():
         
         return jsonify({
             "success": True,
-            "generated_numbers_for_analysis": generated_white_balls,
+            "generated_numbers_for_analysis": generated_white_balls, 
             "generated_powerball_for_analysis": generated_powerball,
             "match_summary": historical_match_results['summary']
         })
@@ -3020,7 +3062,7 @@ def save_manual_pick_route():
         white_balls = data.get('white_balls')
         powerball = data.get('powerball')
 
-        if not white_balls or len(white_balls) != 5 || powerball is None:
+        if not white_balls or len(white_balls) != 5 or powerball is None:
             return jsonify({"success": False, "error": "Invalid input. Please provide 5 white balls and 1 powerball."}), 400
         
         white_balls = sorted([int(n) for n in white_balls])
@@ -3065,4 +3107,23 @@ def weekday_trends_route():
     return render_template('weekday_trends.html', 
                            weekday_trends=weekday_data)
 
+@app.route('/yearly_white_ball_trends')
+def yearly_white_ball_trends_route():
+    if df.empty:
+        flash("Cannot display Yearly White Ball Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    # Cache the full yearly frequency data for all white balls
+    yearly_freq_all_white_balls = get_cached_analysis('yearly_white_ball_frequency_all', get_yearly_white_ball_frequency, df, start_year=2017)
+    
+    # Get the list of years for the dropdown/chart labels
+    current_year = datetime.now().year
+    years_for_display = list(range(2017, current_year + 1))
+
+    # Convert the dictionary to a JSON string to pass to the frontend
+    yearly_freq_json = json.dumps(yearly_freq_all_white_balls)
+
+    return render_template('yearly_white_ball_trends.html',
+                           yearly_freq_json=yearly_freq_json,
+                           years=years_for_display)
 
