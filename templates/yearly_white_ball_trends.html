@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Yearly White Ball Trends{% endblock %}
+
+{% block page_heading %}Yearly White Ball Frequency Trends{% endblock %}
+
+{% block content %}
+<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">White Ball Yearly Appearances (2017 - Present)</h2>
+        <p class="text-gray-600 mb-6">Select a white ball number to see how many times it has been drawn each year since 2017. The data will be displayed in both a bar chart and a detailed table.</p>
+
+        <div class="mb-6">
+            <label for="whiteBallSelect" class="block text-lg font-semibold text-gray-700 mb-2">Select White Ball Number (1-69):</label>
+            <select id="whiteBallSelect" class="form-input w-full md:w-1/3">
+                {% for i in range(1, 70) %}
+                    <option value="{{ i }}">{{ i }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div id="chartContainer" class="mb-8 p-4 bg-gray-50 rounded-lg shadow-inner">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4 text-center">Frequency of White Ball <span id="selectedBallNumber">--</span> by Year</h3>
+            <canvas id="yearlyFrequencyChart" class="w-full h-80"></canvas>
+        </div>
+
+        <div id="tableContainer" class="overflow-x-auto">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4 text-center">Detailed Yearly Frequency for White Ball <span id="selectedBallNumberTable">--</span></h3>
+            <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Year</th>
+                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Frequency</th>
+                    </tr>
+                </thead>
+                <tbody id="yearlyFrequencyTableBody">
+                    {# Table rows will be populated by JavaScript #}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const whiteBallSelect = document.getElementById('whiteBallSelect');
+        const selectedBallNumberSpan = document.getElementById('selectedBallNumber');
+        const selectedBallNumberTableSpan = document.getElementById('selectedBallNumberTable');
+        const yearlyFrequencyTableBody = document.getElementById('yearlyFrequencyTableBody');
+        const yearlyFrequencyChartCanvas = document.getElementById('yearlyFrequencyChart');
+
+        // Data passed from Flask, parsed from JSON
+        const allYearlyFreqData = JSON.parse('{{ yearly_freq_json | tojson | safe }}');
+        const years = {{ years | tojson | safe }}; // List of years for labels
+
+        let yearlyChart; // To hold the Chart.js instance
+
+        // Function to update the chart and table
+        function updateDisplay(selectedBall) {
+            const dataForSelectedBall = allYearlyFreqData[selectedBall] || [];
+            
+            // Update display spans
+            selectedBallNumberSpan.textContent = selectedBall;
+            selectedBallNumberTableSpan.textContent = selectedBall;
+
+            // Prepare data for Chart.js
+            const chartLabels = years;
+            const chartData = years.map(year => {
+                const yearEntry = dataForSelectedBall.find(item => item.year === year);
+                return yearEntry ? yearEntry.frequency : 0;
+            });
+
+            // Destroy existing chart if it exists
+            if (yearlyChart) {
+                yearlyChart.destroy();
+            }
+
+            // Create new chart
+            yearlyChart = new Chart(yearlyFrequencyChartCanvas, {
+                type: 'bar',
+                data: {
+                    labels: chartLabels,
+                    datasets: [{
+                        label: `Occurrences of White Ball ${selectedBall}`,
+                        data: chartData,
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)', // Tailwind blue-500 with opacity
+                        borderColor: 'rgba(37, 99, 235, 1)', // Tailwind blue-600
+                        borderWidth: 1,
+                        borderRadius: 5, // Rounded bars
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false, // Allow canvas to resize freely
+                    plugins: {
+                        title: {
+                            display: false, // Title is handled by HTML h3
+                        },
+                        legend: {
+                            display: false, // No need for legend with single dataset
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Year',
+                                color: '#4b5563' // gray-700
+                            },
+                            grid: {
+                                display: false // No vertical grid lines
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Frequency',
+                                color: '#4b5563' // gray-700
+                            },
+                            ticks: {
+                                precision: 0 // Ensure integer ticks
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Update table
+            yearlyFrequencyTableBody.innerHTML = ''; // Clear existing rows
+            if (dataForSelectedBall.length > 0) {
+                years.forEach(year => {
+                    const yearEntry = dataForSelectedBall.find(item => item.year === year);
+                    const frequency = yearEntry ? yearEntry.frequency : 0;
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-gray-50';
+                    row.innerHTML = `
+                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${year}</td>
+                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${frequency}</td>
+                    `;
+                    yearlyFrequencyTableBody.appendChild(row);
+                });
+            } else {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td colspan="2" class="px-4 py-2 text-sm text-gray-500 text-center">No data available for this number.</td>
+                `;
+                yearlyFrequencyTableBody.appendChild(row);
+            }
+        }
+
+        // Event listener for dropdown change
+        whiteBallSelect.addEventListener('change', (event) => {
+            updateDisplay(parseInt(event.target.value));
+        });
+
+        // Initial display when the page loads (for the first number in the dropdown)
+        updateDisplay(parseInt(whiteBallSelect.value));
+    });
+</script>
+{% endblock %}
