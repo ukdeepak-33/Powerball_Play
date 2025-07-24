@@ -1,22 +1,32 @@
 {% extends "base.html" %}
 
-{% block title %}Yearly White Ball Trends{% endblock %}
+{% block title %}White Ball Trends by Period{% endblock %}
 
-{% block page_heading %}Yearly White Ball Frequency Trends{% endblock %}
+{% block page_heading %}White Ball Frequency Trends by Period{% endblock %}
 
 {% block content %}
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">White Ball Yearly Appearances (2017 - Present)</h2>
-        <p class="text-gray-600 mb-6">Select a white ball number to see how many times it has been drawn each year since 2017. The data will be displayed in both a bar chart and a detailed table.</p>
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">White Ball Appearances (2017 - Present)</h2>
+        <p class="text-gray-600 mb-6">Select a white ball number and a time period (Yearly, Half-Yearly, or Quarterly) to see its drawing frequency over time.</p>
 
-        <div class="mb-6">
-            <label for="whiteBallSelect" class="block text-lg font-semibold text-gray-700 mb-2">Select White Ball Number (1-69):</label>
-            <select id="whiteBallSelect" class="form-input w-full md:w-1/3">
-                {% for i in range(1, 70) %}
-                    <option value="{{ i }}">{{ i }}</option>
-                {% endfor %}
-            </select>
+        <div class="flex flex-col md:flex-row gap-4 mb-6">
+            <div class="flex-1">
+                <label for="whiteBallSelect" class="block text-lg font-semibold text-gray-700 mb-2">Select White Ball Number (1-69):</label>
+                <select id="whiteBallSelect" class="form-input w-full">
+                    {% for i in range(1, 70) %}
+                        <option value="{{ i }}">{{ i }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex-1">
+                <label for="periodSelect" class="block text-lg font-semibold text-gray-700 mb-2">Select Time Period:</label>
+                <select id="periodSelect" class="form-input w-full">
+                    <option value="year">Yearly</option>
+                    <option value="half_year">Half-Yearly</option>
+                    <option value="quarter">Quarterly</option>
+                </select>
+            </div>
         </div>
 
         <div id="loadingIndicator" class="text-center text-blue-600 hidden">
@@ -24,18 +34,17 @@
             <p class="mt-2">Loading historical data...</p>
         </div>
 
-        {# ADDED 'relative h-80' to chartContainer and changed canvas to 'h-full' #}
         <div id="chartContainer" class="mb-8 p-4 bg-gray-50 rounded-lg shadow-inner hidden relative h-80">
-            <h3 class="text-xl font-semibold text-gray-800 mb-4 text-center">Frequency of White Ball <span id="selectedBallNumber">--</span> by Year</h3>
+            <h3 class="text-xl font-semibold text-gray-800 mb-4 text-center">Frequency of White Ball <span id="selectedBallNumber">--</span> by <span id="selectedPeriodType">Year</span></h3>
             <canvas id="yearlyFrequencyChart" class="w-full h-full"></canvas>
         </div>
 
         <div id="tableContainer" class="overflow-x-auto hidden">
-            <h3 class="text-xl font-semibold text-gray-800 mb-4 text-center">Detailed Yearly Frequency for White Ball <span id="selectedBallNumberTable">--</span></h3>
+            <h3 class="text-xl font-semibold text-gray-800 mb-4 text-center">Detailed Frequency for White Ball <span id="selectedBallNumberTable">--</span> by <span id="selectedPeriodTypeTable">Year</span></h3>
             <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
                 <thead class="bg-gray-100">
                     <tr>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Year</th>
+                        <th id="tablePeriodHeader" class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Year</th>
                         <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Frequency</th>
                     </tr>
                 </thead>
@@ -75,8 +84,12 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const whiteBallSelect = document.getElementById('whiteBallSelect');
+        const periodSelect = document.getElementById('periodSelect'); // New period select
         const selectedBallNumberSpan = document.getElementById('selectedBallNumber');
+        const selectedPeriodTypeSpan = document.getElementById('selectedPeriodType'); // New span for period type
         const selectedBallNumberTableSpan = document.getElementById('selectedBallNumberTable');
+        const selectedPeriodTypeTableSpan = document.getElementById('selectedPeriodTypeTable'); // New span for table period type
+        const tablePeriodHeader = document.getElementById('tablePeriodHeader'); // New table header for period
         const yearlyFrequencyTableBody = document.getElementById('yearlyFrequencyTableBody');
         const yearlyFrequencyChartCanvas = document.getElementById('yearlyFrequencyChart');
         const loadingIndicator = document.getElementById('loadingIndicator');
@@ -84,24 +97,27 @@
         const tableContainer = document.getElementById('tableContainer');
         const errorMessage = document.getElementById('errorMessage');
 
-        let allYearlyFreqData = {}; // Will be populated by AJAX
-        const years = {{ years | tojson }}; // Years still passed from Flask for labels
+        let allWhiteBallTrendsData = {}; // Will be populated by AJAX for the current period type
+        let currentPeriodLabels = []; // Labels for the current period type (e.g., ['2023 Q1', '2023 Q2', ...])
 
         let yearlyChart; // To hold the Chart.js instance
 
         // Function to update the chart and table
-        function updateDisplay(selectedBall) {
-            const dataForSelectedBall = allYearlyFreqData[selectedBall] || [];
+        function updateDisplay(selectedBall, selectedPeriodText) {
+            const dataForSelectedBall = allWhiteBallTrendsData[selectedBall] || [];
             
             // Update display spans
             selectedBallNumberSpan.textContent = selectedBall;
             selectedBallNumberTableSpan.textContent = selectedBall;
+            selectedPeriodTypeSpan.textContent = selectedPeriodText;
+            selectedPeriodTypeTableSpan.textContent = selectedPeriodText;
+            tablePeriodHeader.textContent = selectedPeriodText; // Update table header
 
             // Prepare data for Chart.js
-            const chartLabels = years;
-            const chartData = years.map(year => {
-                const yearEntry = dataForSelectedBall.find(item => item.year === year);
-                return yearEntry ? yearEntry.frequency : 0;
+            const chartLabels = currentPeriodLabels; // Use the labels fetched from API
+            const chartData = currentPeriodLabels.map(label => {
+                const periodEntry = dataForSelectedBall.find(item => item.period_label === label);
+                return periodEntry ? periodEntry.frequency : 0;
             });
 
             // Destroy existing chart if it exists
@@ -138,7 +154,7 @@
                         x: {
                             title: {
                                 display: true,
-                                text: 'Year',
+                                text: selectedPeriodText, // Dynamic X-axis title
                                 color: '#4b5563' // gray-700
                             },
                             grid: {
@@ -162,14 +178,14 @@
 
             // Update table
             yearlyFrequencyTableBody.innerHTML = ''; // Clear existing rows
-            if (dataForSelectedBall.length > 0) {
-                years.forEach(year => {
-                    const yearEntry = dataForSelectedBall.find(item => item.year === year);
-                    const frequency = yearEntry ? yearEntry.frequency : 0;
+            if (currentPeriodLabels.length > 0) {
+                currentPeriodLabels.forEach(label => {
+                    const periodEntry = dataForSelectedBall.find(item => item.period_label === label);
+                    const frequency = periodEntry ? periodEntry.frequency : 0;
                     const row = document.createElement('tr');
                     row.className = 'hover:bg-gray-50';
                     row.innerHTML = `
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${year}</td>
+                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${label}</td>
                         <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${frequency}</td>
                     `;
                     yearlyFrequencyTableBody.appendChild(row);
@@ -177,47 +193,58 @@
             } else {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td colspan="2" class="px-4 py-2 text-sm text-gray-500 text-center">No data available for this number.</td>
+                    <td colspan="2" class="px-4 py-2 text-sm text-gray-500 text-center">No data available for this number or period.</td>
                 `;
                 yearlyFrequencyTableBody.appendChild(row);
             }
         }
 
-        // Function to fetch data from the API
-        async function fetchYearlyData() {
+        // Function to fetch data from the API based on selected period
+        async function fetchTrendData() {
             loadingIndicator.classList.remove('hidden');
             chartContainer.classList.add('hidden');
             tableContainer.classList.add('hidden');
             errorMessage.classList.add('hidden');
 
+            const selectedPeriodType = periodSelect.value;
+            const selectedPeriodText = periodSelect.options[periodSelect.selectedIndex].text;
+
             try {
-                const response = await fetch('/api/yearly_white_ball_data');
+                const response = await fetch(`/api/white_ball_trends?period=${selectedPeriodType}`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                allYearlyFreqData = await response.json();
+                const result = await response.json();
+                allWhiteBallTrendsData = result.data;
+                currentPeriodLabels = result.period_labels;
                 
-                // Once data is loaded, update display for the initially selected ball
-                updateDisplay(parseInt(whiteBallSelect.value));
+                // Once data is loaded, update display for the initially selected ball and period
+                updateDisplay(parseInt(whiteBallSelect.value), selectedPeriodText);
 
                 chartContainer.classList.remove('hidden');
                 tableContainer.classList.remove('hidden');
 
             } catch (error) {
-                console.error('Error fetching yearly white ball data:', error);
+                console.error('Error fetching white ball trends data:', error);
                 errorMessage.classList.remove('hidden');
             } finally {
                 loadingIndicator.classList.add('hidden');
             }
         }
 
-        // Event listener for dropdown change
-        whiteBallSelect.addEventListener('change', (event) => {
-            updateDisplay(parseInt(event.target.value));
+        // Event listeners for dropdown changes
+        whiteBallSelect.addEventListener('change', () => {
+            // When white ball changes, only update display with already fetched data
+            updateDisplay(parseInt(whiteBallSelect.value), periodSelect.options[periodSelect.selectedIndex].text);
         });
 
-        // Initial data fetch when the page loads
-        fetchYearlyData();
+        periodSelect.addEventListener('change', () => {
+            // When period changes, refetch all data for the new period type
+            fetchTrendData();
+        });
+
+        // Initial data fetch when the page loads (defaults to 'year')
+        fetchTrendData();
     });
 </script>
 {% endblock %}
