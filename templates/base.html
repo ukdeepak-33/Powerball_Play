@@ -196,30 +196,18 @@
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M16 12a4 4 0 10-8 0 4 4 0 008 0z"></path><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 2a8 8 0 100 16 8 8 0 000-16z" clip-rule="evenodd"></path></svg>
                     Frequency Analysis
                 </a></li>
-                <li><a href="{{ url_for('monthly_white_ball_analysis_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 3H5c-1.103 0-2 .897-2 2v14c0 1.103.897 2 2 2h14c1.103 0 2-.897 2-2V5c0-1.103-.897-2-2-2zm-5 14h-4v-6h4v6zm4-8H6V7h12v2z"></path></svg>
-                    Monthly Trends
+                <li><a href="{{ url_for('hot_cold_numbers_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
+                    Hot & Cold Numbers
                 </a></li>
                  <li><a href="{{ url_for('sum_of_main_balls_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0-5C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"></path></svg>
                     Sum of Balls Analysis
                 </a></li>
                 <!-- NEW LINK HERE -->
-                <li><a href="{{ url_for('sum_trends_and_gaps_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 14h-4v-4h4v4zm-6 0H9v-4h4v4zm-6 0H3v-4h4v4zm16-6V3H3v5h18zM3 16h4v4H3v-4zm6 0h4v4H9v-4zm6 0h4v4h-4v-4z"></path></svg>
-                 Sum Trends & Gaps
-                </a></li>
-                 <li><a href="{{ url_for('find_results_by_sum_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15.5 14h-.79l-.28-.27C14.53 12.63 15 11.37 15 10c0-2.76-2.24-5-5-5S5 7.24 5 10s2.24 5 5 5c1.37 0 2.63-.47 3.66-1.28l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"></path></svg>
-                    Search by Sum
-                </a></li>
-                <li><a href="{{ url_for('find_results_by_first_white_ball') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM11 6h2v6h-2zM11 14h2v2h-2z"></path></svg>
-                    Search by First White Ball
-                </a></li>
-                 <li><a href="{{ url_for('hot_cold_numbers_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
-                    Hot & Cold Numbers
+                <li><a href="{{ url_for('monthly_white_ball_analysis_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 3H5c-1.103 0-2 .897-2 2v14c0 1.103.897 2 2 2h14c1.103 0 2-.897 2-2V5c0-1.103-.897-2-2-2zm-5 14h-4v-6h4v6zm4-8H6V7h12v2z"></path></svg>
+                    Monthly Trends
                 </a></li>
                 <li><a href="{{ url_for('odd_even_trends_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12s4.48 10 10 10 10-4.48 10-10zm-9 7v-4h-2v4H7l4 4 4-4h-3zM12 5L8 9h3v4h2V9h3l-4-4z"></path></svg>
@@ -245,12 +233,24 @@
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 3H5c-1.103 0-2 .897-2 2v14c0 1.103.897 2 2 2h14c1.103 0 2-.897 2-2V5c0-1.103-.897-2-2-2zM5 5h14v14H5V5zm4 10h2v-6H9v6zm4 0h2v-3h-2v3zm4 0h2v-9h-2v9z"></path></svg>
                     Powerball Freq by Year
                 </a></li>
-                {# NEW ADVANCED ANALYSIS SECTION #}
-                <li class="mt-4"><div class="px-3 py-1 text-gray-500 text-sm font-semibold uppercase">Advanced Analysis</div></li>
                 <li><a href="{{ url_for('strict_positional_search_route') }}" class="flex items-center py-2.5 px-4 rounded-lg transition duration-200 hover:bg-gray-700 hover:text-indigo-200">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                         Positional Search
                     </a></li>
+                 <li><a href="{{ url_for('find_results_by_sum_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15.5 14h-.79l-.28-.27C14.53 12.63 15 11.37 15 10c0-2.76-2.24-5-5-5S5 7.24 5 10s2.24 5 5 5c1.37 0 2.63-.47 3.66-1.28l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"></path></svg>
+                    Search by Sum
+                </a></li>
+                <li><a href="{{ url_for('find_results_by_first_white_ball') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM11 6h2v6h-2zM11 14h2v2h-2z"></path></svg>
+                    Search by First White Ball
+                </a></li>
+                {# NEW ADVANCED ANALYSIS SECTION #}
+                 <li><a href="{{ url_for('sum_trends_and_gaps_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 14h-4v-4h4v4zm-6 0H9v-4h4v4zm-6 0H3v-4h4v4zm16-6V3H3v5h18zM3 16h4v4H3v-4zm6 0h4v4H9v-4zm6 0h4v4h-4v-4z"></path></svg>
+                 Sum Trends & Gaps
+                </a></li>
+                <li class="mt-4"><div class="px-3 py-1 text-gray-500 text-sm font-semibold uppercase">Advanced Analysis</div></li>
                 <li><a href="{{ url_for('boundary_crossing_pairs_trends_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-10h2v-2h-2v2zm0 4h2v-2h-2v2z"></path></svg>
                     Boundary Pairs Trends
