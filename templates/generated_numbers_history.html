@@ -95,42 +95,81 @@
     <p class="text-gray-700 mb-4">Below is the historical record of your saved Powerball picks, grouped by the date they were generated.</p>
 
     {% if generated_history %}
+        {# Group data by year and month for display #}
+        {% set grouped_by_year = {} %}
+        {% for date_str, picks_for_date in generated_history.items() %}
+            {# Assuming 'moment' filter is available from Flask-Moment or similar, otherwise use Python datetime in Flask #}
+            {# For simplicity in template, we'll assume a YYYY-MM-DD string and parse it #}
+            {% set year = date_str[0:4] %}
+            {% set month_num = date_str[5:7] %}
+            {% set month_name_map = {
+                "01": "January", "02": "February", "03": "March", "04": "April",
+                "05": "May", "06": "June", "07": "July", "08": "August",
+                "09": "September", "10": "October", "11": "November", "12": "December"
+            } %}
+            {% set month = month_name_map[month_num] %}
+            {% set month_key = date_str[0:7] %} {# YYYY-MM for unique sorting #}
+
+            {% if year not in grouped_by_year %}{% set _ = grouped_by_year.update({year: {}}) %}{% endif %}
+            {% if month_key not in grouped_by_year[year] %}{% set _ = grouped_by_year[year].update({month_key: {'name': month, 'dates': {}}}) %}{% endif %}
+            {% set _ = grouped_by_year[year][month_key]['dates'].update({date_str: picks_for_date}) %}
+        {% endfor %}
+
+        {% set sorted_years = grouped_by_year.keys() | sort(reverse=true) %}
+
         <div id="accordion-container" class="space-y-4">
-            {% for date, picks in generated_history.items() %}
-            <div class="border border-gray-200 rounded-lg overflow-hidden">
-                <button class="accordion-header flex justify-between items-center w-full p-4 bg-gray-100 hover:bg-gray-200 focus:outline-none text-left text-lg font-semibold text-gray-800">
-                    <span>{{ date }} ({{ picks | length }} picks)</span>
-                    <svg class="w-5 h-5 transform transition-transform duration-200 accordion-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </button>
-                <div class="accordion-content p-4 bg-white border-t border-gray-200 hidden">
-                    <ul class="list-none space-y-3">
-                        {% for pick in picks %}
-                        <li class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b pb-3 mb-3 last:border-b-0 last:pb-0 last:mb-0">
-                            <span class="text-gray-600 text-sm mb-2 sm:mb-0 sm:mr-4">Generated at: <span class="font-medium text-gray-800">{{ pick.time }}</span></span>
-                            <div class="flex items-center space-x-2 flex-wrap justify-center sm:justify-start">
-                                {% for ball in pick.white_balls %}
-                                    <span class="ball-small">{{ ball }}</span>
-                                {% endfor %}
-                                <span class="ball-small powerball-small">{{ pick.powerball }}</span>
-                            </div>
-                            <div class="flex space-x-2 mt-3 sm:mt-0">
-                                {# Changed from form submit to button with data attributes for AJAX #}
-                                <button type="button" class="btn-primary-small analyze-single-pick-btn" 
-                                        data-white-balls="{{ pick.white_balls | join(',') }}" 
-                                        data-powerball="{{ pick.powerball }}">
-                                    Analyze Single Pick
+            {% for year in sorted_years %}
+                <div class="border border-gray-300 rounded-lg shadow-md overflow-hidden">
+                    <button class="year-toggle w-full flex justify-between items-center p-4 bg-gray-100 hover:bg-gray-200 font-bold text-lg text-gray-800 transition-colors duration-200"
+                            data-target="year-content-{{ year }}">
+                        {{ year }}
+                        <svg class="w-5 h-5 transform transition-transform duration-200 year-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div id="year-content-{{ year }}" class="year-content hidden">
+                        {% set sorted_months_keys = grouped_by_year[year].keys() | sort(reverse=true) %}
+                        {% for month_key in sorted_months_keys %}
+                            {% set month_data = grouped_by_year[year][month_key] %}
+                            <div class="border-t border-gray-200">
+                                <button class="month-toggle w-full flex justify-between items-center p-3 bg-white hover:bg-gray-50 font-semibold text-md text-gray-700 transition-colors duration-200 pl-8"
+                                        data-target="month-content-{{ year }}-{{ month_key }}">
+                                    {{ month_data.name }}
+                                    <svg class="w-4 h-4 transform transition-transform duration-200 month-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                                 </button>
-                                <button type="button" class="btn-primary-small analyze-batch-btn bg-purple-600 hover:bg-purple-700" data-generated-date="{{ date }}">
-                                    Analyze This Batch
-                                </button>
+                                <div id="month-content-{{ year }}-{{ month_key }}" class="month-content hidden">
+                                    {% set sorted_dates = month_data.dates.keys() | sort(reverse=true) %}
+                                    {% for date_str in sorted_dates %}
+                                        <div class="p-4 border-t border-gray-100 bg-gray-50 pl-12">
+                                            <h4 class="font-bold text-gray-800 mb-3 text-sm">{{ date_str }}</h4>
+                                            <div class="space-y-3">
+                                                {% for pick in month_data.dates[date_str] %}
+                                                    <li class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b pb-3 mb-3 last:border-b-0 last:pb-0 last:mb-0">
+                                                        <span class="text-gray-600 text-sm mb-2 sm:mb-0 sm:mr-4">Generated at: <span class="font-medium text-gray-800">{{ pick.time }}</span></span>
+                                                        <div class="flex items-center space-x-2 flex-wrap justify-center sm:justify-start">
+                                                            {% for ball in pick.white_balls %}
+                                                                <span class="ball-small">{{ ball }}</span>
+                                                            {% endfor %}
+                                                            <span class="ball-small powerball-small">{{ pick.powerball }}</span>
+                                                        </div>
+                                                        <div class="flex space-x-2 mt-3 sm:mt-0">
+                                                            <button type="button" class="btn-primary-small analyze-single-pick-btn" 
+                                                                    data-white-balls="{{ pick.white_balls | join(',') }}" 
+                                                                    data-powerball="{{ pick.powerball }}">
+                                                                Analyze Single Pick
+                                                            </button>
+                                                            <button type="button" class="btn-primary-small analyze-batch-btn bg-purple-600 hover:bg-purple-700" data-generated-date="{{ date_str }}">
+                                                                Analyze This Batch
+                                                            </button>
+                                                        </div>
+                                                    </li>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
                             </div>
-                        </li>
                         {% endfor %}
-                    </ul>
+                    </div>
                 </div>
-            </div>
             {% endfor %}
         </div>
     {% else %}
@@ -186,17 +225,36 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Accordion functionality (existing)
-        const accordionHeaders = document.querySelectorAll('.accordion-header');
-        accordionHeaders.forEach(header => {
-            header.addEventListener('click', function() {
-                const content = this.nextElementSibling;
-                const icon = this.querySelector('.accordion-icon');
-                content.classList.toggle('hidden');
-                if (content.classList.contains('hidden')) {
-                    icon.style.transform = 'rotate(0deg)';
+        // Toggle functionality for Year sections
+        document.querySelectorAll('.year-toggle').forEach(button => {
+            button.addEventListener('click', function() {
+                const targetId = this.dataset.target;
+                const targetContent = document.getElementById(targetId);
+                const arrow = this.querySelector('.year-arrow');
+
+                if (targetContent.classList.contains('hidden')) {
+                    targetContent.classList.remove('hidden');
+                    arrow.classList.add('rotate-180');
                 } else {
-                    icon.style.transform = 'rotate(180deg)';
+                    targetContent.classList.add('hidden');
+                    arrow.classList.remove('rotate-180');
+                }
+            });
+        });
+
+        // Toggle functionality for Month sections
+        document.querySelectorAll('.month-toggle').forEach(button => {
+            button.addEventListener('click', function() {
+                const targetId = this.dataset.target;
+                const targetContent = document.getElementById(targetId);
+                const arrow = this.querySelector('.month-arrow');
+
+                if (targetContent.classList.contains('hidden')) {
+                    targetContent.classList.remove('hidden');
+                    arrow.classList.add('rotate-180');
+                } else {
+                    targetContent.classList.add('hidden');
+                    arrow.classList.remove('rotate-180');
                 }
             });
         });
@@ -224,8 +282,6 @@
         // Initial check for official draw dates to enable/disable batch analysis buttons
         if (officialDrawDateSelect.options.length === 0 || officialDrawDateSelect.value === "") {
             analyzeBatchButtons.forEach(btn => btn.disabled = true);
-            // batchAnalysisErrorMessage.classList.remove('hidden'); // Only show error on interaction now
-            // batchAnalysisErrorMessage.innerHTML = "No official draw dates available for batch analysis. Please add official draws first.";
         }
 
         // Function to display match summary (reusable for both batch and single)
@@ -234,12 +290,24 @@
             let foundMatches = false;
             for (const key in summary) {
                 if (summary.hasOwnProperty(key)) {
+                    // Exclude "No Match" from display
+                    if (key === "No Match") {
+                        continue;
+                    }
+
                     const count = summary[key].count;
+                    const draws = summary[key].draws;
+                    
                     if (count > 0) {
                         foundMatches = true;
                         const div = document.createElement('div');
                         div.className = 'bg-blue-100 p-2 rounded-md font-medium';
-                        div.innerHTML = `<span class="text-blue-900">${key}:</span> <span class="font-bold text-lg text-blue-700">${count}</span>`;
+                        let listItemText = `<span class="text-blue-900">${key}:</span> <span class="font-bold text-lg text-blue-700">${count}</span>`;
+                        if (draws.length > 0) {
+                            const drawDates = draws.map(d => d.date).join(', ');
+                            listItemText += `<span class="text-sm text-gray-600 ml-2">(Last drawn: ${drawDates})</span>`;
+                        }
+                        div.innerHTML = listItemText;
                         targetDiv.appendChild(div);
                     }
                 }
@@ -247,7 +315,7 @@
             if (!foundMatches && totalPicks > 0) {
                  const div = document.createElement('div');
                  div.className = 'bg-blue-100 p-2 rounded-md font-medium';
-                 div.innerHTML = `<span class="text-blue-900">No Matches Found.</span>`;
+                 div.innerHTML = `<span class="text-blue-900">No Significant Matches Found.</span>`;
                  targetDiv.appendChild(div);
             }
         }
