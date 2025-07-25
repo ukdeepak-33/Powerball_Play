@@ -965,13 +965,14 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
     
     return trend_data
     
-def get_powerball_frequency_by_year(df_source): # Removed num_years param
+def get_powerball_frequency_by_year(df_source):
     if df_source.empty:
         return [], []
 
     current_year = datetime.now().year
-    # Always analyze from 2017 up to the current year
-    years = [y for y in range(2017, current_year + 1)]
+    # Dynamically set start_year to ensure a rolling 10-year window (current year + 9 previous years)
+    start_year = max(2017, current_year - 9) # Ensure it doesn't go before 2017 if data starts then
+    years = [y for y in range(start_year, current_year + 1)]
 
     if 'Draw Date_dt' not in df_source.columns or not pd.api.types.is_datetime64_any_dtype(df_source['Draw Date_dt']):
         df_source['Draw Date_dt'] = pd.to_datetime(df_source['Draw Date'], errors='coerce')
@@ -1044,6 +1045,7 @@ def _get_generated_picks_for_date_from_db(date_str):
                 int(record['number_4']), int(record['number_5'])
             ])
             formatted_picks.append({
+                'time': datetime.fromisoformat(record['generated_date'].replace('Z', '+00:00')).strftime('%I:%M %p'), # Add time for display
                 'white_balls': white_balls,
                 'powerball': int(record['powerball'])
             })
@@ -1597,7 +1599,7 @@ def get_weekday_draw_trends(df_source, group_a_numbers_def=None):
             
     return final_results
 
-def _get_yearly_patterns_for_range(df_source, selected_range_name): # Removed num_years param
+def _get_yearly_patterns_for_range(df_source, selected_range_name):
     if df_source.empty:
         return []
 
@@ -1617,12 +1619,12 @@ def _get_yearly_patterns_for_range(df_source, selected_range_name): # Removed nu
             pass
 
     current_year = datetime.now().year
-    # Always analyze from 2017 up to the current year
-    years_to_analyze = range(2017, current_year + 1) 
+    # Dynamically set start_year for a rolling 10-year window
+    start_year = max(2017, current_year - 9) 
+    years_to_analyze = range(start_year, current_year + 1) 
 
     yearly_pattern_data = []
 
-    # Correct variable names here: use range_min, range_max
     range_min, range_max = NUMBER_RANGES.get(selected_range_name, (1, 69)) 
 
     for year in years_to_analyze:
@@ -1635,7 +1637,6 @@ def _get_yearly_patterns_for_range(df_source, selected_range_name): # Removed nu
         for _, row in yearly_df.iterrows():
             white_balls = [int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])]
             
-            # Corrected line: use range_min and range_max
             numbers_in_current_range = sorted([num for num in white_balls if range_min <= num <= range_max])
             
             if len(numbers_in_current_range) >= 2:
@@ -1687,13 +1688,19 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
         if col in df_copy.columns:
             df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce').fillna(0).astype(int)
 
+    current_year = datetime.now().year
+    # Dynamically set start_year for a rolling 10-year window
+    start_year = max(2017, current_year - 9) 
+    all_years = sorted([y for y in df_copy['Draw Date_dt'].dt.year.unique().tolist() if y >= start_year])
+
+
     yearly_boundary_pair_counts = defaultdict(lambda: defaultdict(int)) 
     overall_boundary_pair_counts = defaultdict(int) 
 
-    all_years = sorted(df_copy['Draw Date_dt'].dt.year.unique().tolist())
-
     for _, row in df_copy.iterrows():
         year = row['Draw Date_dt'].year
+        if year < start_year: # Filter out years outside the rolling window
+            continue
         white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
         current_draw_pairs = set(combinations(white_balls, 2))
         
@@ -1799,11 +1806,10 @@ def get_special_patterns_analysis(df_source):
         'repeating_digit_patterns': formatted_repeating_digit
     }
 
-def get_white_ball_frequency_by_period(df_source, period_type='year', start_year=2017):
+def get_white_ball_frequency_by_period(df_source, period_type='year'):
     """
     Calculates the frequency of each white ball (1-69) per specified period (year, half_year, quarter).
-    Returns a dictionary where keys are white ball numbers and values are lists of
-    {'period_label': 'YYYY QX' or 'YYYY Hx' or 'YYYY', 'frequency': count} dictionaries.
+    Defaults to a rolling 10-year window.
     """
     if df_source.empty:
         return {}, []
@@ -1817,6 +1823,8 @@ def get_white_ball_frequency_by_period(df_source, period_type='year', start_year
         return {}, []
 
     current_year = datetime.now().year
+    # Dynamically set start_year for a rolling 10-year window (current year + 9 previous years)
+    start_year = max(2017, current_year - 9) 
     years_to_analyze = range(start_year, current_year + 1)
 
     # Filter data to only include relevant years
@@ -1839,7 +1847,6 @@ def get_white_ball_frequency_by_period(df_source, period_type='year', start_year
     all_period_labels = sorted(df_filtered_years['period_label'].unique().tolist())
 
     # Initialize a nested dictionary for all white balls and all periods
-    # We need to ensure all possible white balls (1-69) are present for each period
     period_freq_data = {wb: {label: 0 for label in all_period_labels} for wb in range(1, 70)}
 
     # Iterate through each draw and populate frequencies
@@ -1859,6 +1866,55 @@ def get_white_ball_frequency_by_period(df_source, period_type='year', start_year
         ], key=lambda x: x['period_label']) # Sort by period label for chronological order
         
     return formatted_data, all_period_labels # Also return all_period_labels for frontend chart axes
+
+def get_consecutive_numbers_yearly_trends(df_source):
+    """
+    Calculates the percentage of draws containing consecutive numbers for each year
+    within a rolling 10-year window.
+    """
+    if df_source.empty:
+        return {'yearly_data': [], 'years': []}
+
+    df_copy = df_source.copy()
+    if 'Draw Date_dt' not in df_copy.columns:
+        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
+    
+    if df_copy.empty:
+        return {'yearly_data': [], 'years': []}
+
+    current_year = datetime.now().year
+    start_year = max(2017, current_year - 9) # Rolling 10-year window
+    years_to_analyze = range(start_year, current_year + 1)
+
+    yearly_trends = []
+    
+    for year in years_to_analyze:
+        yearly_df = df_copy[df_copy['Draw Date_dt'].dt.year == year].copy()
+        
+        total_draws_in_year = len(yearly_df)
+        consecutive_draws_count = 0
+
+        if total_draws_in_year > 0:
+            for _, row in yearly_df.iterrows():
+                white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+                if _find_consecutive_pairs(white_balls):
+                    consecutive_draws_count += 1
+            
+            percentage = round((consecutive_draws_count / total_draws_in_year) * 100, 2)
+        else:
+            percentage = 0.0
+        
+        yearly_trends.append({
+            'year': int(year),
+            'percentage': percentage,
+            'total_draws': total_draws_in_year,
+            'consecutive_draws': consecutive_draws_count
+        })
+    
+    yearly_trends.sort(key=lambda x: x['year'])
+    
+    return {'yearly_data': yearly_trends, 'years': list(years_to_analyze)}
 
 
 def initialize_core_data():
@@ -1972,12 +2028,12 @@ def _summarize_for_ai(df_source):
 
     # 5. Monthly Trends (Recent Activity)
     # Using the new flexible function for monthly trends for AI summary
-    monthly_trends_data, _ = get_white_ball_frequency_by_period(df_source, period_type='half_year', start_year=datetime.now().year - 1) # Last 2 half-years for "recent"
+    # Call without start_year, so it uses the 10-year rolling window
+    monthly_trends_data, _ = get_white_ball_frequency_by_period(df_source, period_type='half_year') 
     
     recent_monthly_numbers_wb = defaultdict(int)
     for wb_num, periods_data in monthly_trends_data.items():
         for period_info in periods_data:
-            # Corrected: period_info['number'] is not present here. It should be wb_num
             recent_monthly_numbers_wb[wb_num] += period_info['frequency']
 
     sorted_recent_monthly_wb = sorted(recent_monthly_numbers_wb.items(), key=lambda item: item[1], reverse=True)
@@ -2342,13 +2398,13 @@ def monthly_white_ball_analysis_route():
     last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
 
     # Pass df directly to the function, not for cache key serialization
+    # Removed num_months_for_top_display from get_white_ball_frequency_by_period call
     monthly_trends_data = get_cached_analysis(
         'monthly_trends_and_streaks', 
         get_monthly_white_ball_analysis_data, 
         df, 
         num_top_wb=69, 
-        num_top_pb=3,  
-        num_months_for_top_display=6 
+        num_top_pb=3 
     )
     
     return render_template('monthly_white_ball_analysis.html', 
@@ -2493,7 +2549,6 @@ def powerball_position_frequency_route():
 
 @app.route('/powerball_frequency_by_year')
 def powerball_frequency_by_year_route():
-    # Removed num_years parameter from get_powerball_frequency_by_year call
     # Pass df directly to the function, not for cache key serialization
     yearly_pb_freq_data, years = get_cached_analysis('yearly_pb_freq', get_powerball_frequency_by_year, df)
     return render_template('powerball_frequency_by_year.html',
@@ -2510,11 +2565,37 @@ def odd_even_trends_route():
 
 @app.route('/consecutive_trends')
 def consecutive_trends_route():
+    if df.empty:
+        flash("Cannot display Consecutive Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
     last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
-    # Pass df directly to the function, not for cache key serialization
+    
+    # Existing recent trends data
     consecutive_trends = get_cached_analysis('consecutive_trends', get_consecutive_numbers_trends, df, last_draw_date_str_for_cache)
+    
+    # New yearly trends data and years for dropdown
+    yearly_consecutive_data = get_cached_analysis('consecutive_yearly_trends', get_consecutive_numbers_yearly_trends, df)
+    years_for_dropdown = yearly_consecutive_data['years']
+
     return render_template('consecutive_trends.html',
-                           consecutive_trends=consecutive_trends)
+                           consecutive_trends=consecutive_trends,
+                           yearly_consecutive_data=yearly_consecutive_data['yearly_data'],
+                           years_for_dropdown=years_for_dropdown)
+
+# New API endpoint for yearly consecutive trends
+@app.route('/api/consecutive_yearly_trends')
+def api_consecutive_yearly_trends_route():
+    if df.empty:
+        return jsonify({"error": "Historical data not loaded or is empty."}), 500
+    
+    yearly_consecutive_data = get_cached_analysis('consecutive_yearly_trends', get_consecutive_numbers_yearly_trends, df)
+    
+    return jsonify({
+        'data': yearly_consecutive_data['yearly_data'],
+        'years': yearly_consecutive_data['years']
+    })
+
 
 @app.route('/triplets_analysis')
 def triplets_analysis_route():
@@ -2543,7 +2624,6 @@ def grouped_patterns_yearly_comparison_route():
 
     cache_key = f'yearly_patterns_{selected_range_label}'
     
-    # Removed num_years parameter from _get_yearly_patterns_for_range call
     # Pass df directly to the function, not for cache key serialization
     yearly_patterns_data = get_cached_analysis(
         cache_key,
@@ -3116,7 +3196,9 @@ def yearly_white_ball_trends_route():
     
     # Get the list of years for the dropdown/chart labels (up to current year + 1 for future-proofing)
     current_year = datetime.now().year
-    years_for_display = list(range(2017, current_year + 1))
+    # Calculate the start year for a 10-year rolling window
+    start_year_for_display = max(2017, current_year - 9) 
+    years_for_display = list(range(start_year_for_display, current_year + 1))
 
     return render_template('yearly_white_ball_trends.html',
                            years=years_for_display) # Pass years for initial dropdown values
@@ -3131,12 +3213,12 @@ def api_white_ball_trends_route():
 
     # Cache the data based on the period type
     # Pass df directly to the function, not for cache key serialization
+    # Removed start_year parameter, it's now dynamically calculated within the function
     white_ball_data, period_labels = get_cached_analysis(
         f'white_ball_frequency_{period_type}', 
         get_white_ball_frequency_by_period, 
         df, 
-        period_type=period_type, 
-        start_year=2017
+        period_type=period_type
     )
     
     return jsonify({
