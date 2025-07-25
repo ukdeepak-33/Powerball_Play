@@ -403,19 +403,8 @@ def generate_with_user_provided_pair(num1, num2, white_ball_range, powerball_ran
 
 
 def check_historical_match(white_balls, powerball):
-    global df 
-    if df.empty: return None
-
-    if frozenset(white_balls) not in historical_white_ball_sets:
-        return None 
-
-    for _, row in df.iterrows():
-        historical_white_balls = sorted([int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])])
-        historical_powerball = int(row['Powerball'])
-        
-        if set(white_balls) == set(historical_white_balls) and powerball == historical_powerball:
-            return row['Draw Date']
-    return None
+    global historical_white_ball_sets
+    return frozenset(white_balls) in historical_white_ball_sets
 
 def frequency_analysis(df_source):
     if df_source.empty: 
@@ -829,22 +818,6 @@ def get_co_occurrence_matrix(df_source):
     max_co_occurrence = max(item['count'] for item in co_occurrence_data) if co_occurrence_data else 0
     
     return co_occurrence_data, max_co_occurrence
-
-def get_powerball_position_frequency(df_source):
-    if df_source.empty: return []
-    position_frequency_data = []
-    
-    for index, row in df_source.iterrows():
-        powerball = int(row['Powerball'])
-        for i in range(1, 6):
-            col_name = f'Number {i}'
-            if col_name in row and pd.notna(row[col_name]):
-                position_frequency_data.append({
-                    'powerball_number': powerball,
-                    'white_ball_value_at_position': int(row[col_name]),
-                    'white_ball_position': i
-                })
-    return position_frequency_data
 
 def _find_consecutive_pairs(numbers_list):
     pairs = []
@@ -1870,10 +1843,10 @@ def get_white_ball_frequency_by_period(df_source, period_type='year'):
 def get_consecutive_numbers_yearly_trends(df_source):
     """
     Calculates the percentage of draws containing consecutive numbers for each year
-    within a rolling 10-year window.
+    within a rolling 10-year window, and also lists the most frequent consecutive pairs per year.
     """
     if df_source.empty:
-        return {'yearly_data': [], 'years': []}
+        return {'yearly_data': [], 'years': [], 'yearly_consecutive_pairs': {}}
 
     df_copy = df_source.copy()
     if 'Draw Date_dt' not in df_copy.columns:
@@ -1881,25 +1854,33 @@ def get_consecutive_numbers_yearly_trends(df_source):
     df_copy = df_copy.dropna(subset=['Draw Date_dt'])
     
     if df_copy.empty:
-        return {'yearly_data': [], 'years': []}
+        return {'yearly_data': [], 'years': [], 'yearly_consecutive_pairs': {}}
 
     current_year = datetime.now().year
     start_year = max(2017, current_year - 9) # Rolling 10-year window
     years_to_analyze = range(start_year, current_year + 1)
 
     yearly_trends = []
-    
+    yearly_consecutive_pairs_data = {} # Stores {year: {pair_tuple: count}}
+
     for year in years_to_analyze:
         yearly_df = df_copy[df_copy['Draw Date_dt'].dt.year == year].copy()
         
         total_draws_in_year = len(yearly_df)
         consecutive_draws_count = 0
+        consecutive_pairs_in_year = defaultdict(int)
 
         if total_draws_in_year > 0:
             for _, row in yearly_df.iterrows():
                 white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
-                if _find_consecutive_pairs(white_balls):
+                
+                # Find all consecutive pairs in this draw
+                current_draw_consecutive_pairs = _find_consecutive_pairs(white_balls)
+                
+                if current_draw_consecutive_pairs:
                     consecutive_draws_count += 1
+                    for pair in current_draw_consecutive_pairs:
+                        consecutive_pairs_in_year[tuple(pair)] += 1 # Store as tuple for dict key
             
             percentage = round((consecutive_draws_count / total_draws_in_year) * 100, 2)
         else:
@@ -1911,10 +1892,23 @@ def get_consecutive_numbers_yearly_trends(df_source):
             'total_draws': total_draws_in_year,
             'consecutive_draws': consecutive_draws_count
         })
-    
+
+        # Convert consecutive_pairs_in_year to a list of dicts for JSON serialization
+        # Sort by count (descending) then by pair (ascending)
+        sorted_pairs_for_year = sorted([
+            {'pair': list(p), 'count': c} for p, c in consecutive_pairs_in_year.items()
+        ], key=lambda x: (-x['count'], x['pair']))
+        
+        # Removed the [:20] slicing here to return ALL consecutive pairs for the year
+        yearly_consecutive_pairs_data[str(year)] = sorted_pairs_for_year
+
     yearly_trends.sort(key=lambda x: x['year'])
     
-    return {'yearly_data': yearly_trends, 'years': list(years_to_analyze)}
+    return {
+        'yearly_data': yearly_trends, 
+        'years': list(years_to_analyze), 
+        'yearly_consecutive_pairs': yearly_consecutive_pairs_data
+    }
 
 
 def initialize_core_data():
@@ -2575,13 +2569,18 @@ def consecutive_trends_route():
     consecutive_trends = get_cached_analysis('consecutive_trends', get_consecutive_numbers_trends, df, last_draw_date_str_for_cache)
     
     # New yearly trends data and years for dropdown
-    yearly_consecutive_data = get_cached_analysis('consecutive_yearly_trends', get_consecutive_numbers_yearly_trends, df)
-    years_for_dropdown = yearly_consecutive_data['years']
+    yearly_consecutive_data_full = get_cached_analysis('consecutive_yearly_trends', get_consecutive_numbers_yearly_trends, df)
+    
+    # Extract data for template
+    yearly_consecutive_percentage_data = yearly_consecutive_data_full['yearly_data']
+    years_for_dropdown = yearly_consecutive_data_full['years']
+    yearly_consecutive_pairs_summary = yearly_consecutive_data_full['yearly_consecutive_pairs']
 
     return render_template('consecutive_trends.html',
                            consecutive_trends=consecutive_trends,
-                           yearly_consecutive_data=yearly_consecutive_data['yearly_data'],
-                           years_for_dropdown=years_for_dropdown)
+                           yearly_consecutive_percentage_data=yearly_consecutive_percentage_data,
+                           years_for_dropdown=years_for_dropdown,
+                           yearly_consecutive_pairs_summary=yearly_consecutive_pairs_summary)
 
 # New API endpoint for yearly consecutive trends
 @app.route('/api/consecutive_yearly_trends')
@@ -2589,11 +2588,12 @@ def api_consecutive_yearly_trends_route():
     if df.empty:
         return jsonify({"error": "Historical data not loaded or is empty."}), 500
     
-    yearly_consecutive_data = get_cached_analysis('consecutive_yearly_trends', get_consecutive_numbers_yearly_trends, df)
+    yearly_consecutive_data_full = get_cached_analysis('consecutive_yearly_trends', get_consecutive_numbers_yearly_trends, df)
     
     return jsonify({
-        'data': yearly_consecutive_data['yearly_data'],
-        'years': yearly_consecutive_data['years']
+        'data': yearly_consecutive_data_full['yearly_data'],
+        'years': yearly_consecutive_data_full['years'],
+        'yearly_consecutive_pairs': yearly_consecutive_data_full['yearly_consecutive_pairs']
     })
 
 
