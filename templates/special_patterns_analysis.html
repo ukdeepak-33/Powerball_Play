@@ -8,13 +8,22 @@
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="card p-6 bg-white rounded-xl shadow-lg">
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Special Number Patterns</h2>
-        <p class="text-gray-700 mb-6">This page analyzes historical draws for specific "special" number patterns that might be of interest, such as numbers that are a multiple of 10 apart, numbers sharing the same last digit, or repeating digit numbers. Click "Show All" to expand the full list for each category.</p>
+        <p class="text-gray-700 mb-6">This page analyzes historical draws for specific "special" number patterns that might be of interest, such as numbers that are a multiple of 10 apart, numbers sharing the same last digit, or repeating digit numbers. Use the sort options below for each table.</p>
 
         {# Tens-Apart Patterns Section #}
         <div class="mb-8">
             <h3 class="text-xl font-semibold mb-4 text-gray-800">Tens-Apart Patterns (e.g., 10, 20; 55, 65)</h3>
             <p class="text-gray-700 mb-4">These are pairs of white balls where one number is exactly 10, 20, 30, 40, or 50 greater than the other. This table shows the most frequently occurring such pairs.</p>
+            
             {% if special_patterns_data.tens_apart_patterns %}
+                <div class="mb-4">
+                    <label for="tensApartSortOrder" class="block text-gray-700 text-sm font-bold mb-2">Sort By:</label>
+                    <select id="tensApartSortOrder" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300">
+                        <option value="count_desc">Most Frequent First</option>
+                        <option value="count_asc">Least Frequent First</option>
+                        <option value="pattern_asc">Pattern Numbers Ascending</option>
+                    </select>
+                </div>
                 <div class="overflow-x-auto shadow-md rounded-lg">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
@@ -24,12 +33,7 @@
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200" id="tensApartTableBody">
-                            {% for pattern in special_patterns_data.tens_apart_patterns %}
-                                <tr class="hover:bg-gray-50 {% if loop.index > 10 %}hidden{% endif %}"> {# Initially hide rows beyond the first 10 #}
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">({{ pattern.pattern | join(', ') }})</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pattern.count }}</td>
-                                </tr>
-                            {% endfor %}
+                            {# Data will be rendered by JavaScript #}
                         </tbody>
                     </table>
                 </div>
@@ -50,6 +54,14 @@
             <h3 class="text-xl font-semibold mb-4 text-gray-800">Same Last Digit Patterns (e.g., 9, 19, 29; 8, 28, 48, 58)</h3>
             <p class="text-gray-700 mb-4">These patterns consist of two or more white balls that share the same last digit. This table lists the most frequent occurrences of these vertical patterns.</p>
             {% if special_patterns_data.same_last_digit_patterns %}
+                <div class="mb-4">
+                    <label for="sameLastDigitSortOrder" class="block text-gray-700 text-sm font-bold mb-2">Sort By:</label>
+                    <select id="sameLastDigitSortOrder" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300">
+                        <option value="count_desc">Most Frequent First</option>
+                        <option value="count_asc">Least Frequent First</option>
+                        <option value="pattern_asc">Pattern Numbers Ascending</option>
+                    </select>
+                </div>
                 <div class="overflow-x-auto shadow-md rounded-lg">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
@@ -59,12 +71,7 @@
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200" id="sameLastDigitTableBody">
-                            {% for pattern in special_patterns_data.same_last_digit_patterns %}
-                                <tr class="hover:bg-gray-50 {% if loop.index > 10 %}hidden{% endif %}"> {# Initially hide rows beyond the first 10 #}
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">({{ pattern.pattern | join(', ') }})</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pattern.count }}</td>
-                                </tr>
-                            {% endfor %}
+                            {# Data will be rendered by JavaScript #}
                         </tbody>
                     </table>
                 </div>
@@ -85,6 +92,14 @@
             <h3 class="text-xl font-semibold mb-4 text-gray-800">Repeating Digit Patterns (e.g., 11, 22, 33)</h3>
             <p class="text-gray-700 mb-4">This section identifies occurrences of numbers with repeating digits (e.g., 11, 22, 33, 44, 55, 66) appearing together in a draw. The table shows the most frequent combinations.</p>
             {% if special_patterns_data.repeating_digit_patterns %}
+                <div class="mb-4">
+                    <label for="repeatingDigitSortOrder" class="block text-gray-700 text-sm font-bold mb-2">Sort By:</label>
+                    <select id="repeatingDigitSortOrder" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300">
+                        <option value="count_desc">Most Frequent First</option>
+                        <option value="count_asc">Least Frequent First</option>
+                        <option value="pattern_asc">Pattern Numbers Ascending</option>
+                    </select>
+                </div>
                 <div class="overflow-x-auto shadow-md rounded-lg">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
@@ -94,12 +109,7 @@
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200" id="repeatingDigitTableBody">
-                            {% for pattern in special_patterns_data.repeating_digit_patterns %}
-                                <tr class="hover:bg-gray-50 {% if loop.index > 10 %}hidden{% endif %}"> {# Initially hide rows beyond the first 10 #}
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">({{ pattern.pattern | join(', ') }})</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pattern.count }}</td>
-                                </tr>
-                            {% endfor %}
+                            {# Data will be rendered by JavaScript #}
                         </tbody>
                     </table>
                 </div>
@@ -122,25 +132,90 @@
 {{ super() }}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Function to toggle visibility of table rows
-        function setupToggle(buttonId, tableBodyId, initialShowCount) {
-            const toggleBtn = document.getElementById(buttonId);
-            const tableBody = document.getElementById(tableBodyId);
-            if (!toggleBtn || !tableBody) return; // Exit if elements not found
+        const specialPatternsData = {{ special_patterns_data | tojson }};
 
-            const rows = Array.from(tableBody.children);
-            let isExpanded = false;
+        // References to table bodies and sort selects
+        const tensApartTableBody = document.getElementById('tensApartTableBody');
+        const tensApartSortOrder = document.getElementById('tensApartSortOrder');
+        const tensApartToggleBtn = document.getElementById('tensApartToggleBtn');
 
-            // Initial state based on hidden class
-            rows.forEach((row, index) => {
-                if (index >= initialShowCount) {
-                    row.classList.add('hidden');
-                } else {
-                    row.classList.remove('hidden');
+        const sameLastDigitTableBody = document.getElementById('sameLastDigitTableBody');
+        const sameLastDigitSortOrder = document.getElementById('sameLastDigitSortOrder');
+        const sameLastDigitToggleBtn = document.getElementById('sameLastDigitToggleBtn');
+
+        const repeatingDigitTableBody = document.getElementById('repeatingDigitTableBody');
+        const repeatingDigitSortOrder = document.getElementById('repeatingDigitSortOrder');
+        const repeatingDigitToggleBtn = document.getElementById('repeatingDigitToggleBtn');
+
+        // Function to sort and render a specific table
+        function sortAndRenderTable(tableBody, data, sortOrder, toggleBtn, initialShowCount = 10) {
+            let sortedData = [...data]; // Create a mutable copy
+
+            sortedData.sort((a, b) => {
+                if (sortOrder === 'count_desc') {
+                    // Primary: count descending, Secondary: pattern ascending
+                    if (b.count !== a.count) return b.count - a.count;
+                    return a.pattern[0] - b.pattern[0] || (a.pattern[1] !== undefined ? a.pattern[1] - b.pattern[1] : 0) || (a.pattern[2] !== undefined ? a.pattern[2] - b.pattern[2] : 0);
+                } else if (sortOrder === 'count_asc') {
+                    // Primary: count ascending, Secondary: pattern ascending
+                    if (a.count !== b.count) return a.count - b.count;
+                    return a.pattern[0] - b.pattern[0] || (a.pattern[1] !== undefined ? a.pattern[1] - b.pattern[1] : 0) || (a.pattern[2] !== undefined ? a.pattern[2] - b.pattern[2] : 0);
+                } else if (sortOrder === 'pattern_asc') {
+                    // Primary: pattern ascending, Secondary: count descending
+                    if (a.pattern[0] !== b.pattern[0]) return a.pattern[0] - b.pattern[0];
+                    if (a.pattern[1] !== undefined && b.pattern[1] !== undefined && a.pattern[1] !== b.pattern[1]) return a.pattern[1] - b.pattern[1];
+                    if (a.pattern[2] !== undefined && b.pattern[2] !== undefined && a.pattern[2] !== b.pattern[2]) return a.pattern[2] - b.pattern[2];
+                    return b.count - a.count;
                 }
+                return 0; // No change if sort order is not recognized
             });
 
+            tableBody.innerHTML = ''; // Clear existing rows
+
+            if (sortedData.length === 0) {
+                const noDataRow = document.createElement('tr');
+                noDataRow.innerHTML = `<td colspan="2" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No patterns found.</td>`;
+                tableBody.appendChild(noDataRow);
+                if (toggleBtn) toggleBtn.classList.add('hidden'); // Hide toggle if no data
+                return;
+            }
+
+            sortedData.forEach((pattern, index) => {
+                const row = document.createElement('tr');
+                row.className = `hover:bg-gray-50 ${index >= initialShowCount ? 'hidden' : ''}`; // Apply hidden class based on initialShowCount
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">(${pattern.pattern.join(', ')})</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${pattern.count}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+            // Update toggle button text and visibility
+            if (toggleBtn) {
+                if (sortedData.length > initialShowCount) {
+                    toggleBtn.classList.remove('hidden');
+                    toggleBtn.textContent = `Show All (${sortedData.length} entries)`;
+                    // Reset toggle state to 'Show All'
+                    toggleBtn.dataset.isExpanded = 'false';
+                    tableBody.parentElement.style.maxHeight = ''; // Remove max height
+                    tableBody.parentElement.style.overflowY = '';
+                } else {
+                    toggleBtn.classList.add('hidden');
+                }
+            }
+        }
+
+        // Setup toggle functionality (modified to work with re-rendering)
+        function setupToggleFunctionality(buttonId, tableBodyId, initialShowCount) {
+            const toggleBtn = document.getElementById(buttonId);
+            const tableBody = document.getElementById(tableBodyId);
+            if (!toggleBtn || !tableBody) return;
+
             toggleBtn.addEventListener('click', function() {
+                let isExpanded = this.dataset.isExpanded === 'true';
+                const rows = Array.from(tableBody.children);
+
                 isExpanded = !isExpanded;
                 rows.forEach((row, index) => {
                     if (index >= initialShowCount) {
@@ -153,22 +228,39 @@
                 });
 
                 if (isExpanded) {
-                    toggleBtn.textContent = 'Show Less';
-                    // Optional: Add max-height and overflow-y for internal scrolling
+                    this.textContent = 'Show Less';
                     tableBody.parentElement.style.maxHeight = '400px'; // Example max height
                     tableBody.parentElement.style.overflowY = 'auto';
                 } else {
-                    toggleBtn.textContent = `Show All (${rows.length} entries)`;
+                    this.textContent = `Show All (${rows.length} entries)`;
                     tableBody.parentElement.style.maxHeight = ''; // Remove max height
                     tableBody.parentElement.style.overflowY = '';
                 }
+                this.dataset.isExpanded = isExpanded.toString();
             });
         }
 
-        // Setup for each table
-        setupToggle('tensApartToggleBtn', 'tensApartTableBody', 10);
-        setupToggle('sameLastDigitToggleBtn', 'sameLastDigitTableBody', 10);
-        setupToggle('repeatingDigitToggleBtn', 'repeatingDigitTableBody', 10);
+
+        // Initial render for each table
+        sortAndRenderTable(tensApartTableBody, specialPatternsData.tens_apart_patterns, tensApartSortOrder.value);
+        sortAndRenderTable(sameLastDigitTableBody, specialPatternsData.same_last_digit_patterns, sameLastDigitSortOrder.value);
+        sortAndRenderTable(repeatingDigitTableBody, specialPatternsData.repeating_digit_patterns, repeatingDigitSortOrder.value);
+
+        // Add event listeners for sort order changes
+        tensApartSortOrder.addEventListener('change', () => {
+            sortAndRenderTable(tensApartTableBody, specialPatternsData.tens_apart_patterns, tensApartSortOrder.value);
+        });
+        sameLastDigitSortOrder.addEventListener('change', () => {
+            sortAndRenderTable(sameLastDigitTableBody, specialPatternsData.same_last_digit_patterns, sameLastDigitSortOrder.value);
+        });
+        repeatingDigitSortOrder.addEventListener('change', () => {
+            sortAndRenderTable(repeatingDigitTableBody, specialPatternsData.repeating_digit_patterns, repeatingDigitSortOrder.value);
+        });
+
+        // Setup toggle functionality for each table
+        setupToggleFunctionality('tensApartToggleBtn', 'tensApartTableBody', 10);
+        setupToggleFunctionality('sameLastDigitToggleBtn', 'sameLastDigitTableBody', 10);
+        setupToggleFunctionality('repeatingDigitToggleBtn', 'repeatingDigitTableBody', 10);
     });
 </script>
 {% endblock %}
