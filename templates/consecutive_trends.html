@@ -67,15 +67,25 @@
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Consecutive Numbers Trends Over Years</h2>
         <p class="text-gray-600 mb-4">This chart shows the percentage of draws each year that contained at least one consecutive pair of white balls.</p>
         
-        <div class="mb-6">
-            <label for="yearSelect" class="block text-gray-700 text-sm font-bold mb-2">Select Year(s):</label>
-            <select id="yearSelect" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300" multiple>
-                {# Populate with years from backend, default to all selected #}
-                {% for year in years_for_dropdown %}
-                    <option value="{{ year }}" selected>{{ year }}</option>
-                {% endfor %}
-            </select>
-            <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple years.</p>
+        <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-4 sm:space-y-0">
+            <div class="flex-1">
+                <label for="yearSelect" class="block text-gray-700 text-sm font-bold mb-2">Select Year(s):</label>
+                <select id="yearSelect" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300" multiple>
+                    {# Populate with years from backend, default to all selected #}
+                    {% for year in years_for_dropdown %}
+                        <option value="{{ year }}" selected>{{ year }}</option>
+                    {% endfor %}
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple years.</p>
+            </div>
+            <div class="flex-1">
+                <label for="sortOrderSelect" class="block text-gray-700 text-sm font-bold mb-2">Sort Pairs By:</label>
+                <select id="sortOrderSelect" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300">
+                    <option value="count_desc">Most Frequent First</option>
+                    <option value="count_asc">Least Frequent First</option>
+                    <option value="pair_asc">Pair Numbers Ascending</option>
+                </select>
+            </div>
         </div>
 
         <div class="relative h-96 mb-8"> {# Fixed height for chart container, added margin-bottom #}
@@ -98,6 +108,7 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const yearSelect = document.getElementById('yearSelect');
+        const sortOrderSelect = document.getElementById('sortOrderSelect'); // New sort select
         const yearlyConsecutiveChartCtx = document.getElementById('yearlyConsecutiveChart').getContext('2d');
         const consecutivePairsDisplay = document.getElementById('consecutivePairsDisplay');
         let yearlyChart;
@@ -107,7 +118,7 @@
         const allYearsConsecutivePairsSummary = {{ yearly_consecutive_pairs_summary | tojson }};
 
         // Function to render the consecutive pairs list
-        function renderConsecutivePairs(selectedYears) {
+        function renderConsecutivePairs(selectedYears, sortOrder) {
             let combinedPairs = {};
 
             selectedYears.forEach(year => {
@@ -124,8 +135,18 @@
                 }
             });
 
-            // Convert combinedPairs object back to a sorted array
-            let sortedCombinedPairs = Object.values(combinedPairs).sort((a, b) => b.count - a.count);
+            // Convert combinedPairs object back to an array
+            let sortedCombinedPairs = Object.values(combinedPairs);
+
+            // Apply sorting based on the selected order
+            if (sortOrder === 'count_desc') {
+                sortedCombinedPairs.sort((a, b) => b.count - a.count || a.pair[0] - b.pair[0]);
+            } else if (sortOrder === 'count_asc') {
+                sortedCombinedPairs.sort((a, b) => a.count - b.count || a.pair[0] - b.pair[0]);
+            } else if (sortOrder === 'pair_asc') {
+                sortedCombinedPairs.sort((a, b) => a.pair[0] - b.pair[0] || a.pair[1] - b.pair[1]);
+            }
+
 
             consecutivePairsDisplay.innerHTML = ''; // Clear previous content
 
@@ -150,13 +171,7 @@
 
         // Function to fetch and render yearly consecutive trends
         async function fetchAndRenderYearlyConsecutiveTrends() {
-            // No need to fetch again, data is already passed from Flask
-            // const response = await fetch('/api/consecutive_yearly_trends');
-            // const data = await response.json();
-            // const yearlyData = data.data;
-            // const allYearsConsecutivePairsSummary = data.yearly_consecutive_pairs; // New data
-
-            const yearlyData = allYearsData; // Use data passed from Flask
+            const yearlyData = allYearsData; 
             
             if (!yearlyData || yearlyData.length === 0) {
                 console.error("No yearly consecutive trends data available.");
@@ -244,25 +259,30 @@
                             ticks: {
                                 callback: function(value) {
                                     return value + '%';
-                                    }
                                 }
                             }
                         }
                     }
-                });
+                }
+            });
 
-            // Also render the consecutive pairs list
-            renderConsecutivePairs(selectedYears);
+            // Also render the consecutive pairs list with the current sort order
+            renderConsecutivePairs(selectedYears, sortOrderSelect.value);
 
         }
 
-        // Event listener for year selection change
+        // Event listeners for changes
         yearSelect.addEventListener('change', fetchAndRenderYearlyConsecutiveTrends);
+        sortOrderSelect.addEventListener('change', () => {
+            // Re-render only the pairs list when sort order changes
+            const selectedYears = Array.from(yearSelect.selectedOptions).map(option => parseInt(option.value));
+            renderConsecutivePairs(selectedYears, sortOrderSelect.value);
+        });
 
         // Initial render of the chart and pairs list
-        // Select all options by default on page load to show full data
         Array.from(yearSelect.options).forEach(option => option.selected = true);
         fetchAndRenderYearlyConsecutiveTrends();
     });
 </script>
+
  {% endblock %}
