@@ -6,9 +6,22 @@
 
 {% block content %}
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {# Flash messages display #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages space-y-3">
+                {% for category, message in messages %}
+                    <div class="p-4 rounded-lg shadow-md text-sm {% if category == 'error' %}bg-red-100 text-red-700 border border-red-200{% elif category == 'info' %}bg-blue-100 text-blue-700 border border-blue-200{% else %}bg-green-100 text-green-700 border border-green-200{% endif %} animate-fade-in">
+                        <p class="font-medium">{{ message }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Compare Patterns by Year</h2>
-        <p class="text-gray-700 mb-6">Select a number range to see the most frequent pairs and triplets within that range, year by year, for the last 5 years. This helps identify how patterns in specific number groups have changed over time.</p>
+        <p class="text-gray-700 mb-6">Select a number range to see the most frequent pairs and triplets within that range, year by year. This helps identify how patterns in specific number groups have changed over time.</p>
 
         <form method="POST" action="{{ url_for('grouped_patterns_yearly_comparison_route') }}" class="mb-8 flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
             <label for="selected_range" class="font-medium text-gray-700 whitespace-nowrap">Select Number Range:</label>
@@ -25,44 +38,8 @@
         {% if yearly_patterns_data %}
             <h3 class="text-xl font-semibold mb-6 text-gray-800">Patterns in {{ selected_range }} ({{ number_ranges[selected_range][0] }}-{{ number_ranges[selected_range][1] }})</h3>
             
-            {# Changed to responsive grid for side-by-side layout #}
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"> {# This div will arrange cards in a responsive grid #}
-                {% for year_data in yearly_patterns_data %}
-                    <div class="bg-gray-50 p-6 rounded-xl shadow-md border border-gray-200">
-                        <h4 class="text-lg font-bold mb-4 text-gray-700">Year: {{ year_data.year }}</h4>
-                        <p class="text-sm text-gray-600 mb-4">Total Unique Patterns Found: {{ year_data.total_unique_patterns }}</p>
-
-                        <div class="grid grid-cols-1 gap-6"> {# Inner grid for pairs/triplets, still stacking vertically within each year card #}
-                            {# Pairs Section #}
-                            <div>
-                                <h5 class="text-md font-semibold mb-3 text-gray-700">Most Frequent Pairs</h5>
-                                {% if year_data.pairs %}
-                                    <ul class="list-disc list-inside space-y-1 text-sm text-gray-800">
-                                        {% for pair in year_data.pairs %}
-                                            <li>{{ pair.pattern | join(', ') }} ({{ pair.count }} times)</li>
-                                        {% endfor %}
-                                    </ul>
-                                {% else %}
-                                    <p class="text-sm text-gray-500">No pairs found in this range for {{ year_data.year }}.</p>
-                                {% endif %}
-                            </div>
-
-                            {# Triplets Section #}
-                            <div>
-                                <h5 class="text-md font-semibold mb-3 text-gray-700">Most Frequent Triplets</h5>
-                                {% if year_data.triplets %}
-                                    <ul class="list-disc list-inside space-y-1 text-sm text-gray-800">
-                                        {% for triplet in year_data.triplets %}
-                                            <li>{{ triplet.pattern | join(', ') }} ({{ triplet.count }} times)</li>
-                                        {% endfor %}
-                                    </ul>
-                                {% else %}
-                                    <p class="text-sm text-gray-500">No triplets found in this range for {{ year_data.year }}.</p>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                {% endfor %}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="yearlyPatternsContainer"> {# Container for year cards #}
+                {# Year cards will be rendered by JavaScript #}
             </div>
         {% else %}
             <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
@@ -71,4 +48,119 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const yearlyPatternsData = {{ yearly_patterns_data | tojson }};
+        const yearlyPatternsContainer = document.getElementById('yearlyPatternsContainer');
+
+        // Function to sort patterns (pairs or triplets)
+        function sortPatterns(patterns, sortOrder) {
+            return patterns.sort((a, b) => {
+                if (sortOrder === 'count_desc') {
+                    // Primary: count descending, Secondary: pattern ascending
+                    if (b.count !== a.count) return b.count - a.count;
+                    return a.pattern[0] - b.pattern[0] || (a.pattern[1] !== undefined ? a.pattern[1] - b.pattern[1] : 0) || (a.pattern[2] !== undefined ? a.pattern[2] - b.pattern[2] : 0);
+                } else if (sortOrder === 'count_asc') {
+                    // Primary: count ascending, Secondary: pattern ascending
+                    if (a.count !== b.count) return a.count - b.count;
+                    return a.pattern[0] - b.pattern[0] || (a.pattern[1] !== undefined ? a.pattern[1] - b.pattern[1] : 0) || (a.pattern[2] !== undefined ? a.pattern[2] - b.pattern[2] : 0);
+                } else if (sortOrder === 'pattern_asc') {
+                    // Primary: pattern ascending, Secondary: count descending
+                    if (a.pattern[0] !== b.pattern[0]) return a.pattern[0] - b.pattern[0];
+                    if (a.pattern[1] !== undefined && b.pattern[1] !== undefined && a.pattern[1] !== b.pattern[1]) return a.pattern[1] - b.pattern[1];
+                    if (a.pattern[2] !== undefined && b.pattern[2] !== undefined && a.pattern[2] !== b.pattern[2]) return a.pattern[2] - b.pattern[2];
+                    return b.count - a.count;
+                }
+                return 0; // No change if sort order is not recognized
+            });
+        }
+
+        // Function to render all year cards with their sorted patterns
+        function renderYearlyPatterns() {
+            yearlyPatternsContainer.innerHTML = ''; // Clear existing content
+
+            if (!yearlyPatternsData || yearlyPatternsData.length === 0) {
+                yearlyPatternsContainer.innerHTML = '<p class="text-gray-600 col-span-full text-center">No grouped patterns data available for the selected range or years.</p>';
+                return;
+            }
+
+            yearlyPatternsData.forEach(yearData => {
+                const yearCard = document.createElement('div');
+                yearCard.className = 'bg-gray-50 p-6 rounded-xl shadow-md border border-gray-200';
+                
+                // Get current sort order for this year's patterns (default to count_desc)
+                const currentPairsSortOrder = document.getElementById(`pairsSortOrder-${yearData.year}`)?.value || 'count_desc';
+                const currentTripletsSortOrder = document.getElementById(`tripletsSortOrder-${yearData.year}`)?.value || 'count_desc';
+
+                const sortedPairs = sortPatterns([...yearData.pairs], currentPairsSortOrder);
+                const sortedTriplets = sortPatterns([...yearData.triplets], currentTripletsSortOrder);
+
+                let pairsHtml = '';
+                if (sortedPairs.length > 0) {
+                    pairsHtml = `<ul class="list-disc list-inside space-y-1 text-sm text-gray-800">` +
+                                sortedPairs.map(pair => `<li>${pair.pattern.join(', ')} (${pair.count} times)</li>`).join('') +
+                                `</ul>`;
+                } else {
+                    pairsHtml = `<p class="text-sm text-gray-500">No pairs found in this range for ${yearData.year}.</p>`;
+                }
+
+                let tripletsHtml = '';
+                if (sortedTriplets.length > 0) {
+                    tripletsHtml = `<ul class="list-disc list-inside space-y-1 text-sm text-gray-800">` +
+                                   sortedTriplets.map(triplet => `<li>${triplet.pattern.join(', ')} (${triplet.count} times)</li>`).join('') +
+                                   `</ul>`;
+                } else {
+                    tripletsHtml = `<p class="text-sm text-gray-500">No triplets found in this range for ${yearData.year}.</p>`;
+                }
+
+                yearCard.innerHTML = `
+                    <h4 class="text-lg font-bold mb-4 text-gray-700">Year: ${yearData.year}</h4>
+                    <p class="text-sm text-gray-600 mb-4">Total Unique Patterns Found: ${yearData.total_unique_patterns}</p>
+
+                    <div class="grid grid-cols-1 gap-6">
+                        {# Pairs Section #}
+                        <div>
+                            <h5 class="text-md font-semibold mb-3 text-gray-700">Most Frequent Pairs</h5>
+                            <div class="mb-3">
+                                <select id="pairsSortOrder-${yearData.year}" class="sort-select shadow appearance-none border rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300 text-sm">
+                                    <option value="count_desc">Most Frequent First</option>
+                                    <option value="count_asc">Least Frequent First</option>
+                                    <option value="pattern_asc">Pattern Numbers Ascending</option>
+                                </select>
+                            </div>
+                            <div class="pairs-list">
+                                ${pairsHtml}
+                            </div>
+                        </div>
+
+                        {# Triplets Section #}
+                        <div>
+                            <h5 class="text-md font-semibold mb-3 text-gray-700">Most Frequent Triplets</h5>
+                            <div class="mb-3">
+                                <select id="tripletsSortOrder-${yearData.year}" class="sort-select shadow appearance-none border rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300 text-sm">
+                                    <option value="count_desc">Most Frequent First</option>
+                                    <option value="count_asc">Least Frequent First</option>
+                                    <option value="pattern_asc">Pattern Numbers Ascending</option>
+                                </select>
+                            </div>
+                            <div class="triplets-list">
+                                ${tripletsHtml}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                yearlyPatternsContainer.appendChild(yearCard);
+            });
+
+            // Attach event listeners to the newly created select elements
+            document.querySelectorAll('.sort-select').forEach(selectElement => {
+                selectElement.addEventListener('change', renderYearlyPatterns);
+            });
+        }
+
+        // Initial render on page load
+        renderYearlyPatterns();
+    });
+</script>
 {% endblock %}
