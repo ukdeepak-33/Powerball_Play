@@ -11,7 +11,7 @@
         {% if messages %}
             <div class="flash-messages space-y-3">
                 {% for category, message in messages %}
-                    <div class="p-4 rounded-lg shadow-md text-sm {% if category == 'error' %}bg-red-100 text-red-700 border border-red-200{% elif category == 'info' %}bg-blue-100 text-blue-700 border border-blue-200{% else %}bg-green-100 text-green-700 border border-green-200{% endif %} animate-fade-in">
+                    <div class="p-4 rounded-lg shadow-md text-sm {% if category == 'error' %}bg-red-100 text-red-700 border border-red-200{% elif category == 'info' %}bg-blue-100 text-blue-700 border border-blue-200{% else %}bg-green-100 text-green-700 border border-blue-200{% endif %} animate-fade-in">
                         <p class="font-medium">{{ message }}</p>
                     </div>
                 {% endfor %}
@@ -69,7 +69,7 @@
         
         <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-4 sm:space-y-0">
             <div class="flex-1">
-                <label for="yearSelect" class="block text-gray-700 text-sm font-bold mb-2">Select Year(s):</label>
+                <label for="yearSelect" class="block text-gray-700 text-sm font-bold mb-2">Filter by Year(s):</label>
                 <select id="yearSelect" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300" multiple>
                     {# Populate with years from backend, default to all selected #}
                     {% for year in years_for_dropdown %}
@@ -115,46 +115,53 @@
 
         // Data passed from Flask template
         const allYearsData = {{ yearly_consecutive_percentage_data | tojson }};
-        // This now contains 'dates' array for each pair
-        const allYearsConsecutivePairsSummary = {{ yearly_consecutive_pairs_summary | tojson }};
+        // This is now the flat list of all consecutive pairs with their dates
+        const allConsecutivePairsFlat = {{ all_consecutive_pairs_flat | tojson }}; // Corrected variable name
 
         // Function to render the consecutive pairs list
-        function renderConsecutivePairs(selectedYears, sortOrder) {
-            let combinedPairs = {}; // Stores {pairKey: {pair: [n1, n2], count: X, dates: ['d1', 'd2', ...]}}
+        function renderConsecutivePairs() {
+            const selectedYears = Array.from(yearSelect.selectedOptions).map(option => parseInt(option.value));
+            const sortOrder = sortOrderSelect.value;
 
-            selectedYears.forEach(year => {
-                const yearStr = year.toString();
-                if (allYearsConsecutivePairsSummary[yearStr]) {
-                    allYearsConsecutivePairsSummary[yearStr].forEach(item => {
-                        const pairKey = item.pair.join(','); // Use string key for aggregation
-                        if (combinedPairs[pairKey]) {
-                            combinedPairs[pairKey].count += item.count;
-                            // Combine and deduplicate dates, then sort descending
-                            combinedPairs[pairKey].dates = Array.from(new Set([...combinedPairs[pairKey].dates, ...item.dates])).sort().reverse();
-                        } else {
-                            // Ensure dates are sorted descending initially
-                            combinedPairs[pairKey] = { pair: item.pair, count: item.count, dates: item.dates.sort().reverse() };
-                        }
+            let filteredAndSortedPairs = [];
+
+            // Filter by selected years
+            if (selectedYears.length > 0) {
+                allConsecutivePairsFlat.forEach(item => {
+                    // Check if any of the pair's dates fall within the selected years
+                    const datesInSelectedYears = item.dates.filter(date => {
+                        const year = new Date(date).getFullYear();
+                        return selectedYears.includes(year);
                     });
-                }
-            });
 
-            // Convert combinedPairs object back to a sorted array
-            let sortedCombinedPairs = Object.values(combinedPairs);
+                    if (datesInSelectedYears.length > 0) {
+                        // Create a new item with only the dates relevant to the selected years
+                        filteredAndSortedPairs.push({
+                            pair: item.pair,
+                            count: datesInSelectedYears.length, // Count only occurrences in selected years
+                            dates: datesInSelectedYears // Keep only dates in selected years
+                        });
+                    }
+                });
+            } else {
+                // If no years selected, show all pairs (or none, depending on desired behavior)
+                // For now, let's show all if no filter is applied, but count reflects total
+                filteredAndSortedPairs = JSON.parse(JSON.stringify(allConsecutivePairsFlat)); // Deep copy to avoid modifying original
+            }
 
             // Apply sorting based on the selected order
             if (sortOrder === 'count_desc') {
-                sortedCombinedPairs.sort((a, b) => b.count - a.count || a.pair[0] - b.pair[0]);
+                filteredAndSortedPairs.sort((a, b) => b.count - a.count || a.pair[0] - b.pair[0]);
             } else if (sortOrder === 'count_asc') {
-                sortedCombinedPairs.sort((a, b) => a.count - b.count || a.pair[0] - b.pair[0]);
+                filteredAndSortedPairs.sort((a, b) => a.count - b.count || a.pair[0] - b.pair[0]);
             } else if (sortOrder === 'pair_asc') {
-                sortedCombinedPairs.sort((a, b) => a.pair[0] - b.pair[0] || a.pair[1] - b.pair[1]);
+                filteredAndSortedPairs.sort((a, b) => a.pair[0] - b.pair[0] || a.pair[1] - b.pair[1]);
             }
 
             consecutivePairsDisplay.innerHTML = ''; // Clear previous content
 
-            if (sortedCombinedPairs.length > 0) {
-                sortedCombinedPairs.forEach(item => {
+            if (filteredAndSortedPairs.length > 0) {
+                filteredAndSortedPairs.forEach(item => {
                     const pairElement = document.createElement('div');
                     pairElement.className = 'bg-blue-50 p-4 rounded-lg shadow-sm flex flex-col space-y-2';
                     
@@ -183,17 +190,10 @@
         }
 
 
-        // Function to fetch and render yearly consecutive trends
-        async function fetchAndRenderYearlyConsecutiveTrends() {
-            const yearlyData = allYearsData; // Use data passed from Flask
-            
-            if (!yearlyData || yearlyData.length === 0) {
-                console.error("No yearly consecutive trends data available.");
-                return;
-            }
-
+        // Function to fetch and render yearly consecutive trends chart
+        function renderChart() {
             const selectedYears = Array.from(yearSelect.selectedOptions).map(option => parseInt(option.value));
-            const filteredData = yearlyData.filter(item => selectedYears.includes(item.year));
+            const filteredData = allYearsData.filter(item => selectedYears.includes(item.year));
 
             const labels = filteredData.map(item => item.year.toString());
             const percentages = filteredData.map(item => item.percentage);
@@ -279,24 +279,23 @@
                     }
                 }
             });
-
-            // Also render the consecutive pairs list with the current sort order
-            renderConsecutivePairs(selectedYears, sortOrderSelect.value);
-
         }
 
         // Event listener for year selection change
-        yearSelect.addEventListener('change', fetchAndRenderYearlyConsecutiveTrends);
+        yearSelect.addEventListener('change', () => {
+            renderChart(); // Update chart
+            renderConsecutivePairs(); // Update pairs list
+        });
+        
+        // Event listener for sort order change
         sortOrderSelect.addEventListener('change', () => {
-            // Re-render only the pairs list when sort order changes
-            const selectedYears = Array.from(yearSelect.selectedOptions).map(option => parseInt(option.value));
-            renderConsecutivePairs(selectedYears, sortOrderSelect.value);
+            renderConsecutivePairs(); // Only update pairs list
         });
 
-        // Initial render of the chart and pairs list
-        // Select all options by default on page load to show full data
+        // Initial render: Select all options by default on page load
         Array.from(yearSelect.options).forEach(option => option.selected = true);
-        fetchAndRenderYearlyConsecutiveTrends();
+        renderChart();
+        renderConsecutivePairs();
     });
 </script>
 {% endblock %}
