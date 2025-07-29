@@ -92,9 +92,9 @@
             <canvas id="yearlyConsecutiveChart"></canvas>
         </div>
 
-        {# Section for displaying specific consecutive pairs #}
+        {# Section for displaying specific consecutive pairs with dates #}
         <div id="yearlyConsecutivePairsSection">
-            <h3 class="text-xl font-bold mb-4 text-gray-800">Consecutive Pairs in Selected Year(s)</h3>
+            <h3 class="text-xl font-bold mb-4 text-gray-800">Consecutive Pairs in Selected Year(s) (with Dates)</h3>
             <div id="consecutivePairsDisplay" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <p class="text-gray-600 col-span-full">Select one or more years above to see the most frequent consecutive pairs.</p>
             </div>
@@ -108,18 +108,19 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const yearSelect = document.getElementById('yearSelect');
-        const sortOrderSelect = document.getElementById('sortOrderSelect'); // New sort select
+        const sortOrderSelect = document.getElementById('sortOrderSelect');
         const yearlyConsecutiveChartCtx = document.getElementById('yearlyConsecutiveChart').getContext('2d');
         const consecutivePairsDisplay = document.getElementById('consecutivePairsDisplay');
         let yearlyChart;
 
         // Data passed from Flask template
         const allYearsData = {{ yearly_consecutive_percentage_data | tojson }};
+        // This now contains 'dates' array for each pair
         const allYearsConsecutivePairsSummary = {{ yearly_consecutive_pairs_summary | tojson }};
 
         // Function to render the consecutive pairs list
         function renderConsecutivePairs(selectedYears, sortOrder) {
-            let combinedPairs = {};
+            let combinedPairs = {}; // Stores {pairKey: {pair: [n1, n2], count: X, dates: ['d1', 'd2', ...]}}
 
             selectedYears.forEach(year => {
                 const yearStr = year.toString();
@@ -128,14 +129,17 @@
                         const pairKey = item.pair.join(','); // Use string key for aggregation
                         if (combinedPairs[pairKey]) {
                             combinedPairs[pairKey].count += item.count;
+                            // Combine and deduplicate dates, then sort descending
+                            combinedPairs[pairKey].dates = Array.from(new Set([...combinedPairs[pairKey].dates, ...item.dates])).sort().reverse();
                         } else {
-                            combinedPairs[pairKey] = { pair: item.pair, count: item.count };
+                            // Ensure dates are sorted descending initially
+                            combinedPairs[pairKey] = { pair: item.pair, count: item.count, dates: item.dates.sort().reverse() };
                         }
                     });
                 }
             });
 
-            // Convert combinedPairs object back to an array
+            // Convert combinedPairs object back to a sorted array
             let sortedCombinedPairs = Object.values(combinedPairs);
 
             // Apply sorting based on the selected order
@@ -147,19 +151,29 @@
                 sortedCombinedPairs.sort((a, b) => a.pair[0] - b.pair[0] || a.pair[1] - b.pair[1]);
             }
 
-
             consecutivePairsDisplay.innerHTML = ''; // Clear previous content
 
             if (sortedCombinedPairs.length > 0) {
                 sortedCombinedPairs.forEach(item => {
                     const pairElement = document.createElement('div');
-                    pairElement.className = 'bg-blue-50 p-4 rounded-lg shadow-sm flex items-center justify-between';
+                    pairElement.className = 'bg-blue-50 p-4 rounded-lg shadow-sm flex flex-col space-y-2';
+                    
+                    const datesHtml = item.dates.map(date => `<span class="inline-block bg-blue-200 text-blue-800 text-xs px-2 py-1 rounded-full">${date}</span>`).join(' ');
+
                     pairElement.innerHTML = `
-                        <div class="flex items-center space-x-2">
-                            <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold">${item.pair[0]}</span>
-                            <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold mr-2">${item.pair[1]}</span>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold">${item.pair[0]}</span>
+                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold">${item.pair[1]}</span>
+                            </div>
+                            <span class="text-gray-800 font-semibold">Appeared: ${item.count} times</span>
                         </div>
-                        <span class="text-gray-800 font-semibold">Appeared: ${item.count} times</span>
+                        <details class="text-sm text-gray-700">
+                            <summary class="cursor-pointer font-medium text-blue-700 hover:text-blue-900">Show Dates (${item.dates.length})</summary>
+                            <div class="mt-2 flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1 bg-gray-100 rounded-md">
+                                ${datesHtml}
+                            </div>
+                        </details>
                     `;
                     consecutivePairsDisplay.appendChild(pairElement);
                 });
@@ -171,7 +185,7 @@
 
         // Function to fetch and render yearly consecutive trends
         async function fetchAndRenderYearlyConsecutiveTrends() {
-            const yearlyData = allYearsData; 
+            const yearlyData = allYearsData; // Use data passed from Flask
             
             if (!yearlyData || yearlyData.length === 0) {
                 console.error("No yearly consecutive trends data available.");
@@ -271,7 +285,7 @@
 
         }
 
-        // Event listeners for changes
+        // Event listener for year selection change
         yearSelect.addEventListener('change', fetchAndRenderYearlyConsecutiveTrends);
         sortOrderSelect.addEventListener('change', () => {
             // Re-render only the pairs list when sort order changes
@@ -280,9 +294,8 @@
         });
 
         // Initial render of the chart and pairs list
+        // Select all options by default on page load to show full data
         Array.from(yearSelect.options).forEach(option => option.selected = true);
         fetchAndRenderYearlyConsecutiveTrends();
     });
 </script>
-
- {% endblock %}
