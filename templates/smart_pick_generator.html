@@ -2,7 +2,7 @@
 
 {% block title %}Smart Pick Generator{% endblock %}
 
-{% block page_heading %}Smart Pick Generator{% endblock %}
+{% block page_heading %}Pattern-Based Smart Pick Generator{% endblock %}
 
 {% block content %}
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -10,7 +10,7 @@
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             <div class="flash-messages space-y-3">
-                {% for category, message in messages %}\
+                {% for category, message in messages %}.
                     <div class="p-4 rounded-lg shadow-md text-sm {% if category == 'error' %}bg-red-100 text-red-700 border border-red-200{% elif category == 'info' %}bg-blue-100 text-blue-700 border border-blue-200{% else %}bg-green-100 text-green-700 border border-green-200{% endif %} animate-fade-in">
                         <p class="font-medium">{{ message }}</p>
                     </div>
@@ -20,135 +20,141 @@
     {% endwith %}
 
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Generate Smart Picks Based on Patterns</h2>
-        <p class="text-gray-700 mb-6">Configure your desired number patterns and trends to generate highly customized Powerball picks. The generator will attempt to create combinations that meet all selected criteria.</p>
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Generate Picks with Advanced Patterns</h2>
+        <p class="text-gray-700 mb-6">Create Powerball number sets based on specific patterns, historical trends, and your preferred criteria. Select the options below to tailor your smart picks.</p>
 
         <form id="smartPickForm" class="space-y-6">
             {# Number of Sets to Generate #}
             <div>
-                <label for="num_sets" class="block text-sm font-medium text-gray-700">Number of Picks to Generate (1-5):</label>
-                <input type="number" id="num_sets" name="num_sets" min="1" max="5" value="1"
-                       class="mt-1 block w-full sm:w-auto rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                <label for="num_sets_to_generate" class="block text-gray-700 text-sm font-bold mb-2">Number of Smart Pick Sets to Generate (1-10):</label>
+                <input type="number" id="num_sets_to_generate" name="num_sets_to_generate" min="1" max="10" value="1"
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
             </div>
 
-            {# Consecutive Numbers #}
-            <div>
-                <label for="consecutive_option" class="block text-sm font-medium text-gray-700">Consecutive Numbers:</label>
-                <select id="consecutive_option" name="consecutive_option"
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-                    <option value="none">No Consecutive Numbers</option>
-                    <option value="at_least_one_pair">At Least One Consecutive Pair</option>
-                    <option value="exactly_one_pair">Exactly One Consecutive Pair</option>
-                    <option value="two_pairs">Two Consecutive Pairs</option>
-                    {# Add more options like "at_least_one_triplet" if feasible and desired #}
-                </select>
+            {# Consecutive Pair #}
+            <div class="border p-4 rounded-lg bg-gray-50">
+                <h3 class="text-lg font-semibold mb-3 text-gray-800">Include Consecutive Pair (Optional)</h3>
+                <p class="text-sm text-gray-600 mb-3">Enter two consecutive numbers you want to guarantee in your white ball set (e.g., 10,11 or 45,46).</p>
+                <div class="flex items-center space-x-2">
+                    <input type="number" id="consecutive_num1" min="1" max="68" placeholder="Num 1"
+                           class="shadow appearance-none border rounded w-1/2 py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    <input type="number" id="consecutive_num2" min="2" max="69" placeholder="Num 2"
+                           class="shadow appearance-none border rounded w-1/2 py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                </div>
             </div>
 
             {# Special Patterns #}
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Include Numbers from Special Patterns:</label>
-                <div class="flex flex-wrap gap-4">
-                    <div class="flex items-center">
-                        <input id="include_tens_apart" name="include_tens_apart" type="checkbox"
-                               class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded">
-                        <label for="include_tens_apart" class="ml-2 block text-sm text-gray-900">Tens-Apart Pairs (e.g., 10, 20)</label>
-                    </div>
-                    <div class="flex items-center">
-                        <input id="include_same_last_digit" name="include_same_last_digit" type="checkbox"
-                               class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded">
-                        <label for="include_same_last_digit" class="ml-2 block text-sm text-gray-900">Same Last Digit (e.g., 12, 22)</label>
-                    </div>
-                    <div class="flex items-center">
-                        <input id="include_repeating_digit" name="include_repeating_digit" type="checkbox"
-                               class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded">
-                        <label for="include_repeating_digit" class="ml-2 block text-sm text-gray-900">Repeating Digit (e.g., 11, 22)</label>
-                    </div>
+            <div class="border p-4 rounded-lg bg-gray-50">
+                <h3 class="text-lg font-semibold mb-3 text-gray-800">Include Special Patterns (Optional)</h3>
+                <p class="text-sm text-gray-600 mb-3">Attempt to include numbers from these historical patterns. Selecting multiple may lead to conflicts or fewer generated sets.</p>
+                <div class="flex flex-col space-y-2">
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" id="include_tens_apart" name="special_pattern" value="tens_apart" class="form-checkbox h-5 w-5 text-blue-600 rounded-md">
+                        <span class="ml-2 text-gray-700">Tens-Apart (e.g., 10, 20; 55, 65)</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" id="include_same_last_digit" name="special_pattern" value="same_last_digit" class="form-checkbox h-5 w-5 text-blue-600 rounded-md">
+                        <span class="ml-2 text-gray-700">Same Last Digit (e.g., 12, 22, 32)</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" id="include_repeating_digit" name="special_pattern" value="repeating_digit" class="form-checkbox h-5 w-5 text-blue-600 rounded-md">
+                        <span class="ml-2 text-gray-700">Repeating Digit (e.g., 11, 22, 33)</span>
+                    </label>
                 </div>
-                <p class="text-xs text-gray-500 mt-1">If selected, the generator will prioritize numbers from these historical patterns.</p>
             </div>
 
             {# Grouped Patterns #}
-            <div>
-                <label for="grouped_pattern_range" class="block text-sm font-medium text-gray-700">Prioritize from Grouped Patterns (e.g., 10s, 20s):</label>
+            <div class="border p-4 rounded-lg bg-gray-50">
+                <h3 class="text-lg font-semibold mb-3 text-gray-800">Prioritize Grouped Patterns (Optional)</h3>
+                <p class="text-sm text-gray-600 mb-3">Try to include numbers that frequently appear together within a specific numerical range (e.g., 10s, 30s).</p>
                 <select id="grouped_pattern_range" name="grouped_pattern_range"
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-                    <option value="none">Do Not Prioritize</option>
+                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    <option value="">No Preference</option>
                     {% for range_name, range_tuple in number_ranges.items() %}
                         <option value="{{ range_name }}">{{ range_name }} ({{ range_tuple[0] }}-{{ range_tuple[1] }})</option>
                     {% endfor %}
                 </select>
-                <p class="text-xs text-gray-500 mt-1">Select a range to prioritize numbers from its most frequent pairs/triplets.</p>
             </div>
 
-            {# Monthly Trends (Hot Numbers) #}
-            <div class="flex items-center">
-                <input id="include_monthly_hot" name="include_monthly_hot" type="checkbox"
-                       class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded">
-                <label for="include_monthly_hot" class="ml-2 block text-sm text-gray-900">Prioritize Numbers from Recent Monthly Trends (Hot Numbers)</label>
+            {# Monthly Trends & Group A & Odd/Even #}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="border p-4 rounded-lg bg-gray-50">
+                    <h3 class="text-lg font-semibold mb-3 text-gray-800">Monthly Trends & Group A</h3>
+                    <div class="space-y-3">
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" id="prioritize_monthly_hot" name="prioritize_monthly_hot" class="form-checkbox h-5 w-5 text-blue-600 rounded-md">
+                            <span class="ml-2 text-gray-700">Prioritize Numbers Drawn This Month</span>
+                        </label>
+                        <div>
+                            <label for="num_from_group_a" class="block text-gray-700 text-sm font-bold mb-2">Numbers from Group A:</label>
+                            <select id="num_from_group_a" name="num_from_group_a"
+                                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                                <option value="0">Any (0-5)</option>
+                                <option value="1">At least 1</option>
+                                <option value="2">At least 2</option>
+                                <option value="3">At least 3</option>
+                                <option value="4">At least 4</option>
+                                <option value="5">All 5</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border p-4 rounded-lg bg-gray-50">
+                    <h3 class="text-lg font-semibold mb-3 text-gray-800">Odd/Even Distribution</h3>
+                    <select id="odd_even_choice" name="odd_even_choice"
+                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        <option value="Any">Any</option>
+                        <option value="All Even">All Even (5 Even / 0 Odd)</option>
+                        <option value="All Odd">All Odd (5 Odd / 0 Even)</option>
+                        <option value="3 Even / 2 Odd">3 Even / 2 Odd</option>
+                        <option value="2 Even / 3 Odd">2 Even / 3 Odd</option>
+                        <option value="4 Even / 1 Odd">4 Even / 1 Odd</option>
+                        <option value="1 Even / 4 Odd">1 Even / 4 Odd</option>
+                    </select>
+                </div>
             </div>
 
-            {# Group A Numbers #}
-            <div>
-                <label for="num_from_group_a" class="block text-sm font-medium text-gray-700">Number of Group A Numbers (0-5):</label>
-                <input type="number" id="num_from_group_a" name="num_from_group_a" min="0" max="5" value="2"
-                       class="mt-1 block w-full sm:w-auto rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-            </div>
-
-            {# Odd/Even Distribution #}
-            <div>
-                <label for="odd_even_choice" class="block text-sm font-medium text-gray-700">Odd/Even Distribution:</label>
-                <select id="odd_even_choice" name="odd_even_choice"
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-                    <option value="Any">Any</option>
-                    <option value="All Even">All Even (5 Even / 0 Odd)</option>
-                    <option value="All Odd">All Odd (0 Even / 5 Odd)</option>
-                    <option value="3 Even / 2 Odd">3 Even / 2 Odd</option>
-                    <option value="2 Even / 3 Odd">2 Even / 3 Odd</option>
-                    <option value="1 Even / 4 Odd">1 Even / 4 Odd</option>
-                    <option value="4 Even / 1 Odd">4 Even / 1 Odd</option>
-                </select>
+            {# Excluded Numbers #}
+            <div class="border p-4 rounded-lg bg-gray-50">
+                <h3 class="text-lg font-semibold mb-3 text-gray-800">Excluded Numbers (Optional)</h3>
+                <p class="text-sm text-gray-600 mb-3">Enter numbers to exclude from white balls, separated by commas (e.g., 1,5,10).</p>
+                <input type="text" id="excluded_numbers" name="excluded_numbers" placeholder="e.g., 1, 5, 10"
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
             </div>
 
             {# Sum Range #}
-            <div>
-                <label for="sum_range_filter" class="block text-sm font-medium text-gray-700">White Ball Sum Range:</label>
+            <div class="border p-4 rounded-lg bg-gray-50">
+                <h3 class="text-lg font-semibold mb-3 text-gray-800">Sum Range (Optional)</h3>
+                <p class="text-sm text-gray-600 mb-3">Target a specific sum range for your white balls.</p>
                 <select id="sum_range_filter" name="sum_range_filter"
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    <option value="Any">Any</option>
                     {% for range_name, range_tuple in sum_ranges.items() %}
-                        <option value="{{ range_name }}" {% if range_name == "Any" %}selected{% endif %}>
-                            {{ range_name }} {% if range_tuple %}({{ range_tuple[0] }}-{{ range_tuple[1] }}){% endif %}
-                        </option>
+                        {% if range_tuple %}
+                            <option value="{{ range_name }}">{{ range_name }} ({{ range_tuple[0] }}-{{ range_tuple[1] }})</option>
+                        {% endif %}
                     {% endfor %}
                 </select>
             </div>
 
-            {# Excluded Numbers #}
-            <div>
-                <label for="excluded_numbers" class="block text-sm font-medium text-gray-700">Numbers to Exclude (comma-separated):</label>
-                <input type="text" id="excluded_numbers" name="excluded_numbers" placeholder="e.g., 7, 13, 21"
-                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-                <p class="text-xs text-gray-500 mt-1">These numbers will not be included in the generated picks.</p>
-            </div>
-
-            {# Generate Button #}
-            <button type="submit" id="generateSmartPicksBtn" class="btn-primary w-full sm:w-auto">Generate Smart Picks</button>
+            <button type="submit" id="generateSmartPicksBtn" class="btn-primary w-full">Generate Smart Picks</button>
         </form>
 
         {# Loading Indicator #}
-        <div id="loadingIndicator" class="hidden mt-8 text-center">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-            <p class="mt-3 text-lg text-blue-700">Generating smart picks...</p>
+        <div id="loadingIndicator" class="hidden text-center py-4">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto"></div>
+            <p class="mt-3 text-blue-700">Generating smart picks, please wait...</p>
         </div>
 
         {# Results Display #}
         <div id="smartPicksResults" class="mt-8 space-y-4">
-            <h3 class="text-xl font-bold text-gray-800 hidden" id="resultsHeading">Generated Smart Picks</h3>
-            {# Picks will be dynamically added here #}
+            {# Generated picks will be inserted here by JavaScript #}
         </div>
 
-        {# Save All Button #}
-        <div id="saveAllSmartPicksActions" class="mt-6 hidden">
-            <button id="saveAllSmartPicksBtn" class="btn-secondary w-full sm:w-auto">Save All Generated Picks</button>
+        {# Save All Button (initially hidden) #}
+        <div id="saveAllSmartPicksActions" class="mt-6 hidden flex justify-center">
+            <button id="saveAllSmartPicksBtn" class="btn-secondary">Save All Generated Picks</button>
         </div>
     </div>
 </div>
@@ -158,64 +164,38 @@
         const smartPickForm = document.getElementById('smartPickForm');
         const generateSmartPicksBtn = document.getElementById('generateSmartPicksBtn');
         const loadingIndicator = document.getElementById('loadingIndicator');
-        const smartPicksResults = document.getElementById('smartPicksResults');
-        const resultsHeading = document.getElementById('resultsHeading');
+        const smartPicksResultsDiv = document.getElementById('smartPicksResults');
         const saveAllSmartPicksActions = document.getElementById('saveAllSmartPicksActions');
         const saveAllSmartPicksBtn = document.getElementById('saveAllSmartPicksBtn');
 
-        // Function to display generated picks
-        function displayPicks(picks) {
-            smartPicksResults.innerHTML = ''; // Clear previous results
-            resultsHeading.classList.remove('hidden');
-            saveAllSmartPicksActions.classList.remove('hidden');
+        // Function to display messages (replaces Flask flash messages for dynamic content)
+        function displayMessage(message, type = 'info') {
+            const messageDiv = document.createElement('div');
+            let bgColor = 'bg-blue-100';
+            let textColor = 'text-blue-700';
+            let borderColor = 'border-blue-200';
 
-            if (picks.length === 0) {
-                smartPicksResults.innerHTML = '<p class="text-red-600 text-center">No picks could be generated with the selected criteria. Try adjusting your filters.</p>';
-                saveAllSmartPicksActions.classList.add('hidden');
-                return;
+            if (type === 'error') {
+                bgColor = 'bg-red-100';
+                textColor = 'text-red-700';
+                borderColor = 'border-red-200';
+            } else if (type === 'success') {
+                bgColor = 'bg-green-100';
+                textColor = 'text-green-700';
+                borderColor = 'border-green-200';
             }
 
-            picks.forEach(pick => {
-                const pickDiv = document.createElement('div');
-                pickDiv.className = 'generated-pick-item bg-gradient-to-br from-blue-500 to-indigo-600 text-white p-6 rounded-xl shadow-xl flex flex-col items-center justify-center space-y-4';
-                pickDiv.dataset.whiteBalls = pick.white_balls.join(',');
-                pickDiv.dataset.powerball = pick.powerball;
+            messageDiv.className = `p-4 rounded-lg shadow-md text-sm ${bgColor} ${textColor} border ${borderColor} animate-fade-in mb-4`;
+            messageDiv.innerHTML = `<p class="font-medium">${message}</p>`;
+            smartPicksResultsDiv.prepend(messageDiv); // Add to top of results or before results
 
-                const whiteBallsHtml = pick.white_balls.map(num => `
-                    <span class="w-12 h-12 flex items-center justify-center rounded-full bg-white text-blue-800 text-xl font-bold shadow-md">
-                        ${num}
-                    </span>
-                `).join('');
-
-                pickDiv.innerHTML = `
-                    <div class="flex space-x-3">
-                        ${whiteBallsHtml}
-                    </div>
-                    <div class="flex items-center space-x-3 mt-4">
-                        <span class="text-lg font-semibold">Powerball:</span>
-                        <span class="w-12 h-12 flex items-center justify-center rounded-full bg-red-600 text-white text-xl font-bold shadow-md">
-                            ${pick.powerball}
-                        </span>
-                    </div>
-                    <button class="save-single-pick-btn mt-4 bg-white text-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-blue-100 transition duration-200 ease-in-out">
-                        Save This Pick
-                    </button>
-                `;
-                smartPicksResults.appendChild(pickDiv);
-            });
-
-            // Add event listeners for individual save buttons
-            document.querySelectorAll('.save-single-pick-btn').forEach(button => {
-                button.addEventListener('click', function() {
-                    const item = this.closest('.generated-pick-item');
-                    const whiteBalls = item.dataset.whiteBalls.split(',').map(Number);
-                    const powerball = Number(item.dataset.powerball);
-                    saveSinglePick(whiteBalls, powerball);
-                });
-            });
+            // Optionally, remove after a few seconds
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 5000);
         }
 
-        // Function to save a single pick
+        // Function to save a single pick to the database
         async function saveSinglePick(whiteBalls, powerball) {
             try {
                 const response = await fetch('/save_generated_pick', {
@@ -226,22 +206,31 @@
                     body: new URLSearchParams({
                         generated_white_balls: whiteBalls.join(','),
                         generated_powerball: powerball
-                    })
+                    }).toString()
                 });
                 const text = await response.text(); // Get response as text
-                if (response.ok) {
-                    alert('Pick saved successfully!'); // Use alert for simplicity, replace with modal later
+                // Check if the response indicates success or failure from Flask's flash
+                if (text.includes('info')) { // Simple check based on flash category
+                    displayMessage(`Saved: ${whiteBalls.join(', ')} + ${powerball}`, 'success');
+                } else if (text.includes('error')) {
+                     // Extract message more robustly if needed, or rely on Flask's flash
+                    displayMessage(`Failed to save: ${whiteBalls.join(', ')} + ${powerball}. It might already exist.`, 'error');
                 } else {
-                    alert('Error saving pick: ' + text); // Display error message from server
+                    displayMessage(`Unknown response when saving: ${whiteBalls.join(', ')} + ${powerball}`, 'info');
                 }
             } catch (error) {
                 console.error('Error saving pick:', error);
-                alert('An unexpected error occurred while saving the pick.');
+                displayMessage(`Network error saving pick: ${whiteBalls.join(', ')} + ${powerball}`, 'error');
             }
         }
 
-        // Function to save multiple picks
+        // Function to save multiple picks to the database
         async function saveMultiplePicks(picks) {
+            if (picks.length === 0) {
+                displayMessage("No picks to save.", "info");
+                return;
+            }
+
             try {
                 const response = await fetch('/save_multiple_generated_picks', {
                     method: 'POST',
@@ -250,45 +239,59 @@
                     },
                     body: JSON.stringify({ picks: picks })
                 });
+
                 const result = await response.json();
-                if (response.ok) {
-                    alert(result.message);
+                if (result.success) {
+                    displayMessage(result.message, 'success');
+                    if (result.details) {
+                        result.details.forEach(detail => console.log(detail)); // Log individual save messages
+                    }
                 } else {
-                    alert('Error saving all picks: ' + result.message);
+                    displayMessage(result.message || "Failed to save some picks.", 'error');
                 }
             } catch (error) {
-                console.error('Error saving all picks:', error);
-                alert('An unexpected error occurred while saving all picks.');
+                console.error('Error saving multiple picks:', error);
+                displayMessage(`Network error saving multiple picks: ${error.message}`, 'error');
             }
         }
 
-        // Event listener for the main form submission
         smartPickForm.addEventListener('submit', async function(event) {
             event.preventDefault(); // Prevent default form submission
 
+            smartPicksResultsDiv.innerHTML = ''; // Clear previous results
+            loadingIndicator.classList.remove('hidden');
             generateSmartPicksBtn.disabled = true;
             generateSmartPicksBtn.textContent = 'Generating...';
-            loadingIndicator.classList.remove('hidden');
-            smartPicksResults.innerHTML = ''; // Clear previous results
-            resultsHeading.classList.add('hidden');
             saveAllSmartPicksActions.classList.add('hidden');
 
-            const formData = new FormData(smartPickForm);
-            const data = {};
-            for (let [key, value] of formData.entries()) {
-                if (key === 'include_tens_apart' || key === 'include_same_last_digit' || key === 'include_repeating_digit' || key === 'include_monthly_hot') {
-                    data[key] = true; // Checkbox is present if checked
-                } else {
-                    data[key] = value;
-                }
-            }
+            const numSetsToGenerate = document.getElementById('num_sets_to_generate').value;
+            const consecutiveNum1 = document.getElementById('consecutive_num1').value;
+            const consecutiveNum2 = document.getElementById('consecutive_num2').value;
+            const includeTensApart = document.getElementById('include_tens_apart').checked;
+            const includeSameLastDigit = document.getElementById('include_same_last_digit').checked;
+            const includeRepeatingDigit = document.getElementById('include_repeating_digit').checked;
+            const groupedPatternRange = document.getElementById('grouped_pattern_range').value;
+            const prioritizeMonthlyHot = document.getElementById('prioritize_monthly_hot').checked;
+            const numFromGroupA = document.getElementById('num_from_group_a').value;
+            const oddEvenChoice = document.getElementById('odd_even_choice').value;
+            const excludedNumbers = document.getElementById('excluded_numbers').value;
+            const sumRangeFilter = document.getElementById('sum_range_filter').value;
 
-            // Handle unchecked checkboxes (they won't be in formData.entries())
-            ['include_tens_apart', 'include_same_last_digit', 'include_repeating_digit', 'include_monthly_hot'].forEach(id => {
-                if (!formData.has(id)) {
-                    data[id] = false;
-                }
-            });
+            const requestBody = {
+                num_sets_to_generate: parseInt(numSetsToGenerate),
+                consecutive_pair: (consecutiveNum1 && consecutiveNum2) ? [parseInt(consecutiveNum1), parseInt(consecutiveNum2)] : null,
+                special_patterns: {
+                    tens_apart: includeTensApart,
+                    same_last_digit: includeSameLastDigit,
+                    repeating_digit: includeRepeatingDigit
+                },
+                grouped_pattern_range: groupedPatternRange || null,
+                prioritize_monthly_hot: prioritizeMonthlyHot,
+                num_from_group_a: parseInt(numFromGroupA),
+                odd_even_choice: oddEvenChoice,
+                excluded_numbers: excludedNumbers.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n)),
+                sum_range_filter: sumRangeFilter || null
+            };
 
             try {
                 const response = await fetch('/generate_smart_picks', {
@@ -296,19 +299,48 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify(requestBody)
                 });
 
                 const result = await response.json();
 
                 if (result.success) {
-                    displayPicks(result.generated_sets);
+                    if (result.generated_sets && result.generated_sets.length > 0) {
+                        result.generated_sets.forEach(pick => {
+                            const pickElement = document.createElement('div');
+                            pickElement.className = 'generated-pick-item bg-gradient-to-br from-blue-500 to-indigo-600 text-white p-6 rounded-xl shadow-xl flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0 md:space-x-6';
+                            pickElement.dataset.whiteBalls = pick.white_balls.join(',');
+                            pickElement.dataset.powerball = pick.powerball;
+
+                            const whiteBallsHtml = pick.white_balls.map(num => `<span class="flex items-center justify-center w-12 h-12 rounded-full bg-white text-blue-800 text-lg font-bold shadow-md">${num}</span>`).join('');
+                            const lastDrawnDatesHtml = Object.keys(pick.last_drawn_dates).map(key => `
+                                <span class="block text-xs text-blue-100">${key}: ${pick.last_drawn_dates[key]}</span>
+                            `).join('');
+
+                            pickElement.innerHTML = `
+                                <div class="flex flex-wrap justify-center gap-2">
+                                    ${whiteBallsHtml}
+                                    <span class="flex items-center justify-center w-12 h-12 rounded-full bg-red-600 text-white text-lg font-bold shadow-md ml-4">${pick.powerball}</span>
+                                </div>
+                                <div class="text-center md:text-left">
+                                    <p class="text-sm font-semibold text-blue-100 mb-2">Last Drawn Dates:</p>
+                                    ${lastDrawnDatesHtml}
+                                </div>
+                                <button class="btn-secondary bg-white text-blue-600 hover:bg-gray-100 self-center md:self-auto" onclick="saveSinglePick([${pick.white_balls.join(',')}], ${pick.powerball})">Save Pick</button>
+                            `;
+                            smartPicksResultsDiv.appendChild(pickElement);
+                        });
+                        saveAllSmartPicksActions.classList.remove('hidden');
+                    } else {
+                        displayMessage(result.message || "No smart picks could be generated with the selected criteria. Try adjusting your filters.", 'info');
+                    }
                 } else {
-                    smartPicksResults.innerHTML = `<p class="text-red-600 text-center">${result.message || 'An error occurred during generation.'}</p>`;
+                    displayMessage(result.message || "An error occurred during generation.", 'error');
                 }
+
             } catch (error) {
                 console.error('Error generating smart picks:', error);
-                smartPicksResults.innerHTML = `<p class="text-red-600 text-center">An unexpected error occurred: ${error.message}</p>`;
+                displayMessage(`An unexpected error occurred: ${error.message}`, 'error');
             } finally {
                 generateSmartPicksBtn.disabled = false;
                 generateSmartPicksBtn.textContent = 'Generate Smart Picks';
@@ -316,22 +348,24 @@
             }
         });
 
-        // --- Smart Generated Numbers - Save All Button Logic --
-        saveAllSmartPicksBtn.addEventListener('click', function() {
-            const allSmartPickItems = document.querySelectorAll('#smartPicksResults .generated-pick-item');
-            const picksToSave = [];
-            allSmartPickItems.forEach(item => {
-                const whiteBallsStr = item.dataset.whiteBalls;
-                const powerballStr = item.dataset.powerball;
-                if (whiteBallsStr && powerballStr) {
-                    picksToSave.push({
-                        white_balls: whiteBallsStr.split(',').map(Number),
-                        powerball: Number(powerballStr)
-                    });
-                }
+        // --- Smart Generated Numbers - Save All Button Logic ---
+        if (saveAllSmartPicksBtn) {
+            saveAllSmartPicksBtn.addEventListener('click', function() {
+                const allSmartPickItems = document.querySelectorAll('#smartPicksResults .generated-pick-item');
+                const picksToSave = [];
+                allSmartPickItems.forEach(item => {
+                    const whiteBallsStr = item.dataset.whiteBalls;
+                    const powerballStr = item.dataset.powerball;
+                    if (whiteBallsStr && powerballStr) {
+                        picksToSave.push({
+                            white_balls: whiteBallsStr.split(',').map(Number),
+                            powerball: Number(powerballStr)
+                        });
+                    }
+                });
+                saveMultiplePicks(picksToSave);
             });
-            saveMultiplePicks(picksToSave);
-        });
+        }
     });
 </script>
 {% endblock %}
