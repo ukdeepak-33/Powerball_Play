@@ -1573,6 +1573,10 @@ def get_weekday_draw_trends(df_source, group_a_numbers_def=None):
     return final_results
 
 def _get_yearly_patterns_for_range(df_source, selected_range_name):
+    """
+    Analyzes grouped patterns (pairs and triplets) within a specific number range,
+    grouped by year. Returns data structured for yearly comparison in the frontend.
+    """
     if df_source.empty:
         return []
 
@@ -1591,50 +1595,45 @@ def _get_yearly_patterns_for_range(df_source, selected_range_name):
         else:
             pass
 
+    # Filter for the selected range only
+    min_val, max_val = NUMBER_RANGES.get(selected_range_name, (1, 69))
 
-    all_patterns_data = []
+    yearly_data_structured = []
     
     for year in sorted(df_copy['Draw Date_dt'].dt.year.unique()):
         yearly_df = df_copy[df_copy['Draw Date_dt'].dt.year == year]
         
-        year_pairs_counts = defaultdict(int)
-        year_triplets_counts = defaultdict(int)
+        year_pairs = defaultdict(int)
+        year_triplets = defaultdict(int)
 
         for _, row in yearly_df.iterrows():
             white_balls = [int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])]
             
-            for range_name, (min_val, max_val) in NUMBER_RANGES.items():
-                numbers_in_current_range = sorted([num for num in white_balls if min_val <= num <= max_val])
-                
-                if len(numbers_in_current_range) >= 2:
-                    for pair in combinations(numbers_in_current_range, 2):
-                        year_pairs_counts[(range_name, tuple(sorted(pair)))] += 1
-                
-                if len(numbers_in_current_range) >= 3:
-                    for triplet_combo in combinations(numbers_in_current_range, 3):
-                        year_triplets_counts[(range_name, tuple(sorted(triplet_combo)))] += 1
+            numbers_in_current_range = sorted([num for num in white_balls if min_val <= num <= max_val])
+            
+            if len(numbers_in_current_range) >= 2:
+                for pair in combinations(numbers_in_current_range, 2):
+                    year_pairs[tuple(sorted(pair))] += 1
+            
+            if len(numbers_in_current_range) >= 3:
+                for triplet_combo in combinations(numbers_in_current_range, 3):
+                    year_triplets[tuple(sorted(triplet_combo))] += 1
         
-        for (range_name, pattern), count in year_pairs_counts.items():
-            all_patterns_data.append({
-                "year": int(year),
-                "range": range_name,
-                "type": "Pair",
-                "pattern": list(pattern),
-                "count": int(count)
-            })
-        
-        for (range_name, pattern), count in year_triplets_counts.items():
-            all_patterns_data.append({
-                "year": int(year),
-                "range": range_name,
-                "type": "Triplet",
-                "pattern": list(pattern),
-                "count": int(count)
-            })
+        # Convert defaultdicts to lists of dicts for JSON serialization
+        formatted_pairs = [{'pattern': list(p), 'count': c} for p, c in year_pairs.items()]
+        formatted_triplets = [{'pattern': list(t), 'count': c} for t, c in year_triplets.items()]
 
-    all_patterns_data.sort(key=lambda x: (x['count'], x['year'], x['range'], str(x['pattern'])), reverse=True)
+        yearly_data_structured.append({
+            "year": int(year),
+            "pairs": formatted_pairs,
+            "triplets": formatted_triplets,
+            "total_unique_patterns": len(formatted_pairs) + len(formatted_triplets)
+        })
+
+    # Sort the overall yearly data by year
+    yearly_data_structured.sort(key=lambda x: x['year'])
     
-    return all_patterns_data
+    return yearly_data_structured
 
 def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
     if df_source.empty:
@@ -1843,11 +1842,12 @@ def get_white_ball_frequency_by_period(df_source, period_type='year'):
 def get_consecutive_numbers_yearly_trends(df_source):
     """
     Calculates the percentage of draws containing consecutive numbers for each year
-    within a rolling 10-year window, and also lists the most frequent consecutive pairs per year,
-    including the specific draw dates for each occurrence.
+    within a rolling 10-year window.
+    Also generates a flat list of all unique consecutive pairs found in the data,
+    with their total counts and all associated draw dates.
     """
     if df_source.empty:
-        return {'yearly_data': [], 'years': [], 'yearly_consecutive_pairs': {}}
+        return {'yearly_data': [], 'years': [], 'all_consecutive_pairs_flat': []}
 
     df_copy = df_source.copy()
     if 'Draw Date_dt' not in df_copy.columns:
@@ -1855,15 +1855,15 @@ def get_consecutive_numbers_yearly_trends(df_source):
     df_copy = df_copy.dropna(subset=['Draw Date_dt'])
     
     if df_copy.empty:
-        return {'yearly_data': [], 'years': [], 'yearly_consecutive_pairs': {}}
+        return {'yearly_data': [], 'years': [], 'all_consecutive_pairs_flat': []}
 
     current_year = datetime.now().year
     start_year = max(2017, current_year - 9) # Rolling 10-year window
     years_to_analyze = range(start_year, current_year + 1)
 
     yearly_trends = []
-    # Change: Store occurrences as a list of dates for each pair
-    yearly_consecutive_pairs_data = {} # Stores {year: {pair_tuple: [date1, date2, ...]}}
+    # This will store {pair_tuple: {'count': X, 'dates': [date1, date2, ...]}}
+    all_consecutive_pairs_aggregated = defaultdict(lambda: {'count': 0, 'dates': []}) 
 
     for year in years_to_analyze:
         yearly_df = df_copy[df_copy['Draw Date_dt'].dt.year == year].copy()
@@ -1871,9 +1871,6 @@ def get_consecutive_numbers_yearly_trends(df_source):
         total_draws_in_year = len(yearly_df)
         consecutive_draws_count = 0
         
-        # Change: defaultdict to store lists of dates
-        consecutive_pairs_occurrences = defaultdict(list) 
-
         if total_draws_in_year > 0:
             for _, row in yearly_df.iterrows():
                 white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
@@ -1884,8 +1881,9 @@ def get_consecutive_numbers_yearly_trends(df_source):
                 if current_draw_consecutive_pairs:
                     consecutive_draws_count += 1
                     for pair in current_draw_consecutive_pairs:
-                        # Append the draw date to the list for this pair
-                        consecutive_pairs_occurrences[tuple(pair)].append(draw_date_str) 
+                        pair_tuple = tuple(pair)
+                        all_consecutive_pairs_aggregated[pair_tuple]['count'] += 1
+                        all_consecutive_pairs_aggregated[pair_tuple]['dates'].append(draw_date_str)
             
             percentage = round((consecutive_draws_count / total_draws_in_year) * 100, 2)
         else:
@@ -1898,27 +1896,24 @@ def get_consecutive_numbers_yearly_trends(df_source):
             'consecutive_draws': consecutive_draws_count
         })
 
-        # Format for JSON: Convert occurrences dict to list of dicts
-        # Each item in the list will have 'pair', 'count', and 'dates'
-        formatted_pairs_for_year = []
-        for pair_tuple, dates_list in consecutive_pairs_occurrences.items():
-            formatted_pairs_for_year.append({
-                'pair': list(pair_tuple),
-                'count': len(dates_list),
-                'dates': sorted(dates_list, reverse=True) # Sort dates descending (most recent first)
-            })
-        
-        # Sort these formatted pairs by count (descending) then by pair (ascending)
-        formatted_pairs_for_year.sort(key=lambda x: (-x['count'], x['pair']))
-        
-        yearly_consecutive_pairs_data[str(year)] = formatted_pairs_for_year
+    # Convert the aggregated dictionary to a flat list of dictionaries
+    flat_consecutive_pairs_list = []
+    for pair_tuple, data in all_consecutive_pairs_aggregated.items():
+        flat_consecutive_pairs_list.append({
+            'pair': list(pair_tuple),
+            'count': data['count'],
+            'dates': sorted(list(set(data['dates'])), reverse=True) # Deduplicate and sort dates descending
+        })
+    
+    # Sort the flat list by count (descending) then by pair (ascending)
+    flat_consecutive_pairs_list.sort(key=lambda x: (-x['count'], x['pair']))
 
     yearly_trends.sort(key=lambda x: x['year'])
     
     return {
         'yearly_data': yearly_trends, 
         'years': list(years_to_analyze), 
-        'yearly_consecutive_pairs': yearly_consecutive_pairs_data
+        'all_consecutive_pairs_flat': flat_consecutive_pairs_list
     }
 
 
@@ -2585,15 +2580,17 @@ def consecutive_trends_route():
     # Extract data for template
     yearly_consecutive_percentage_data = yearly_consecutive_data_full['yearly_data']
     years_for_dropdown = yearly_consecutive_data_full['years']
-    yearly_consecutive_pairs_summary = yearly_consecutive_data_full['yearly_consecutive_pairs']
+    # Changed to pass the flat list directly
+    all_consecutive_pairs_flat = yearly_consecutive_data_full['all_consecutive_pairs_flat']
 
     return render_template('consecutive_trends.html',
                            consecutive_trends=consecutive_trends,
                            yearly_consecutive_percentage_data=yearly_consecutive_percentage_data,
                            years_for_dropdown=years_for_dropdown,
-                           yearly_consecutive_pairs_summary=yearly_consecutive_pairs_summary)
+                           # Pass the new flat list
+                           all_consecutive_pairs_flat=all_consecutive_pairs_flat)
 
-# New API endpoint for yearly consecutive trends
+# New API endpoint for yearly consecutive trends (now returns flat list)
 @app.route('/api/consecutive_yearly_trends')
 def api_consecutive_yearly_trends_route():
     if df.empty:
@@ -2604,7 +2601,7 @@ def api_consecutive_yearly_trends_route():
     return jsonify({
         'data': yearly_consecutive_data_full['yearly_data'],
         'years': yearly_consecutive_data_full['years'],
-        'yearly_consecutive_pairs': yearly_consecutive_data_full['yearly_consecutive_pairs']
+        'all_consecutive_pairs_flat': yearly_consecutive_data_full['all_consecutive_pairs_flat'] # Changed key
     })
 
 
@@ -3236,3 +3233,4 @@ def api_white_ball_trends_route():
         'data': white_ball_data,
         'period_labels': period_labels
     })
+
