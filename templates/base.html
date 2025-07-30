@@ -293,6 +293,11 @@
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 7h-4V4c0-1.103-.897-2-2-2H8c-1.103 0-2 .897-2 2v3H4c-1.103 0-2 .897-2 2v11c0 1.103.897 2 2 2h16c1.103 0 2-.897 2-2V9c0-1.103-.897-2-2-2zM8 4h8v3H8V4zm12 16H4V9h16v11zM11 11h2v6h-2z"></path></svg>
                     My Jackpot Pick
                 </a></li>
+                {# SMART PICK GENERATOR #}
+                <li><a href="{{ url_for('smart_pick_generator_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 7h-4V4c0-1.103-.897-2-2-2H8c-1.103 0-2 .897-2 2v3H4c-1.103 0-2 .897-2 2v11c0 1.103.897 2 2 2h16c1.103 0 2-.897 2-2V9c0-1.103-.897-2-2-2zM8 4h8v3H8V4zm12 16H4V9h16v11zM11 11h2v6h-2z"></path></svg>
+                    Smart Pick Generator
+                    </a></li>
                 {# ORIGINAL BOTTOM LINKS #}
                 <li><a href="{{ url_for('generated_numbers_history_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6C4.895 2 4 2.895 4 4V20C4 21.105 4.895 22 6 22H18C19.105 22 20 21.105 20 20V8L14 2ZM18 20H6V4H13V9H18V20Z"></path></svg>
