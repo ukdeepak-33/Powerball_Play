@@ -41,7 +41,7 @@ CACHE_EXPIRATION_SECONDS = 3600
 group_a = [3, 5, 6, 7, 9, 11, 15, 16, 18, 21, 23, 24, 27, 31, 32, 33, 36, 42, 44, 45, 48, 50, 51, 54, 55, 60, 66, 69]
 GLOBAL_WHITE_BALL_RANGE = (1, 69)
 GLOBAL_POWERBALL_RANGE = (1, 26)
-excluded_numbers = []
+excluded_numbers = [] # Global excluded numbers, can be overridden by form input
 
 NUMBER_RANGES = {
     "1-9": (1, 9),
@@ -1916,6 +1916,60 @@ def get_consecutive_numbers_yearly_trends(df_source):
         'all_consecutive_pairs_flat': flat_consecutive_pairs_list
     }
 
+def get_powerball_position_frequency(df_source):
+    if df_source.empty:
+        return {}
+    
+    position_freq = defaultdict(lambda: defaultdict(int))
+
+    for _, row in df_source.iterrows():
+        powerball = int(row['Powerball'])
+        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6)])
+        
+        # Determine the "position" of the Powerball relative to the white balls
+        # This is a conceptual position, not an actual draw position.
+        # For simplicity, we can categorize it into ranges or relative to the white balls.
+        # For now, let's just count its frequency. If a more complex "position" is needed,
+        # we'd need a more specific definition.
+        
+        # For a more meaningful "position", we could see if it's lower than all white balls,
+        # between certain white balls, or higher than all.
+        
+        # Example: Is Powerball lower than the lowest white ball?
+        if white_balls and powerball < white_balls[0]:
+            position_freq[powerball]['Lower than all WB'] += 1
+        # Is Powerball higher than the highest white ball?
+        elif white_balls and powerball > white_balls[-1]:
+            position_freq[powerball]['Higher than all WB'] += 1
+        else:
+            position_freq[powerball]['Within WB Range'] += 1 # This needs refinement for real positional analysis
+        
+        # For now, let's just return the raw frequency of the Powerball
+        # as the concept of "position" without more specific criteria is ambiguous.
+        # If the user wants a specific positional analysis (e.g., PB is the 3rd lowest number overall),
+        # we'd need to define that.
+        
+        # Reverting to simple frequency for now, as "position" wasn't clearly defined.
+        # If the user wants "Powerball frequency by its value", the existing powerball_freq
+        # function is better.
+        # If they want "Powerball relative to white balls", we need specific categories.
+        
+        # Let's assume for this function, they want the raw frequency of Powerball numbers
+        # without complex positional logic, as the name might imply.
+        # This function name is a bit misleading given its current implementation.
+        # I'll provide a basic frequency for now.
+        position_freq[powerball]['Total Draws'] += 1
+
+    formatted_data = []
+    for pb_num in sorted(position_freq.keys()):
+        total_draws = position_freq[pb_num]['Total Draws']
+        formatted_data.append({
+            'Powerball': int(pb_num),
+            'Total Draws': int(total_draws)
+            # Add more specific positional data if defined later
+        })
+    return formatted_data
+
 
 def initialize_core_data():
     global df, last_draw, historical_white_ball_sets, white_ball_co_occurrence_lookup
@@ -3233,4 +3287,352 @@ def api_white_ball_trends_route():
         'data': white_ball_data,
         'period_labels': period_labels
     })
+
+# --- Smart Pick Generator Logic (New Functions and Route) ---
+
+def _get_current_month_hot_numbers(df_source):
+    """
+    Identifies numbers that have appeared more than once in the current (incomplete) month's draws.
+    Returns a set of these hot numbers.
+    """
+    if df_source.empty:
+        return set()
+
+    df_copy = df_source.copy()
+    if 'Draw Date_dt' not in df_copy.columns:
+        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
+
+    if df_copy.empty:
+        return set()
+
+    current_month_start = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    current_month_df = df_copy[df_copy['Draw Date_dt'] >= current_month_start]
+
+    if current_month_df.empty:
+        return set()
+
+    monthly_counts = defaultdict(int)
+    for _, row in current_month_df.iterrows():
+        for i in range(1, 6):
+            num = int(row[f'Number {i}'])
+            monthly_counts[num] += 1
+        monthly_counts[int(row['Powerball'])] += 1 # Include Powerball in hot numbers consideration
+
+    hot_numbers = {num for num, count in monthly_counts.items() if count > 1}
+    return hot_numbers
+
+def _score_pick_for_patterns(white_balls, criteria_data):
+    """
+    Scores a generated white ball pick based on how well it aligns with various
+    pattern-based preferences (soft constraints). Higher score means better alignment.
+    """
+    score = 0
+    wb_set = set(white_balls)
+    sorted_wb = sorted(white_balls)
+
+    # 1. Grouped Patterns Score
+    if criteria_data['prioritize_grouped_patterns'] and criteria_data['most_frequent_grouped_patterns']:
+        for pattern_info in criteria_data['most_frequent_grouped_patterns']:
+            pattern_set = set(pattern_info['pattern'])
+            if pattern_set.issubset(wb_set):
+                # Give higher score for more frequent patterns
+                score += pattern_info['count'] * 0.1 # Adjust multiplier as needed
+
+    # 2. Special Patterns Score
+    if criteria_data['prioritize_special_patterns'] and criteria_data['most_frequent_special_patterns']:
+        # Combine all special patterns for scoring
+        all_special_patterns = []
+        all_special_patterns.extend(criteria_data['most_frequent_special_patterns']['tens_apart_patterns'])
+        all_special_patterns.extend(criteria_data['most_frequent_special_patterns']['same_last_digit_patterns'])
+        all_special_patterns.extend(criteria_data['most_frequent_special_patterns']['repeating_digit_patterns'])
+        
+        for pattern_info in all_special_patterns:
+            pattern_set = set(pattern_info['pattern'])
+            if pattern_set.issubset(wb_set):
+                score += pattern_info['count'] * 0.05 # Smaller multiplier for special patterns
+
+    # 3. Consecutive Trends Score
+    if criteria_data['prioritize_consecutive_patterns']:
+        consecutive_pairs = _find_consecutive_pairs(white_balls)
+        score += len(consecutive_pairs) * 5 # Score for each consecutive pair
+        # Add bonus for triplets if present
+        if len(consecutive_pairs) >= 2 and \
+           (sorted_wb[0] + 1 == sorted_wb[1] and sorted_wb[1] + 1 == sorted_wb[2] or \
+            sorted_wb[1] + 1 == sorted_wb[2] and sorted_wb[2] + 1 == sorted_wb[3] or \
+            sorted_wb[2] + 1 == sorted_wb[3] and sorted_wb[3] + 1 == sorted_wb[4]):
+            score += 10 # Bonus for a triplet
+
+    # 4. Monthly Hot Numbers Score
+    if criteria_data['prioritize_monthly_hot'] and criteria_data['current_month_hot_numbers']:
+        hot_count = len(wb_set.intersection(criteria_data['current_month_hot_numbers']))
+        score += hot_count * 2 # Score for each hot number included
+
+    return score
+
+def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a, odd_even_choice, sum_range_tuple, prioritize_monthly_hot, prioritize_grouped_patterns, prioritize_special_patterns, prioritize_consecutive_patterns, force_specific_pattern):
+    """
+    Generates Powerball picks based on a combination of hard and soft criteria.
+    """
+    if df_source.empty:
+        raise ValueError("Historical data is empty. Cannot generate smart picks.")
+
+    generated_sets = []
+    max_overall_attempts = 5000 * num_sets # Increased attempts for complex criteria
+
+    # Pre-calculate historical data needed for soft constraints
+    # These are cached, so calling them here is efficient
+    all_grouped_patterns = get_cached_analysis('grouped_patterns', get_grouped_patterns_over_years, df_source)
+    all_special_patterns = get_cached_analysis('special_patterns_analysis', get_special_patterns_analysis, df_source)
+    
+    # For scoring, we need a flat list of most frequent patterns
+    most_frequent_grouped_patterns = sorted(all_grouped_patterns, key=lambda x: x['count'], reverse=True)[:50] # Top 50 grouped patterns
+    
+    # Combine all special patterns into one list for easier scoring
+    most_frequent_special_patterns = {
+        'tens_apart_patterns': sorted(all_special_patterns['tens_apart_patterns'], key=lambda x: x['count'], reverse=True)[:20],
+        'same_last_digit_patterns': sorted(all_special_patterns['same_last_digit_patterns'], key=lambda x: x['count'], reverse=True)[:20],
+        'repeating_digit_patterns': sorted(all_special_patterns['repeating_digit_patterns'], key=lambda x: x['count'], reverse=True)[:20]
+    }
+
+    current_month_hot_numbers = set()
+    if prioritize_monthly_hot:
+        current_month_hot_numbers = _get_current_month_hot_numbers(df_source)
+
+    # Prepare criteria data for scoring function
+    criteria_for_scoring = {
+        'prioritize_monthly_hot': prioritize_monthly_hot,
+        'current_month_hot_numbers': current_month_hot_numbers,
+        'prioritize_grouped_patterns': prioritize_grouped_patterns,
+        'most_frequent_grouped_patterns': most_frequent_grouped_patterns,
+        'prioritize_special_patterns': prioritize_special_patterns,
+        'most_frequent_special_patterns': most_frequent_special_patterns,
+        'prioritize_consecutive_patterns': prioritize_consecutive_patterns,
+    }
+
+    for _ in range(num_sets):
+        best_pick_white_balls = None
+        best_pick_powerball = None
+        highest_score = -1
+        current_set_attempts = 0
+        max_attempts_per_set = max_overall_attempts // num_sets # Distribute attempts
+
+        while current_set_attempts < max_attempts_per_set:
+            current_set_attempts += 1
+            
+            candidate_white_balls = []
+            candidate_powerball = random.randint(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1])
+            
+            # 1. Handle Forced Specific Pattern (Hard Constraint)
+            remaining_to_pick = 5
+            temp_excluded = set(excluded_numbers)
+            
+            if force_specific_pattern:
+                for num in force_specific_pattern:
+                    if not (GLOBAL_WHITE_BALL_RANGE[0] <= num <= GLOBAL_WHITE_BALL_RANGE[1]) or num in temp_excluded:
+                        # If forced number is invalid or excluded, this attempt fails
+                        continue 
+                candidate_white_balls.extend(force_specific_pattern)
+                temp_excluded.update(force_specific_pattern)
+                remaining_to_pick -= len(force_specific_pattern)
+                
+            # Ensure we have enough numbers left to pick
+            if remaining_to_pick < 0: # Should not happen with valid input
+                continue
+            
+            available_pool = [n for n in range(GLOBAL_WHITE_BALL_RANGE[0], GLOBAL_WHITE_BALL_RANGE[1] + 1)
+                              if n not in temp_excluded and n not in candidate_white_balls]
+
+            if len(available_pool) < remaining_to_pick:
+                continue # Not enough numbers to complete the pick
+
+            # 2. Handle Group A Numbers (Hard Constraint)
+            # Determine how many more Group A numbers are needed
+            current_group_a_count = sum(1 for num in candidate_white_balls if num in group_a)
+            needed_from_group_a = num_from_group_a - current_group_a_count
+
+            temp_available_pool = list(available_pool) # Copy to modify
+            
+            if needed_from_group_a > 0:
+                possible_group_a_from_pool = [n for n in temp_available_pool if n in group_a]
+                if len(possible_group_a_from_pool) < needed_from_group_a:
+                    continue # Not enough Group A numbers available
+                
+                try:
+                    selected_group_a = random.sample(possible_group_a_from_pool, needed_from_group_a)
+                    candidate_white_balls.extend(selected_group_a)
+                    temp_excluded.update(selected_group_a)
+                    remaining_to_pick -= needed_from_group_a
+                    
+                    # Update available pool after selecting Group A numbers
+                    available_pool = [n for n in available_pool if n not in selected_group_a]
+                except ValueError: # Not enough elements to sample
+                    continue
+            elif needed_from_group_a < 0: # Already have too many Group A numbers from forced pattern
+                # This scenario means the forced pattern already violates the Group A count.
+                # We should probably raise an error earlier or ensure the UI prevents this.
+                # For now, just skip this candidate.
+                continue
+
+            # 3. Fill remaining spots randomly from available pool
+            if remaining_to_pick > 0:
+                if len(available_pool) < remaining_to_pick:
+                    continue # Not enough numbers left
+                try:
+                    random_fill = random.sample(available_pool, remaining_to_pick)
+                    candidate_white_balls.extend(random_fill)
+                except ValueError: # Not enough elements to sample
+                    continue
+            
+            # Ensure 5 unique white balls
+            if len(set(candidate_white_balls)) != 5:
+                continue
+            
+            candidate_white_balls = sorted(candidate_white_balls)
+
+            # 4. Check Odd/Even Split (Hard Constraint)
+            even_count = sum(1 for num in candidate_white_balls if num % 2 == 0)
+            odd_count = 5 - even_count
+            current_odd_even_split = f"{odd_count} Odd / {even_count} Even"
+            
+            if odd_even_choice != "Any" and odd_even_choice != current_odd_even_split:
+                if odd_even_choice == "All Odd" and odd_count != 5: continue
+                if odd_even_choice == "All Even" and even_count != 5: continue
+                if odd_even_choice == "3 Odd / 2 Even" and (odd_count != 3 or even_count != 2): continue
+                if odd_even_choice == "2 Odd / 3 Even" and (odd_count != 2 or even_count != 3): continue
+                if odd_even_choice == "4 Odd / 1 Even" and (odd_count != 4 or even_count != 1): continue
+                if odd_even_choice == "1 Odd / 4 Even" and (odd_count != 1 or even_count != 4): continue
+            
+            # 5. Check Sum Range (Hard Constraint)
+            current_sum = sum(candidate_white_balls)
+            if sum_range_tuple and not (sum_range_tuple[0] <= current_sum <= sum_range_tuple[1]):
+                continue
+
+            # 6. Check against last draw and historical exact matches (Hard Constraint)
+            if check_exact_match(candidate_white_balls): 
+                continue
+            
+            last_draw_data = get_last_draw(df_source)
+            if not last_draw_data.empty and last_draw_data.get('Draw Date') != 'N/A':
+                last_white_balls = [int(last_draw_data['Number 1']), int(last_draw_data['Number 2']), int(last_draw_data['Number 3']), int(last_draw_data['Number 4']), int(last_draw_data['Number 5'])]
+                if set(candidate_white_balls) == set(last_white_balls) and candidate_powerball == int(last_draw_data['Powerball']):
+                    continue
+
+            # All hard constraints met, now score for soft constraints
+            current_score = _score_pick_for_patterns(candidate_white_balls, criteria_for_scoring)
+
+            if current_score > highest_score:
+                highest_score = current_score
+                best_pick_white_balls = candidate_white_balls
+                best_pick_powerball = candidate_powerball
+            
+            # If we found a perfect pick (can define "perfect" as score > threshold or just the first valid one)
+            # For now, let's just return the first pick that meets all hard constraints and has a positive score
+            # or if we have enough attempts, just return the best one found.
+            # For simplicity, if a pick has a score > 0 and meets all hard constraints, we can consider it "good enough"
+            # to prevent excessive iterations if many options exist.
+            if highest_score > 0 and current_set_attempts > max_attempts_per_set / 5: # Found a good one early
+                 break
+        
+        if best_pick_white_balls:
+            generated_sets.append({'white_balls': best_pick_white_balls, 'powerball': best_pick_powerball})
+        else:
+            raise ValueError(f"Could not generate a smart pick meeting all criteria after {max_attempts_per_set} attempts. Try adjusting filters or reducing strictness.")
+            
+    return generated_sets
+
+
+@app.route('/smart_pick_generator')
+def smart_pick_generator_route():
+    if df.empty:
+        flash("Cannot load Smart Pick Generator: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
+
+@app.route('/generate_smart_picks_route', methods=['POST'])
+def generate_smart_picks_route():
+    if df.empty:
+        flash("Cannot generate smart picks: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
+
+    try:
+        num_sets_to_generate = int(request.form.get('num_sets_to_generate', 1))
+        excluded_numbers_input = request.form.get('excluded_numbers', '')
+        excluded_numbers_local = [int(num.strip()) for num in excluded_numbers_input.split(',') if num.strip().isdigit()] if excluded_numbers_input else []
+        
+        num_from_group_a = int(request.form.get('num_from_group_a', 0))
+        odd_even_choice = request.form.get('odd_even_choice', 'Any')
+        
+        selected_sum_range_label = request.form.get('sum_range_filter', 'Any')
+        selected_sum_range_tuple = SUM_RANGES.get(selected_sum_range_label)
+
+        prioritize_monthly_hot = 'prioritize_monthly_hot' in request.form
+        prioritize_grouped_patterns = 'prioritize_grouped_patterns' in request.form
+        prioritize_special_patterns = 'prioritize_special_patterns' in request.form
+        prioritize_consecutive_patterns = 'prioritize_consecutive_patterns' in request.form
+        
+        force_specific_pattern_input = request.form.get('force_specific_pattern', '')
+        force_specific_pattern = []
+        if force_specific_pattern_input:
+            force_specific_pattern = sorted([int(num.strip()) for num in force_specific_pattern_input.split(',') if num.strip().isdigit()])
+            if not (2 <= len(force_specific_pattern) <= 3):
+                flash("Forced specific pattern must contain 2 or 3 numbers.", 'error')
+                return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
+            # Check if forced numbers are within range and not excluded
+            for num in force_specific_pattern:
+                if not (GLOBAL_WHITE_BALL_RANGE[0] <= num <= GLOBAL_WHITE_BALL_RANGE[1]):
+                    flash(f"Forced number {num} is outside the valid white ball range (1-69).", 'error')
+                    return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
+                if num in excluded_numbers_local:
+                    flash(f"Forced number {num} is also in the excluded numbers list. Please remove it from excluded.", 'error')
+                    return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
+            if len(set(force_specific_pattern)) != len(force_specific_pattern):
+                flash("Forced specific pattern numbers must be unique.", 'error')
+                return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
+
+
+        generated_sets = generate_smart_picks(
+            df_source=df,
+            num_sets=num_sets_to_generate,
+            excluded_numbers=excluded_numbers_local,
+            num_from_group_a=num_from_group_a,
+            odd_even_choice=odd_even_choice,
+            sum_range_tuple=selected_sum_range_tuple,
+            prioritize_monthly_hot=prioritize_monthly_hot,
+            prioritize_grouped_patterns=prioritize_grouped_patterns,
+            prioritize_special_patterns=prioritize_special_patterns,
+            prioritize_consecutive_patterns=prioritize_consecutive_patterns,
+            force_specific_pattern=force_specific_pattern
+        )
+        
+        # For display, get last draw dates for the *last* generated set
+        last_draw_dates = {}
+        if generated_sets:
+            last_draw_dates = find_last_draw_dates_for_numbers(df, generated_sets[-1]['white_balls'], generated_sets[-1]['powerball'])
+
+        return render_template('smart_pick_generator.html', 
+                               generated_sets=generated_sets, 
+                               last_draw_dates=last_draw_dates,
+                               sum_ranges=SUM_RANGES,
+                               group_a=group_a,
+                               # Pass back selected values to re-populate form
+                               num_sets_to_generate=num_sets_to_generate,
+                               excluded_numbers=excluded_numbers_input,
+                               num_from_group_a=num_from_group_a,
+                               odd_even_choice=odd_even_choice,
+                               selected_sum_range=selected_sum_range_label,
+                               prioritize_monthly_hot=prioritize_monthly_hot,
+                               prioritize_grouped_patterns=prioritize_grouped_patterns,
+                               prioritize_special_patterns=prioritize_special_patterns,
+                               prioritize_consecutive_patterns=prioritize_consecutive_patterns,
+                               force_specific_pattern_input=force_specific_pattern_input
+                               )
+
+    except ValueError as e:
+        flash(str(e), 'error')
+        return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
+    except Exception as e:
+        traceback.print_exc()
+        flash(f"An unexpected error occurred: {e}", 'error')
+        return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
 
