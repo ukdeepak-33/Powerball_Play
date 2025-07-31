@@ -9,6 +9,11 @@
     <h2 class="text-2xl font-bold mb-4 text-gray-800">Recent Odd/Even Splits by Draw Date</h2>
     <p class="text-gray-700 mb-4">This table shows the odd/even distribution of white balls for each draw over the last six months. "Odd/Even Split" refers to the count of odd vs. even white balls (e.g., 3 Odd / 2 Even). It also includes the sum of the white balls and any numbers from your predefined 'Group A' that appeared in the draw.</p>
 
+    {% block content %}
+<div class="card p-6 bg-white rounded-lg shadow-lg">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">Group A Numbers</h2>
+    <p class="text-gray-700 mb-4">Group A Numbers: Numbers historically considered "hot" or significant (3, 5, 6, 7, 9, 11, 15, 16, 18, 21, 23, 24, 27, 31, 32, 33, 36, 42, 44, 45, 48, 50, 51, 54, 55, 60, 66, 69).</p>
+    
     {% if odd_even_trends %}
         <div class="overflow-x-auto">
             <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
