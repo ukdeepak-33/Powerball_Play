@@ -2657,7 +2657,17 @@ def api_consecutive_yearly_trends_route():
         'years': yearly_consecutive_data_full['years'],
         'all_consecutive_pairs_flat': yearly_consecutive_data_full['all_consecutive_pairs_flat'] # Changed key
     })
+# Add this new function to your index.py file
+@app.route('/consecutive_trends_by_year/<int:year>')
+def consecutive_trends_by_year(year):
+    # Assuming 'df' is your global DataFrame of historical data
+    df_year = df[(df['Draw Date_dt'].dt.year == year)].copy()
 
+    # Call your existing function to calculate the consecutive trends for the filtered data
+    trends = calculate_consecutive_trends(df_year)
+
+    # Return the data as a JSON object
+    return jsonify(trends)
 
 @app.route('/triplets_analysis')
 def triplets_analysis_route():
