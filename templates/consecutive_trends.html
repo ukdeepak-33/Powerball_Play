@@ -21,144 +21,357 @@
 
     {# Recent Consecutive Trends Card #}
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Recent Consecutive Trends</h2>
-        {% if consecutive_trends %}
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Draw Date</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Consecutive Pairs</th>
-                        </tr>
-                    </thead>
-                    <tbody id="trends-table-body" class="bg-white divide-y divide-gray-200">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Recent Consecutive Trends (Last 6 Months)</h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-full bg-white rounded-lg shadow overflow-hidden">
+                <thead class="bg-blue-100 text-blue-800">
+                    <tr>
+                        <th class="py-3 px-4 text-left text-sm font-semibold">Draw Date</th>
+                        <th class="py-3 px-4 text-left text-sm font-semibold">Consecutive Numbers Present?</th>
+                        <th class="py-3 px-4 text-left text-sm font-semibold">Pairs</th>
+                    </tr>
+                </thead>
+                <tbody id="trends-table-body" class="divide-y divide-gray-200">
+                    {# Initial data for the last 6 months #}
+                    {% if consecutive_trends %}
                         {% for trend in consecutive_trends %}
-                        <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ trend.draw_date }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ trend.consecutive_pairs }}</td>
+                        <tr class="hover:bg-gray-50">
+                            <td class="py-3 px-4 text-sm text-gray-700">{{ trend.draw_date }}</td>
+                            <td class="py-3 px-4 text-sm text-gray-700">
+                                <span class="px-2 py-1 rounded-full text-xs font-semibold 
+                                    {% if trend.consecutive_present == 'Yes' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                                    {{ trend.consecutive_present }}
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 text-sm text-gray-700">
+                                {% if trend.consecutive_pairs %}
+                                    {% for pair in trend.consecutive_pairs %}
+                                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white text-sm font-bold mr-1">{{ pair[0] }}</span>
+                                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white text-sm font-bold mr-2">{{ pair[1] }}</span>
+                                    {% endfor %}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% else %}
-            <p class="text-gray-500">No recent consecutive number trends available.</p>
-        {% endif %}
+                    {% else %}
+                        <tr>
+                            <td colspan="3" class="py-3 px-4 text-sm text-gray-600 text-center">No recent consecutive trends data available.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    {# Yearly Trends Chart Card #}
+    {# Yearly Consecutive Trends Chart Card #}
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Consecutive Numbers Trends Over the Years</h2>
-        <p class="text-gray-600 mb-4">Click on a bar to see the trends for that year.</p>
-        <div class="mb-4">
-            <canvas id="yearly-consecutive-chart"></canvas>
-        </div>
-
-        {# Most Frequent Pairs Section #}
-        <div class="mt-8">
-            <h3 class="text-xl font-bold mb-2 text-gray-800">Most Frequent Consecutive Pairs</h3>
-            <div id="frequent-consecutive-pairs-list" class="flex flex-wrap gap-2 text-sm text-gray-600">
-                {% for pair in most_frequent_pairs %}
-                <span class="bg-gray-200 px-3 py-1 rounded-full">{{ pair.pair }} ({{ pair.count }})</span>
-                {% endfor %}
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Consecutive Numbers Trends Over Years</h2>
+        <p class="text-gray-600 mb-4">This chart shows the percentage of draws each year that contained at least one consecutive pair of white balls. Click on a bar to see the trends for that year.</p>
+        
+        <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-4 sm:space-y-0">
+            <div class="flex-1">
+                <label for="yearSelect" class="block text-gray-700 text-sm font-bold mb-2">Filter by Year(s):</label>
+                <select id="yearSelect" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300" multiple>
+                    {# Populate with years from backend, default to all selected #}
+                    {% for year in years_for_dropdown %}
+                        <option value="{{ year }}" selected>{{ year }}</option>
+                    {% endfor %}
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple years.</p>
+            </div>
+            <div class="flex-1">
+                <label for="sortOrderSelect" class="block text-gray-700 text-sm font-bold mb-2">Sort Pairs By:</label>
+                <select id="sortOrderSelect" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300">
+                    <option value="count_desc">Most Frequent First</option>
+                    <option value="count_asc">Least Frequent First</option>
+                    <option value="pair_asc">Pair Numbers Ascending</option>
+                </select>
             </div>
         </div>
+
+        <div class="relative h-96 mb-8"> {# Fixed height for chart container, added margin-bottom #}
+            <canvas id="yearlyConsecutiveChart"></canvas>
+        </div>
+
+        {# Section for displaying specific consecutive pairs with dates #}
+        <div id="yearlyConsecutivePairsSection">
+            <h3 class="text-xl font-bold mb-4 text-gray-800">Consecutive Pairs in Selected Year(s) (with Dates)</h3>
+            <div id="consecutivePairsDisplay" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <p class="text-gray-600 col-span-full">Select one or more years above to see the most frequent consecutive pairs.</p>
+            </div>
+        </div>
+
     </div>
+
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const trendsData = JSON.parse('{{ yearly_trends | tojson }}');
-        const labels = trendsData.map(d => d.year);
-        const data = trendsData.map(d => d.percentage);
+        // Use the correct variable name passed from Flask
+        const allYearsData = {{ yearly_consecutive_percentage_data | tojson }};
+        const allConsecutivePairsFlat = {{ all_consecutive_pairs_flat | tojson }};
 
-        // Chart configuration
-        const ctx = document.getElementById('yearly-consecutive-chart').getContext('2d');
-        const yearlyChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Percentage of Draws with Consecutive Numbers',
-                    data: data,
-                    backgroundColor: 'rgba(75, 192, 192, 0.6)',
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    x: {
+        const yearSelect = document.getElementById('yearSelect');
+        const sortOrderSelect = document.getElementById('sortOrderSelect');
+        const yearlyConsecutiveChartCtx = document.getElementById('yearlyConsecutiveChart').getContext('2d');
+        const consecutivePairsDisplay = document.getElementById('consecutivePairsDisplay');
+        let yearlyChart;
+
+        // Function to render the consecutive pairs list
+        function renderConsecutivePairs() {
+            const selectedYears = Array.from(yearSelect.selectedOptions).map(option => parseInt(option.value));
+            const sortOrder = sortOrderSelect.value;
+
+            let filteredAndSortedPairs = [];
+
+            // Filter by selected years
+            if (selectedYears.length > 0) {
+                allConsecutivePairsFlat.forEach(item => {
+                    const datesInSelectedYears = item.dates.filter(date => {
+                        const year = new Date(date).getFullYear();
+                        return selectedYears.includes(year);
+                    });
+
+                    if (datesInSelectedYears.length > 0) {
+                        filteredAndSortedPairs.push({
+                            pair: item.pair,
+                            count: datesInSelectedYears.length,
+                            dates: datesInSelectedYears
+                        });
+                    }
+                });
+            } else {
+                // If no years selected, show all pairs (or none, depending on desired behavior)
+                filteredAndSortedPairs = JSON.parse(JSON.stringify(allConsecutivePairsFlat));
+            }
+
+            // Apply sorting based on the selected order
+            if (sortOrder === 'count_desc') {
+                filteredAndSortedPairs.sort((a, b) => b.count - a.count || a.pair[0] - b.pair[0]);
+            } else if (sortOrder === 'count_asc') {
+                filteredAndSortedPairs.sort((a, b) => a.count - b.count || a.pair[0] - b.pair[0]);
+            } else if (sortOrder === 'pair_asc') {
+                filteredAndSortedPairs.sort((a, b) => a.pair[0] - b.pair[0] || a.pair[1] - b.pair[1]);
+            }
+
+            consecutivePairsDisplay.innerHTML = ''; // Clear previous content
+
+            if (filteredAndSortedPairs.length > 0) {
+                filteredAndSortedPairs.forEach(item => {
+                    const pairElement = document.createElement('div');
+                    pairElement.className = 'bg-blue-50 p-4 rounded-lg shadow-sm flex flex-col space-y-2';
+                    
+                    const datesHtml = item.dates.map(date => `<span class="inline-block bg-blue-200 text-blue-800 text-xs px-2 py-1 rounded-full">${date}</span>`).join(' ');
+
+                    pairElement.innerHTML = `
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold">${item.pair[0]}</span>
+                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold">${item.pair[1]}</span>
+                            </div>
+                            <span class="text-gray-800 font-semibold">Appeared: ${item.count} times</span>
+                        </div>
+                        <details class="text-sm text-gray-700">
+                            <summary class="cursor-pointer font-medium text-blue-700 hover:text-blue-900">Show Dates (${item.dates.length})</summary>
+                            <div class="mt-2 flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1 bg-gray-100 rounded-md">
+                                ${datesHtml}
+                            </div>
+                        </details>
+                    `;
+                    consecutivePairsDisplay.appendChild(pairElement);
+                });
+            } else {
+                consecutivePairsDisplay.innerHTML = '<p class="text-gray-600 col-span-full">No consecutive pairs found for the selected year(s).</p>';
+            }
+        }
+
+        // Function to fetch and render yearly consecutive trends chart
+        function renderChart() {
+            const selectedYears = Array.from(yearSelect.selectedOptions).map(option => parseInt(option.value));
+            const filteredData = allYearsData.filter(item => selectedYears.includes(item.year));
+
+            const labels = filteredData.map(item => item.year.toString());
+            const percentages = filteredData.map(item => item.percentage);
+            const totalDraws = filteredData.map(item => item.total_draws);
+            const consecutiveDraws = filteredData.map(item => item.consecutive_draws);
+
+            if (yearlyChart) {
+                yearlyChart.destroy(); // Destroy existing chart before creating a new one
+            }
+
+            yearlyChart = new Chart(yearlyConsecutiveChartCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '% of Draws with Consecutive Numbers',
+                        data: percentages,
+                        backgroundColor: 'rgba(59, 130, 246, 0.8)', // Tailwind blue-500
+                        borderColor: 'rgba(37, 99, 235, 1)', // Tailwind blue-600
+                        borderWidth: 1,
+                        borderRadius: 8, // Rounded corners for bars
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
                         title: {
                             display: true,
-                            text: 'Year',
-                            font: { size: 14, weight: 'bold' }
+                            text: 'Yearly Consecutive Number Trends',
+                            font: {
+                                size: 18,
+                                weight: 'bold'
+                            },
+                            color: '#374151' // Tailwind gray-700
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const index = context.dataIndex;
+                                    const year = labels[index];
+                                    const percentage = percentages[index];
+                                    const total = totalDraws[index];
+                                    const consecutive = consecutiveDraws[index];
+                                    return `Year: ${year}\nPercentage: ${percentage}%\nTotal Draws: ${total}\nConsecutive Draws: ${consecutive}`;
+                                }
+                            }
                         }
                     },
-                    y: {
-                        title: {
-                            display: true,
-                            text: 'Percentage (%)',
-                            font: { size: 14, weight: 'bold' }
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Year',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                },
+                                color: '#4b5563' // Tailwind gray-600
+                            },
+                            grid: {
+                                display: false
+                            }
                         },
-                        beginAtZero: true,
-                        max: 100,
-                        ticks: {
-                            callback: function(value) { return value + '%'; }
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Percentage (%)',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                },
+                                color: '#4b5563' // Tailwind gray-600
+                            },
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    },
+                    // Add the onClick event listener here for chart interactivity
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            const clickedElementIndex = elements[0].index;
+                            const year = yearlyChart.data.labels[clickedElementIndex];
+                            fetchTrendsForYear(year);
                         }
                     }
-                },
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                },
-                // Add the onClick event listener here
-                onClick: (event, elements) => {
-                    if (elements.length > 0) {
-                        const clickedElementIndex = elements[0].index;
-                        const year = yearlyChart.data.labels[clickedElementIndex];
-                        fetchTrendsForYear(year);
-                    }
                 }
-            }
-        });
-    });
-
-    function fetchTrendsForYear(year) {
-        // This makes a GET request to the new endpoint you created in index.py
-        fetch(`/consecutive_trends_by_year/${year}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                updateTrendsTable(data);
-            })
-            .catch(error => console.error('Error fetching data:', error));
-    }
-
-    function updateTrendsTable(trends) {
-        const tableBody = document.getElementById('trends-table-body');
-        tableBody.innerHTML = ''; // Clear existing table rows
-
-        if (trends && trends.length > 0) {
-            trends.forEach(trend => {
-                const row = tableBody.insertRow();
-                row.insertCell(0).innerText = trend.draw_date;
-                row.insertCell(1).innerText = trend.consecutive_pairs;
             });
-        } else {
-            const row = tableBody.insertRow();
-            const cell = row.insertCell(0);
-            cell.colSpan = 2;
-            cell.innerText = `No consecutive trends found for this year.`;
-            cell.classList.add('text-center', 'py-4', 'text-gray-500');
         }
-    }
+
+        // Function to fetch and update the "Recent Consecutive Trends" table for a specific year
+        function fetchTrendsForYear(year) {
+            // Update the heading to reflect the selected year
+            document.querySelector('.card h2').innerText = `Consecutive Trends for ${year}`;
+
+            // Make a GET request to the new endpoint you created in index.py
+            fetch(`/api/consecutive_trends_by_year/${year}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    updateTrendsTable(data);
+                })
+                .catch(error => console.error('Error fetching data for year:', error));
+        }
+
+        // Function to update the "Recent Consecutive Trends" table
+        function updateTrendsTable(trends) {
+            const tableBody = document.getElementById('trends-table-body');
+            tableBody.innerHTML = ''; // Clear existing table rows
+
+            if (trends && trends.length > 0) {
+                trends.forEach(trend => {
+                    const row = tableBody.insertRow();
+                    row.className = 'hover:bg-gray-50';
+
+                    // Draw Date
+                    const dateCell = row.insertCell(0);
+                    dateCell.className = 'py-3 px-4 text-sm text-gray-700';
+                    dateCell.innerText = trend.draw_date;
+
+                    // Consecutive Numbers Present?
+                    const presentCell = row.insertCell(1);
+                    presentCell.className = 'py-3 px-4 text-sm text-gray-700';
+                    const presentSpan = document.createElement('span');
+                    presentSpan.className = `px-2 py-1 rounded-full text-xs font-semibold ${trend.consecutive_present === 'Yes' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+                    presentSpan.innerText = trend.consecutive_present;
+                    presentCell.appendChild(presentSpan);
+
+                    // Pairs
+                    const pairsCell = row.insertCell(2);
+                    pairsCell.className = 'py-3 px-4 text-sm text-gray-700';
+                    if (trend.consecutive_pairs && trend.consecutive_pairs.length > 0) {
+                        trend.consecutive_pairs.forEach(pair => {
+                            const span1 = document.createElement('span');
+                            span1.className = 'inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white text-sm font-bold mr-1';
+                            span1.innerText = pair[0];
+                            pairsCell.appendChild(span1);
+
+                            const span2 = document.createElement('span');
+                            span2.className = 'inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white text-sm font-bold mr-2';
+                            span2.innerText = pair[1];
+                            pairsCell.appendChild(span2);
+                        });
+                    } else {
+                        pairsCell.innerText = 'N/A';
+                    }
+                });
+            } else {
+                const row = tableBody.insertRow();
+                const cell = row.insertCell(0);
+                cell.colSpan = 3; // Span all 3 columns
+                cell.innerText = `No consecutive trends found for the selected year.`;
+                cell.classList.add('py-3', 'px-4', 'text-sm', 'text-gray-600', 'text-center');
+            }
+        }
+
+        // Event listener for year selection change (dropdown)
+        yearSelect.addEventListener('change', () => {
+            renderChart(); // Update chart based on dropdown
+            renderConsecutivePairs(); // Update pairs list based on dropdown
+        });
+        
+        // Event listener for sort order change (dropdown)
+        sortOrderSelect.addEventListener('change', () => {
+            renderConsecutivePairs(); // Only update pairs list
+        });
+
+        // Initial render: Select all options by default on page load
+        Array.from(yearSelect.options).forEach(option => option.selected = true);
+        renderChart();
+        renderConsecutivePairs();
+    });
 </script>
 {% endblock %}
