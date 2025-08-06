@@ -2123,7 +2123,25 @@ def _summarize_for_ai(df_source):
         summary_parts.append(f"Consecutive numbers appeared in {consecutive_percentage:.2f}% of recent draws (last 6 months).")
 
     return "\n".join(summary_parts)
+    
+# Function to get consecutive trends for a specific DataFrame (e.g., filtered by year)
+def get_consecutive_trends_for_df(df_to_analyze):
+    if df_to_analyze.empty:
+        return []
 
+    trend_data = []
+    for idx, row in df_to_analyze.iterrows():
+        # Ensure numbers are integers before sorting and finding pairs
+        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+        
+        consecutive_pairs = _find_consecutive_pairs(white_balls)
+        
+        trend_data.append({
+            'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
+            'consecutive_present': "Yes" if consecutive_pairs else "No",
+            'consecutive_pairs': consecutive_pairs # This will be a list of lists, e.g., [[1,2], [5,6]]
+        })
+    return trend_data
 
 initialize_core_data() 
 
