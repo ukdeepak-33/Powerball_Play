@@ -819,13 +819,34 @@ def get_co_occurrence_matrix(df_source):
     
     return co_occurrence_data, max_co_occurrence
 
-def _find_consecutive_pairs(numbers_list):
-    pairs = []
-    sorted_nums = sorted(numbers_list)
-    for i in range(len(sorted_nums) - 1):
-        if sorted_nums[i] + 1 == sorted_nums[i+1]:
-            pairs.append([sorted_nums[i], sorted_nums[i+1]])
-    return pairs
+def _find_consecutive_sequences(numbers_list):
+    """
+    Identifies and returns all consecutive sequences (pairs, triplets, etc.)
+    from a list of numbers.
+    Example: [1, 2, 3, 5, 6] -> [[1, 2, 3], [5, 6]]
+    """
+    sequences = []
+    if not numbers_list:
+        return sequences
+
+    sorted_nums = sorted(list(set(numbers_list))) # Ensure unique and sorted
+    if not sorted_nums:
+        return sequences
+
+    current_sequence = [sorted_nums[0]]
+    for i in range(1, len(sorted_nums)):
+        if sorted_nums[i] == current_sequence[-1] + 1:
+            current_sequence.append(sorted_nums[i])
+        else:
+            if len(current_sequence) >= 2: # Only add sequences of 2 or more
+                sequences.append(current_sequence)
+            current_sequence = [sorted_nums[i]]
+    
+    # Add the last sequence if it's long enough
+    if len(current_sequence) >= 2:
+        sequences.append(current_sequence)
+        
+    return sequences
 
 def get_consecutive_numbers_trends(df_source, last_draw_date_str):
     if df_source.empty or last_draw_date_str == 'N/A':
@@ -850,7 +871,7 @@ def get_consecutive_numbers_trends(df_source, last_draw_date_str):
     for idx, row in recent_data.iterrows():
         white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])]
         
-        consecutive_pairs = _find_consecutive_pairs(white_balls)
+        consecutive_sequences = _find_consecutive_sequences(white_balls)
         
         trend_data.append({
             'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
@@ -1876,15 +1897,15 @@ def get_consecutive_numbers_yearly_trends(df_source):
                 white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
                 draw_date_str = row['Draw Date_dt'].strftime('%Y-%m-%d')
                 
-                current_draw_consecutive_pairs = _find_consecutive_pairs(white_balls)
+                current_draw_consecutive_sequences = _find_consecutive_sequences(white_balls)
                 
-                if current_draw_consecutive_pairs:
+                if current_draw_consecutive_sequences:
                     consecutive_draws_count += 1
-                    for pair in current_draw_consecutive_pairs:
-                        pair_tuple = tuple(pair)
-                        all_consecutive_pairs_aggregated[pair_tuple]['count'] += 1
-                        all_consecutive_pairs_aggregated[pair_tuple]['dates'].append(draw_date_str)
-            
+                    for sequence in current_draw_consecutive_sequences: # Iterate through sequences
+                        sequence_tuple = tuple(sequence) # Use tuple for dict key
+                        all_consecutive_pairs_aggregated[sequence_tuple]['count'] += 1
+                        all_consecutive_pairs_aggregated[sequence_tuple]['dates'].append(draw_date_str)
+                        
             percentage = round((consecutive_draws_count / total_draws_in_year) * 100, 2)
         else:
             percentage = 0.0
@@ -1898,16 +1919,16 @@ def get_consecutive_numbers_yearly_trends(df_source):
 
     # Convert the aggregated dictionary to a flat list of dictionaries
     flat_consecutive_pairs_list = []
-    for pair_tuple, data in all_consecutive_pairs_aggregated.items():
+    for sequence_tuple, data in all_consecutive_pairs_aggregated.items(): # Changed to sequence_tuple
         flat_consecutive_pairs_list.append({
-            'pair': list(pair_tuple),
+            'sequence': list(sequence_tuple), # Changed key to 'sequence'
             'count': data['count'],
             'dates': sorted(list(set(data['dates'])), reverse=True) # Deduplicate and sort dates descending
         })
     
-    # Sort the flat list by count (descending) then by pair (ascending)
-    flat_consecutive_pairs_list.sort(key=lambda x: (-x['count'], x['pair']))
-
+    # Sort the flat list by count (descending) then by sequence (ascending)
+    flat_consecutive_pairs_list.sort(key=lambda x: (-x['count'], x['sequence'])) # Changed key to 'sequence'
+    
     yearly_trends.sort(key=lambda x: x['year'])
     
     return {
@@ -2134,12 +2155,12 @@ def get_consecutive_trends_for_df(df_to_analyze):
         # Ensure numbers are integers before sorting and finding pairs
         white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
         
-        consecutive_pairs = _find_consecutive_pairs(white_balls)
+        consecutive_sequences = _find_consecutive_sequences(white_balls)
         
         trend_data.append({
             'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
             'consecutive_present': "Yes" if consecutive_pairs else "No",
-            'consecutive_pairs': consecutive_pairs # This will be a list of lists, e.g., [[1,2], [5,6]]
+            'consecutive_sequences': consecutive_sequences # Changed key to sequences
         })
     return trend_data
 
