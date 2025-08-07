@@ -21,18 +21,18 @@
 
     {# Recent Consecutive Trends Card #}
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Recent Consecutive Trends (Last 6 Months)</h2>
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Recent Consecutive Trends (Last 12 Months)</h2>
         <div class="overflow-x-auto">
             <table class="min-w-full bg-white rounded-lg shadow overflow-hidden">
                 <thead class="bg-blue-100 text-blue-800">
                     <tr>
                         <th class="py-3 px-4 text-left text-sm font-semibold">Draw Date</th>
                         <th class="py-3 px-4 text-left text-sm font-semibold">Consecutive Numbers Present?</th>
-                        <th class="py-3 px-4 text-left text-sm font-semibold">Pairs</th>
+                        <th class="py-3 px-4 text-left text-sm font-semibold">Sequences</th> {# Changed from Pairs to Sequences #}
                     </tr>
                 </thead>
                 <tbody id="trends-table-body" class="divide-y divide-gray-200">
-                    {# Initial data for the last 6 months #}
+                    {# Initial data for the last 12 months #}
                     {% if consecutive_trends %}
                         {% for trend in consecutive_trends %}
                         <tr class="hover:bg-gray-50">
@@ -69,7 +69,7 @@
     {# Yearly Consecutive Trends Chart Card #}
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Consecutive Numbers Trends Over Years</h2>
-        <p class="text-gray-600 mb-4">This chart shows the percentage of draws each year that contained at least one consecutive pair of white balls. Click on a bar to see the trends for that year.</p>
+        <p class="text-gray-600 mb-4">This chart shows the percentage of draws each year that contained at least one consecutive sequence of white balls. Click on a bar to see the trends for that year.</p>
         
         <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-4 sm:space-y-0">
             <div class="flex-1">
@@ -83,11 +83,11 @@
                 <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple years.</p>
             </div>
             <div class="flex-1">
-                <label for="sortOrderSelect" class="block text-gray-700 text-sm font-bold mb-2">Sort Pairs By:</label>
+                <label for="sortOrderSelect" class="block text-gray-700 text-sm font-bold mb-2">Sort Sequences By:</label> {# Changed from Pairs to Sequences #}
                 <select id="sortOrderSelect" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300">
                     <option value="count_desc">Most Frequent First</option>
                     <option value="count_asc">Least Frequent First</option>
-                    <option value="pair_asc">Pair Numbers Ascending</option>
+                    <option value="sequence_asc">Sequence Numbers Ascending</option> {# Changed from Pair to Sequence #}
                 </select>
             </div>
         </div>
@@ -96,11 +96,11 @@
             <canvas id="yearlyConsecutiveChart"></canvas>
         </div>
 
-        {# Section for displaying specific consecutive pairs with dates #}
+        {# Section for displaying specific consecutive sequences with dates #}
         <div id="yearlyConsecutivePairsSection">
-            <h3 class="text-xl font-bold mb-4 text-gray-800">Consecutive Pairs in Selected Year(s) (with Dates)</h3>
+            <h3 class="text-xl font-bold mb-4 text-gray-800">Consecutive Sequences in Selected Year(s) (with Dates)</h3> {# Changed from Pairs to Sequences #}
             <div id="consecutivePairsDisplay" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <p class="text-gray-600 col-span-full">Select one or more years above to see the most frequent consecutive pairs.</p>
+                <p class="text-gray-600 col-span-full">Select one or more years above to see the most frequent consecutive sequences.</p> {# Changed from Pairs to Sequences #}
             </div>
         </div>
 
@@ -121,8 +121,8 @@
         const consecutivePairsDisplay = document.getElementById('consecutivePairsDisplay');
         let yearlyChart;
 
-        // Function to render the consecutive pairs list
-        function renderConsecutivePairs() {
+        // Function to render the consecutive sequences list
+        function renderConsecutivePairs() { // Function name remains for now, but it renders sequences
             const selectedYears = Array.from(yearSelect.selectedOptions).map(option => parseInt(option.value));
             const sortOrder = sortOrderSelect.value;
 
@@ -138,25 +138,28 @@
 
                     if (datesInSelectedYears.length > 0) {
                         filteredAndSortedPairs.push({
-                            pair: item.pair,
+                            sequence: item.sequence, // <--- FIX: Use 'sequence' here
                             count: datesInSelectedYears.length,
                             dates: datesInSelectedYears
                         });
                     }
                 });
             } else {
-                // If no years selected, show all pairs (or none, depending on desired behavior)
+                // If no years selected, show all sequences
                 filteredAndSortedPairs = JSON.parse(JSON.stringify(allConsecutivePairsFlat));
             }
 
             // Apply sorting based on the selected order
             if (sortOrder === 'count_desc') {
-                filteredAndSortedPairs.sort((a, b) => b.count - a.count || a.pair[0] - b.pair[0]);
+                filteredAndSortedPairs.sort((a, b) => b.count - a.count || (a.sequence && b.sequence ? a.sequence[0] - b.sequence[0] : 0));
             } else if (sortOrder === 'count_asc') {
-                filteredAndSortedPairs.sort((a, b) => a.count - b.count || a.pair[0] - b.pair[0]);
-            } else if (sortOrder === 'pair_asc') {
-                // Sort by the first number in the sequence
-                filteredAndSortedPairs.sort((a, b) => a.sequence[0] - b.sequence[0]);
+                filteredAndSortedPairs.sort((a, b) => a.count - b.count || (a.sequence && b.sequence ? a.sequence[0] - b.sequence[0] : 0));
+            } else if (sortOrder === 'sequence_asc') { // Changed from pair_asc to sequence_asc
+                // Sort by the first number in the sequence, handling potential undefined sequences
+                filteredAndSortedPairs.sort((a, b) => {
+                    if (!a.sequence || !b.sequence) return 0; // Handle cases where sequence might be missing
+                    return a.sequence[0] - b.sequence[0];
+                });
             }
 
             consecutivePairsDisplay.innerHTML = ''; // Clear previous content
@@ -172,8 +175,8 @@
                         <div class="flex items-center justify-between">
                             <div class="flex items-center space-x-2">
                                 <span class="inline-flex items-center justify-center rounded-full bg-blue-600 text-white text-sm font-bold px-2 py-1">
-                                ${item.sequence.join(', ')} {# Changed to sequence and join #}
-                            </span>
+                                    ${item.sequence.join(', ')} {# Changed to sequence and join #}
+                                </span>
                             </div>
                             <span class="text-gray-800 font-semibold">Appeared: ${item.count} times</span>
                         </div>
@@ -187,9 +190,10 @@
                     consecutivePairsDisplay.appendChild(pairElement);
                 });
             } else {
-                consecutivePairsDisplay.innerHTML = '<p class="text-gray-600 col-span-full">No consecutive pairs found for the selected year(s).</p>';
+                consecutivePairsDisplay.innerHTML = '<p class="text-gray-600 col-span-full">No consecutive sequences found for the selected year(s).</p>';
             }
         }
+
 
         // Function to fetch and render yearly consecutive trends chart
         function renderChart() {
@@ -332,15 +336,14 @@
                     presentSpan.innerText = trend.consecutive_present;
                     presentCell.appendChild(presentSpan);
 
-                   // Sequences (Pairs, Triplets, etc.)
-                    const sequencesCell = row.insertCell(2); // Changed variable name for clarity
+                    // Sequences
+                    const sequencesCell = row.insertCell(2);
                     sequencesCell.className = 'py-3 px-4 text-sm text-gray-700';
-                    if (trend.consecutive_sequences && trend.consecutive_sequences.length > 0) { // Changed to consecutive_sequences
-                        trend.consecutive_sequences.forEach(sequence => { // Iterate through sequences
+                    if (trend.consecutive_sequences && trend.consecutive_sequences.length > 0) {
+                        trend.consecutive_sequences.forEach(sequence => {
                             const span = document.createElement('span');
-                            // Adjusted styling for variable length sequences
                             span.className = 'inline-flex items-center justify-center rounded-full bg-blue-500 text-white text-sm font-bold px-2 py-1 mr-2';
-                            span.innerText = sequence.join(', '); // Join numbers in sequence with comma
+                            span.innerText = sequence.join(', ');
                             sequencesCell.appendChild(span);
                         });
                     } else {
@@ -359,12 +362,12 @@
         // Event listener for year selection change (dropdown)
         yearSelect.addEventListener('change', () => {
             renderChart(); // Update chart based on dropdown
-            renderConsecutivePairs(); // Update pairs list based on dropdown
+            renderConsecutivePairs(); // Update sequences list based on dropdown
         });
         
         // Event listener for sort order change (dropdown)
         sortOrderSelect.addEventListener('change', () => {
-            renderConsecutivePairs(); // Only update pairs list
+            renderConsecutivePairs(); // Only update sequences list
         });
 
         // Initial render: Select all options by default on page load
