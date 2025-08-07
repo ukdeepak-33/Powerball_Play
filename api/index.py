@@ -857,12 +857,14 @@ def get_consecutive_numbers_trends(df_source, last_draw_date_str):
     except Exception as e:
         return []
 
-    six_months_ago = last_draw_date - pd.DateOffset(months=6)
+    # Change this line from 6 months to 12 months (1 year)
+    one_year_ago = last_draw_date - pd.DateOffset(years=1) # Changed from months=6 to years=1
 
     if 'Draw Date_dt' not in df_source.columns or not pd.api.types.is_datetime64_any_dtype(df_source['Draw Date_dt']):
         return []
 
-    recent_data = df_source[df_source['Draw Date_dt'] >= six_months_ago].copy()
+    # Filter data for the last 12 months
+    recent_data = df_source[df_source['Draw Date_dt'] >= one_year_ago].copy() # Changed to one_year_ago
     recent_data = recent_data.sort_values(by='Draw Date_dt', ascending=False)
     if recent_data.empty:
         return []
@@ -871,12 +873,15 @@ def get_consecutive_numbers_trends(df_source, last_draw_date_str):
     for idx, row in recent_data.iterrows():
         white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])]
         
+        # Call the new function _find_consecutive_sequences
         consecutive_sequences = _find_consecutive_sequences(white_balls)
         
         trend_data.append({
             'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
-            'consecutive_present': "Yes" if consecutive_pairs else "No",
-            'consecutive_pairs': consecutive_pairs
+            # Use the new variable name 'consecutive_sequences'
+            'consecutive_present': "Yes" if consecutive_sequences else "No",
+            # Use the new key 'consecutive_sequences'
+            'consecutive_sequences': consecutive_sequences
         })
     
     return trend_data
