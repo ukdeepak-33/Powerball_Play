@@ -44,10 +44,11 @@
                                 </span>
                             </td>
                             <td class="py-3 px-4 text-sm text-gray-700">
-                                {% if trend.consecutive_pairs %}
-                                    {% for pair in trend.consecutive_pairs %}
-                                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white text-sm font-bold mr-1">{{ pair[0] }}</span>
-                                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white text-sm font-bold mr-2">{{ pair[1] }}</span>
+                                {% if trend.consecutive_sequences %} {# Changed to consecutive_sequences #}
+                                    {% for sequence in trend.consecutive_sequences %} {# Iterate through sequences #}
+                                        <span class="inline-flex items-center justify-center rounded-full bg-blue-500 text-white text-sm font-bold px-2 py-1 mr-2"> {# Adjusted styling for variable length #}
+                                            {{ sequence | join(', ') }} {# Join numbers in sequence with comma #}
+                                        </span>
                                     {% endfor %}
                                 {% else %}
                                     N/A
@@ -154,7 +155,8 @@
             } else if (sortOrder === 'count_asc') {
                 filteredAndSortedPairs.sort((a, b) => a.count - b.count || a.pair[0] - b.pair[0]);
             } else if (sortOrder === 'pair_asc') {
-                filteredAndSortedPairs.sort((a, b) => a.pair[0] - b.pair[0] || a.pair[1] - b.pair[1]);
+                // Sort by the first number in the sequence
+                filteredAndSortedPairs.sort((a, b) => a.sequence[0] - b.sequence[0]);
             }
 
             consecutivePairsDisplay.innerHTML = ''; // Clear previous content
@@ -169,8 +171,9 @@
                     pairElement.innerHTML = `
                         <div class="flex items-center justify-between">
                             <div class="flex items-center space-x-2">
-                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold">${item.pair[0]}</span>
-                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold">${item.pair[1]}</span>
+                                <span class="inline-flex items-center justify-center rounded-full bg-blue-600 text-white text-sm font-bold px-2 py-1">
+                                ${item.sequence.join(', ')} {# Changed to sequence and join #}
+                            </span>
                             </div>
                             <span class="text-gray-800 font-semibold">Appeared: ${item.count} times</span>
                         </div>
@@ -329,23 +332,19 @@
                     presentSpan.innerText = trend.consecutive_present;
                     presentCell.appendChild(presentSpan);
 
-                    // Pairs
-                    const pairsCell = row.insertCell(2);
-                    pairsCell.className = 'py-3 px-4 text-sm text-gray-700';
-                    if (trend.consecutive_pairs && trend.consecutive_pairs.length > 0) {
-                        trend.consecutive_pairs.forEach(pair => {
-                            const span1 = document.createElement('span');
-                            span1.className = 'inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white text-sm font-bold mr-1';
-                            span1.innerText = pair[0];
-                            pairsCell.appendChild(span1);
-
-                            const span2 = document.createElement('span');
-                            span2.className = 'inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-500 text-white text-sm font-bold mr-2';
-                            span2.innerText = pair[1];
-                            pairsCell.appendChild(span2);
+                   // Sequences (Pairs, Triplets, etc.)
+                    const sequencesCell = row.insertCell(2); // Changed variable name for clarity
+                    sequencesCell.className = 'py-3 px-4 text-sm text-gray-700';
+                    if (trend.consecutive_sequences && trend.consecutive_sequences.length > 0) { // Changed to consecutive_sequences
+                        trend.consecutive_sequences.forEach(sequence => { // Iterate through sequences
+                            const span = document.createElement('span');
+                            // Adjusted styling for variable length sequences
+                            span.className = 'inline-flex items-center justify-center rounded-full bg-blue-500 text-white text-sm font-bold px-2 py-1 mr-2';
+                            span.innerText = sequence.join(', '); // Join numbers in sequence with comma
+                            sequencesCell.appendChild(span);
                         });
                     } else {
-                        pairsCell.innerText = 'N/A';
+                        sequencesCell.innerText = 'N/A';
                     }
                 });
             } else {
