@@ -2164,7 +2164,7 @@ def get_consecutive_trends_for_df(df_to_analyze):
         
         trend_data.append({
             'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
-            'consecutive_present': "Yes" if consecutive_pairs else "No",
+            'consecutive_present': "Yes" if consecutive_sequences else "No",
             'consecutive_sequences': consecutive_sequences # Changed key to sequences
         })
     return trend_data
