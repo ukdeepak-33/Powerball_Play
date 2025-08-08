@@ -3384,13 +3384,6 @@ def api_white_ball_trends_route():
         'period_labels': period_labels
     })
 
-@app.route('/triplets_analysis')
-def triplets_analysis_route():
-    # Pass df directly to the function, not for cache key serialization
-    triplets_data = get_cached_analysis('triplets_analysis', get_most_frequent_triplets, df) 
-    return render_template('triplets_analysis.html',
-                           triplets_data=triplets_data)
-
 @app.route('/grouped_patterns_analysis')
 def grouped_patterns_analysis_route():
     # Pass df directly to the function, not for cache key serialization
