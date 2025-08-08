@@ -3384,12 +3384,6 @@ def api_white_ball_trends_route():
         'period_labels': period_labels
     })
 
-@app.route('/grouped_patterns_analysis')
-def grouped_patterns_analysis_route():
-    # Pass df directly to the function, not for cache key serialization
-    patterns_data = get_cached_analysis('grouped_patterns', get_grouped_patterns_over_years, df)
-    return render_template('grouped_patterns_analysis.html', patterns_data=patterns_data)
-
 @app.route('/grouped_patterns_yearly_comparison', methods=['GET', 'POST'])
 def grouped_patterns_yearly_comparison_route():
     if df.empty:
