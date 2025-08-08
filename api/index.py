@@ -3384,33 +3384,6 @@ def api_white_ball_trends_route():
         'period_labels': period_labels
     })
 
-@app.route('/grouped_patterns_yearly_comparison', methods=['GET', 'POST'])
-def grouped_patterns_yearly_comparison_route():
-    if df.empty:
-        flash("Cannot display Grouped Patterns Yearly Comparison: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return redirect(url_for('index'))
-
-    selected_range_label = request.form.get('selected_range', '20s') 
-    
-    if selected_range_label not in NUMBER_RANGES:
-        flash(f"Invalid number range selected: {selected_range_label}. Displaying data for default range '20s'.", 'error')
-        selected_range_label = '20s' 
-
-    cache_key = f'yearly_patterns_{selected_range_label}'
-    
-    # Pass df directly to the function, not for cache key serialization
-    yearly_patterns_data = get_cached_analysis(
-        cache_key,
-        _get_yearly_patterns_for_range,
-        df,
-        selected_range_label
-    )
-
-    return render_template('grouped_patterns_yearly_comparison.html',
-                           yearly_patterns_data=yearly_patterns_data,
-                           number_ranges=NUMBER_RANGES, 
-                           selected_range=selected_range_label) 
-
 @app.route('/boundary_crossing_pairs_trends', methods=['GET', 'POST'])
 def boundary_crossing_pairs_trends_route():
     if df.empty:
