@@ -21,7 +21,7 @@
 
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
         <h2 class="text-2xl font-bold mb-4 text-gray-800">White Ball Frequency by Period</h2>
-        <p class="text-gray-700 mb-6">Explore the frequency of each white ball over different time periods. Select a period type (Year, Half-Year, Quarter) and a specific white ball number to visualize its trend.</p>
+        <p class="text-gray-700 mb-6">Explore the frequency of each white ball over different time periods. Select a period type (Year, Half-Year, Quarter) and a specific white ball number to visualize its trend. The table below provides detailed data, filterable by number ranges.</p>
 
         <div class="flex flex-col sm:flex-row sm:items-end space-y-4 sm:space-y-0 sm:space-x-4 mb-6">
             <div class="flex-1">
@@ -33,11 +33,11 @@
                 </select>
             </div>
             <div class="flex-1">
-                <label for="whiteBallNumber" class="block text-gray-700 text-sm font-bold mb-2">Select White Ball Number (1-69):</label>
+                <label for="whiteBallNumber" class="block text-gray-700 text-sm font-bold mb-2">Select White Ball Number for Chart (1-69):</label>
                 <input type="number" id="whiteBallNumber" min="1" max="69" value="1" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300">
             </div>
             <div class="flex-1">
-                <button id="fetchDataBtn" class="btn-primary w-full sm:w-auto">Show Trend</button>
+                <button id="fetchDataBtn" class="btn-primary w-full sm:w-auto">Show Trend & Data</button>
             </div>
         </div>
 
@@ -49,9 +49,28 @@
             </div>
         </div>
 
-        {# New section for the data table #}
+        {# New section for the data table with range filter #}
         <div id="dataTableContainer" class="mt-8">
-            <h3 class="text-xl font-bold mb-4 text-gray-800">Detailed Frequency Data</h3>
+            <h3 class="text-xl font-bold mb-4 text-gray-800">Detailed Frequency Data Table</h3>
+            <div class="flex flex-col sm:flex-row sm:items-end space-y-4 sm:space-y-0 sm:space-x-4 mb-6">
+                <div class="flex-1">
+                    <label for="numberRangeSelect" class="block text-gray-700 text-sm font-bold mb-2">Select Number Range for Table:</label>
+                    <select id="numberRangeSelect" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300">
+                        <option value="all">All White Balls (1-69)</option>
+                        <option value="1-10">1-10</option>
+                        <option value="11-20">11-20</option>
+                        <option value="21-30">21-30</option>
+                        <option value="31-40">31-40</option>
+                        <option value="41-50">41-50</option>
+                        <option value="51-60">51-60</option>
+                        <option value="61-69">61-69</option>
+                    </select>
+                </div>
+                <div class="flex-1">
+                    <button id="applyTableFilterBtn" class="btn-primary w-full sm:w-auto">Apply Table Filter</button>
+                </div>
+            </div>
+
             <div class="overflow-x-auto shadow-md rounded-lg">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-blue-100 text-blue-800">
@@ -83,6 +102,11 @@
 
         const tableHeaderRow = document.getElementById('tableHeaderRow');
         const tableBody = document.getElementById('tableBody');
+        const numberRangeSelect = document.getElementById('numberRangeSelect'); // New dropdown
+        const applyTableFilterBtn = document.getElementById('applyTableFilterBtn'); // New button
+
+        let cachedAllWhiteBallData = {}; // Cache for the full dataset once fetched
+        let cachedAllPeriodsLabels = []; // Cache for all period labels once fetched
 
         // Function to get background color based on period label for chart bars
         function getChartBackgroundColorForPeriod(periodLabel) {
@@ -137,40 +161,43 @@
             const selectedWhiteBallNumber = parseInt(whiteBallNumberInput.value);
 
             if (selectedWhiteBallNumber < 1 || selectedWhiteBallNumber > 69) {
-                alert('Please enter a white ball number between 1 and 69.');
+                alert('Please enter a white ball number between 1 and 69 for the chart.');
                 loadingIndicator.classList.add('hidden');
                 return;
             }
 
             try {
+                // Fetch ALL white ball data for the selected period type
                 const response = await fetch(`/api/white_ball_trends?period=${periodType}`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const data = await response.json();
 
-                const allPeriodsLabels = data.period_labels;
-                const allWhiteBallData = data.data; // Now get all white ball data
+                cachedAllPeriodsLabels = data.period_labels;
+                cachedAllWhiteBallData = data.data; // Cache the full dataset
 
-                // --- Render Chart ---
-                const whiteBallDataForChart = allWhiteBallData[selectedWhiteBallNumber];
+                // --- Render Chart (unchanged logic) ---
+                const whiteBallDataForChart = cachedAllWhiteBallData[selectedWhiteBallNumber];
 
                 if (!whiteBallDataForChart) {
-                    alert(`No data found for white ball ${selectedWhiteBallNumber} for the selected period type.`);
+                    // This scenario means no data at all for this number/period, not just that it wasn't drawn
+                    // alert(`No data found for white ball ${selectedWhiteBallNumber} for the selected period type.`);
                     if (whiteBallFrequencyChart) {
                         whiteBallFrequencyChart.destroy();
                     }
-                    tableBody.innerHTML = '<tr><td colspan="2" class="py-4 px-4 text-center text-gray-600">No data available for selected white ball and period.</td></tr>';
-                    loadingIndicator.classList.add('hidden');
-                    return;
+                    // Do not clear the table here, it will be rendered based on its own filter
+                    // tableBody.innerHTML = '<tr><td colspan="2" class="py-4 px-4 text-center text-gray-600">No data available for selected white ball and period.</td></tr>';
+                    // loadingIndicator.classList.add('hidden');
+                    // return; // Don't return, as table might still render data for other numbers
                 }
 
-                const frequencies = allPeriodsLabels.map(label => {
-                    const found = whiteBallDataForChart.find(item => item.period_label === label);
+                const frequencies = cachedAllPeriodsLabels.map(label => {
+                    const found = whiteBallDataForChart ? whiteBallDataForChart.find(item => item.period_label === label) : null;
                     return found ? found.frequency : 0;
                 });
 
-                const chartBackgroundColors = allPeriodsLabels.map(label => getChartBackgroundColorForPeriod(label));
+                const chartBackgroundColors = cachedAllPeriodsLabels.map(label => getChartBackgroundColorForPeriod(label));
 
                 if (whiteBallFrequencyChart) {
                     whiteBallFrequencyChart.destroy();
@@ -179,7 +206,7 @@
                 whiteBallFrequencyChart = new Chart(chartCtx, {
                     type: 'bar',
                     data: {
-                        labels: allPeriodsLabels,
+                        labels: cachedAllPeriodsLabels,
                         datasets: [{
                             label: `Frequency of White Ball ${selectedWhiteBallNumber}`,
                             data: frequencies,
@@ -245,32 +272,51 @@
                     }
                 });
 
-                // --- Render Table ---
-                renderTable(allWhiteBallData, allPeriodsLabels, periodType);
+                // --- Render Table based on the *cached* data and *current* table filter ---
+                renderTable();
 
             } catch (error) {
-                console.error('Error fetching or rendering chart data:', error);
+                console.error('Error fetching or rendering data:', error);
                 alert('Failed to load data. Please try again later.');
             } finally {
                 loadingIndicator.classList.add('hidden');
             }
         }
 
-        function renderTable(allWhiteBallData, allPeriodsLabels, periodType) {
+        // New function to determine the range of numbers for the table
+        function getNumbersForTableRange() {
+            const selectedRange = numberRangeSelect.value;
+            let startNum = 1;
+            let endNum = 69;
+
+            if (selectedRange !== 'all') {
+                const rangeParts = selectedRange.split('-');
+                startNum = parseInt(rangeParts[0]);
+                endNum = parseInt(rangeParts[1]);
+            }
+            return { start: startNum, end: endNum };
+        }
+
+        // Modified renderTable function to use the new number range filter
+        function renderTable() {
             // Clear previous table content
             tableHeaderRow.innerHTML = '<th class="py-3 px-4 text-left text-sm font-semibold">White Ball</th>';
             tableBody.innerHTML = '';
 
             // Add period headers to the table
-            allPeriodsLabels.forEach(label => {
+            cachedAllPeriodsLabels.forEach(label => {
                 const th = document.createElement('th');
                 th.className = 'py-3 px-4 text-left text-sm font-semibold';
                 th.textContent = label;
                 tableHeaderRow.appendChild(th);
             });
 
-            // Iterate through each white ball (1-69)
-            for (let wbNum = 1; wbNum <= 69; wbNum++) {
+            const { start, end } = getNumbersForTableRange();
+
+            let hasDataInSelectedRange = false;
+
+            // Iterate through white balls based on the selected range
+            for (let wbNum = start; wbNum <= end; wbNum++) {
                 const row = document.createElement('tr');
                 row.className = 'hover:bg-gray-50'; // Default hover state
 
@@ -279,14 +325,19 @@
                 wbCell.textContent = wbNum;
                 row.appendChild(wbCell);
 
-                // Get frequency data for the current white ball
-                const currentWbData = allWhiteBallData[wbNum] || [];
+                // Get frequency data for the current white ball from the cached data
+                const currentWbData = cachedAllWhiteBallData[wbNum] || [];
                 const currentWbDataMap = new Map(currentWbData.map(item => [item.period_label, item.frequency]));
 
-                allPeriodsLabels.forEach(label => {
+                let rowHasData = false;
+                cachedAllPeriodsLabels.forEach(label => {
                     const cell = document.createElement('td');
                     cell.className = 'py-3 px-4 text-sm text-gray-700';
-                    cell.textContent = currentWbDataMap.get(label) || 0; // Display frequency or 0 if not found
+                    const freq = currentWbDataMap.get(label) || 0;
+                    cell.textContent = freq; // Display frequency or 0 if not found
+                    if (freq > 0) {
+                        rowHasData = true; // Mark if this row actually has data
+                    }
                     
                     // Apply background color class to the cell
                     const bgClass = getTableBgClassForPeriod(label);
@@ -295,16 +346,24 @@
                     }
                     row.appendChild(cell);
                 });
-                tableBody.appendChild(row);
+                if (rowHasData) { // Only append rows that have data or are within the selected range
+                    tableBody.appendChild(row);
+                    hasDataInSelectedRange = true;
+                }
             }
 
-            if (Object.keys(allWhiteBallData).length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="' + (allPeriodsLabels.length + 1) + '" class="py-4 px-4 text-center text-gray-600">No detailed frequency data available.</td></tr>';
+            if (!hasDataInSelectedRange && cachedAllPeriodsLabels.length > 0) {
+                 tableBody.innerHTML = `<tr><td colspan="${cachedAllPeriodsLabels.length + 1}" class="py-4 px-4 text-center text-gray-600">No data found in the selected range for the current period type.</td></tr>`;
+            } else if (cachedAllPeriodsLabels.length === 0) {
+                 tableBody.innerHTML = `<tr><td colspan="2" class="py-4 px-4 text-center text-gray-600">No detailed frequency data available.</td></tr>`;
             }
         }
 
         fetchDataBtn.addEventListener('click', fetchAndRenderData);
-        periodTypeSelect.addEventListener('change', fetchAndRenderData); // Re-render when period type changes
+        periodTypeSelect.addEventListener('change', fetchAndRenderData); // Re-render everything when period type changes
+
+        // New event listener for the table filter button
+        applyTableFilterBtn.addEventListener('click', renderTable); // Only re-render table when its filter changes
 
         // Initial fetch and render when the page loads
         fetchAndRenderData();
