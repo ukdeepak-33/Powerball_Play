@@ -5,37 +5,68 @@
 {% block page_heading %}Simulate Multiple Powerball Draws{% endblock %}
 
 {% block content %}
-<div class="space-y-8">
-    <div class="card p-6 bg-white rounded-lg shadow-lg">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Simulate Draws</h2>
-        <form method="POST" action="{{ url_for('simulate_multiple_draws_route') }}" class="space-y-4">
+<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {# Flash messages display #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages space-y-3">
+                {% for category, message in messages %}
+                    <div class="p-4 rounded-lg shadow-md text-sm {% if category == 'error' %}bg-red-100 text-red-700 border border-red-200{% elif category == 'info' %}bg-blue-100 text-blue-700 border border-blue-200{% else %}bg-green-100 text-green-700 border border-green-200{% endif %} animate-fade-in">
+                        <p class="font-medium">{{ message }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Configure & Run Simulation</h2>
+        <p class="text-gray-700 mb-6">Simulate hypothetical Powerball draws based on your chosen criteria. A live animation will show a single draw, followed by aggregated frequency results.</p>
+        
+        <form id="simulationForm" class="space-y-4"> {# Changed to ID for JS submission #}
             <div class="form-group">
-                <label for="num_draws" class="form-label">Number of Simulations:</label>
-                <input type="number" id="num_draws" name="num_draws" class="form-input" min="1" value="{{ num_simulations if num_simulations else 100 }}" required>
-                <p class="text-gray-600 text-sm mt-1">Enter how many hypothetical draws you want to simulate (e.g., 100, 1000, 10000).</p>
+                <label for="num_draws" class="form-label">Number of Simulations (100-1000):</label>
+                <input type="number" id="num_draws" name="num_draws" class="form-input" min="100" max="1000" value="{{ num_simulations if num_simulations else 100 }}" required>
+                <p class="text-gray-600 text-sm mt-1">Enter how many hypothetical draws you want to simulate.</p>
             </div>
 
             <div class="form-group">
                 <label for="odd_even_choice" class="form-label">Odd/Even Split Preference:</label>
                 <select id="odd_even_choice" name="odd_even_choice" class="form-input">
                     <option value="Any">Any Split (Random)</option>
-                    <option value="All Even">All Even (5 Even / 0 Odd)</option>
-                    <option value="All Odd">All Odd (0 Even / 5 Odd)</option>
-                    <option value="3 Even / 2 Odd">3 Even / 2 Odd</option>
-                    <option value="2 Even / 3 Odd">2 Even / 3 Odd</option>
-                    <option value="1 Even / 4 Odd">1 Even / 4 Odd</option>
-                    <option value="4 Even / 1 Odd">4 Even / 1 Odd</option>
+                    <option value="All Even" {% if selected_odd_even_choice == 'All Even' %}selected{% endif %}>All Even (5 Even / 0 Odd)</option>
+                    <option value="All Odd" {% if selected_odd_even_choice == 'All Odd' %}selected{% endif %}>All Odd (0 Even / 5 Odd)</option>
+                    <option value="3 Even / 2 Odd" {% if selected_odd_even_choice == '3 Even / 2 Odd' %}selected{% endif %}>3 Even / 2 Odd</option>
+                    <option value="2 Even / 3 Odd" {% if selected_odd_even_choice == '2 Even / 3 Odd' %}selected{% endif %}>2 Odd / 3 Even</option>
+                    <option value="1 Even / 4 Odd" {% if selected_odd_even_choice == '1 Even / 4 Odd' %}selected{% endif %}>1 Even / 4 Odd</option>
+                    <option value="4 Even / 1 Odd" {% if selected_odd_even_choice == '4 Even / 1 Odd' %}selected{% endif %}>4 Even / 1 Odd</option>
                 </select>
                 <p class="text-gray-600 text-sm mt-1">Choose a specific odd/even distribution for the white balls in the simulation.</p>
             </div>
             
-            <button type="submit" class="btn-primary w-full md:w-auto">Run Simulation</button>
+            <button type="submit" id="runSimulationBtn" class="btn-primary w-full md:w-auto">Run Simulation</button>
         </form>
     </div>
 
-    {% if simulated_white_ball_freq and simulated_powerball_freq %}
-    <div class="card p-6 bg-white rounded-lg shadow-lg">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Simulated Frequencies ({{ num_simulations }} Draws)</h2>
+    {# Live Draw Animation Section #}
+    <div id="liveDrawSection" class="card p-6 bg-white rounded-lg shadow-lg hidden">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800 text-center">Live Draw Animation</h2>
+        <div id="liveDrawAnimation" class="flex flex-wrap justify-center items-center gap-4 min-h-[100px] mb-4">
+            <!-- Animated balls will appear here -->
+        </div>
+        <p id="liveDrawMessage" class="text-center text-gray-600 font-medium"></p>
+    </div>
+
+    {# Loading Indicator for Batch Simulation #}
+    <div id="batchSimulationLoading" class="card p-6 bg-blue-50 rounded-lg shadow-lg text-center hidden">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-3"></div>
+        <p class="text-blue-700 text-lg font-semibold">Running {{ num_simulations if num_simulations else 'many' }} simulations...</p>
+        <p class="text-blue-600 text-sm mt-1">This may take a moment. Results will appear below.</p>
+    </div>
+
+    {# Simulation Results Section (initially hidden, shown via JS) #}
+    <div id="simulationResultsSection" class="card p-6 bg-white rounded-lg shadow-lg hidden">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Simulated Frequencies (<span id="simCountDisplay">0</span> Draws)</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
                 <h3 class="text-xl font-semibold mb-3 text-gray-700">White Ball Frequencies (1-69)</h3>
@@ -51,10 +82,10 @@
             </div>
         </div>
 
-        {# New section for Simulated Hot Numbers #}
+        {# Simulated Hot Numbers #}
         <div class="mt-8 border-t pt-6 border-gray-200">
             <h3 class="text-xl font-semibold mb-4 text-gray-700">Simulated Hot Numbers 🔥</h3>
-            <p class="text-gray-600 mb-4">These are the numbers that appeared most frequently in your {{ num_simulations }} simulated draws.</p>
+            <p class="text-gray-600 mb-4">These are the numbers that appeared most frequently in your simulated draws.</p>
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -72,11 +103,42 @@
             </div>
         </div>
     </div>
-    {% endif %}
 </div>
 
-{# Custom CSS for the flashing effect #}
+{# Custom CSS for ball animations and flashing #}
 <style>
+    /* Base styles for animated balls */
+    .ball-animation {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        width: 45px; /* Slightly larger for animation */
+        height: 45px;
+        border-radius: 50%;
+        font-weight: bold;
+        font-size: 1.2em;
+        color: #333;
+        background-color: #f0f0f0; /* White ball color */
+        border: 2px solid #a0a0a0;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+        opacity: 0; /* Start invisible */
+        transform: scale(0.5); /* Start small */
+        transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+    }
+
+    .powerball-animation {
+        background-color: #ef4444; /* Red for Powerball */
+        border-color: #dc2626;
+        color: white;
+    }
+
+    /* Animation for appearing */
+    .ball-appear {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    /* Existing flash animation for hot numbers */
     @keyframes flash {
         0% { transform: scale(1); box-shadow: 0 0 0 rgba(0, 0, 0, 0); }
         50% { transform: scale(1.1); box-shadow: 0 0 15px rgba(255, 215, 0, 0.8); } /* Gold glow */
@@ -106,35 +168,202 @@
         color: white;
         border-color: #dc2626;
     }
+
+    .btn-primary {
+        @apply bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-blue-700 transition duration-300 ease-in-out transform hover:scale-105;
+    }
+    .btn-secondary {
+        @apply bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-400 transition duration-300 ease-in-out;
+    }
+    .form-group {
+        @apply mb-4;
+    }
+    .form-label {
+        @apply block text-gray-700 text-sm font-bold mb-2;
+    }
+    .form-input {
+        @apply shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300 rounded-md;
+    }
 </style>
 
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const whiteBallFreqData = {{ simulated_white_ball_freq | tojson }};
-        const powerballFreqData = {{ simulated_powerball_freq | tojson }};
+        const simulationForm = document.getElementById('simulationForm');
+        const runSimulationBtn = document.getElementById('runSimulationBtn');
+        const numDrawsInput = document.getElementById('num_draws');
+        const oddEvenSelect = document.getElementById('odd_even_choice');
 
-        // Render charts if data exists
-        if (whiteBallFreqData && whiteBallFreqData.length > 0) {
-            renderSimulatedCharts(whiteBallFreqData, powerballFreqData);
-            displayHotNumbers(whiteBallFreqData, powerballFreqData);
-        }
+        const liveDrawSection = document.getElementById('liveDrawSection');
+        const liveDrawAnimationContainer = document.getElementById('liveDrawAnimation');
+        const liveDrawMessage = document.getElementById('liveDrawMessage');
+        
+        const batchSimulationLoading = document.getElementById('batchSimulationLoading');
+        const simulationResultsSection = document.getElementById('simulationResultsSection');
+        const simCountDisplay = document.getElementById('simCountDisplay');
+
+        const whiteBallFrequencyChartCanvas = document.getElementById('whiteBallFrequencyChart');
+        const powerballFrequencyChartCanvas = document.getElementById('powerballFrequencyChart');
+        let whiteBallChartInstance;
+        let powerballChartInstance;
 
         // Set selected odd/even choice if it was submitted
-        const oddEvenChoice = "{{ request.form.get('odd_even_choice', 'Any') }}";
-        const oddEvenSelect = document.getElementById('odd_even_choice');
-        if (oddEvenSelect) {
-            oddEvenSelect.value = oddEvenChoice;
+        const initialOddEvenChoice = "{{ selected_odd_even_choice }}";
+        if (oddEvenSelect && initialOddEvenChoice) {
+            oddEvenSelect.value = initialOddEvenChoice;
         }
 
+        simulationForm.addEventListener('submit', async function(event) {
+            event.preventDefault(); // Prevent default form submission
+
+            // Hide previous results and show loading indicators
+            liveDrawSection.classList.add('hidden');
+            liveDrawAnimationContainer.innerHTML = '';
+            liveDrawMessage.textContent = '';
+            simulationResultsSection.classList.add('hidden');
+            batchSimulationLoading.classList.remove('hidden');
+            runSimulationBtn.disabled = true;
+            runSimulationBtn.textContent = 'Running Simulation...';
+
+            const numDraws = numDrawsInput.value;
+            const oddEvenChoice = oddEvenSelect.value;
+
+            // --- Step 1: Run Live Draw Animation ---
+            try {
+                const response = await fetch('/api/generate_single_draw');
+                const data = await response.json();
+                if (data.success) {
+                    liveDrawSection.classList.remove('hidden');
+                    await animateLiveDraw(data.white_balls, data.powerball);
+                } else {
+                    console.error('Failed to fetch single draw for animation:', data.error);
+                    liveDrawMessage.textContent = 'Failed to load live draw animation.';
+                }
+            } catch (error) {
+                console.error('Error during live draw fetch:', error);
+                liveDrawMessage.textContent = 'An error occurred during live draw animation.';
+            }
+
+            // --- Step 2: Run Batch Simulation via AJAX (simultaneously or after animation starts) ---
+            try {
+                const formData = new FormData();
+                formData.append('num_draws', numDraws);
+                formData.append('odd_even_choice', oddEvenChoice);
+
+                const response = await fetch('/simulate_multiple_draws', {
+                    method: 'POST',
+                    body: formData // Send as form data
+                });
+                
+                // Flask returns HTML for the whole page on POST for this route.
+                // We need to parse it to extract the data we need.
+                // A better approach would be to make simulate_multiple_draws_route return JSON on AJAX requests.
+                // For now, let's stick to parsing the HTML for simplicity given existing structure.
+                
+                const responseText = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(responseText, 'text/html');
+
+                const simulatedWhiteBallFreqScript = doc.querySelector('script').textContent;
+                
+                // Extract the data passed from Flask's render_template
+                let whiteBallFreqData = [];
+                let powerballFreqData = [];
+                let numSimulations = 0;
+
+                // Regex to find the JSON data in the script tag
+                const wbMatch = simulatedWhiteBallFreqScript.match(/whiteBallFreqData = (\[.*?\]);/s);
+                const pbMatch = simulatedWhiteBallFreqScript.match(/powerballFreqData = (\[.*?\]);/s);
+                const numSimMatch = simulatedWhiteBallFreqScript.match(/num_simulations=(\d+)/);
+
+
+                if (wbMatch && pbMatch) {
+                    try {
+                        whiteBallFreqData = JSON.parse(wbMatch[1]);
+                        powerballFreqData = JSON.parse(pbMatch[1]);
+                        numSimulations = numSimMatch ? parseInt(numSimMatch[1]) : 0;
+                    } catch (parseError) {
+                        console.error('Error parsing JSON from script:', parseError);
+                    }
+                } else {
+                     // Fallback for direct data if not in script tag
+                    const fallbackWbData = doc.getElementById('fallbackWhiteBallData')?.textContent;
+                    const fallbackPbData = doc.getElementById('fallbackPowerballData')?.textContent;
+                    if (fallbackWbData && fallbackPbData) {
+                         try {
+                            whiteBallFreqData = JSON.parse(fallbackWbData);
+                            powerballFreqData = JSON.parse(fallbackPbData);
+                             numSimulations = doc.getElementById('fallbackNumSimulations')?.textContent ? parseInt(doc.getElementById('fallbackNumSimulations').textContent) : 0;
+                        } catch (parseError) {
+                            console.error('Error parsing fallback JSON:', parseError);
+                        }
+                    }
+                }
+
+                if (whiteBallFreqData && whiteBallFreqData.length > 0) {
+                    simCountDisplay.textContent = numSimulations;
+                    renderSimulatedCharts(whiteBallFreqData, powerballFreqData);
+                    displayHotNumbers(whiteBallFreqData, powerballFreqData, numSimulations);
+                    simulationResultsSection.classList.remove('hidden');
+                } else {
+                    showFlashMessage("No simulation data returned. Check filters or backend logs.", "error");
+                }
+
+            } catch (error) {
+                console.error('Error during batch simulation fetch:', error);
+                showFlashMessage("An error occurred during batch simulation. Please try again.", "error");
+            } finally {
+                batchSimulationLoading.classList.add('hidden');
+                runSimulationBtn.disabled = false;
+                runSimulationBtn.textContent = 'Run Simulation';
+            }
+        });
+
+        // --- Live Draw Animation Function ---
+        async function animateLiveDraw(whiteBalls, powerball) {
+            liveDrawAnimationContainer.innerHTML = ''; // Clear previous balls
+            liveDrawMessage.textContent = 'Drawing...';
+
+            const delays = [0, 6000, 7000, 8000, 9000]; // Delays for WB1, WB2, WB3, WB4, WB5 (relative to start)
+
+            for (let i = 0; i < whiteBalls.length; i++) {
+                await new Promise(resolve => setTimeout(resolve, delays[i] - (i > 0 ? delays[i-1] : 0))); // Calculate diff delay
+                const ball = document.createElement('span');
+                ball.classList.add('ball-animation');
+                ball.textContent = whiteBalls[i];
+                liveDrawAnimationContainer.appendChild(ball);
+                setTimeout(() => ball.classList.add('ball-appear'), 50); // Small delay to trigger transition
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 15000 - delays[whiteBalls.length - 1])); // Delay for Powerball
+            const powerballElement = document.createElement('span');
+            powerballElement.classList.add('ball-animation', 'powerball-animation');
+            powerballElement.textContent = powerball;
+            liveDrawAnimationContainer.appendChild(powerballElement);
+            setTimeout(() => powerballElement.classList.add('ball-appear'), 50);
+
+            liveDrawMessage.textContent = 'Live Draw Complete!';
+        }
+
+
+        // --- Chart Rendering (unchanged logic) ---
         function renderSimulatedCharts(whiteBallData, powerballData) {
+            // Destroy existing chart instances if they exist
+            if (whiteBallChartInstance) {
+                whiteBallChartInstance.destroy();
+            }
+            if (powerballChartInstance) {
+                powerballChartInstance.destroy();
+            }
+
             const whiteBallLabels = whiteBallData.map(d => d.Number);
             const whiteBallCounts = whiteBallData.map(d => d.Frequency);
 
-            new Chart(document.getElementById('whiteBallFrequencyChart'), {
+            whiteBallChartInstance = new Chart(whiteBallFrequencyChartCanvas, {
                 type: 'bar',
                 data: {
                     labels: whiteBallLabels,
@@ -143,7 +372,8 @@
                         data: whiteBallCounts,
                         backgroundColor: 'rgba(54, 162, 235, 0.6)', // Blue
                         borderColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 1
+                        borderWidth: 1,
+                        borderRadius: 8, // Added for rounded bars
                     }]
                 },
                 options: {
@@ -179,7 +409,7 @@
             const powerballLabels = powerballData.map(d => d.Number);
             const powerballCounts = powerballData.map(d => d.Frequency);
 
-            new Chart(document.getElementById('powerballFrequencyChart'), {
+            powerballChartInstance = new Chart(powerballFrequencyChartCanvas, {
                 type: 'bar',
                 data: {
                     labels: powerballLabels,
@@ -188,7 +418,8 @@
                         data: powerballCounts,
                         backgroundColor: 'rgba(255, 99, 132, 0.6)', // Red
                         borderColor: 'rgba(255, 99, 132, 1)',
-                        borderWidth: 1
+                        borderWidth: 1,
+                        borderRadius: 8, // Added for rounded bars
                     }]
                 },
                 options: {
@@ -222,7 +453,8 @@
             });
         }
 
-        function displayHotNumbers(whiteBallData, powerballData) {
+        // --- Display Hot Numbers (unchanged logic, but improved call) ---
+        function displayHotNumbers(whiteBallData, powerballData, numSimulations) {
             const hotWhiteBallsContainer = document.getElementById('hotWhiteBallsContainer');
             const hotPowerballsContainer = document.getElementById('hotPowerballsContainer');
 
@@ -247,7 +479,7 @@
 
             // Display and flash hot white balls
             hotWhiteBallsContainer.innerHTML = '';
-            if (numHotWhiteBalls > 0 && sortedWhiteBalls[0].Frequency > 0) { // Only show if at least one number has frequency > 0
+            if (numHotWhiteBalls > 0 && sortedWhiteBalls[0].Frequency > 0) {
                 for (let i = 0; i < numHotWhiteBalls; i++) {
                     const ball = document.createElement('span');
                     ball.classList.add('ball', 'flash-hot');
@@ -255,12 +487,12 @@
                     hotWhiteBallsContainer.appendChild(ball);
                 }
             } else {
-                hotWhiteBallsContainer.innerHTML = '<p class="text-gray-500">No hot white balls detected in this simulation (all numbers appeared equally or zero).</p>';
+                hotWhiteBallsContainer.innerHTML = `<p class="text-gray-500">No hot white balls detected in this simulation (all numbers appeared equally or zero based on ${numSimulations} draws).</p>`;
             }
 
             // Display and flash hot powerballs
             hotPowerballsContainer.innerHTML = '';
-            if (numHotPowerballs > 0 && sortedPowerballs[0].Frequency > 0) { // Only show if at least one number has frequency > 0
+            if (numHotPowerballs > 0 && sortedPowerballs[0].Frequency > 0) {
                 for (let i = 0; i < numHotPowerballs; i++) {
                     const ball = document.createElement('span');
                     ball.classList.add('ball', 'powerball-ball', 'flash-hot');
@@ -268,9 +500,10 @@
                     hotPowerballsContainer.appendChild(ball);
                 }
             } else {
-                hotPowerballsContainer.innerHTML = '<p class="text-gray-500">No hot powerballs detected in this simulation (all numbers appeared equally or zero).</p>';
+                hotPowerballsContainer.innerHTML = `<p class="text-gray-500">No hot powerballs detected in this simulation (all numbers appeared equally or zero based on ${numSimulations} draws).</p>`;
             }
         }
     });
 </script>
+
 {% endblock %}
