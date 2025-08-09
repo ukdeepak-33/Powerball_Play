@@ -613,12 +613,12 @@ def simulate_multiple_draws(df_source, group_a, odd_even_choice, white_ball_rang
     
     full_white_ball_range_list = list(range(GLOBAL_WHITE_BALL_RANGE[0], GLOBAL_WHITE_BALL_RANGE[1] + 1))
     simulated_white_ball_freq_list = sorted([
-        {'Number': n, 'Frequency': white_ball_results[n]} for n in full_white_ball_range_list
+        {'Number': int(n), 'Frequency': int(white_ball_results[n])} for n in full_white_ball_range_list
     ], key=lambda x: x['Number'])
 
     full_powerball_range_list = list(range(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1] + 1))
     simulated_powerball_freq_list = sorted([
-        {'Number': n, 'Frequency': powerball_results[n]} for n in full_powerball_range_list
+        {'Number': int(n), 'Frequency': int(powerball_results[n])} for n in full_powerball_range_list
     ], key=lambda x: x['Number'])
 
     return {'white_ball_freq': simulated_white_ball_freq_list, 'powerball_freq': simulated_powerball_freq_list}
@@ -1136,8 +1136,12 @@ def analyze_generated_batch_against_official_draw(generated_picks_list, official
             category = "Match 3 White Balls Only"
         elif white_matches == 2 and powerball_match == 1:
             category = "Match 2 White Balls + Powerball"
+        elif white_matches == 2 and powerball_match == 0: # Added this case
+            category = "No Match" # For 2 white balls, but no Powerball match = no prize
         elif white_matches == 1 and powerball_match == 1:
             category = "Match 1 White Ball + Powerball"
+        elif white_matches == 1 and powerball_match == 0: # Added this case
+            category = "No Match" # For 1 white ball, but no Powerball match = no prize
         elif white_matches == 0 and powerball_match == 1:
             category = "Match Powerball Only"
         
@@ -2597,6 +2601,9 @@ def find_results_by_sum_route():
 def simulate_multiple_draws_route():
     if df.empty:
         flash("Cannot run simulation: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        # Check if it's an AJAX request to return JSON error
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({"error": "Historical data not loaded or is empty.", "success": False}), 500
         return redirect(url_for('index'))
 
     simulated_white_ball_freq_list = []
@@ -2622,7 +2629,20 @@ def simulate_multiple_draws_route():
             simulated_powerball_freq_list = sim_results['powerball_freq']
         else:
             flash("Please enter a valid number for Number of Simulations.", 'error')
+            # If AJAX and validation fails
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({"error": "Please enter a valid number for Number of Simulations.", "success": False}), 400
 
+    # If this is an AJAX request, return JSON
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            "success": True,
+            "simulated_white_ball_freq": simulated_white_ball_freq_list,
+            "simulated_powerball_freq": simulated_powerball_freq_list,
+            "num_simulations": num_draws_display,
+            "selected_odd_even_choice": odd_even_choice_display
+        })
+    # Otherwise, render the full HTML page
     return render_template('simulate_multiple_draws.html', 
                            simulated_white_ball_freq=simulated_white_ball_freq_list, 
                            simulated_powerball_freq=simulated_powerball_freq_list,   
@@ -3410,7 +3430,7 @@ def _score_pick_for_patterns(white_balls, criteria_data):
                 # Give higher score for more frequent patterns
                 score += pattern_info['count'] * 0.1 # Adjust multiplier as needed
 
-    # 2. Special Patterns Score
+     # 2. Special Patterns Score
     if criteria_data['prioritize_special_patterns'] and criteria_data['most_frequent_special_patterns']:
         # Combine all special patterns for scoring
         all_special_patterns = []
@@ -3705,4 +3725,3 @@ def generate_smart_picks_route():
         traceback.print_exc()
         flash(f"An unexpected error occurred: {e}", 'error')
         return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
-
