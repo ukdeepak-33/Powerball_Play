@@ -181,7 +181,7 @@ def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice
     if df_source.empty:
         raise ValueError("Cannot generate numbers: Historical data is empty.")
 
-    max_attempts = 5000 # Increased attempts for stricter adherence
+    max_attempts = 5000 # Increased attempts for stricter adherence, especially with odd/even
     attempts = 0
     
     # Pre-filter available numbers for white balls
@@ -225,9 +225,10 @@ def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice
                 attempts += 1
                 continue 
 
-        # 4. Check Group A constraint
+        # 4. Check Group A constraint (reverting to original logic from index (2).py, as it does not pass num_from_group_a directly to this function for 'simulate_multiple_draws')
         group_a_numbers = [num for num in white_balls_candidate if num in group_a]
-        if len(group_a_numbers) < 2: # Assuming at least 2 Group A numbers is a general rule, adjust if needed
+        if len(group_a_numbers) < 2: # This condition might make generation very hard if group_a is small or numbers are excluded.
+                                     # The original index (2).py had this, so keeping it.
             attempts += 1
             continue
             
@@ -595,9 +596,12 @@ def simulate_multiple_draws(df_source, group_a, odd_even_choice, white_ball_rang
 
     for _ in range(num_draws):
         try:
+            # Pass the selected_sum_range_tuple as None here, as it's not a direct filter for simulate_multiple_draws
+            # Also, high_low_balance is not used in this context.
             white_balls, powerball = generate_powerball_numbers(
                 df_source, group_a, odd_even_choice, "No Combo", 
-                white_ball_range, powerball_range, excluded_numbers, is_simulation=True
+                white_ball_range, powerball_range, excluded_numbers, 
+                high_low_balance=None, selected_sum_range_tuple=None, is_simulation=True
             )
             
             for wb in white_balls:
@@ -896,27 +900,6 @@ def get_consecutive_numbers_trends(df_source, last_draw_date_str):
     
     return trend_data
 
-# Function to get consecutive trends for a specific DataFrame (e.g., filtered by year)
-def get_consecutive_trends_for_df(df_to_analyze):
-    if df_to_analyze.empty:
-        return []
-
-    trend_data = []
-    for idx, row in df_to_analyze.iterrows():
-        # Ensure numbers are integers before sorting and finding pairs
-        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
-        
-        consecutive_sequences = _find_consecutive_sequences(white_balls)
-        
-        # FIX: Changed from 'consecutive_pairs' to 'consecutive_sequences'
-        trend_data.append({
-            'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
-            'consecutive_present': "Yes" if consecutive_sequences else "No", 
-            'consecutive_sequences': consecutive_sequences # Changed key to sequences
-        })
-    return trend_data
-
-
 def get_most_frequent_triplets(df_source): 
     if df_source.empty:
         return []
@@ -1153,12 +1136,8 @@ def analyze_generated_batch_against_official_draw(generated_picks_list, official
             category = "Match 3 White Balls Only"
         elif white_matches == 2 and powerball_match == 1:
             category = "Match 2 White Balls + Powerball"
-        elif white_matches == 2 and powerball_match == 0: # Added this case
-            category = "No Match" # For 2 white balls, but no Powerball match = no prize
         elif white_matches == 1 and powerball_match == 1:
             category = "Match 1 White Ball + Powerball"
-        elif white_matches == 1 and powerball_match == 0: # Added this case
-            category = "No Match" # For 1 white ball, but no Powerball match = no prize
         elif white_matches == 0 and powerball_match == 1:
             category = "Match Powerball Only"
         
@@ -1376,12 +1355,15 @@ def check_generated_against_history(generated_white_balls, generated_powerball, 
         elif white_matches == 0 and powerball_match == 1:
             category = "Match Powerball Only"
         
-        summary[category]["count"] += 1 
-        summary[category]["draws"].append({
+        results["summary"][category]["count"] += 1 
+        results["summary"][category]["draws"].append({
             "date": historical_draw_date, 
             "white_balls": historical_white_balls,
             "powerball": historical_powerball
         })
+    
+    for category in results["summary"]:
+        results["summary"][category]["draws"].sort(key=lambda x: x['date'], reverse=True)
 
     return results
 
@@ -1573,7 +1555,7 @@ def get_weekday_draw_trends(df_source, group_a_numbers_def=None):
         high_count = sum(1 for num in white_balls if HIGH_NUMBER_MIN <= num <= GLOBAL_WHITE_BALL_RANGE[1])
         
         odd_count = sum(1 for num in white_balls if num % 2 != 0)
-        even_count = sum(1 for num in white_balls if num % 2 == 0)
+        even_count = 5 - odd_count # Correct calculation for even count
 
         current_sum = sum(white_balls)
 
@@ -1971,7 +1953,7 @@ def get_consecutive_numbers_yearly_trends(df_source):
     return {
         'yearly_data': yearly_trends, 
         'years': list(years_to_analyze), 
-        'all_consecutive_pairs_flat': flat_consecutive_sequences_list # Changed key to all_consecutive_pairs_flat for frontend compatibility
+        'all_consecutive_pairs_flat': flat_consecutive_sequences_list # Also corrected return key
     }
 
 def get_powerball_position_frequency(df_source):
@@ -2134,16 +2116,16 @@ def _summarize_for_ai(df_source):
     # 5. Monthly Trends (Recent Activity)
     # Using the new flexible function for monthly trends for AI summary
     # Call without start_year, so it uses the 10-year rolling window
-    monthly_trends_data = get_monthly_white_ball_analysis_data(df_source, num_months_for_top_display=6) # Limiting to 6 months for summary
+    monthly_trends_data, _ = get_white_ball_frequency_by_period(df_source, period_type='half_year') 
     
     recent_monthly_numbers_wb = defaultdict(int)
-    for month_data in monthly_trends_data['monthly_data']:
-        for wb_data in month_data['drawn_white_balls_with_counts']:
-            recent_monthly_numbers_wb[wb_data['number']] += wb_data['count']
+    for wb_num, periods_data in monthly_trends_data.items():
+        for period_info in periods_data:
+            recent_monthly_numbers_wb[wb_num] += period_info['frequency']
 
     sorted_recent_monthly_wb = sorted(recent_monthly_numbers_wb.items(), key=lambda item: item[1], reverse=True)
     if sorted_recent_monthly_wb:
-        summary_parts.append("White Balls frequently drawn in recent 6-month period: " + ", ".join([f"{n} ({c} times)" for n, c in sorted_recent_monthly_wb[:15]])) 
+        summary_parts.append("White Balls frequently drawn in recent half-years: " + ", ".join([f"{n} ({c} times)" for n, c in sorted_recent_monthly_wb[:15]])) 
 
     # 6. Odd/Even Split Trends
     odd_even_trends_list = get_odd_even_split_trends(df_source, last_draw_date_str) 
@@ -2171,15 +2153,33 @@ def _summarize_for_ai(df_source):
     consecutive_present_count = sum(1 for t in consecutive_trends_list if t['consecutive_present'] == 'Yes')
     if consecutive_trends_list:
         consecutive_percentage = (consecutive_present_count / len(consecutive_trends_list)) * 100
-        summary_parts.append(f"Consecutive numbers appeared in {consecutive_percentage:.2f}% of recent draws (last 12 months).")
+        summary_parts.append(f"Consecutive numbers appeared in {consecutive_percentage:.2f}% of recent draws (last 6 months).")
 
     return "\n".join(summary_parts)
     
+# Function to get consecutive trends for a specific DataFrame (e.g., filtered by year)
+def get_consecutive_trends_for_df(df_to_analyze):
+    if df_to_analyze.empty:
+        return []
+
+    trend_data = []
+    for idx, row in df_to_analyze.iterrows():
+        # Ensure numbers are integers before sorting and finding pairs
+        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+        
+        consecutive_sequences = _find_consecutive_sequences(white_balls)
+        
+        trend_data.append({
+            'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
+            'consecutive_present': "Yes" if consecutive_sequences else "No", 
+            'consecutive_sequences': consecutive_sequences # Changed key to sequences
+        })
+    return trend_data
 
 initialize_core_data() 
 
 
-# --- Flask Routes ---
+# --- Flask Routes (Ordered for Dependency - all UI-facing routes first, then API routes) ---
 
 @app.route('/')
 def index():
@@ -2478,6 +2478,7 @@ def save_multiple_generated_picks_route():
 
 @app.route('/frequency_analysis')
 def frequency_analysis_route():
+    # Pass df directly to the function, not for cache key serialization
     white_ball_freq_list, powerball_freq_list = get_cached_analysis('freq_analysis', frequency_analysis, df)
     return render_template('frequency_analysis.html', 
                            white_ball_freq=white_ball_freq_list, 
@@ -2486,6 +2487,7 @@ def frequency_analysis_route():
 @app.route('/hot_cold_numbers')
 def hot_cold_numbers_route():
     last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
+    # Pass df directly to the function, not for cache key serialization
     hot_numbers_list, cold_numbers_list = get_cached_analysis('hot_cold_numbers', hot_cold_numbers, df, last_draw_date_str_for_cache)
     
     return render_template('hot_cold_numbers.html', 
@@ -2500,6 +2502,8 @@ def monthly_white_ball_analysis_route():
     
     last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
 
+    # Pass df directly to the function, not for cache key serialization
+    # Removed num_months_for_top_display from get_white_ball_frequency_by_period call
     monthly_trends_data = get_cached_analysis(
         'monthly_trends_and_streaks', 
         get_monthly_white_ball_analysis_data, 
@@ -2518,6 +2522,7 @@ def sum_of_main_balls_route():
         flash("Cannot display Sum of Main Balls Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
+    # Pass df directly to the function, not for cache key serialization
     sums_data_df, sum_freq_list, min_sum, max_sum, avg_sum = get_cached_analysis('sum_of_main_balls_data', sum_of_main_balls, df)
     
     sums_data = sums_data_df.to_dict('records') 
@@ -2638,6 +2643,7 @@ def generate_single_draw_api():
 
 @app.route('/number_age_distribution')
 def number_age_distribution_route():
+    # Pass df directly to the function, not for cache key serialization
     number_age_counts, detailed_number_ages = get_cached_analysis('number_age_distribution', get_number_age_distribution, df)
     return render_template('number_age_distribution.html',
                            number_age_data=number_age_counts,
@@ -2645,6 +2651,7 @@ def number_age_distribution_route():
 
 @app.route('/co_occurrence_analysis')
 def co_occurrence_analysis_route():
+    # Pass df directly to the function, not for cache key serialization
     co_occurrence_data, max_co_occurrence = get_cached_analysis('co_occurrence_analysis', get_co_occurrence_matrix, df)
     return render_template('co_occurrence_analysis.html',
                            co_occurrence_data=co_occurrence_data,
@@ -2652,12 +2659,14 @@ def co_occurrence_analysis_route():
 
 @app.route('/powerball_position_frequency')
 def powerball_position_frequency_route():
+    # Pass df directly to the function, not for cache key serialization
     powerball_position_data = get_cached_analysis('powerball_position_frequency', get_powerball_position_frequency, df)
     return render_template('powerball_position_frequency.html',
                            powerball_position_data=powerball_position_data)
 
 @app.route('/powerball_frequency_by_year')
 def powerball_frequency_by_year_route():
+    # Pass df directly to the function, not for cache key serialization
     yearly_pb_freq_data, years = get_cached_analysis('yearly_pb_freq', get_powerball_frequency_by_year, df)
     return render_template('powerball_frequency_by_year.html',
                            yearly_pb_freq_data=yearly_pb_freq_data,
@@ -2666,6 +2675,7 @@ def powerball_frequency_by_year_route():
 @app.route('/odd_even_trends')
 def odd_even_trends_route():
     last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
+    # Pass df directly to the function, not for cache key serialization
     odd_even_trends = get_cached_analysis('odd_even_trends', get_odd_even_split_trends, df, last_draw_date_str_for_cache)
     return render_template('odd_even_trends.html',
                            odd_even_trends=odd_even_trends)
@@ -2687,109 +2697,930 @@ def consecutive_trends_route():
     # Extract data for template
     yearly_consecutive_percentage_data = yearly_consecutive_data_full['yearly_data']
     years_for_dropdown = yearly_consecutive_data_full['years']
-    all_consecutive_sequences_flat = yearly_consecutive_data_full['all_consecutive_pairs_flat'] # Corrected variable name
+    all_consecutive_pairs_flat = yearly_consecutive_data_full['all_consecutive_pairs_flat']
 
     return render_template('consecutive_trends.html',
                            consecutive_trends=consecutive_trends,
                            yearly_consecutive_percentage_data=yearly_consecutive_percentage_data,
                            years_for_dropdown=years_for_dropdown,
-                           all_consecutive_pairs_flat=all_consecutive_sequences_flat) # Pass the corrected variable
+                           all_consecutive_pairs_flat=all_consecutive_pairs_flat)
 
 # NEW API endpoint for yearly consecutive trends (now returns flat list)
-@app.route('/api/consecutive_trends_by_year/<int:year>') # Corrected endpoint name as per frontend's fetch call
-def api_consecutive_trends_by_year(year):
+@app.route('/api/consecutive_yearly_trends')
+def api_consecutive_yearly_trends_route():
     if df.empty:
         return jsonify({"error": "Historical data not loaded or is empty."}), 500
-
-    # Filter the main DataFrame for the requested year
-    df_for_year = df[df['Draw Date_dt'].dt.year == year].copy()
     
-    # Calculate consecutive trends for the filtered year's data
-    trends_for_year = get_consecutive_trends_for_df(df_for_year.sort_values(by='Draw Date_dt', ascending=False))
+    yearly_consecutive_data_full = get_cached_analysis('consecutive_yearly_trends', get_consecutive_numbers_yearly_trends, df)
     
-    return jsonify(trends_for_year)
+    return jsonify({
+        'data': yearly_consecutive_data_full['yearly_data'],
+        'years': yearly_consecutive_data_full['years'],
+        'all_consecutive_pairs_flat': yearly_consecutive_data_full['all_consecutive_pairs_flat']
+    })
+# Add this new function to your index.py file
+@app.route('/consecutive_trends_by_year/<int:year>')
+def consecutive_trends_by_year(year):
+    # Assuming 'df' is your global DataFrame of historical data
+    df_year = df[(df['Draw Date_dt'].dt.year == year)].copy()
 
+    # Call your existing function to calculate the consecutive trends for the filtered data
+    trends = get_consecutive_trends_for_df(df_year) # Corrected function call
 
-# NEW ROUTE: For the AI-Powered Smart Pick Generator on the homepage
-@app.route('/generate_smart_picks', methods=['POST'])
-def generate_ai_smart_picks(): 
+    # Return the data as a JSON object
+    return jsonify(trends)
+
+@app.route('/triplets_analysis')
+def triplets_analysis_route():
+    # Pass df directly to the function, not for cache key serialization
+    triplets_data = get_cached_analysis('triplets_analysis', get_most_frequent_triplets, df) 
+    return render_template('triplets_analysis.html',
+                           triplets_data=triplets_data)
+
+@app.route('/grouped_patterns_analysis')
+def grouped_patterns_analysis_route():
+    # Pass df directly to the function, not for cache key serialization
+    patterns_data = get_cached_analysis('grouped_patterns', get_grouped_patterns_over_years, df)
+    return render_template('grouped_patterns_analysis.html', patterns_data=patterns_data)
+
+@app.route('/grouped_patterns_yearly_comparison', methods=['GET', 'POST'])
+def grouped_patterns_yearly_comparison_route():
     if df.empty:
-        return jsonify({"error": "Historical data not loaded. Please try again later."}), 500
+        flash("Cannot display Grouped Patterns Yearly Comparison: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+
+    selected_range_label = request.form.get('selected_range', '20s') 
+    
+    if selected_range_label not in NUMBER_RANGES:
+        flash(f"Invalid number range selected: {selected_range_label}. Displaying data for default range '20s'.", 'error')
+        selected_range_label = '20s' 
+
+    cache_key = f'yearly_patterns_{selected_range_label}'
+    
+    # Pass df directly to the function, not for cache key serialization
+    yearly_patterns_data = get_cached_analysis(
+        cache_key,
+        _get_yearly_patterns_for_range,
+        df,
+        selected_range_label
+    )
+
+    return render_template('grouped_patterns_yearly_comparison.html',
+                           yearly_patterns_data=yearly_patterns_data,
+                           number_ranges=NUMBER_RANGES, 
+                           selected_range=selected_range_label) 
+
+@app.route('/boundary_crossing_pairs_trends', methods=['GET', 'POST'])
+def boundary_crossing_pairs_trends_route():
+    if df.empty:
+        flash("Cannot display Boundary Crossing Pairs Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    selected_pair = request.form.get('selected_pair') 
+    selected_pair_tuple = None
+    if selected_pair:
+        try:
+            parts = [int(p.strip()) for p in selected_pair.split(',')]
+            if len(parts) == 2:
+                selected_pair_tuple = tuple(sorted(parts))
+        except ValueError:
+            flash("Invalid pair format. Please select a valid pair from the dropdown.", 'error')
+            selected_pair = None 
+
+    # Pass df directly to the function, not for cache key serialization
+    boundary_trends_data = get_cached_analysis(
+        f'boundary_crossing_trends_{selected_pair}', 
+        get_boundary_crossing_pairs_trends, 
+        df, 
+        selected_pair_tuple
+    )
+    
+    all_boundary_patterns_summary = boundary_trends_data['all_boundary_patterns_summary']
+    yearly_data_for_selected_pattern = boundary_trends_data['yearly_data_for_selected_pattern']
+    all_years_in_data = boundary_trends_data['all_years_in_data']
+
+    boundary_pairs_for_dropdown = [f"{p[0]}, {p[1]}" for p in BOUNDARY_PAIRS_TO_ANALYZE]
+
+    return render_template('boundary_crossing_pairs_trends.html',
+                           all_boundary_patterns_summary=all_boundary_patterns_summary,
+                           yearly_data_for_selected_pattern=yearly_data_for_selected_pattern,
+                           all_years_in_data=all_years_in_data,
+                           boundary_pairs_for_dropdown=boundary_pairs_for_dropdown,
+                           selected_pair=selected_pair) 
+
+@app.route('/special_patterns_analysis')
+def special_patterns_analysis_route():
+    if df.empty:
+        flash("Cannot display Special Patterns Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    # Pass df directly to the function, not for cache key serialization
+    special_patterns_data = get_cached_analysis('special_patterns_analysis', get_special_patterns_analysis, df)
+    
+    return render_template('special_patterns_analysis.html',
+                           special_patterns_data=special_patterns_data)
+
+
+@app.route('/find_results_by_first_white_ball', methods=['GET', 'POST'])
+def find_results_by_first_white_ball():
+    if df.empty:
+        flash("Cannot find results: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+
+    results_dict = []
+    white_ball_number_display = None
+    selected_sort_by = 'date_desc'
+
+    if request.method == 'POST':
+        white_ball_number_str = request.form.get('white_ball_number')
+        selected_sort_by = request.form.get('sort_by', 'date_desc')
+
+        if white_ball_number_str and white_ball_number_str.isdigit():
+            white_ball_number = int(white_ball_number_str)
+            white_ball_number_display = white_ball_number
+            
+            if 'Draw Date_dt' not in df.columns:
+                 df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'], errors='coerce')
+
+            results = df[df['Number 1'].astype(int) == white_ball_number].copy()
+
+            if selected_sort_by == 'date_desc':
+                results = results.sort_values(by='Draw Date_dt', ascending=False)
+            elif selected_sort_by == 'date_asc':
+                results = results.sort_values(by='Draw Date_dt', ascending=True)
+            elif selected_sort_by == 'balls_asc':
+                results['WhiteBallsTuple'] = results.apply(
+                    lambda row: tuple(sorted([
+                        int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                        int(row['Number 4']), int(row['Number 5'])
+                    ])), axis=1
+                )
+                results = results.sort_values(by='WhiteBallsTuple', ascending=True)
+                results = results.drop(columns=['WhiteBallsTuple'])
+            elif selected_sort_by == 'balls_desc':
+                results['WhiteBallsTuple'] = results.apply(
+                    lambda row: tuple(sorted([
+                        int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                        int(row['Number 4']), int(row['Number 5'])
+                    ])), axis=1
+                )
+                results = results.sort_values(by='WhiteBallsTuple', ascending=False)
+                results = results.drop(columns=['WhiteBallsTuple'])
+
+            results_dict = results.to_dict('records')
+        else:
+            flash("Please enter a valid number for First White Ball Number.", 'error')
+
+    return render_template('find_results_by_first_white_ball.html', 
+                           results_by_first_white_ball=results_dict, 
+                           white_ball_number=white_ball_number_display,
+                           selected_sort_by=selected_sort_by)
+
+def supabase_search_draws(query_params):
+    url = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
+    headers = _get_supabase_headers(is_service_key=False) 
 
     try:
-        # Parse incoming JSON data from the homepage's fetch request
-        request_data = request.get_json()
-        num_sets_to_generate = int(request_data.get('num_sets', 1))
+        response = requests.get(url, headers=headers, params=query_params)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        if hasattr(e, 'response') and e.response is not None:
+            pass
+        return []
+    except Exception as e:
+        traceback.print_exc()
+        return []
 
-        # Default values for parameters not provided by the homepage's AI generator UI.
-        # These are sensible defaults for an "AI-Powered" generator.
-        excluded_numbers_ai = []
-        num_from_group_a_ai = 0 
-        odd_even_choice_ai = 'Any'
-        sum_range_tuple_ai = None 
-        prioritize_monthly_hot_ai = True 
-        prioritize_grouped_patterns_ai = True 
-        prioritize_special_patterns_ai = True 
-        prioritize_consecutive_patterns_ai = True 
-        force_specific_pattern_ai = []
+@app.route('/strict_positional_search', methods=['GET', 'POST'])
+def strict_positional_search_route():
+    entered_numbers = {
+        'white_ball_1': '', 'white_ball_2': '', 'white_ball_3': '', 
+        'white_ball_4': '', 'white_ball_5': '', 'powerball_pos': ''
+    }
+    search_results = []
+    total_results = 0
+    
+    if request.method == 'POST':
+        entered_numbers['white_ball_1'] = request.form.get('white_ball_1', '').strip()
+        entered_numbers['white_ball_2'] = request.form.get('white_ball_2', '').strip()
+        entered_numbers['white_ball_3'] = request.form.get('white_ball_3', '').strip()
+        entered_numbers['white_ball_4'] = request.form.get('white_ball_4', '').strip()
+        entered_numbers['white_ball_5'] = request.form.get('white_ball_5', '').strip()
+        entered_numbers['powerball_pos'] = request.form.get('powerball_pos', '').strip()
 
-        # Call the core `generate_smart_picks` function (from the original smart_pick_generator.py logic)
-        # You would replace `generate_smart_picks_core_logic` with the actual function name from your other file
-        # or consolidate that logic here. For now, using a placeholder.
+        if df.empty:
+            flash("Historical data not loaded or is empty. Please check Supabase connection before searching.", 'error')
+            return render_template('strict_positional_search.html', 
+                                   entered_numbers=entered_numbers, 
+                                   search_results=[],
+                                   total_results=0)
+
+        query_params = {'select': 'Draw Date,Number 1,Number 2,Number 3,Number 4,Number 5,Powerball'}
+        filter_count = 0
+
+        for i in range(1, 6):
+            key = f'white_ball_{i}'
+            col_name = f'Number {i}'
+            if entered_numbers[key]:
+                try:
+                    num = int(entered_numbers[key])
+                    if not (1 <= num <= 69):
+                        flash(f"White ball {i} must be between 1 and 69. Please correct your input.", 'error')
+                        return render_template('strict_positional_search.html', 
+                                               entered_numbers=entered_numbers, 
+                                               search_results=[],
+                                               total_results=0)
+                    query_params[col_name] = f'eq.{num}'
+                    filter_count += 1
+                except ValueError:
+                    flash(f"White ball {i} must be a valid number. Please correct your input.", 'error')
+                    return render_template('strict_positional_search.html', 
+                                           entered_numbers=entered_numbers, 
+                                           search_results=[],
+                                           total_results=0)
+
+        if entered_numbers['powerball_pos']:
+            try:
+                pb_num = int(entered_numbers['powerball_pos'])
+                if not (1 <= pb_num <= 26):
+                    flash("Powerball must be between 1 and 26. Please correct your input.", 'error')
+                    return render_template('strict_positional_search.html', 
+                                           entered_numbers=entered_numbers, 
+                                           search_results=[],
+                                           total_results=0)
+                query_params['Powerball'] = f'eq.{pb_num}'
+                filter_count += 1
+            except ValueError:
+                flash("Powerball must be a valid number. Please correct your input.", 'error')
+                return render_template('strict_positional_search.html', 
+                                       entered_numbers=entered_numbers, 
+                                       search_results=[],
+                                       total_results=0)
         
-        # NOTE: If your actual `generate_smart_picks` function expects `df_source` as first arg, ensure `df` is passed.
-        generated_sets = generate_smart_picks_core_logic( # Placeholder - REPLACE THIS with your actual smart pick generation function
-            df_source=df, # Pass the global df
-            num_sets=num_sets_to_generate,
-            excluded_numbers=excluded_numbers_ai,
-            num_from_group_a=num_from_group_a_ai,
-            odd_even_choice=odd_even_choice_ai,
-            sum_range_tuple=sum_range_tuple_ai,
-            prioritize_monthly_hot=prioritize_monthly_hot_ai,
-            prioritize_grouped_patterns=prioritize_grouped_patterns_ai,
-            prioritize_special_patterns=prioritize_special_patterns_ai,
-            prioritize_consecutive_patterns=prioritize_consecutive_patterns_ai,
-            force_specific_pattern=force_specific_pattern_ai
-        )
+        if filter_count == 0:
+            flash("Please enter at least one number to perform a search.", 'info')
+            return render_template('strict_positional_search.html', 
+                                   entered_numbers=entered_numbers, 
+                                   search_results=[],
+                                   total_results=0)
+
+        draws = supabase_search_draws(query_params)
+
+        if draws:
+            search_results = sorted(draws, key=lambda x: x.get('Draw Date', ''), reverse=True)
+            total_results = len(search_results)
+            if total_results == 0:
+                flash("No draws found matching your criteria.", 'info')
+            else:
+                flash(f"Found {total_results} draw(s) matching your criteria.", 'success')
+        else:
+            flash("Error fetching data from Supabase. Please try again later.", 'error')
+
+    return render_template('strict_positional_search.html', 
+                           entered_numbers=entered_numbers, 
+                           search_results=search_results,
+                           total_results=total_results)
+
+
+@app.route('/generated_numbers_history')
+def generated_numbers_history_route():
+    generated_history = get_cached_analysis('generated_history', get_generated_numbers_history)
+    
+    official_draw_dates = []
+    if not df.empty:
+        official_draw_dates = sorted(df['Draw Date'].unique(), reverse=True)
+
+    last_draw_for_template = last_draw.to_dict()
+
+    return render_template('generated_numbers_history.html', 
+                           generated_history=generated_history,
+                           official_draw_dates=official_draw_dates,
+                           last_official_draw=last_draw_for_template) 
+
+
+@app.route('/update_powerball_data', methods=['GET'])
+def update_powerball_data():
+    service_headers = _get_supabase_headers(is_service_key=True)
+    anon_headers = _get_supabase_headers(is_service_key=False)
+
+    try:
+        url_check_latest = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
+        params_check_latest = {
+            'select': 'Draw Date',
+            'order': 'Draw Date.desc',
+            'limit': 1
+        }
+        response_check_latest = requests.get(url_check_latest, headers=anon_headers, params=params_check_latest)
+        response_check_latest.raise_for_status()
         
-        # For display on the homepage, get last draw dates for the *last* generated set
-        last_draw_dates = {}
-        if generated_sets:
-            last_draw_dates = find_last_draw_dates_for_numbers(df, generated_sets[-1]['white_balls'], generated_sets[-1]['powerball'])
+        latest_db_draw_data = response_check_latest.json()
+        last_db_draw_date = None
+        if latest_db_draw_data:
+            last_db_draw_date = latest_db_draw_data[0]['Draw Date']
+        
+        simulated_draw_date_dt = datetime.now()
+        simulated_draw_date = simulated_draw_date_dt.strftime('%Y-%m-%d')
+        simulated_numbers_list = sorted(random.sample(range(1, 70), 5))
+        simulated_powerball = random.randint(1, 26)
+
+        new_draw_data = {
+            'Draw Date': simulated_draw_date,
+            'Number 1': simulated_numbers_list[0],
+            'Number 2': simulated_numbers_list[1],
+            'Number 3': simulated_numbers_list[2], 
+            'Number 4': simulated_numbers_list[3], 
+            'Number 5': simulated_numbers_list[4], 
+            'Powerball': simulated_powerball
+        }
+        
+        if new_draw_data['Draw Date'] == last_db_draw_date:
+            return "No new draw data. Database is up-to-date.", 200
+        
+        url_insert = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
+        insert_response = requests.post(url_insert, headers=service_headers, data=json.dumps(new_draw_data))
+        insert_response.raise_for_status()
+
+        if insert_response.status_code == 201:
+            initialize_core_data() 
+            invalidate_analysis_cache()
+
+            return f"Data updated successfully with draw for {simulated_draw_date}.", 200
+        else:
+            return f"Error updating data: {insert_response.status_code} - {insert_response.text}", 500
+
+    except requests.exceptions.RequestException as e:
+        if hasattr(e, 'response') and e.response is not None:
+            pass
+        return f"Network or HTTP error: {e}", 500
+    except json.JSONDecodeError as e:
+        if 'insert_response' in locals() and insert_response is not None:
+            pass
+        return f"JSON parsing error: {e}", 500
+    except Exception as e:
+        traceback.print_exc()
+        return f"An internal error occurred: {e}", 500
+
+
+@app.route('/export_analysis_results')
+def export_analysis_results_route():
+    if df.empty:
+        flash("Cannot export results: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+
+    export_analysis_results(df) 
+    flash("Analysis results exported to analysis_results.csv (this file is temporary on Vercel's serverless environment).", 'info')
+    return redirect(url_for('index'))
+
+
+@app.route('/analyze_batch_vs_official', methods=['POST'])
+def analyze_batch_vs_official_route():
+    try:
+        data = request.get_json()
+        generated_date_str = data.get('generated_date')
+        official_draw_date_str = data.get('official_draw_date')
+
+        if not generated_date_str or not official_draw_date_str:
+            return jsonify({"error": "Missing generated_date or official_draw_date"}), 400
+
+        generated_picks = _get_generated_picks_for_date_from_db(generated_date_str)
+        if not generated_picks:
+            return jsonify({"error": f"No generated picks found for date: {generated_date_str}"}), 404
+
+        official_draw = _get_official_draw_for_date_from_db(official_draw_date_str)
+        if not official_draw:
+            return jsonify({"error": f"No official draw found for date: {official_draw_date_str}. Please ensure it is added to the database."}), 404
+
+        analysis_summary = analyze_generated_batch_against_official_draw(generated_picks, official_draw)
+        
+        return jsonify({
+            "success": True,
+            "generated_date": generated_date_str,
+            "official_draw_date": official_draw_date_str,
+            "total_generated_picks_in_batch": len(generated_picks),
+            "summary": analysis_summary
+        })
+
+    except Exception as e:
+        traceback.print_exc() 
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
+@app.route('/analyze_generated_historical_matches', methods=['POST'])
+def analyze_generated_historical_matches_route():
+    if df.empty:
+        return jsonify({"success": False, "error": "Historical data not loaded or is empty."}), 500
+    
+    try:
+        data = request.get_json() 
+        generated_white_balls_str = data.get('generated_white_balls')
+        generated_powerball_str = data.get('generated_powerball')
+
+        if not generated_white_balls_str or not generated_powerball_str: 
+            return jsonify({"success": False, "error": "Missing generated_white_balls or generated_powerball"}), 400
+
+        generated_white_balls = sorted([int(x.strip()) for x in generated_white_balls_str.split(',') if x.strip().isdigit()])
+        generated_powerball = int(generated_powerball_str)
+
+        if len(generated_white_balls) != 5:
+            return jsonify({"success": False, "error": "Invalid generated white balls format. Expected 5 numbers."}), 400
+
+        historical_match_results = check_generated_against_history(generated_white_balls, generated_powerball, df)
+        
+        return jsonify({
+            "success": True,
+            "generated_numbers_for_analysis": generated_white_balls, 
+            "generated_powerball_for_analysis": generated_powerball,
+            "match_summary": historical_match_results['summary']
+        })
+
+    except ValueError:
+        return jsonify({"success": False, "error": "Invalid number format for historical analysis."}), 400
+    except Exception as e:
+        traceback.print_exc() 
+        return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
+
+@app.route('/ai_assistant')
+def ai_assistant_route():
+    return render_template('ai_assistant.html')
+
+@app.route('/chat_with_ai', methods=['POST'])
+def chat_with_ai_route():
+    user_message = request.json.get('message')
+
+    if not user_message:
+        return jsonify({"response": "Please provide a message."}), 400
+
+    chat_history = []
+    
+    # Get the detailed historical summary
+    historical_summary = _summarize_for_ai(df)
+
+    initial_prompt_text = f"""
+    You are a highly knowledgeable Powerball Lottery Analysis AI Assistant. 
+    Your purpose is to help users understand Powerball data, trends, and probabilities.
+    You should be helpful, informative, and concise.
+    
+    Here's some general knowledge about Powerball:
+    - White Balls: 5 numbers are drawn from a pool of 1 to 69.
+    - Powerball: 1 number is drawn from a separate pool of 1 to 26.
+    - Odds of winning the jackpot (matching 5 White Balls + Powerball): 1 in 292,201,338.
+    
+    Here is a summary of the *current and recent Powerball historical data and trends* from the user's database:
+    ---
+    {historical_summary}
+    ---
+
+    When answering, refer to the provided historical data summary where relevant.
+    If a user asks to "generate numbers," or requests specific real-time data that you don't have access to (like "what are the current hot numbers?" *if not explicitly in the summary*), you should gently explain that you are an analytical assistant and cannot perform live data lookups or generate numbers, but can explain the *concepts* behind them and refer to the data provided in the summary.
+
+    User's question: """ + user_message
+
+    chat_history.append({
+        "role": "user",
+        "parts": [{"text": initial_prompt_text}]
+    })
+    
+    try:
+        apiKey = GEMINI_API_KEY 
+        apiUrl = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}"
+
+        payload = {
+            "contents": chat_history,
+            "generationConfig": {
+                "temperature": 0.7,
+                "topK": 40,
+                "topP": 0.95,
+                "maxOutputTokens": 500
+            },
+            "safetySettings": [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
+            ]
+        }
+        
+        response = requests.post(apiUrl, headers={'Content-Type': 'application/json'}, data=json.dumps(payload))
+        response.raise_for_status() 
+        
+        result = response.json()
+
+        if result and result.get('candidates') and len(result['candidates']) > 0 and \
+           result['candidates'][0].get('content') and result['candidates'][0]['content'].get('parts') and \
+           len(result['candidates'][0]['content']['parts']) > 0:
+            ai_response = result['candidates'][0]['content']['parts'][0]['text']
+            return jsonify({"response": ai_response})
+        else:
+            error_message = "I'm sorry, I couldn't generate a response. The AI model did not return valid content."
+            return jsonify({"response": error_message}), 500
+
+    except requests.exceptions.RequestException as e:
+        traceback.print_exc() 
+        return jsonify({"response": f"Error communicating with AI: {e}"}), 500
+    except json.JSONDecodeError as e:
+        traceback.print_exc() 
+        return jsonify({"response": f"Error parsing AI response: {e}"}), 500
+    except Exception as e:
+        traceback.print_exc() 
+        return jsonify({"response": f"An internal error occurred: {e}"}), 500
+
+@app.route('/my_jackpot_pick')
+def my_jackpot_pick_route():
+    try:
+        return render_template('my_jackpot_pick.html')
+    except Exception as e:
+        traceback.print_exc() 
+        flash("An error occurred loading the Jackpot Pick page. Please try again.", 'error')
+        return redirect(url_for('index')) 
+
+@app.route('/analyze_manual_pick', methods=['POST'])
+def analyze_manual_pick_route():
+    if df.empty:
+        return jsonify({"error": "Historical data not loaded or is empty."}), 500
+    
+    try:
+        data = request.get_json()
+        white_balls = data.get('white_balls')
+        powerball = data.get('powerball')
+
+        if not white_balls or len(white_balls) != 5 or powerball is None:
+            return jsonify({"error": "Invalid input. Please provide 5 white balls and 1 powerball."}), 400
+        
+        white_balls = sorted([int(n) for n in white_balls])
+        powerball = int(powerball)
+
+        historical_match_results = check_generated_against_history(white_balls, powerball, df)
+        
+        last_drawn_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
 
         return jsonify({
             "success": True,
-            "smart_picks": generated_sets,
-            "last_draw_dates": last_draw_dates 
+            "generated_numbers": white_balls, 
+            "generated_powerball": powerball,
+            "match_summary": historical_match_results['summary'],
+            "last_drawn_dates": last_drawn_dates
         })
 
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+    except ValueError:
+        return jsonify({"error": "Invalid number format provided."}), 400
+    except Exception as e:
+        traceback.print_exc() 
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
+@app.route('/save_manual_pick', methods=['POST']) 
+def save_manual_pick_route():
+    try:
+        data = request.get_json()
+        white_balls = data.get('white_balls')
+        powerball = data.get('powerball')
+
+        if not white_balls or len(white_balls) != 5 or powerball is None:
+            return jsonify({"success": False, "error": "Invalid input. Please provide 5 white balls and 1 powerball."}), 400
+        
+        white_balls = sorted([int(n) for n in white_balls])
+        powerball = int(powerball)
+
+        success, message = save_generated_numbers_to_db(white_balls, powerball)
+
+        if success:
+            return jsonify({"success": True, "message": message})
+        else:
+            return jsonify({"success": False, "error": message}), 400
+
+    except ValueError:
+        return jsonify({"success": False, "error": "Invalid number format provided."}), 400
     except Exception as e:
         traceback.print_exc()
-        return jsonify({"error": f"An unexpected error occurred: {e}"}), 500
+        return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
 
-# Placeholder for your actual smart pick generation function if it's external
-# You must ensure this function is defined or imported correctly.
-def generate_smart_picks_core_logic(df_source, num_sets, excluded_numbers, num_from_group_a, odd_even_choice, sum_range_tuple, prioritize_monthly_hot, prioritize_grouped_patterns, prioritize_special_patterns, prioritize_consecutive_patterns, force_specific_pattern):
-    # This is a dummy implementation. REPLACE with your actual complex logic
-    # from your smart_pick_generator.py (if it's a separate function, bring it here or import it)
+@app.route('/sum_trends_and_gaps')
+def sum_trends_and_gaps_route():
+    if df.empty:
+        flash("Cannot display Sum Trends and Gaps: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    # Pass df directly to the function, not for cache key serialization
+    sum_data = get_cached_analysis('sum_trends_and_gaps', get_sum_trends_and_gaps_data, df)
+    
+    return render_template('sum_trends_and_gaps.html', 
+                           min_possible_sum=sum_data['min_possible_sum'],
+                           max_possible_sum=sum_data['max_possible_sum'],
+                           appeared_sums_details=sum_data['appeared_sums_details'],
+                           missing_sums=sum_data['missing_sums'],
+                           grouped_sums_analysis=sum_data['grouped_sums_analysis'])
+
+@app.route('/weekday_trends')
+def weekday_trends_route():
+    if df.empty:
+        flash("Cannot display Weekday Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    # Pass df directly to the function, not for cache key serialization
+    weekday_data = get_cached_analysis('weekday_all_trends', get_weekday_draw_trends, df, group_a_numbers_def=group_a)
+    
+    return render_template('weekday_trends.html', 
+                           weekday_trends=weekday_data)
+
+@app.route('/yearly_white_ball_trends')
+def yearly_white_ball_trends_route():
+    if df.empty:
+        flash("Cannot display Yearly White Ball Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    # Get the list of years for the dropdown/chart labels (up to current year + 1 for future-proofing)
+    current_year = datetime.now().year
+    # Calculate the start year for a 10-year rolling window
+    start_year_for_display = max(2017, current_year - 9) 
+    years_for_display = list(range(start_year_for_display, current_year + 1))
+
+    return render_template('yearly_white_ball_trends.html',
+                           years=years_for_display) # Pass years for initial dropdown values
+
+# Renamed from /api/yearly_white_ball_data
+@app.route('/api/white_ball_trends')
+def api_white_ball_trends_route():
+    if df.empty:
+        return jsonify({"error": "Historical data not loaded or is empty."}), 500
+    
+    period_type = request.args.get('period', 'year') # Default to 'year'
+
+    # Cache the data based on the period type
+    # Pass df directly to the function, not for cache key serialization
+    # Removed start_year parameter, it's now dynamically calculated within the function
+    white_ball_data, period_labels = get_cached_analysis(
+        f'white_ball_frequency_{period_type}', 
+        get_white_ball_frequency_by_period, 
+        df, 
+        period_type=period_type
+    )
+    
+    return jsonify({
+        'data': white_ball_data,
+        'period_labels': period_labels
+    })
+
+# --- Smart Pick Generator Logic (New Functions and Route) ---
+
+def _get_current_month_hot_numbers(df_source):
+    """
+    Identifies numbers that have appeared more than once in the current (incomplete) month's draws.
+    Returns a set of these hot numbers.
+    """
+    if df_source.empty:
+        return set()
+
+    df_copy = df_source.copy()
+    if 'Draw Date_dt' not in df_copy.columns:
+        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
+
+    if df_copy.empty:
+        return set()
+
+    current_month_start = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    current_month_df = df_copy[df_copy['Draw Date_dt'] >= current_month_start]
+
+    if current_month_df.empty:
+        return set()
+
+    monthly_counts = defaultdict(int)
+    for _, row in current_month_df.iterrows():
+        for i in range(1, 6):
+            num = int(row[f'Number {i}'])
+            monthly_counts[num] += 1
+        monthly_counts[int(row['Powerball'])] += 1 # Include Powerball in hot numbers consideration
+
+    hot_numbers = {num for num, count in monthly_counts.items() if count > 1}
+    return hot_numbers
+
+def _score_pick_for_patterns(white_balls, criteria_data):
+    """
+    Scores a generated white ball pick based on how well it aligns with various
+    pattern-based preferences (soft constraints). Higher score means better alignment.
+    """
+    score = 0
+    wb_set = set(white_balls)
+    sorted_wb = sorted(white_balls)
+
+    # 1. Grouped Patterns Score
+    if criteria_data['prioritize_grouped_patterns'] and criteria_data['most_frequent_grouped_patterns']:
+        for pattern_info in criteria_data['most_frequent_grouped_patterns']:
+            pattern_set = set(pattern_info['pattern'])
+            if pattern_set.issubset(wb_set):
+                # Give higher score for more frequent patterns
+                score += pattern_info['count'] * 0.1 # Adjust multiplier as needed
+
+    # 2. Special Patterns Score
+    if criteria_data['prioritize_special_patterns'] and criteria_data['most_frequent_special_patterns']:
+        # Combine all special patterns for scoring
+        all_special_patterns = []
+        all_special_patterns.extend(criteria_data['most_frequent_special_patterns']['tens_apart_patterns'])
+        all_special_patterns.extend(criteria_data['most_frequent_special_patterns']['same_last_digit_patterns'])
+        all_special_patterns.extend(criteria_data['most_frequent_special_patterns']['repeating_digit_patterns'])
+        
+        for pattern_info in all_special_patterns:
+            pattern_set = set(pattern_info['pattern'])
+            if pattern_set.issubset(wb_set):
+                score += pattern_info['count'] * 0.05 # Smaller multiplier for special patterns
+
+    # 3. Consecutive Trends Score
+    if criteria_data['prioritize_consecutive_patterns']:
+        consecutive_sequences = _find_consecutive_sequences(white_balls) # Use the correct function
+        score += len(consecutive_sequences) * 5 # Score for each consecutive sequence found
+        # Add bonus for triplets if present (check if any sequence is length 3)
+        if any(len(s) >= 3 for s in consecutive_sequences):
+            score += 10 # Bonus for a triplet
+
+    # 4. Monthly Hot Numbers Score
+    if criteria_data['prioritize_monthly_hot'] and criteria_data['current_month_hot_numbers']:
+        hot_count = len(wb_set.intersection(criteria_data['current_month_hot_numbers']))
+        score += hot_count * 2 # Score for each hot number included
+
+    return score
+
+def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a, odd_even_choice, sum_range_tuple, prioritize_monthly_hot, prioritize_grouped_patterns, prioritize_special_patterns, prioritize_consecutive_patterns, force_specific_pattern):
+    """
+    Generates Powerball picks based on a combination of hard and soft criteria.
+    """
+    if df_source.empty:
+        raise ValueError("Historical data is empty. Cannot generate smart picks.")
+
     generated_sets = []
+    max_overall_attempts = 5000 * num_sets # Increased attempts for complex criteria
+
+    # Pre-calculate historical data needed for soft constraints
+    # These are cached, so calling them here is efficient
+    all_grouped_patterns = get_cached_analysis('grouped_patterns', get_grouped_patterns_over_years, df_source)
+    all_special_patterns = get_cached_analysis('special_patterns_analysis', get_special_patterns_analysis, df_source)
+    
+    # For scoring, we need a flat list of most frequent patterns
+    most_frequent_grouped_patterns = sorted(all_grouped_patterns, key=lambda x: x['count'], reverse=True)[:50] # Top 50 grouped patterns
+    
+    # Combine all special patterns into one list for easier scoring
+    most_frequent_special_patterns = {
+        'tens_apart_patterns': sorted(all_special_patterns['tens_apart_patterns'], key=lambda x: x['count'], reverse=True)[:20],
+        'same_last_digit_patterns': sorted(all_special_patterns['same_last_digit_patterns'], key=lambda x: x['count'], reverse=True)[:20],
+        'repeating_digit_patterns': sorted(all_special_patterns['repeating_digit_patterns'], key=lambda x: x['count'], reverse=True)[:20]
+    }
+
+    current_month_hot_numbers = set()
+    if prioritize_monthly_hot:
+        current_month_hot_numbers = _get_current_month_hot_numbers(df_source)
+
+    # Prepare criteria data for scoring function
+    criteria_for_scoring = {
+        'prioritize_monthly_hot': prioritize_monthly_hot,
+        'current_month_hot_numbers': current_month_hot_numbers,
+        'prioritize_grouped_patterns': prioritize_grouped_patterns,
+        'most_frequent_grouped_patterns': most_frequent_grouped_patterns,
+        'prioritize_special_patterns': prioritize_special_patterns,
+        'most_frequent_special_patterns': most_frequent_special_patterns,
+        'prioritize_consecutive_patterns': prioritize_consecutive_patterns,
+    }
+
     for _ in range(num_sets):
-        white_balls = sorted(random.sample(range(1, 70), 5))
-        powerball = random.randint(1, 26)
-        generated_sets.append({'white_balls': white_balls, 'powerball': powerball})
+        best_pick_white_balls = None
+        best_pick_powerball = None
+        highest_score = -1
+        current_set_attempts = 0
+        max_attempts_per_set = max_overall_attempts // num_sets # Distribute attempts
+
+        while current_set_attempts < max_attempts_per_set:
+            current_set_attempts += 1
+            
+            candidate_white_balls = []
+            candidate_powerball = random.randint(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1])
+            
+            # 1. Handle Forced Specific Pattern (Hard Constraint)
+            remaining_to_pick = 5
+            temp_excluded = set(excluded_numbers)
+            
+            if force_specific_pattern:
+                for num in force_specific_pattern:
+                    if not (GLOBAL_WHITE_BALL_RANGE[0] <= num <= GLOBAL_WHITE_BALL_RANGE[1]) or num in temp_excluded:
+                        # If forced number is invalid or excluded, this attempt fails
+                        continue 
+                candidate_white_balls.extend(force_specific_pattern)
+                temp_excluded.update(force_specific_pattern)
+                remaining_to_pick -= len(force_specific_pattern)
+                
+            # Ensure we have enough numbers left to pick
+            if remaining_to_pick < 0: # Should not happen with valid input
+                continue
+            
+            available_pool = [n for n in range(GLOBAL_WHITE_BALL_RANGE[0], GLOBAL_WHITE_BALL_RANGE[1] + 1)
+                              if n not in temp_excluded and n not in candidate_white_balls]
+
+            if len(available_pool) < remaining_to_pick:
+                continue # Not enough numbers to complete the pick
+
+            # 2. Handle Group A Numbers (Hard Constraint)
+            # Determine how many more Group A numbers are needed
+            current_group_a_count = sum(1 for num in candidate_white_balls if num in group_a)
+            needed_from_group_a = num_from_group_a - current_group_a_count
+
+            temp_available_pool = list(available_pool) # Copy to modify
+            
+            if needed_from_group_a > 0:
+                possible_group_a_from_pool = [n for n in temp_available_pool if n in group_a]
+                if len(possible_group_a_from_pool) < needed_from_group_a:
+                    continue # Not enough Group A numbers available
+                
+                try:
+                    selected_group_a = random.sample(possible_group_a_from_pool, needed_from_group_a)
+                    candidate_white_balls.extend(selected_group_a)
+                    temp_excluded.update(selected_group_a)
+                    remaining_to_pick -= needed_from_group_a
+                    
+                    # Update available pool after selecting Group A numbers
+                    available_pool = [n for n in available_pool if n not in selected_group_a]
+                except ValueError: # Not enough elements to sample
+                    continue
+            elif needed_from_group_a < 0: # Already have too many Group A numbers from forced pattern
+                # This scenario means the forced pattern already violates the Group A count.
+                # We should probably raise an error earlier or ensure the UI prevents this.
+                # For now, just skip this candidate.
+                continue
+
+            # 3. Fill remaining spots randomly from available pool
+            if remaining_to_pick > 0:
+                if len(available_pool) < remaining_to_pick:
+                    continue # Not enough numbers left
+                try:
+                    random_fill = random.sample(available_pool, remaining_to_pick)
+                    candidate_white_balls.extend(random_fill)
+                except ValueError: # Not enough elements to sample
+                    continue
+            
+            # Ensure 5 unique white balls
+            if len(set(candidate_white_balls)) != 5:
+                continue
+            
+            candidate_white_balls = sorted(candidate_white_balls)
+
+            # 4. Check Odd/Even Split (Hard Constraint)
+            even_count = sum(1 for num in candidate_white_balls if num % 2 == 0)
+            odd_count = 5 - even_count
+            
+            # Adjusted for expected format from form (e.g., "3 Even / 2 Odd")
+            expected_odd_even_split = odd_even_choice
+            
+            # If a specific odd/even choice is made, apply it strictly
+            if expected_odd_even_split != "Any":
+                current_split_str = f"{odd_count} Odd / {even_count} Even"
+                if current_split_str != expected_odd_even_split:
+                    # Special handling for "All Even" or "All Odd" which are specific cases
+                    if expected_odd_even_split == "All Even" and even_count != 5: continue
+                    if expected_odd_even_split == "All Odd" and odd_count != 5: continue
+                    # For other named splits, check for exact match
+                    if expected_odd_even_split not in ["All Even", "All Odd"] and current_split_str != expected_odd_even_split: continue
+
+            # 5. Check Sum Range (Hard Constraint)
+            current_sum = sum(candidate_white_balls)
+            if sum_range_tuple and not (sum_range_tuple[0] <= current_sum <= sum_range_tuple[1]):
+                continue
+
+            # 6. Check against last draw and historical exact matches (Hard Constraint)
+            if check_exact_match(candidate_white_balls): 
+                continue
+            
+            last_draw_data = get_last_draw(df_source)
+            if not last_draw_data.empty and last_draw_data.get('Draw Date') != 'N/A':
+                last_white_balls = [int(last_draw_data['Number 1']), int(last_draw_data['Number 2']), int(last_draw_data['Number 3']), int(last_draw_data['Number 4']), int(last_draw_data['Number 5'])]
+                if set(candidate_white_balls) == set(last_white_balls) and candidate_powerball == int(last_draw_data['Powerball']):
+                    continue
+
+            # All hard constraints met, now score for soft constraints
+            current_score = _score_pick_for_patterns(candidate_white_balls, criteria_for_scoring)
+
+            if current_score > highest_score:
+                highest_score = current_score
+                best_pick_white_balls = candidate_white_balls
+                best_pick_powerball = candidate_powerball
+            
+            # If we found a perfect pick (can define "perfect" as score > threshold or just the first valid one)
+            # For now, if a pick has a positive score and meets all hard constraints, we can consider it "good enough"
+            # to prevent excessive iterations if many options exist, especially for lower `num_sets`.
+            if highest_score > 0 and current_set_attempts > max_attempts_per_set / 2: # Found a good one relatively early
+                 break
+        
+        if best_pick_white_balls:
+            generated_sets.append({'white_balls': best_pick_white_balls, 'powerball': best_pick_powerball})
+        else:
+            raise ValueError(f"Could not generate a smart pick meeting all criteria after {max_attempts_per_set} attempts. Try adjusting filters or reducing strictness.")
+            
     return generated_sets
 
 
 @app.route('/smart_pick_generator')
 def smart_pick_generator_route():
-    # This is the route for your 'Pattern-Based Smart Pick Generator' HTML page
+    if df.empty:
+        flash("Cannot load Smart Pick Generator: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
     return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
 
-# The form POST for the 'Pattern-Based Smart Pick Generator'
 @app.route('/generate_smart_picks_route', methods=['POST'])
-def generate_smart_picks_submission_route(): # Renamed to differentiate from the homepage's AJAX route
+def generate_smart_picks_route():
     if df.empty:
         flash("Cannot generate smart picks: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
@@ -2829,8 +3660,8 @@ def generate_smart_picks_submission_route(): # Renamed to differentiate from the
                 flash("Forced specific pattern numbers must be unique.", 'error')
                 return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
 
-        # Call the core smart pick generation function
-        generated_sets = generate_smart_picks_core_logic( # Using the placeholder/actual core logic
+
+        generated_sets = generate_smart_picks(
             df_source=df,
             num_sets=num_sets_to_generate,
             excluded_numbers=excluded_numbers_local,
