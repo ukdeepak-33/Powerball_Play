@@ -2048,7 +2048,120 @@ def get_consecutive_numbers_yearly_trends(df_source):
         'years': list(years_to_analyze), 
         'all_consecutive_pairs_flat': flat_consecutive_sequences_list # Also corrected return key
     }
+# Define the specific ranges and target positions as per your request
+POSITIONAL_ANALYSIS_CONFIG = {
+    "1-10": {"range": (1, 10), "positions": [1]},
+    "11-20": {"range": (11, 20), "positions": [2, 3]},
+    "21-30": {"range": (21, 30), "positions": [1, 2, 3, 4, 5]},
+    "31-40": {"range": (31, 40), "positions": [1, 2, 3, 4, 5]},
+    "41-50": {"range": (41, 50), "positions": [1, 2, 3, 4, 5]},
+    "51-60": {"range": (51, 60), "positions": [3, 4, 5]},
+    "61-69": {"range": (61, 69), "positions": [3, 4, 5]},
+}
 
+def get_positional_range_frequency_analysis(df_source):
+    """
+    Analyzes the frequency and percentage of white balls appearing at specific
+    sorted positions within predefined number ranges, broken down by year.
+
+    Args:
+        df_source (pd.DataFrame): The historical Powerball draw data, expected to have
+                                  'Draw Date_dt' (datetime) and 'Number 1' through 'Number 5'.
+
+    Returns:
+        list: A list of dictionaries, each representing a year's positional analysis.
+              Each yearly dictionary contains:
+              - 'year': The year (e.g., 2017)
+              - 'total_draws': Total number of draws in that year.
+              - 'data': A list of dictionaries, each for a configured number range/position combo.
+                        Each combo dictionary contains:
+                        - 'range_label': e.g., "1-10"
+                        - 'position': e.g., 1 (for 1st ball)
+                        - 'count': Number of times this combination occurred.
+                        - 'percentage': Percentage of total draws in that year where this occurred.
+    """
+    if df_source.empty:
+        return []
+
+    # Ensure 'Draw Date_dt' is datetime and numbers are int
+    df_copy = df_source.copy()
+    if 'Draw Date_dt' not in df_copy.columns:
+        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
+
+    if df_copy.empty:
+        return []
+
+    for i in range(1, 6):
+        col = f'Number {i}'
+        if col in df_copy.columns:
+            df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce').fillna(0).astype(int)
+
+    # Filter years from 2017 to current year
+    current_year = datetime.now().year
+    years_to_analyze = sorted([y for y in df_copy['Draw Date_dt'].dt.year.unique() if 2017 <= y <= current_year])
+
+    yearly_analysis_results = []
+
+    for year in years_to_analyze:
+        yearly_df = df_copy[df_copy['Draw Date_dt'].dt.year == year].copy()
+        total_draws_in_year = len(yearly_df)
+
+        if total_draws_in_year == 0:
+            yearly_analysis_results.append({
+                'year': int(year),
+                'total_draws': 0,
+                'data': []
+            })
+            continue
+
+        # Use defaultdict to count occurrences for each configured combination
+        # Key: (range_label, position)
+        counts = defaultdict(int)
+
+        for idx, row in yearly_df.iterrows():
+            # Get the sorted white balls for the current draw
+            white_balls_sorted = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+
+            for range_label, config in POSITIONAL_ANALYSIS_CONFIG.items():
+                min_val, max_val = config["range"]
+                target_positions = config["positions"]
+
+                for pos_idx in range(len(white_balls_sorted)):
+                    # Adjust to 1-based position for user-friendly labels (1st, 2nd, etc.)
+                    current_position = pos_idx + 1
+                    current_ball_value = white_balls_sorted[pos_idx]
+
+                    # Check if the ball's value is within the specified range
+                    # AND if its position is one of the target positions for that range
+                    if min_val <= current_ball_value <= max_val and current_position in target_positions:
+                        counts[(range_label, current_position)] += 1
+
+        # Format results for the current year
+        year_data = []
+        for (range_label, position), count in counts.items():
+            percentage = round((count / total_draws_in_year) * 100, 2) if total_draws_in_year > 0 else 0.0
+            year_data.append({
+                'range_label': range_label,
+                'position': position,
+                'count': count,
+                'percentage': percentage
+            })
+        
+        # Sort data for consistent display (e.g., by range_label then position)
+        year_data.sort(key=lambda x: (x['range_label'], x['position']))
+
+        yearly_analysis_results.append({
+            'year': int(year),
+            'total_draws': total_draws_in_year,
+            'data': year_data
+        })
+    
+    # Sort years in descending order for display (most recent first)
+    yearly_analysis_results.sort(key=lambda x: x['year'], reverse=True)
+
+    return yearly_analysis_results
+    
 def get_powerball_position_frequency(df_source):
     if df_source.empty:
         return {}
@@ -3482,7 +3595,25 @@ def api_white_ball_trends_route():
         'data': white_ball_data,
         'period_labels': period_labels
     })
+    
+@app.route('/positional_analysis')
+def positional_analysis_route():
+    if df.empty:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({"error": "Historical data not loaded or is empty."}), 500
+        else:
+            flash("Cannot display Positional Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+            return redirect(url_for('index'))
 
+    # Pass df directly to the function for analysis
+    positional_data = get_cached_analysis('positional_range_frequency', get_positional_range_frequency_analysis, df)
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        # This is an AJAX request, return JSON
+        return jsonify(positional_data)
+    else:
+        # Not an AJAX request, render the full template (we'll create this next)
+        return render_template('positional_analysis.html', positional_data=positional_data)
 # --- Smart Pick Generator Logic (New Functions and Route) ---
 
 def _get_current_month_hot_numbers(df_source):
