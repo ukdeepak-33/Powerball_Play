@@ -23,7 +23,7 @@
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Configure & Run Simulation</h2>
         <p class="text-gray-700 mb-6">Simulate hypothetical Powerball draws based on your chosen criteria. A live animation will show a single draw, followed by aggregated frequency results.</p>
         
-        <form id="simulationForm" class="space-y-4"> {# Changed to ID for JS submission #}
+        <form id="simulationForm" class="space-y-4">
             <div class="form-group">
                 <label for="num_draws" class="form-label">Number of Simulations (100-1000):</label>
                 <input type="number" id="num_draws" name="num_draws" class="form-input" min="100" max="1000" value="{{ num_simulations if num_simulations else 100 }}" required>
@@ -60,7 +60,7 @@
     {# Loading Indicator for Batch Simulation #}
     <div id="batchSimulationLoading" class="card p-6 bg-blue-50 rounded-lg shadow-lg text-center hidden">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-3"></div>
-        <p class="text-blue-700 text-lg font-semibold">Running {{ num_simulations if num_simulations else 'many' }} simulations...</p>
+        <p class="text-blue-700 text-lg font-semibold">Running <span id="loadingSimCount"></span> simulations...</p>
         <p class="text-blue-600 text-sm mt-1">This may take a moment. Results will appear below.</p>
     </div>
 
@@ -203,6 +203,7 @@
         const liveDrawMessage = document.getElementById('liveDrawMessage');
         
         const batchSimulationLoading = document.getElementById('batchSimulationLoading');
+        const loadingSimCount = document.getElementById('loadingSimCount'); // New element for loading count
         const simulationResultsSection = document.getElementById('simulationResultsSection');
         const simCountDisplay = document.getElementById('simCountDisplay');
 
@@ -226,10 +227,12 @@
             liveDrawMessage.textContent = '';
             simulationResultsSection.classList.add('hidden');
             batchSimulationLoading.classList.remove('hidden');
+            
+            const numDraws = numDrawsInput.value;
+            loadingSimCount.textContent = numDraws; // Update loading text
             runSimulationBtn.disabled = true;
             runSimulationBtn.textContent = 'Running Simulation...';
 
-            const numDraws = numDrawsInput.value;
             const oddEvenChoice = oddEvenSelect.value;
 
             // --- Step 1: Run Live Draw Animation ---
@@ -248,7 +251,7 @@
                 liveDrawMessage.textContent = 'An error occurred during live draw animation.';
             }
 
-            // --- Step 2: Run Batch Simulation via AJAX (simultaneously or after animation starts) ---
+            // --- Step 2: Run Batch Simulation via AJAX ---
             try {
                 const formData = new FormData();
                 formData.append('num_draws', numDraws);
@@ -256,58 +259,20 @@
 
                 const response = await fetch('/simulate_multiple_draws', {
                     method: 'POST',
-                    body: formData // Send as form data
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest' // Identify as AJAX request
+                    },
+                    body: formData
                 });
                 
-                // Flask returns HTML for the whole page on POST for this route.
-                // We need to parse it to extract the data we need.
-                // A better approach would be to make simulate_multiple_draws_route return JSON on AJAX requests.
-                // For now, let's stick to parsing the HTML for simplicity given existing structure.
-                
-                const responseText = await response.text();
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(responseText, 'text/html');
+                const result = await response.json(); // Expect JSON response
 
-                const simulatedWhiteBallFreqScript = doc.querySelector('script').textContent;
-                
-                // Extract the data passed from Flask's render_template
-                let whiteBallFreqData = [];
-                let powerballFreqData = [];
-                let numSimulations = 0;
-
-                // Regex to find the JSON data in the script tag
-                const wbMatch = simulatedWhiteBallFreqScript.match(/whiteBallFreqData = (\[.*?\]);/s);
-                const pbMatch = simulatedWhiteBallFreqScript.match(/powerballFreqData = (\[.*?\]);/s);
-                const numSimMatch = simulatedWhiteBallFreqScript.match(/num_simulations=(\d+)/);
-
-
-                if (wbMatch && pbMatch) {
-                    try {
-                        whiteBallFreqData = JSON.parse(wbMatch[1]);
-                        powerballFreqData = JSON.parse(pbMatch[1]);
-                        numSimulations = numSimMatch ? parseInt(numSimMatch[1]) : 0;
-                    } catch (parseError) {
-                        console.error('Error parsing JSON from script:', parseError);
-                    }
-                } else {
-                     // Fallback for direct data if not in script tag
-                    const fallbackWbData = doc.getElementById('fallbackWhiteBallData')?.textContent;
-                    const fallbackPbData = doc.getElementById('fallbackPowerballData')?.textContent;
-                    if (fallbackWbData && fallbackPbData) {
-                         try {
-                            whiteBallFreqData = JSON.parse(fallbackWbData);
-                            powerballFreqData = JSON.parse(fallbackPbData);
-                             numSimulations = doc.getElementById('fallbackNumSimulations')?.textContent ? parseInt(doc.getElementById('fallbackNumSimulations').textContent) : 0;
-                        } catch (parseError) {
-                            console.error('Error parsing fallback JSON:', parseError);
-                        }
-                    }
-                }
-
-                if (whiteBallFreqData && whiteBallFreqData.length > 0) {
-                    simCountDisplay.textContent = numSimulations;
-                    renderSimulatedCharts(whiteBallFreqData, powerballFreqData);
-                    displayHotNumbers(whiteBallFreqData, powerballFreqData, numSimulations);
+                if (result.error) {
+                    showFlashMessage(result.error, "error");
+                } else if (result.simulated_white_ball_freq && result.simulated_white_ball_freq.length > 0) {
+                    simCountDisplay.textContent = result.num_simulations;
+                    renderSimulatedCharts(result.simulated_white_ball_freq, result.simulated_powerball_freq);
+                    displayHotNumbers(result.simulated_white_ball_freq, result.simulated_powerball_freq, result.num_simulations);
                     simulationResultsSection.classList.remove('hidden');
                 } else {
                     showFlashMessage("No simulation data returned. Check filters or backend logs.", "error");
@@ -329,9 +294,14 @@
             liveDrawMessage.textContent = 'Drawing...';
 
             const delays = [0, 6000, 7000, 8000, 9000]; // Delays for WB1, WB2, WB3, WB4, WB5 (relative to start)
+            let cumulativeDelay = 0;
 
             for (let i = 0; i < whiteBalls.length; i++) {
-                await new Promise(resolve => setTimeout(resolve, delays[i] - (i > 0 ? delays[i-1] : 0))); // Calculate diff delay
+                // Calculate delay for this ball: current ball's absolute delay - previous ball's absolute delay
+                const currentBallDelay = delays[i] - cumulativeDelay;
+                await new Promise(resolve => setTimeout(resolve, currentBallDelay));
+                cumulativeDelay += currentBallDelay;
+
                 const ball = document.createElement('span');
                 ball.classList.add('ball-animation');
                 ball.textContent = whiteBalls[i];
@@ -339,7 +309,10 @@
                 setTimeout(() => ball.classList.add('ball-appear'), 50); // Small delay to trigger transition
             }
 
-            await new Promise(resolve => setTimeout(resolve, 15000 - delays[whiteBalls.length - 1])); // Delay for Powerball
+            // Calculate delay for Powerball
+            const powerballDelay = 15000 - cumulativeDelay;
+            await new Promise(resolve => setTimeout(resolve, powerballDelay));
+            
             const powerballElement = document.createElement('span');
             powerballElement.classList.add('ball-animation', 'powerball-animation');
             powerballElement.textContent = powerball;
@@ -503,7 +476,30 @@
                 hotPowerballsContainer.innerHTML = `<p class="text-gray-500">No hot powerballs detected in this simulation (all numbers appeared equally or zero based on ${numSimulations} draws).</p>`;
             }
         }
+
+        // Helper function to show flash messages
+        function showFlashMessage(message, category) {
+            const flashMessagesDiv = document.querySelector('.flash-messages') || document.createElement('div');
+            flashMessagesDiv.className = 'flash-messages space-y-3'; // Ensure class if created
+            if (!document.querySelector('.flash-messages')) {
+                // If it didn't exist, prepend it to the main content div
+                document.querySelector('.space-y-8.max-w-6xl.mx-auto.px-4.sm\\:px-6.lg\\:px-8.py-8').prepend(flashMessagesDiv);
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `p-4 rounded-lg shadow-md text-sm animate-fade-in ${
+                category === 'error' ? 'bg-red-100 text-red-700 border border-red-200' :
+                category === 'info' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                'bg-green-100 text-green-700 border border-green-200'
+            }`;
+            messageDiv.innerHTML = `<p class="font-medium">${message}</p>`;
+            flashMessagesDiv.appendChild(messageDiv);
+
+            // Optional: Auto-hide after some time
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 5000); 
+        }
     });
 </script>
-
 {% endblock %}
