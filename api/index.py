@@ -613,12 +613,12 @@ def simulate_multiple_draws(df_source, group_a, odd_even_choice, white_ball_rang
     
     full_white_ball_range_list = list(range(GLOBAL_WHITE_BALL_RANGE[0], GLOBAL_WHITE_BALL_RANGE[1] + 1))
     simulated_white_ball_freq_list = sorted([
-        {'Number': int(n), 'Frequency': int(white_ball_results[n])} for n in full_white_ball_range_list
+        {'Number': n, 'Frequency': white_ball_results[n]} for n in full_white_ball_range_list
     ], key=lambda x: x['Number'])
 
     full_powerball_range_list = list(range(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1] + 1))
     simulated_powerball_freq_list = sorted([
-        {'Number': int(n), 'Frequency': int(powerball_results[n])} for n in full_powerball_range_list
+        {'Number': n, 'Frequency': powerball_results[n]} for n in full_powerball_range_list
     ], key=lambda x: x['Number'])
 
     return {'white_ball_freq': simulated_white_ball_freq_list, 'powerball_freq': simulated_powerball_freq_list}
@@ -1136,12 +1136,8 @@ def analyze_generated_batch_against_official_draw(generated_picks_list, official
             category = "Match 3 White Balls Only"
         elif white_matches == 2 and powerball_match == 1:
             category = "Match 2 White Balls + Powerball"
-        elif white_matches == 2 and powerball_match == 0: # Added this case
-            category = "No Match" # For 2 white balls, but no Powerball match = no prize
         elif white_matches == 1 and powerball_match == 1:
             category = "Match 1 White Ball + Powerball"
-        elif white_matches == 1 and powerball_match == 0: # Added this case
-            category = "No Match" # For 1 white ball, but no Powerball match = no prize
         elif white_matches == 0 and powerball_match == 1:
             category = "Match Powerball Only"
         
@@ -1754,6 +1750,9 @@ def get_special_patterns_analysis(df_source):
     tens_apart_counts = defaultdict(int)
     same_last_digit_counts = defaultdict(int)
     repeating_digit_counts = defaultdict(int)
+    
+    total_draws = len(df_source) if not df_source.empty else 0
+
 
     all_tens_apart_pairs = set()
     for n1 in range(1, 60): 
@@ -1812,9 +1811,24 @@ def get_special_patterns_analysis(df_source):
                     repeating_digit_counts[pattern_combo] += 1
 
 
-    formatted_tens_apart = sorted([{'pattern': list(p), 'count': c} for p, c in tens_apart_counts.items()], key=lambda x: (-x['count'], str(x['pattern'])))
-    formatted_same_last_digit = sorted([{'pattern': list(p), 'count': c} for p, c in same_last_digit_counts.items()], key=lambda x: (-x['count'], str(x['pattern'])))
-    formatted_repeating_digit = sorted([{'pattern': list(p), 'count': c} for p, c in repeating_digit_counts.items()], key=lambda x: (-x['count'], str(x['pattern'])))
+    formatted_tens_apart = []
+    for p, c in tens_apart_counts.items():
+        percentage = round((c / total_draws) * 100, 2) if total_draws > 0 else 0.0
+        formatted_tens_apart.append({'pattern': list(p), 'count': c, 'percentage': percentage})
+    formatted_tens_apart.sort(key=lambda x: (-x['count'], str(x['pattern'])))
+
+    formatted_same_last_digit = []
+    for p, c in same_last_digit_counts.items():
+        percentage = round((c / total_draws) * 100, 2) if total_draws > 0 else 0.0
+        formatted_same_last_digit.append({'pattern': list(p), 'count': c, 'percentage': percentage})
+    formatted_same_last_digit.sort(key=lambda x: (-x['count'], str(x['pattern'])))
+
+    formatted_repeating_digit = []
+    for p, c in repeating_digit_counts.items():
+        percentage = round((c / total_draws) * 100, 2) if total_draws > 0 else 0.0
+        formatted_repeating_digit.append({'pattern': list(p), 'count': c, 'percentage': percentage})
+    formatted_repeating_digit.sort(key=lambda x: (-x['count'], str(x['pattern'])))
+
 
     return {
         'tens_apart_patterns': formatted_tens_apart,
@@ -2600,11 +2614,11 @@ def find_results_by_sum_route():
 @app.route('/simulate_multiple_draws', methods=['GET', 'POST'])
 def simulate_multiple_draws_route():
     if df.empty:
-        flash("Cannot run simulation: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        # Check if it's an AJAX request to return JSON error
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({"error": "Historical data not loaded or is empty.", "success": False}), 500
-        return redirect(url_for('index'))
+            return jsonify({"error": "Historical data not loaded or is empty."}), 500
+        else:
+            flash("Cannot run simulation: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+            return redirect(url_for('index'))
 
     simulated_white_ball_freq_list = []
     simulated_powerball_freq_list = []
@@ -2628,26 +2642,33 @@ def simulate_multiple_draws_route():
             simulated_white_ball_freq_list = sim_results['white_ball_freq']
             simulated_powerball_freq_list = sim_results['powerball_freq']
         else:
-            flash("Please enter a valid number for Number of Simulations.", 'error')
-            # If AJAX and validation fails
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({"error": "Please enter a valid number for Number of Simulations.", "success": False}), 400
+                return jsonify({"error": "Please enter a valid number for Number of Simulations."}), 400
+            else:
+                flash("Please enter a valid number for Number of Simulations.", 'error')
 
-    # If this is an AJAX request, return JSON
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return jsonify({
-            "success": True,
-            "simulated_white_ball_freq": simulated_white_ball_freq_list,
-            "simulated_powerball_freq": simulated_powerball_freq_list,
-            "num_simulations": num_draws_display,
-            "selected_odd_even_choice": odd_even_choice_display
-        })
-    # Otherwise, render the full HTML page
+
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            # This is an AJAX request, return JSON
+            return jsonify({
+                "simulated_white_ball_freq": simulated_white_ball_freq_list,
+                "simulated_powerball_freq": simulated_powerball_freq_list,
+                "num_simulations": num_draws_display
+            })
+        else:
+            # Not an AJAX request, render the full template
+            return render_template('simulate_multiple_draws.html', 
+                                simulated_white_ball_freq=simulated_white_ball_freq_list, 
+                                simulated_powerball_freq=simulated_powerball_freq_list,   
+                                num_simulations=num_draws_display,
+                                selected_odd_even_choice=odd_even_choice_display)
+
+    # For GET requests, render the initial template
     return render_template('simulate_multiple_draws.html', 
-                           simulated_white_ball_freq=simulated_white_ball_freq_list, 
-                           simulated_powerball_freq=simulated_powerball_freq_list,   
-                           num_simulations=num_draws_display,
-                           selected_odd_even_choice=odd_even_choice_display)
+                           simulated_white_ball_freq=[], # Start with empty data for GET
+                           simulated_powerball_freq=[],   # Start with empty data for GET
+                           num_simulations=100, # Default value for display
+                           selected_odd_even_choice="Any")
 
 # NEW API endpoint for generating a single draw for animation purposes
 @app.route('/api/generate_single_draw', methods=['GET'])
@@ -2831,14 +2852,22 @@ def boundary_crossing_pairs_trends_route():
 @app.route('/special_patterns_analysis')
 def special_patterns_analysis_route():
     if df.empty:
-        flash("Cannot display Special Patterns Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return redirect(url_for('index'))
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({"error": "Historical data not loaded or is empty."}), 500
+        else:
+            flash("Cannot display Special Patterns Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+            return redirect(url_for('index'))
     
     # Pass df directly to the function, not for cache key serialization
     special_patterns_data = get_cached_analysis('special_patterns_analysis', get_special_patterns_analysis, df)
-    
-    return render_template('special_patterns_analysis.html',
-                           special_patterns_data=special_patterns_data)
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        # This is an AJAX request, return JSON
+        return jsonify(special_patterns_data)
+    else:
+        # Not an AJAX request, render the full template
+        return render_template('special_patterns_analysis.html',
+                            special_patterns_data=special_patterns_data)
 
 
 @app.route('/find_results_by_first_white_ball', methods=['GET', 'POST'])
@@ -3430,7 +3459,7 @@ def _score_pick_for_patterns(white_balls, criteria_data):
                 # Give higher score for more frequent patterns
                 score += pattern_info['count'] * 0.1 # Adjust multiplier as needed
 
-     # 2. Special Patterns Score
+    # 2. Special Patterns Score
     if criteria_data['prioritize_special_patterns'] and criteria_data['most_frequent_special_patterns']:
         # Combine all special patterns for scoring
         all_special_patterns = []
@@ -3725,3 +3754,4 @@ def generate_smart_picks_route():
         traceback.print_exc()
         flash(f"An unexpected error occurred: {e}", 'error')
         return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
+
