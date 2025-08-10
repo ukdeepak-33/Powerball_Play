@@ -20,19 +20,52 @@
     {% endwith %}
 
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Special Number Patterns by Year</h2>
-        <p class="text-gray-700 mb-6">Explore how often specific special number patterns have appeared in Powerball draws for each year from 2017 to the current year. Each section below represents a year and contains detailed tables for Tens-Apart, Same Last Digit, and Repeating Digit patterns.</p>
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Explore Special Number Patterns</h2>
+        <p class="text-gray-700 mb-6">This page analyzes historical draws for specific "special" number patterns that might be of interest, such as numbers that are a multiple of 10 apart, numbers sharing the same last digit, or repeating digit numbers. You can view recent trends and historical yearly breakdowns.</p>
 
         <div id="loadingIndicator" class="text-center text-blue-600 font-semibold py-4">
             <svg class="animate-spin h-5 w-5 mr-3 inline-block" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            Loading yearly analysis data...
+            Loading analysis data...
         </div>
 
-        <div id="yearlyPatternsContainer" class="space-y-6">
-            <!-- Yearly pattern data will be dynamically loaded here by JavaScript -->
+        <div id="analysisContent" class="space-y-8 hidden">
+            {# Recent Special Patterns Trends Card #}
+            <details class="card p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-100" open>
+                <summary class="text-xl font-bold mb-3 text-gray-800 cursor-pointer flex justify-between items-center">
+                    Recent Special Patterns (Last 12 Months)
+                    <svg class="w-6 h-6 transform transition-transform duration-200 details-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </summary>
+                <p class="text-gray-700 mb-4 mt-4">This table shows which special patterns were present in each Powerball draw over the last 12 months.</p>
+                
+                <div class="overflow-x-auto shadow-md rounded-lg pattern-table-scroll">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-blue-100 text-blue-800">
+                            <tr>
+                                <th class="py-3 px-4 text-left text-sm font-semibold">Draw Date</th>
+                                <th class="py-3 px-4 text-left text-sm font-semibold">Tens-Apart Present</th>
+                                <th class="py-3 px-4 text-left text-sm font-semibold">Same Last Digit Present</th>
+                                <th class="py-3 px-4 text-left text-sm font-semibold">Repeating Digit Present</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="recentTrendsTableBody">
+                            <tr><td colspan="4" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">Loading recent trends...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-center mt-4 hidden" id="recentTrendsToggleContainer">
+                    <button id="recentTrendsToggleBtn" class="btn-secondary">Show All</button>
+                </div>
+            </details>
+
+            {# Yearly Patterns Container #}
+            <div id="yearlyPatternsContainer" class="space-y-6">
+                <!-- Yearly pattern data will be dynamically loaded here by JavaScript -->
+            </div>
         </div>
     </div>
 </div>
@@ -55,6 +88,9 @@
         max-height: 400px; /* Limit height for scrollable tables */
         overflow-y: auto;
     }
+    .hidden-row {
+        display: none;
+    }
 </style>
 {% endblock %}
 
@@ -63,10 +99,80 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const loadingIndicator = document.getElementById('loadingIndicator');
+        const analysisContent = document.getElementById('analysisContent');
         const yearlyPatternsContainer = document.getElementById('yearlyPatternsContainer');
+        const recentTrendsTableBody = document.getElementById('recentTrendsTableBody');
+        const recentTrendsToggleBtn = document.getElementById('recentTrendsToggleBtn');
+        const recentTrendsToggleContainer = document.getElementById('recentTrendsToggleContainer');
+
+        // Function to render the recent trends table
+        function renderRecentTrends(trendsData, initialShowCount = 10) {
+            recentTrendsTableBody.innerHTML = ''; // Clear existing rows
+            if (trendsData.length === 0) {
+                const noDataRow = document.createElement('tr');
+                noDataRow.innerHTML = `<td colspan="4" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No recent special pattern trends found.</td>`;
+                recentTrendsTableBody.appendChild(noDataRow);
+                recentTrendsToggleContainer.classList.add('hidden');
+                return;
+            }
+
+            trendsData.forEach((trend, index) => {
+                const row = document.createElement('tr');
+                row.className = `hover:bg-gray-50 ${index >= initialShowCount ? 'hidden-row' : ''}`;
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${trend.draw_date}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${trend.tens_apart}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${trend.same_last_digit}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${trend.repeating_digit}</td>
+                `;
+                recentTrendsTableBody.appendChild(row);
+            });
+
+            // Setup toggle button for recent trends
+            if (trendsData.length > initialShowCount) {
+                recentTrendsToggleContainer.classList.remove('hidden');
+                recentTrendsToggleBtn.textContent = `Show All (${trendsData.length} entries)`;
+                recentTrendsToggleBtn.dataset.isExpanded = 'false';
+                // Reset scroll/max-height for the table when re-rendering
+                recentTrendsTableBody.parentElement.style.maxHeight = '';
+                recentTrendsTableBody.parentElement.style.overflowY = '';
+            } else {
+                recentTrendsToggleContainer.classList.add('hidden');
+            }
+        }
+
+        // Setup toggle functionality for the recent trends table
+        recentTrendsToggleBtn.addEventListener('click', function() {
+            let isExpanded = this.dataset.isExpanded === 'true';
+            const rows = Array.from(recentTrendsTableBody.children);
+            const initialShowCount = 10; // Must match initial render count
+
+            isExpanded = !isExpanded;
+            rows.forEach((row, index) => {
+                if (index >= initialShowCount) {
+                    if (isExpanded) {
+                        row.classList.remove('hidden-row');
+                    } else {
+                        row.classList.add('hidden-row');
+                    }
+                }
+            });
+
+            if (isExpanded) {
+                this.textContent = 'Show Less';
+                recentTrendsTableBody.parentElement.style.maxHeight = '400px'; 
+                recentTrendsTableBody.parentElement.style.overflowY = 'auto';
+            } else {
+                this.textContent = `Show All (${rows.length} entries)`;
+                recentTrendsTableBody.parentElement.style.maxHeight = ''; 
+                recentTrendsTableBody.parentElement.style.overflowY = '';
+            }
+            this.dataset.isExpanded = isExpanded.toString();
+        });
+
 
         // Function to create and render a single pattern table (tens, same last, repeating)
-        function renderPatternTable(containerElement, patterns, title, typeId, totalDraws) {
+        function renderPatternTable(containerElement, patterns, typeId, totalDraws) {
             // Create sort dropdown
             const sortDiv = document.createElement('div');
             sortDiv.className = 'mb-4';
@@ -82,7 +188,7 @@
 
             // Create table structure
             const tableContainer = document.createElement('div');
-            tableContainer.className = 'overflow-x-auto shadow-md rounded-lg pattern-table-scroll'; // Added scroll class
+            tableContainer.className = 'overflow-x-auto shadow-md rounded-lg pattern-table-scroll';
             tableContainer.innerHTML = `
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-blue-100 text-blue-800">
@@ -101,18 +207,21 @@
             const tableBody = document.getElementById(`${typeId}TableBody-${containerElement.dataset.year}`);
             const sortSelect = document.getElementById(`${typeId}SortOrder-${containerElement.dataset.year}`);
 
-            // Function to sort and render rows
+            // Function to sort and render rows for yearly tables
             const sortAndRenderRows = (currentPatterns, currentSortOrder, initialShowCount = 10) => {
                 let sortedData = [...currentPatterns];
                 sortedData.sort((a, b) => {
                     if (currentSortOrder === 'count_desc') {
                         if (b.count !== a.count) return b.count - a.count;
-                        return a.pattern[0] - b.pattern[0];
+                        return a.pattern[0] - b.pattern[0] || (a.pattern[1] !== undefined ? a.pattern[1] - b.pattern[1] : 0) || (a.pattern[2] !== undefined ? a.pattern[2] - b.pattern[2] : 0);
                     } else if (currentSortOrder === 'count_asc') {
                         if (a.count !== b.count) return a.count - b.count;
-                        return a.pattern[0] - b.pattern[0];
+                        return a.pattern[0] - b.pattern[0] || (a.pattern[1] !== undefined ? a.pattern[1] - b.pattern[1] : 0) || (a.pattern[2] !== undefined ? a.pattern[2] - b.pattern[2] : 0);
                     } else if (currentSortOrder === 'pattern_asc') {
-                        return a.pattern[0] - b.pattern[0];
+                        if (a.pattern[0] !== b.pattern[0]) return a.pattern[0] - b.pattern[0];
+                        if (a.pattern[1] !== undefined && b.pattern[1] !== undefined && a.pattern[1] !== b.pattern[1]) return a.pattern[1] - b.pattern[1];
+                        if (a.pattern[2] !== undefined && b.pattern[2] !== undefined && a.pattern[2] !== b.pattern[2]) return a.pattern[2] - b.pattern[2];
+                        return b.count - a.count;
                     }
                     return 0;
                 });
@@ -127,7 +236,7 @@
 
                 sortedData.forEach((pattern, index) => {
                     const row = document.createElement('tr');
-                    row.className = `hover:bg-gray-50 ${index >= initialShowCount ? 'hidden-row' : ''}`; // Use a class for toggling
+                    row.className = `hover:bg-gray-50 ${index >= initialShowCount ? 'hidden-row' : ''}`;
                     row.innerHTML = `
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">(${pattern.pattern.join(', ')})</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${pattern.count}</td>
@@ -167,15 +276,13 @@
                             });
                             this.textContent = isExpanded ? 'Show Less' : `Show All (${sortedData.length} entries)`;
                             this.dataset.isExpanded = isExpanded.toString();
-                            // Toggle max-height on table container
                             tableContainer.style.maxHeight = isExpanded ? '400px' : '';
                         });
                     } else {
-                        // Update existing button state
                         toggleContainer.classList.remove('hidden');
                         toggleBtn.textContent = `Show All (${sortedData.length} entries)`;
                         toggleBtn.dataset.isExpanded = 'false';
-                        tableContainer.style.maxHeight = ''; // Reset max height
+                        tableContainer.style.maxHeight = '';
                     }
                 } else {
                     if (toggleContainer) toggleContainer.classList.add('hidden');
@@ -191,17 +298,16 @@
             });
         }
 
-
         // Function to fetch and render all yearly data
-        async function fetchAndRenderAllYearlyPatterns() {
+        async function fetchAndRenderAllPatterns() {
             loadingIndicator.classList.remove('hidden');
-            yearlyPatternsContainer.innerHTML = ''; // Clear previous content
+            analysisContent.classList.add('hidden'); // Hide content until loaded
 
             try {
                 const response = await fetch('/special_patterns_analysis', {
                     method: 'GET',
                     headers: {
-                        'X-Requested-With': 'XMLHttpRequest' // Signal an AJAX request
+                        'X-Requested-With': 'XMLHttpRequest'
                     }
                 });
 
@@ -210,57 +316,58 @@
                     throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                 }
 
-                const yearlyData = await response.json(); // This will be a list of yearly data objects
-                
-                if (yearlyData && yearlyData.length > 0) {
-                    yearlyData.forEach(yearData => {
+                const data = await response.json(); // Data now contains yearly_data and recent_trends
+
+                // Render recent trends first
+                renderRecentTrends(data.recent_trends);
+
+                // Then render yearly data
+                yearlyPatternsContainer.innerHTML = ''; // Clear previous yearly content
+                if (data.yearly_data && data.yearly_data.length > 0) {
+                    data.yearly_data.forEach(yearData => {
                         const yearDetails = document.createElement('details');
-                        yearDetails.className = 'card p-6 bg-white rounded-xl shadow-lg border border-gray-200 mb-6';
+                        yearDetails.className = 'card p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-100 mb-6';
                         yearDetails.setAttribute('open', ''); // Open by default
 
                         yearDetails.innerHTML = `
-                            <summary class="text-2xl font-bold mb-4 text-gray-800 cursor-pointer flex justify-between items-center">
+                            <summary class="text-xl font-bold mb-3 text-gray-800 cursor-pointer flex justify-between items-center">
                                 Patterns in ${yearData.year} (${yearData.total_draws} Draws)
                                 <svg class="w-6 h-6 transform transition-transform duration-200 details-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                 </svg>
                             </summary>
                             <div class="space-y-6 mt-4" id="yearContent-${yearData.year}">
-                                <div class="bg-gray-50 p-5 rounded-lg border border-gray-100 shadow-sm">
-                                    <h3 class="text-xl font-bold mb-3 text-gray-800">Tens Apart Patterns</h3>
+                                <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+                                    <h3 class="text-lg font-bold mb-3 text-gray-800">Tens Apart Patterns</h3>
                                     <div id="tensApartPatterns-${yearData.year}" data-year="${yearData.year}"></div>
                                 </div>
-                                <div class="bg-gray-50 p-5 rounded-lg border border-gray-100 shadow-sm">
-                                    <h3 class="text-xl font-bold mb-3 text-gray-800">Same Last Digit Patterns</h3>
+                                <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+                                    <h3 class="text-lg font-bold mb-3 text-gray-800">Same Last Digit Patterns</h3>
                                     <div id="sameLastDigitPatterns-${yearData.year}" data-year="${yearData.year}"></div>
                                 </div>
-                                <div class="bg-gray-50 p-5 rounded-lg border border-gray-100 shadow-sm">
-                                    <h3 class="text-xl font-bold mb-3 text-gray-800">Repeating Digit Patterns</h3>
+                                <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+                                    <h3 class="text-lg font-bold mb-3 text-gray-800">Repeating Digit Patterns</h3>
                                     <div id="repeatingDigitPatterns-${yearData.year}" data-year="${yearData.year}"></div>
                                 </div>
                             </div>
                         `;
                         yearlyPatternsContainer.appendChild(yearDetails);
 
-                        // Now render the individual tables within each year's section
                         renderPatternTable(
                             document.getElementById(`tensApartPatterns-${yearData.year}`),
                             yearData.tens_apart_patterns,
-                            'Tens Apart Patterns',
                             'tensApart',
                             yearData.total_draws
                         );
                         renderPatternTable(
                             document.getElementById(`sameLastDigitPatterns-${yearData.year}`),
                             yearData.same_last_digit_patterns,
-                            'Same Last Digit Patterns',
                             'sameLastDigit',
                             yearData.total_draws
                         );
                         renderPatternTable(
                             document.getElementById(`repeatingDigitPatterns-${yearData.year}`),
                             yearData.repeating_digit_patterns,
-                            'Repeating Digit Patterns',
                             'repeatingDigit',
                             yearData.total_draws
                         );
@@ -276,20 +383,23 @@
                         });
                     });
                 } else {
-                    yearlyPatternsContainer.innerHTML = '<p class="text-gray-600 text-center py-8">No special pattern data available for any year.</p>';
+                    yearlyPatternsContainer.innerHTML = '<p class="text-gray-600 text-center py-8">No historical special pattern data available for any year.</p>';
                 }
+
+                analysisContent.classList.remove('hidden'); // Show content once loaded
 
             } catch (error) {
                 console.error('Error loading special patterns analysis:', error);
                 showFlashMessage(`Failed to load special patterns analysis: ${error.message}. Please try again.`, 'error');
-                yearlyPatternsContainer.innerHTML = '<p class="text-red-600 text-center py-8">An error occurred while loading data. Please check console for details.</p>';
+                analysisContent.innerHTML = '<p class="text-red-600 text-center py-8">An error occurred while loading data. Please check console for details.</p>';
+                analysisContent.classList.remove('hidden'); // Show error message
             } finally {
                 loadingIndicator.classList.add('hidden');
             }
         }
 
         // Initial fetch and render when the page loads
-        fetchAndRenderAllYearlyPatterns();
+        fetchAndRenderAllPatterns();
 
         // Helper function to show flash messages
         function showFlashMessage(message, category) {
@@ -314,4 +424,3 @@
         }
     });
 </script>
-{% endblock %}
