@@ -1739,6 +1739,12 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
     }
 
 
+from collections import defaultdict
+from datetime import datetime, timedelta
+from itertools import combinations
+import pandas as pd # Ensure pandas is imported if not already
+
+
 def get_special_patterns_analysis(df_source):
     """
     Analyzes historical draws for special number patterns (tens-apart, same last digit,
@@ -1767,7 +1773,7 @@ def get_special_patterns_analysis(df_source):
                       ...
                   ],
                   'recent_trends': [
-                      {'draw_date': '2024-07-31', 'tens_apart': 'Yes', 'same_last_digit': 'No', 'repeating_digit': 'Yes'},
+                      {'draw_date': '2024-07-31', 'tens_apart': 'Yes', 'same_last_digit': 'No', 'repeating_digit': 'Yes', 'white_balls': [1,2,3,4,5]},
                       ...
                   ]
               }
@@ -1880,22 +1886,24 @@ def get_special_patterns_analysis(df_source):
                 break
         
         same_last_digit_present = "No"
+        # Check for presence of any same last digit pattern (pairs, triplets, etc.)
         for last_digit, full_group_numbers in same_last_digit_groups_full.items():
             intersection_with_draw = white_ball_set.intersection(set(full_group_numbers))
-            if len(intersection_with_draw) >= 2:
+            if len(intersection_with_draw) >= 2: # Any combination of 2 or more
                 same_last_digit_present = "Yes"
                 break
         
         repeating_digit_present = "No"
         drawn_repeating_digits = [n for n in repeating_digit_numbers if n in white_ball_set]
-        if len(drawn_repeating_digits) >= 2:
+        if len(drawn_repeating_digits) >= 2: # Any combination of 2 or more
             repeating_digit_present = "Yes"
 
         recent_special_trends.append({
             'draw_date': draw_date_str,
             'tens_apart': tens_apart_present,
             'same_last_digit': same_last_digit_present,
-            'repeating_digit': repeating_digit_present
+            'repeating_digit': repeating_digit_present,
+            'white_balls': white_balls # Added white_balls to the data
         })
 
     return {
