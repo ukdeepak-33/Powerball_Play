@@ -40,20 +40,21 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                     </svg>
                 </summary>
-                <p class="text-gray-700 mb-4 mt-4">This table shows which special patterns were present in each Powerball draw over the last 12 months.</p>
+                <p class="text-gray-700 mb-4 mt-4">This table shows which special patterns were present in each Powerball draw over the last 12 months, along with the drawn numbers.</p>
                 
                 <div class="overflow-x-auto shadow-md rounded-lg pattern-table-scroll">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-blue-100 text-blue-800">
                             <tr>
                                 <th class="py-3 px-4 text-left text-sm font-semibold">Draw Date</th>
+                                <th class="py-3 px-4 text-left text-sm font-semibold">White Balls</th> {# ADDED THIS HEADER #}
                                 <th class="py-3 px-4 text-left text-sm font-semibold">Tens-Apart Present</th>
                                 <th class="py-3 px-4 text-left text-sm font-semibold">Same Last Digit Present</th>
                                 <th class="py-3 px-4 text-left text-sm font-semibold">Repeating Digit Present</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200" id="recentTrendsTableBody">
-                            <tr><td colspan="4" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">Loading recent trends...</td></tr>
+                            <tr><td colspan="5" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">Loading recent trends...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -91,6 +92,20 @@
     .hidden-row {
         display: none;
     }
+    /* ADDED STYLING FOR BALLS */
+    .ball {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        width: 30px;
+        height: 30px;
+        background-color: #60a5fa; /* Tailwind blue-400 */
+        color: white;
+        font-weight: bold;
+        border-radius: 50%;
+        margin: 0 2px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
 </style>
 {% endblock %}
 
@@ -110,7 +125,8 @@
             recentTrendsTableBody.innerHTML = ''; // Clear existing rows
             if (trendsData.length === 0) {
                 const noDataRow = document.createElement('tr');
-                noDataRow.innerHTML = `<td colspan="4" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No recent special pattern trends found.</td>`;
+                // Updated colspan to 5 for the new 'White Balls' column
+                noDataRow.innerHTML = `<td colspan="5" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No recent special pattern trends found.</td>`;
                 recentTrendsTableBody.appendChild(noDataRow);
                 recentTrendsToggleContainer.classList.add('hidden');
                 return;
@@ -119,8 +135,13 @@
             trendsData.forEach((trend, index) => {
                 const row = document.createElement('tr');
                 row.className = `hover:bg-gray-50 ${index >= initialShowCount ? 'hidden-row' : ''}`;
+                
+                // NEW: Generate HTML for white balls
+                const whiteBallsHtml = trend.white_balls ? trend.white_balls.map(ball => `<span class="ball">${ball}</span>`).join('') : 'N/A';
+
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${trend.draw_date}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${whiteBallsHtml}</td> {# ADDED WHITE BALLS DISPLAY #}
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${trend.tens_apart}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${trend.same_last_digit}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${trend.repeating_digit}</td>
@@ -298,7 +319,7 @@
             });
         }
 
-        // Function to fetch and render all yearly data
+        // Function to fetch and render all patterns data
         async function fetchAndRenderAllPatterns() {
             loadingIndicator.classList.remove('hidden');
             analysisContent.classList.add('hidden'); // Hide content until loaded
