@@ -276,7 +276,7 @@
                     const row = document.createElement('tr');
                     row.className = `hover:bg-gray-50 ${index >= initialShowCount ? 'hidden-row' : ''}`;
                     
-                    // NEW: Generate HTML for special pattern numbers with new styling
+                    // FIXED LINE: Ensure correct mapping and joining
                     const patternNumbersHtml = pattern.pattern ? `<div class="ball-container">${pattern.pattern.map(num => `<span class="special-pattern-ball">${num}</span>`).join('')}</div>` : 'N/A';
 
                     row.innerHTML = `
