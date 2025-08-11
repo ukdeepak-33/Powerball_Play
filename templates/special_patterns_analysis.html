@@ -155,7 +155,13 @@
                 const row = document.createElement('tr');
                 row.className = `hover:bg-gray-50 ${index >= initialShowCount ? 'hidden-row' : ''}`;
                 
-                const whiteBallsHtml = trend.white_balls ? `<div class="ball-container">${trend.white_balls.map(ball => `<span class="ball">${ball}</span>`).join('')}</div>` : 'N/A';
+                // Construct HTML for white balls, ensuring correct template literal usage
+                const whiteBallsHtml = trend.white_balls ? 
+                    `<div class="ball-container">${trend.white_balls.map(ball => `<span class="ball">${ball}</span>`).join('')}</div>` : 
+                    'N/A';
+
+                // Debugging log for whiteBallsHtml
+                console.log('Generated whiteBallsHtml:', whiteBallsHtml);
 
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${trend.draw_date}</td>
@@ -251,19 +257,15 @@
                 sortedData.sort((a, b) => {
                     if (currentSortOrder === 'count_desc') {
                         if (b.count !== a.count) return b.count - a.count;
-                        // Correctly compare patterns as arrays
-                        return String(a.pattern).localeCompare(String(b.pattern));
+                        return a.pattern[0] - b.pattern[0] || (a.pattern[1] !== undefined ? a.pattern[1] - b.pattern[1] : 0) || (a.pattern[2] !== undefined ? a.pattern[2] - b.pattern[2] : 0);
                     } else if (currentSortOrder === 'count_asc') {
                         if (a.count !== b.count) return a.count - b.count;
-                        // Correctly compare patterns as arrays
-                        return String(a.pattern).localeCompare(String(b.pattern));
+                        return a.pattern[0] - b.pattern[0] || (a.pattern[1] !== undefined ? a.pattern[1] - b.pattern[1] : 0) || (a.pattern[2] !== undefined ? a.pattern[2] - b.pattern[2] : 0);
                     } else if (currentSortOrder === 'pattern_asc') {
-                        // Compare each element in the pattern array
-                        for (let i = 0; i < Math.min(a.pattern.length, b.pattern.length); i++) {
-                            if (a.pattern[i] !== b.pattern[i]) return a.pattern[i] - b.pattern[i];
-                        }
-                        // If one pattern is a prefix of another, the shorter one comes first
-                        return a.pattern.length - b.pattern.length;
+                        if (a.pattern[0] !== b.pattern[0]) return a.pattern[0] - b.pattern[0];
+                        if (a.pattern[1] !== undefined && b.pattern[1] !== undefined && a.pattern[1] !== b.pattern[1]) return a.pattern[1] - b.pattern[1];
+                        if (a.pattern[2] !== undefined && b.pattern[2] !== undefined && a.pattern[2] !== b.pattern[2]) return a.pattern[2] - b.pattern[2];
+                        return b.count - a.count;
                     }
                     return 0;
                 });
@@ -280,10 +282,13 @@
                     const row = document.createElement('tr');
                     row.className = `hover:bg-gray-50 ${index >= initialShowCount ? 'hidden-row' : ''}`;
                     
-                    // FIXED LINE: Ensuring correct mapping and joining
-                    const patternNumbersHtml = pattern.pattern && pattern.pattern.length > 0 
-                        ? `<div class="ball-container">${pattern.pattern.map(num => `<span class="special-pattern-ball">${num}</span>`).join('')}</div>` 
-                        : 'N/A';
+                    // Fixed line: Ensure pattern.pattern is correctly mapped
+                    const patternNumbersHtml = pattern.pattern && pattern.pattern.length > 0 ? 
+                        `<div class="ball-container">${pattern.pattern.map(num => `<span class="special-pattern-ball">${num}</span>`).join('')}</div>` : 
+                        'N/A';
+
+                    // Debugging log for patternNumbersHtml
+                    console.log('Generated patternNumbersHtml:', patternNumbersHtml);
 
                     row.innerHTML = `
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${patternNumbersHtml}</td>
