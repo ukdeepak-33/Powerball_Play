@@ -251,15 +251,19 @@
                 sortedData.sort((a, b) => {
                     if (currentSortOrder === 'count_desc') {
                         if (b.count !== a.count) return b.count - a.count;
-                        return a.pattern[0] - b.pattern[0] || (a.pattern[1] !== undefined ? a.pattern[1] - b.pattern[1] : 0) || (a.pattern[2] !== undefined ? a.pattern[2] - b.pattern[2] : 0);
+                        // Correctly compare patterns as arrays
+                        return String(a.pattern).localeCompare(String(b.pattern));
                     } else if (currentSortOrder === 'count_asc') {
                         if (a.count !== b.count) return a.count - b.count;
-                        return a.pattern[0] - b.pattern[0] || (a.pattern[1] !== undefined ? a.pattern[1] - b.pattern[1] : 0) || (a.pattern[2] !== undefined ? a.pattern[2] - b.pattern[2] : 0);
+                        // Correctly compare patterns as arrays
+                        return String(a.pattern).localeCompare(String(b.pattern));
                     } else if (currentSortOrder === 'pattern_asc') {
-                        if (a.pattern[0] !== b.pattern[0]) return a.pattern[0] - b.pattern[0];
-                        if (a.pattern[1] !== undefined && b.pattern[1] !== undefined && a.pattern[1] !== b.pattern[1]) return a.pattern[1] - b.pattern[1];
-                        if (a.pattern[2] !== undefined && b.pattern[2] !== undefined && a.pattern[2] !== b.pattern[2]) return a.pattern[2] - b.pattern[2];
-                        return b.count - a.count;
+                        // Compare each element in the pattern array
+                        for (let i = 0; i < Math.min(a.pattern.length, b.pattern.length); i++) {
+                            if (a.pattern[i] !== b.pattern[i]) return a.pattern[i] - b.pattern[i];
+                        }
+                        // If one pattern is a prefix of another, the shorter one comes first
+                        return a.pattern.length - b.pattern.length;
                     }
                     return 0;
                 });
@@ -276,9 +280,10 @@
                     const row = document.createElement('tr');
                     row.className = `hover:bg-gray-50 ${index >= initialShowCount ? 'hidden-row' : ''}`;
                     
-                    // FIXED LINE: Ensure correct mapping and joining
-                    const patternNumbersHtml = (pattern.pattern && Array.isArray(pattern.pattern)) ? `<div class="ball-container">${pattern.pattern.map(num => `<span class="special-pattern-ball">${num}</span>`).join('')}</div>` : 'N/A';
-                   // const patternNumbersHtml = pattern.pattern ? `<div class="ball-container">${pattern.pattern.map(num => `<span class="special-pattern-ball">${num}</span>`).join('')}</div>` : 'N/A';
+                    // FIXED LINE: Ensuring correct mapping and joining
+                    const patternNumbersHtml = pattern.pattern && pattern.pattern.length > 0 
+                        ? `<div class="ball-container">${pattern.pattern.map(num => `<span class="special-pattern-ball">${num}</span>`).join('')}</div>` 
+                        : 'N/A';
 
                     row.innerHTML = `
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${patternNumbersHtml}</td>
