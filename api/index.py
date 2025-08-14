@@ -82,8 +82,7 @@ BOUNDARY_PAIRS_TO_ANALYZE = [
     (9, 10), (19, 20), (29, 30), (39, 40), (49, 50), (59, 60)
 ]
 
-# --- Gemini API Configuration ---
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+# Removed GEMINI_API_KEY
 
 
 # --- Core Utility Functions (All helpers defined here) ---
@@ -685,10 +684,10 @@ def partial_match_probabilities(white_ball_range_tuple, powerball_range_tuple):
 
     return probabilities
 
-
-def export_analysis_results(df_source, file_path="analysis_results.csv"):
-    df_source.to_csv(file_path, index=False)
-    print(f"Analysis results saved to {file_path}")
+# Removed export_analysis_results function
+# def export_analysis_results(df_source, file_path="analysis_results.csv"):
+#     df_source.to_csv(file_path, index=False)
+#     print(f"Analysis results saved to {file_path}")
 
 def find_last_draw_dates_for_numbers(df_source, white_balls, powerball):
     if df_source.empty: return {}
@@ -1650,7 +1649,7 @@ def _get_yearly_patterns_for_range(df_source, selected_range_name):
             white_balls = [int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])]
             
             numbers_in_current_range = sorted([num for num in white_balls if min_val <= num <= max_val])
-            
+                
             if len(numbers_in_current_range) >= 2:
                 for pair in combinations(numbers_in_current_range, 2):
                     year_pairs[tuple(sorted(pair))] += 1
@@ -1737,12 +1736,6 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
         'yearly_data_for_selected_pattern': yearly_data_for_selected_pattern,
         'all_years_in_data': all_years
     }
-
-
-from collections import defaultdict
-from datetime import datetime, timedelta
-from itertools import combinations
-import pandas as pd # Ensure pandas is imported if not already
 
 
 def get_special_patterns_analysis(df_source):
@@ -2018,7 +2011,7 @@ def get_consecutive_numbers_yearly_trends(df_source):
                         all_consecutive_sequences_aggregated[sequence_tuple]['count'] += 1
                         all_consecutive_sequences_aggregated[sequence_tuple]['dates'].append(draw_date_str)
                         
-            percentage = round((consecutive_draws_count / total_draws_in_year) * 100, 2)
+            percentage = round((consecutive_draws_count / total_draws_in_1year) * 100, 2)
         else:
             percentage = 0.0
         
@@ -2278,91 +2271,9 @@ def invalidate_analysis_cache():
     last_analysis_cache_update = datetime.min
     print("Analysis cache invalidated.")
 
-def _summarize_for_ai(df_source):
-    if df_source.empty:
-        return "No historical data available for detailed analysis. Please ensure the database is populated."
+# Removed _summarize_for_ai function
 
-    summary_parts = []
 
-    # 1. Overall Frequency
-    white_ball_freq_list, powerball_freq_list = frequency_analysis(df_source)
-    top_wb_freq = sorted(white_ball_freq_list, key=lambda x: x['Frequency'], reverse=True)[:10]
-    top_pb_freq = sorted(powerball_freq_list, key=lambda x: x['Frequency'], reverse=True)[:5]
-    summary_parts.append("Overall Most Frequent White Balls: " + ", ".join([f"{n['Number']} ({n['Frequency']} times)" for n in top_wb_freq]))
-    summary_parts.append("Overall Most Frequent Powerballs: " + ", ".join([f"{n['Number']} ({n['Frequency']} times)" for n in top_pb_freq]))
-
-    # 2. Hot/Cold Numbers (Last Year)
-    last_draw_date_str = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else datetime.now().strftime('%Y-%m-%d')
-    hot_nums, cold_nums = hot_cold_numbers(df_source, last_draw_date_str)
-    if hot_nums:
-        summary_parts.append("Hot Numbers (most frequent in last year): " + ", ".join([f"{n['Number']} ({n['Frequency']} times)" for n in hot_nums[:10]])) 
-    if cold_nums:
-        summary_parts.append("Cold Numbers (least frequent in last year): " + ", ".join([f"{n['Number']} (missed {n['Frequency']} draws)" for n in cold_nums[:10]])) # Changed to 'missed draws' for cold
-
-    # 3. Co-occurring Pairs and Triplets
-    co_occurrence_data, _ = get_co_occurrence_matrix(df_source)
-    sorted_co_occurrence = sorted(co_occurrence_data, key=lambda x: x['count'], reverse=True)
-    if sorted_co_occurrence:
-        summary_parts.append("Top 10 Co-occurring Pairs (most frequent overall): " + ", ".join([f"({p['x']}, {p['y']}) - {p['count']} times" for p in sorted_co_occurrence[:10]]))
-
-    triplets_data = get_most_frequent_triplets(df_source)
-    if triplets_data:
-        summary_parts.append("Top 5 Co-occurring Triplets (most frequent overall): " + ", ".join([f"({', '.join(map(str, t['triplet']))}) - {t['count']} times" for t in triplets_data[:5]]))
-
-    # 4. Number Age (Miss Streak)
-    _, detailed_ages = get_number_age_distribution(df_source) 
-    white_ball_ages = sorted([d for d in detailed_ages if d['type'] == 'White Ball'], key=lambda x: x['age'], reverse=True)
-    powerball_ages = sorted([d for d in detailed_ages if d['type'] == 'Powerball'], key=lambda x: x['age'], reverse=True)
-    
-    if white_ball_ages:
-        summary_parts.append("White Balls with longest 'miss streak' (coldest by age): " + ", ".join([f"{n['number']} (missed {n['age']} draws)" for n in white_ball_ages[:10]]))
-    if powerball_ages:
-        summary_parts.append("Powerballs with longest 'miss streak' (coldest by age): " + ", ".join([f"{n['number']} (missed {n['age']} draws)" for n in powerball_ages[:5]])) 
-
-    # 5. Monthly Trends (Recent Activity)
-    # Using the new flexible function for monthly trends for AI summary
-    # Call without start_year, so it uses the 10-year rolling window
-    monthly_trends_data, _ = get_white_ball_frequency_by_period(df_source, period_type='half_year') 
-    
-    recent_monthly_numbers_wb = defaultdict(int)
-    for wb_num, periods_data in monthly_trends_data.items():
-        for period_info in periods_data:
-            recent_monthly_numbers_wb[wb_num] += period_info['frequency']
-
-    sorted_recent_monthly_wb = sorted(recent_monthly_numbers_wb.items(), key=lambda item: item[1], reverse=True)
-    if sorted_recent_monthly_wb:
-        summary_parts.append("White Balls frequently drawn in recent half-years: " + ", ".join([f"{n} ({c} times)" for n, c in sorted_recent_monthly_wb[:15]])) 
-
-    # 6. Odd/Even Split Trends
-    odd_even_trends_list = get_odd_even_split_trends(df_source, last_draw_date_str) 
-    overall_odd_even_counts = defaultdict(int)
-    for draw_detail in odd_even_trends_list:
-        overall_odd_even_counts[draw_detail['split_category']] += 1
-    
-    most_common_odd_even = sorted(overall_odd_even_counts.items(), key=lambda item: item[1], reverse=True)
-    if most_common_odd_even:
-        summary_parts.append("Most common Odd/Even splits in recent draws (last 6 months): " + ", ".join([f"{s} ({c} times)" for s, c in most_common_odd_even[:3]])) 
-
-    # 7. Sum Range Trends
-    sum_data = get_sum_trends_and_gaps_data(df_source)
-    if sum_data['grouped_sums_analysis']:
-        sum_range_summaries = []
-        for range_name, data in sum_data['grouped_sums_analysis'].items():
-            if data['most_frequent_sums_in_range']:
-                top_sums_str = ", ".join([f"{s['sum']} ({s['count']} times)" for s in data['most_frequent_sums_in_range']])
-                sum_range_summaries.append(f"{range_name} (Top sums: {top_sums_str})")
-        if sum_range_summaries:
-            summary_parts.append("Key Sum Range Trends: " + "; ".join(sum_range_summaries))
-
-    # 8. Consecutive Numbers Trends
-    consecutive_trends_list = get_consecutive_numbers_trends(df_source, last_draw_date_str)
-    consecutive_present_count = sum(1 for t in consecutive_trends_list if t['consecutive_present'] == 'Yes')
-    if consecutive_trends_list:
-        consecutive_percentage = (consecutive_present_count / len(consecutive_trends_list)) * 100
-        summary_parts.append(f"Consecutive numbers appeared in {consecutive_percentage:.2f}% of recent draws (last 6 months).")
-
-    return "\n".join(summary_parts)
-    
 # Function to get consecutive trends for a specific DataFrame (e.g., filtered by year)
 def get_consecutive_trends_for_df(df_to_analyze):
     if df_to_analyze.empty:
@@ -3236,78 +3147,10 @@ def generated_numbers_history_route():
                            last_official_draw=last_draw_for_template) 
 
 
-@app.route('/update_powerball_data', methods=['GET'])
-def update_powerball_data():
-    service_headers = _get_supabase_headers(is_service_key=True)
-    anon_headers = _get_supabase_headers(is_service_key=False)
-
-    try:
-        url_check_latest = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
-        params_check_latest = {
-            'select': 'Draw Date',
-            'order': 'Draw Date.desc',
-            'limit': 1
-        }
-        response_check_latest = requests.get(url_check_latest, headers=anon_headers, params=params_check_latest)
-        response_check_latest.raise_for_status()
-        
-        latest_db_draw_data = response_check_latest.json()
-        last_db_draw_date = None
-        if latest_db_draw_data:
-            last_db_draw_date = latest_db_draw_data[0]['Draw Date']
-        
-        simulated_draw_date_dt = datetime.now()
-        simulated_draw_date = simulated_draw_date_dt.strftime('%Y-%m-%d')
-        simulated_numbers_list = sorted(random.sample(range(1, 70), 5))
-        simulated_powerball = random.randint(1, 26)
-
-        new_draw_data = {
-            'Draw Date': simulated_draw_date,
-            'Number 1': simulated_numbers_list[0],
-            'Number 2': simulated_numbers_list[1],
-            'Number 3': simulated_numbers_list[2], 
-            'Number 4': simulated_numbers_list[3], 
-            'Number 5': simulated_numbers_list[4], 
-            'Powerball': simulated_powerball
-        }
-        
-        if new_draw_data['Draw Date'] == last_db_draw_date:
-            return "No new draw data. Database is up-to-date.", 200
-        
-        url_insert = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
-        insert_response = requests.post(url_insert, headers=service_headers, data=json.dumps(new_draw_data))
-        insert_response.raise_for_status()
-
-        if insert_response.status_code == 201:
-            initialize_core_data() 
-            invalidate_analysis_cache()
-
-            return f"Data updated successfully with draw for {simulated_draw_date}.", 200
-        else:
-            return f"Error updating data: {insert_response.status_code} - {insert_response.text}", 500
-
-    except requests.exceptions.RequestException as e:
-        if hasattr(e, 'response') and e.response is not None:
-            pass
-        return f"Network or HTTP error: {e}", 500
-    except json.JSONDecodeError as e:
-        if 'insert_response' in locals() and insert_response is not None:
-            pass
-        return f"JSON parsing error: {e}", 500
-    except Exception as e:
-        traceback.print_exc()
-        return f"An internal error occurred: {e}", 500
+# Removed @app.route('/update_powerball_data') and update_powerball_data function
 
 
-@app.route('/export_analysis_results')
-def export_analysis_results_route():
-    if df.empty:
-        flash("Cannot export results: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return redirect(url_for('index'))
-
-    export_analysis_results(df) 
-    flash("Analysis results exported to analysis_results.csv (this file is temporary on Vercel's serverless environment).", 'info')
-    return redirect(url_for('index'))
+# Removed @app.route('/export_analysis_results') and export_analysis_results_route function
 
 
 @app.route('/analyze_batch_vs_official', methods=['POST'])
@@ -3376,90 +3219,8 @@ def analyze_generated_historical_matches_route():
         traceback.print_exc() 
         return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
 
-@app.route('/ai_assistant')
-def ai_assistant_route():
-    return render_template('ai_assistant.html')
-
-@app.route('/chat_with_ai', methods=['POST'])
-def chat_with_ai_route():
-    user_message = request.json.get('message')
-
-    if not user_message:
-        return jsonify({"response": "Please provide a message."}), 400
-
-    chat_history = []
-    
-    # Get the detailed historical summary
-    historical_summary = _summarize_for_ai(df)
-
-    initial_prompt_text = f"""
-    You are a highly knowledgeable Powerball Lottery Analysis AI Assistant. 
-    Your purpose is to help users understand Powerball data, trends, and probabilities.
-    You should be helpful, informative, and concise.
-    
-    Here's some general knowledge about Powerball:
-    - White Balls: 5 numbers are drawn from a pool of 1 to 69.
-    - Powerball: 1 number is drawn from a separate pool of 1 to 26.
-    - Odds of winning the jackpot (matching 5 White Balls + Powerball): 1 in 292,201,338.
-    
-    Here is a summary of the *current and recent Powerball historical data and trends* from the user's database:
-    ---
-    {historical_summary}
-    ---
-
-    When answering, refer to the provided historical data summary where relevant.
-    If a user asks to "generate numbers," or requests specific real-time data that you don't have access to (like "what are the current hot numbers?" *if not explicitly in the summary*), you should gently explain that you are an analytical assistant and cannot perform live data lookups or generate numbers, but can explain the *concepts* behind them and refer to the data provided in the summary.
-
-    User's question: """ + user_message
-
-    chat_history.append({
-        "role": "user",
-        "parts": [{"text": initial_prompt_text}]
-    })
-    
-    try:
-        apiKey = GEMINI_API_KEY 
-        apiUrl = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apiKey}"
-
-        payload = {
-            "contents": chat_history,
-            "generationConfig": {
-                "temperature": 0.7,
-                "topK": 40,
-                "topP": 0.95,
-                "maxOutputTokens": 500
-            },
-            "safetySettings": [
-                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-            ]
-        }
-        
-        response = requests.post(apiUrl, headers={'Content-Type': 'application/json'}, data=json.dumps(payload))
-        response.raise_for_status() 
-        
-        result = response.json()
-
-        if result and result.get('candidates') and len(result['candidates']) > 0 and \
-           result['candidates'][0].get('content') and result['candidates'][0]['content'].get('parts') and \
-           len(result['candidates'][0]['content']['parts']) > 0:
-            ai_response = result['candidates'][0]['content']['parts'][0]['text']
-            return jsonify({"response": ai_response})
-        else:
-            error_message = "I'm sorry, I couldn't generate a response. The AI model did not return valid content."
-            return jsonify({"response": error_message}), 500
-
-    except requests.exceptions.RequestException as e:
-        traceback.print_exc() 
-        return jsonify({"response": f"Error communicating with AI: {e}"}), 500
-    except json.JSONDecodeError as e:
-        traceback.print_exc() 
-        return jsonify({"response": f"Error parsing AI response: {e}"}), 500
-    except Exception as e:
-        traceback.print_exc() 
-        return jsonify({"response": f"An internal error occurred: {e}"}), 500
+# Removed @app.route('/ai_assistant') and ai_assistant_route function
+# Removed @app.route('/chat_with_ai') and chat_with_ai_route function
 
 @app.route('/my_jackpot_pick')
 def my_jackpot_pick_route():
@@ -3823,12 +3584,12 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
             # If a specific odd/even choice is made, apply it strictly
             if expected_odd_even_split != "Any":
                 current_split_str = f"{odd_count} Odd / {even_count} Even"
-                if current_split_str != expected_odd_even_split:
-                    # Special handling for "All Even" or "All Odd" which are specific cases
-                    if expected_odd_even_split == "All Even" and even_count != 5: continue
-                    if expected_odd_even_split == "All Odd" and odd_count != 5: continue
-                    # For other named splits, check for exact match
-                    if expected_odd_even_split not in ["All Even", "All Odd"] and current_split_str != expected_odd_even_split: continue
+                if expected_odd_even_split == "All Even" and even_count != 5: continue
+                if expected_odd_even_split == "All Odd" and odd_count != 5: continue
+                if expected_odd_even_split == "3 Even / 2 Odd" and (even_count != 3 or odd_count != 2): continue
+                if expected_odd_even_split == "2 Even / 3 Odd" and (even_count != 2 or odd_count != 3): continue
+                if expected_odd_even_split == "1 Even / 4 Odd" and (even_count != 1 or odd_count != 4): continue
+                if expected_odd_even_split == "4 Even / 1 Odd" and (even_count != 4 or odd_count != 1): continue
 
             # 5. Check Sum Range (Hard Constraint)
             current_sum = sum(candidate_white_balls)
