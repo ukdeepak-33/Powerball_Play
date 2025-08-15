@@ -3397,6 +3397,17 @@ def positional_analysis_route():
     else:
         # Not an AJAX request, render the full template (we'll create this next)
         return render_template('positional_analysis.html', positional_data=positional_data)
+
+# Add this new route to your index.py file, for example, near the other routes.
+@app.route('/ai_assistant')
+def ai_assistant_route():
+    try:
+        return render_template('ai_assistant.html')
+    except Exception as e:
+        traceback.print_exc()
+        flash("An error occurred loading the AI Assistant page. Please try again.", 'error')
+        return redirect(url_for('index'))
+        
 # --- Smart Pick Generator Logic (New Functions and Route) ---
 
 def _get_current_month_hot_numbers(df_source):
