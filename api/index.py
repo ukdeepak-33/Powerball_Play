@@ -3960,4 +3960,3 @@ def generate_smart_picks_route():
         traceback.print_exc()
         flash(f"An unexpected error occurred: {e}", 'error')
         return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
-
