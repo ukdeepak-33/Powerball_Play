@@ -38,6 +38,47 @@
         </div>
     </div>
 
+    {# NEW: Record Official Draw Card #}
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Record Official Draw</h2>
+        <p class="text-gray-700 mb-6">Manually enter the latest official Powerball draw results to keep the historical data up-to-date. This will update the main historical database.</p>
+        <form method="POST" action="{{ url_for('save_official_draw_route') }}" class="space-y-4">
+            <div class="form-group">
+                <label for="draw_date" class="block text-gray-700 text-sm font-bold mb-2">Draw Date:</label>
+                <input type="date" id="draw_date" name="draw_date" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+            </div>
+            <div class="grid grid-cols-5 gap-4">
+                <div class="form-group">
+                    <label for="n1" class="block text-gray-700 text-sm font-bold mb-2">N1:</label>
+                    <input type="number" id="n1" name="n1" min="1" max="69" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                </div>
+                <div class="form-group">
+                    <label for="n2" class="block text-gray-700 text-sm font-bold mb-2">N2:</label>
+                    <input type="number" id="n2" name="n2" min="1" max="69" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                </div>
+                <div class="form-group">
+                    <label for="n3" class="block text-gray-700 text-sm font-bold mb-2">N3:</label>
+                    <input type="number" id="n3" name="n3" min="1" max="69" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                </div>
+                <div class="form-group">
+                    <label for="n4" class="block text-gray-700 text-sm font-bold mb-2">N4:</label>
+                    <input type="number" id="n4" name="n4" min="1" max="69" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                </div>
+                <div class="form-group">
+                    <label for="n5" class="block text-gray-700 text-sm font-bold mb-2">N5:</label>
+                    <input type="number" id="n5" name="n5" min="1" max="69" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="pb" class="block text-gray-700 text-sm font-bold mb-2">Powerball:</label>
+                <input type="number" id="pb" name="pb" min="1" max="26" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+            </div>
+            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition duration-300 ease-in-out w-full sm:w-auto">
+                Record Official Draw
+            </button>
+        </form>
+    </div>
+
     {# General Number Generator Card #}
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
         <h2 class="text-2xl font-bold mb-4 text-gray-800">General Number Generator</h2>
@@ -328,8 +369,6 @@
                 <input type="text" id="excluded_numbers_smart" name="excluded_numbers_smart" placeholder="e.g., 4, 18, 55" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
                 <p class="text-xs text-gray-500 mt-1">Numbers to explicitly exclude from generation.</p>
             </div>
-
-            {# Removed Force Specific Pattern #}
 
             <button type="button" id="generateSmartPicksBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition duration-300 ease-in-out w-full sm:w-auto">
                 Generate Smart Picks
