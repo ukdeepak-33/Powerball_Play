@@ -48,7 +48,7 @@
 
     {# Display Generated Numbers Section (Modified for multiple sets) #}
     {% if generated_sets %}
-    <div id="generatedSection" class="bg-gradient-to-br from-blue-500 to-indigo-600 p-8 rounded-2xl shadow-xl transform transition-all duration-300 hover:scale-105"> {# New vibrant styling for generated numbers #}
+    <div class="bg-gradient-to-br from-blue-500 to-indigo-600 p-8 rounded-2xl shadow-xl transform transition-all duration-300 hover:scale-105"> {# New vibrant styling for generated numbers #}
         <h2 class="text-3xl sm:text-4xl font-extrabold text-white mb-6 text-center animate-pulse">Your Generated Lucky Numbers!</h2>
         
         <div id="randomGeneratedPicksContainer">
@@ -236,135 +236,27 @@
         </form>
     </div>
 
-    {# NEW Smart Generator Card with Customization #}
+    {# NEW Smart Generator Card #}
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Customized Smart Pick Generator</h2>
-        <p class="text-gray-600 mb-6">Generate Powerball numbers by prioritizing specific patterns and controlling Group A numbers.</p>
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Smart Pick Generator (AI-Powered) </h2>
+        <p class="text-gray-600 mb-6">Let the AI analyze historical trends (hot/cold, co-occurrence, number age, monthly trends) and suggest numbers for your next pick!</p>
+        <div class="form-group mb-4">
+            <label for="num_smart_sets" class="form-label">Number of Smart Picks to Generate (1-5):</label>
+            <input type="number" id="num_smart_sets" name="num_smart_sets" min="1" max="5" value="1" class="form-input">
+        </div>
+        <button id="generateSmartPicksBtn" class="btn-primary w-full">Generate Smart Picks</button>
         
-        <form id="smartPickForm" action="{{ url_for('generate_smart_picks_route') }}" method="post" class="space-y-4">
-            <div class="form-group">
-                <label for="num_smart_sets_custom" class="form-label">Number of Smart Picks to Generate (1-5):</label>
-                <input type="number" id="num_smart_sets_custom" name="num_sets_to_generate" min="1" max="5" value="{{ num_sets_to_generate if num_sets_to_generate is not none else 1 }}" class="form-input">
-            </div>
-
-            <div class="form-group">
-                <label for="excluded_numbers_smart" class="form-label">Exclude Numbers (comma-separated):</label>
-                <input type="text" name="excluded_numbers" id="excluded_numbers_smart" class="form-input" placeholder="e.g., 1, 7, 42" value="{{ excluded_numbers if excluded_numbers is not none else '' }}">
-            </div>
-
-            <div class="form-group">
-                <label for="num_from_group_a_smart" class="form-label">Numbers from Group A (0-5, hard constraint):</label>
-                <select name="num_from_group_a" id="num_from_group_a_smart" class="form-input">
-                    <option value="0" {% if num_from_group_a == 0 %}selected{% endif %}>0 (No Group A)</option>
-                    <option value="1" {% if num_from_group_a == 1 %}selected{% endif %}>1</option>
-                    <option value="2" {% if num_from_group_a == 2 %}selected{% endif %}>2</option>
-                    <option value="3" {% if num_from_group_a == 3 %}selected{% endif %}>3</option>
-                    <option value="4" {% if num_from_group_a == 4 %}selected{% endif %}>4</option>
-                    <option value="5" {% if num_from_group_a == 5 %}selected{% endif %}>5 (All Group A)</option>
-                </select>
-                <p class="text-gray-600 text-sm mt-1">Select the exact number of Group A numbers for white balls. This is a strict filter.</p>
-            </div>
-
-            <div class="form-group">
-                <label for="odd_even_choice_smart" class="form-label">Odd/Even Split Preference (hard constraint):</label>
-                <select name="odd_even_choice" id="odd_even_choice_smart" class="form-input">
-                    <option value="Any" {% if odd_even_choice == 'Any' %}selected{% endif %}>Any</option>
-                    <option value="All Odd" {% if odd_even_choice == 'All Odd' %}selected{% endif %}>All Odd (5 Odd / 0 Even)</option>
-                    <option value="All Even" {% if odd_even_choice == 'All Even' %}selected{% endif %}>All Even (0 Odd / 5 Even)</option>
-                    <option value="3 Odd / 2 Even" {% if odd_even_choice == '3 Odd / 2 Even' %}selected{% endif %}>3 Odd / 2 Even</option>
-                    <option value="2 Odd / 3 Even" {% if odd_even_choice == '2 Odd / 3 Even' %}selected{% endif %}>2 Odd / 3 Even</option>
-                    <option value="4 Odd / 1 Even" {% if odd_even_choice == '4 Odd / 1 Even' %}selected{% endif %}>4 Odd / 1 Even</option>
-                    <option value="1 Odd / 4 Even" {% if odd_even_choice == '1 Odd / 4 Even' %}selected{% endif %}>1 Odd / 4 Even</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="sum_range_filter_smart" class="form-label">Sum of White Balls Range (hard constraint):</label>
-                <select name="sum_range_filter" id="sum_range_filter_smart" class="form-input">
-                    {% for label, _ in sum_ranges.items() %}
-                        <option value="{{ label }}" {% if selected_sum_range == label %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="force_specific_pattern_input" class="form-label">Force Specific Pattern (2-3 numbers, comma-separated):</label>
-                <input type="text" name="force_specific_pattern" id="force_specific_pattern_input" class="form-input" placeholder="e.g., 1,2,3 or 10,20" value="{{ force_specific_pattern_input if force_specific_pattern_input is not none else '' }}">
-                <p class="text-gray-600 text-sm mt-1">Forces these numbers to be included. This is a strict filter.</p>
-            </div>
-
-            <h3 class="text-lg font-semibold mt-6 mb-3 text-gray-700">Prioritize Patterns (Soft Constraints):</h3>
-            <div class="space-y-2">
-                <div class="flex items-center">
-                    <input type="checkbox" id="prioritize_monthly_hot" name="prioritize_monthly_hot" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" {% if prioritize_monthly_hot %}checked{% endif %}>
-                    <label for="prioritize_monthly_hot" class="ml-2 block text-gray-700">Prioritize Monthly Hot Numbers</label>
-                </div>
-                <div class="flex items-center">
-                    <input type="checkbox" id="prioritize_grouped_patterns" name="prioritize_grouped_patterns" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" {% if prioritize_grouped_patterns %}checked{% endif %}>
-                    <label for="prioritize_grouped_patterns" class="ml-2 block text-gray-700">Prioritize Grouped Patterns (e.g., numbers in the same 10s range)</label>
-                </div>
-                <div class="flex items-center">
-                    <input type="checkbox" id="prioritize_special_patterns" name="prioritize_special_patterns" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" {% if prioritize_special_patterns %}checked{% endif %}>
-                    <label for="prioritize_special_patterns" class="ml-2 block text-gray-700">Prioritize Special Patterns (e.g., tens-apart, same last digit, repeating digit)</label>
-                </div>
-                <div class="flex items-center">
-                    <input type="checkbox" id="prioritize_consecutive_patterns" name="prioritize_consecutive_patterns" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" {% if prioritize_consecutive_patterns %}checked{% endif %}>
-                    <label for="prioritize_consecutive_patterns" class="ml-2 block text-gray-700">Prioritize Consecutive Numbers Trends</label>
-                </div>
-            </div>
-
-            <button type="submit" id="generateCustomSmartPicksBtn" class="btn-primary w-full mt-6">Generate Customized Smart Picks</button>
-        </form>
-        
-        <div id="smartPicksLoading" class="mt-4 text-center text-blue-600 {% if not generated_sets %}hidden{% endif %}">
+        <div id="smartPicksLoading" class="mt-4 text-center text-blue-600 hidden">
             <div class="spinner"></div>
             <p class="mt-2">Generating smart picks... This may take a moment.</p>
         </div>
 
         <div id="smartPicksResults" class="mt-8 space-y-6 animate-pop-in">
-            {# Smart generated picks will be inserted here by Flask template rendering #}
-            {% if generated_sets %}
-            <div class="bg-gradient-to-br from-blue-500 to-indigo-600 p-8 rounded-2xl shadow-xl transform transition-all duration-300 hover:scale-105">
-                <h3 class="text-xl font-bold text-white mb-4">Your Customized Picks:</h3>
-                {% for generated_pick in generated_sets %}
-                <div class="generated-pick-item p-4 bg-blue-50 rounded-lg border border-blue-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 mb-4 last:mb-0"
-                     data-white-balls="{{ generated_pick.white_balls | join(',') }}"
-                     data-powerball="{{ generated_pick.powerball }}">
-                    <div class="flex items-center space-x-2 flex-wrap justify-center sm:justify-start">
-                        {% for num in generated_pick.white_balls %}
-                            <span class="generated-ball-small">{{ num }}</span>
-                        {% endfor %}
-                        <span class="generated-powerball-label-small">PB:</span>
-                        <span class="generated-powerball-ball-small">{{ generated_pick.powerball }}</span>
-                    </div>
-                    <form method="POST" action="{{ url_for('save_generated_pick_route') }}" class="flex-shrink-0">
-                        <input type="hidden" name="generated_white_balls" value="{{ generated_pick.white_balls | join(',') }}">
-                        <input type="hidden" name="generated_powerball" value="{{ generated_pick.powerball }}">
-                        <button type="submit" class="btn-secondary">Save This Pick</button>
-                    </form>
-                </div>
-                {% endfor %}
-                <div class="mt-6 text-center">
-                    <button id="saveAllSmartPicksBtn" class="btn-primary w-full md:w-auto">Save All Customized Picks</button>
-                </div>
-                {# Last Drawn Dates Section for the last generated smart pick #}
-                {% if last_draw_dates %}
-                <div class="mt-8 pt-6 border-t border-blue-400 text-white text-center">
-                    <h3 class="text-xl font-semibold mb-4 opacity-90">Last Drawn Dates of the Last Generated Pick:</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
-                        {% for ball_info, draw_date in last_draw_dates.items() %}
-                            <div class="bg-blue-700 bg-opacity-30 rounded-lg p-2 flex items-center justify-center space-x-2">
-                                <span class="font-medium text-blue-100">{{ ball_info }}:</span>
-                                <span class="text-white font-mono">{{ draw_date }}</span>
-                            </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-            {% endif %}
+            {# Smart generated picks will be inserted here by JavaScript #}
         </div>
-        {# The old AI-powered button and loading/results divs are moved to Flask rendering #}
+        <div id="smartPicksSaveAllActions" class="mt-4 hidden text-center">
+            <button id="saveAllSmartPicksBtn" class="btn-primary w-full md:w-auto">Save All Smart Picks</button>
+        </div>
     </div>
 
     {# Navigation to Analysis Pages #}
@@ -615,7 +507,7 @@
             excludedNumbersInput.value = "{{ request.form.get('excluded_numbers', '') }}";
         }
 
-        // Preserve num from group A input (for random generator)
+        // Preserve num from group A input
         const numFromGroupAInput = document.getElementById('num_from_group_a');
         if (numFromGroupAInput) {
             numFromGroupAInput.value = "{{ request.form.get('num_from_group_a', '2') }}";
@@ -659,49 +551,6 @@
         const powerballMaxInput = document.getElementById('powerball_max');
         if (powerballMaxInput) {
             powerballMaxInput.value = "{{ request.form.get('powerball_max', '26') }}";
-        }
-
-        // --- Smart Pick Generator: Preserve values ---
-        const numSmartSetsCustomInput = document.getElementById('num_smart_sets_custom');
-        if (numSmartSetsCustomInput) {
-            numSmartSetsCustomInput.value = "{{ num_sets_to_generate if num_sets_to_generate is not none else '1' }}";
-        }
-
-        const excludedNumbersSmartInput = document.getElementById('excluded_numbers_smart');
-        if (excludedNumbersSmartInput) {
-            excludedNumbersSmartInput.value = "{{ excluded_numbers if excluded_numbers is not none else '' }}";
-        }
-
-        const numFromGroupASmartSelect = document.getElementById('num_from_group_a_smart');
-        if (numFromGroupASmartSelect) {
-            numFromGroupASmartSelect.value = "{{ num_from_group_a if num_from_group_a is not none else '0' }}";
-        }
-
-        const oddEvenChoiceSmartSelect = document.getElementById('odd_even_choice_smart');
-        if (oddEvenChoiceSmartSelect) {
-            oddEvenChoiceSmartSelect.value = "{{ odd_even_choice if odd_even_choice is not none else 'Any' }}";
-        }
-
-        const sumRangeFilterSmartSelect = document.getElementById('sum_range_filter_smart');
-        if (sumRangeFilterSmartSelect) {
-            sumRangeFilterSmartSelect.value = "{{ selected_sum_range if selected_sum_range is not none else 'Any' }}";
-        }
-
-        const forceSpecificPatternInput = document.getElementById('force_specific_pattern_input');
-        if (forceSpecificPatternInput) {
-            forceSpecificPatternInput.value = "{{ force_specific_pattern_input if force_specific_pattern_input is not none else '' }}";
-        }
-
-        // Checkboxes for prioritization
-        document.getElementById('prioritize_monthly_hot').checked = {{ 'true' if prioritize_monthly_hot else 'false' }};
-        document.getElementById('prioritize_grouped_patterns').checked = {{ 'true' if prioritize_grouped_patterns else 'false' }};
-        document.getElementById('prioritize_special_patterns').checked = {{ 'true' if prioritize_special_patterns else 'false' }};
-        document.getElementById('prioritize_consecutive_patterns').checked = {{ 'true' if prioritize_consecutive_patterns else 'false' }};
-
-        // Scroll to generated picks section if present
-        const generatedSection = document.getElementById('generatedSection');
-        if (generatedSection) {
-            generatedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     });
 
@@ -822,6 +671,79 @@
             saveMultiplePicks(picksToSave);
         });
     }
+
+    // --- Smart Generator JavaScript Logic ---
+    document.getElementById('generateSmartPicksBtn').addEventListener('click', async function() {
+        const btn = this;
+        const loadingDiv = document.getElementById('smartPicksLoading');
+        const resultsDiv = document.getElementById('smartPicksResults');
+        const numSetsInput = document.getElementById('num_smart_sets');
+        const saveAllSmartPicksActions = document.getElementById('smartPicksSaveAllActions');
+
+        btn.disabled = true;
+        btn.textContent = 'Generating...';
+        loadingDiv.classList.remove('hidden');
+        resultsDiv.innerHTML = ''; // Clear previous results
+        saveAllSmartPicksActions.classList.add('hidden'); // Hide save all button initially
+
+        const numSets = numSetsInput.value;
+
+        try {
+            const response = await fetch('/generate_smart_picks', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ num_sets: numSets })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                if (data.smart_picks && data.smart_picks.length > 0) {
+                    let htmlContent = '<h3 class="text-xl font-bold text-white mb-4">AI Suggested Picks:</h3>';
+                    data.smart_picks.forEach(pick => {
+                        htmlContent += `
+                            <div class="generated-pick-item p-4 bg-blue-50 rounded-lg border border-blue-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 mb-4 last:mb-0"
+                                 data-white-balls="${pick.white_balls.join(',')}"
+                                 data-powerball="${pick.powerball}">
+                                <div class="flex items-center space-x-2 flex-wrap justify-center sm:justify-start">
+                                    ${pick.white_balls.map(num => `<span class="generated-ball-small">${num}</span>`).join('')}
+                                    <span class="generated-powerball-label-small">PB:</span>
+                                    <span class="generated-powerball-ball-small">${pick.powerball}</span>
+                                </div>
+                                <form method="POST" action="{{ url_for('save_generated_pick_route') }}" class="flex-shrink-0">
+                                    <input type="hidden" name="generated_white_balls" value="${pick.white_balls.join(',')}">
+                                    <input type="hidden" name="generated_powerball" value="${pick.powerball}">
+                                    <button type="submit" class="btn-secondary">Save This Pick</button>
+                                </form>
+                            </div>
+                        `;
+                    });
+                    resultsDiv.innerHTML = htmlContent;
+                    resultsDiv.classList.add('bg-gradient-to-br', 'from-blue-500', 'to-indigo-600', 'p-8', 'rounded-2xl', 'shadow-xl'); // Apply gradient background
+                    saveAllSmartPicksActions.classList.remove('hidden'); // Show save all button
+                } else {
+                    resultsDiv.innerHTML = '<p class="text-white text-center">No smart picks could be generated at this time. Please try again.</p>';
+                    resultsDiv.classList.remove('bg-gradient-to-br', 'from-blue-500', 'to-indigo-600', 'p-8', 'rounded-2xl', 'shadow-xl'); // Remove gradient if no results
+                    saveAllSmartPicksActions.classList.add('hidden');
+                }
+            } else {
+                resultsDiv.innerHTML = `<p class="text-red-300 text-center">Error: ${data.error || 'Failed to generate smart picks.'}</p>`;
+                resultsDiv.classList.remove('bg-gradient-to-br', 'from-blue-500', 'to-indigo-600', 'p-8', 'rounded-2xl', 'shadow-xl'); // Remove gradient on error
+                saveAllSmartPicksActions.classList.add('hidden');
+            }
+        } catch (error) {
+            console.error('Error generating smart picks:', error);
+            resultsDiv.innerHTML = `<p class="text-red-300 text-center">An unexpected error occurred: ${error.message}</p>`;
+            resultsDiv.classList.remove('bg-gradient-to-br', 'from-blue-500', 'to-indigo-600', 'p-8', 'rounded-2xl', 'shadow-xl'); // Remove gradient on error
+            saveAllSmartPicksActions.classList.add('hidden');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Generate Smart Picks';
+            loadingDiv.classList.add('hidden');
+        }
+    });
 
     // --- Smart Generated Numbers - Save All Button Logic ---
     const saveAllSmartPicksBtn = document.getElementById('saveAllSmartPicksBtn');
