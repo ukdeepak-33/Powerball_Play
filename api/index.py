@@ -3648,13 +3648,20 @@ def smart_pick_generator_route():
             flash("Failed to load historical data. Please try again later.", 'error')
             return redirect(url_for('index')) # Redirect to home or show an error page
     
+    # --- IMPORTANT FIX: Initialize these variables for GET requests ---
+    # When the page is loaded via GET, there are no generated sets yet.
+    # Pass empty list and dict to avoid Jinja2 UndefinedError.
+    generated_sets = []
+    last_draw_dates = {}
+    # --- END IMPORTANT FIX ---
+
     # Pass necessary data for rendering the form
     return render_template('smart_pick_generator.html', 
                            sum_ranges=SUM_RANGES,
                            group_a=group_a,
+                           generated_sets=generated_sets, # Pass the (potentially empty) list
+                           last_draw_dates=last_draw_dates, # Pass the (potentially empty) dict
                            # Pass default values for form fields.
-                           # No need to pass 'prioritize_monthly_hot' or 'force_specific_pattern_input'
-                           # as they are removed from the HTML form.
                            num_sets_to_generate=1, # Default
                            excluded_numbers='',     # Default
                            num_from_group_a=2,      # Default
