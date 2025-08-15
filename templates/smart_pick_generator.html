@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 
-{% block title %}Pattern-Based Smart Pick Generator{% endblock %}
+{% block title %}Smart Pick Generator{% endblock %}
 
-{% block page_heading %}Pattern-Based Smart Pick Generator{% endblock %}
+{% block page_heading %}Smart Pick Generator (AI-Powered){% endblock %}
 
 {% block content %}
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -72,18 +72,13 @@
                 </select>
             </div>
 
-            {# Criterion 4: Monthly Trends (Current Month Hot Numbers) #}
-            <div class="border-t border-gray-200 pt-6">
-                <h3 class="text-xl font-semibold mb-4 text-gray-800">Monthly Trends</h3>
-                <p class="text-gray-700 mb-4">Prioritize numbers that have appeared more than once in the current (incomplete) month's draws.</p>
-                <input type="checkbox" id="prioritize_monthly_hot" name="prioritize_monthly_hot" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                <label for="prioritize_monthly_hot" class="text-gray-700 text-sm font-bold">Prioritize Current Month's Hot Numbers</label>
-            </div>
+            {# Removed Criterion 4: Monthly Trends (Current Month Hot Numbers) #}
+            {# Removed Criterion 5: Force Specific Pattern #}
 
-            {# Criterion 5: Pattern-Based Preferences (Grouped, Special, Consecutive) #}
+            {# Criterion for Pattern-Based Preferences (Grouped, Special, Consecutive) #}
             <div class="border-t border-gray-200 pt-6">
                 <h3 class="text-xl font-semibold mb-4 text-gray-800">Pattern-Based Preferences</h3>
-                <p class="text-gray-700 mb-4">Choose to prioritize numbers that frequently form certain patterns, or specify a pattern to include.</p>
+                <p class="text-gray-700 mb-4">Choose to prioritize numbers that frequently form certain patterns.</p>
 
                 <div class="mb-4">
                     <input type="checkbox" id="prioritize_grouped_patterns" name="prioritize_grouped_patterns" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
@@ -98,12 +93,6 @@
                 <div class="mb-4">
                     <input type="checkbox" id="prioritize_consecutive_patterns" name="prioritize_consecutive_patterns" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
                     <label for="prioritize_consecutive_patterns" class="text-gray-700 text-sm font-bold">Prioritize forming Consecutive Pairs/Triplets</label>
-                </div>
-
-                <div class="mt-6">
-                    <label for="force_specific_pattern" class="block text-gray-700 text-sm font-bold mb-2">Force Specific Pattern (e.g., 1,2 or 10,11,12):</label>
-                    <input type="text" id="force_specific_pattern" name="force_specific_pattern" placeholder="e.g., 1,2 or 10,11,12" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300">
-                    <p class="text-xs text-gray-500 mt-1">Enter 2 or 3 comma-separated numbers. These numbers *must* be included in the generated pick.</p>
                 </div>
             </div>
 
@@ -120,7 +109,7 @@
     </div>
 
     {# Results Display Area #}
-    <div id="smartPicksResults" class="mt-8 space-y-6">
+    <div id="smartPicksResults" class="mt-8 space-y-6 {% if not generated_sets %}hidden{% endif %}">
         {# Generated picks will be displayed here #}
         {% if generated_sets %}
             <div class="bg-gradient-to-br from-blue-500 to-indigo-600 p-8 rounded-2xl shadow-xl text-white">
@@ -176,20 +165,12 @@
         const loadingSpinner = document.getElementById('loadingSpinner');
         const smartPicksResultsDiv = document.getElementById('smartPicksResults');
         const saveAllSmartPicksBtn = document.getElementById('saveAllSmartPicksBtn');
-        const saveAllSmartPicksActions = document.getElementById('saveAllSmartPicksActions');
+        const saveAllSmartPicksActions = document.getElementById('saveAllSmartPicksActions'); // This might be null if not already rendered
 
         const analysisModal = document.getElementById('analysisModal');
         const analysisModalContent = document.getElementById('analysisModalContent');
         const closeAnalysisModalBtn = document.getElementById('closeAnalysisModal');
         const analysisResultsContent = document.getElementById('analysisResultsContent');
-
-        // Show loading spinner on form submission
-        smartPickForm.addEventListener('submit', function() {
-            generateSmartPicksBtn.disabled = true;
-            loadingSpinner.classList.remove('hidden');
-            generateSmartPicksBtn.textContent = 'Generating...';
-            smartPicksResultsDiv.innerHTML = ''; // Clear previous results
-        });
 
         // Function to show flash messages (if not already handled by Flask)
         function showFlashMessage(message, category) {
@@ -202,12 +183,136 @@
                     'bg-green-100 text-green-700 border border-green-200'
                 }`;
                 messageDiv.innerHTML = `<p class="font-medium">${message}</p>`;
+                flashContainer.innerHTML = ''; // Clear previous messages
                 flashContainer.appendChild(messageDiv);
                 setTimeout(() => messageDiv.remove(), 5000); // Remove after 5 seconds
             }
         }
+        
+        // Handle initial display of results if they were passed from Flask
+        if (smartPicksResultsDiv && smartPicksResultsDiv.querySelectorAll('.generated-pick-item').length > 0) {
+             smartPicksResultsDiv.classList.remove('hidden');
+             const generatedSetsPresent = smartPicksResultsDiv.querySelector('.generated-pick-item');
+             if (generatedSetsPresent) {
+                 if (saveAllSmartPicksActions) {
+                     saveAllSmartPicksActions.classList.remove('hidden');
+                 }
+             }
+         }
+
+
+        smartPickForm.addEventListener('submit', async function(event) {
+            event.preventDefault(); // Prevent default form submission
+
+            generateSmartPicksBtn.disabled = true;
+            loadingSpinner.classList.remove('hidden');
+            generateSmartPicksBtn.textContent = 'Generating...';
+            smartPicksResultsDiv.innerHTML = ''; // Clear previous results
+            if (saveAllSmartPicksActions) {
+                saveAllSmartPicksActions.classList.add('hidden'); // Hide save all button
+            }
+            smartPicksResultsDiv.classList.add('hidden'); // Ensure results area is hidden until populated
+
+
+            const numSets = document.getElementById('num_sets_to_generate').value;
+            // Monthly Hot Numbers checkbox is removed from UI, send false
+            const prioritizeMonthlyHot = false; 
+            const prioritizeGroupedPatterns = document.getElementById('prioritize_grouped_patterns').checked;
+            const prioritizeSpecialPatterns = document.getElementById('prioritize_special_patterns').checked;
+            const prioritizeConsecutivePatterns = document.getElementById('prioritize_consecutive_patterns').checked;
+            const groupANumbersCount = document.getElementById('num_from_group_a').value; // Correct ID
+            const oddEvenChoiceSmart = document.getElementById('odd_even_choice').value; // Correct ID
+            const sumRangeFilterSmart = document.getElementById('sum_range_filter').value; // Correct ID
+            const excludedNumbersSmart = document.getElementById('excluded_numbers').value; // Correct ID
+            // Force Specific Pattern field is removed from UI, send empty string
+            const forceSpecificPatternInput = ''; 
+
+            const payload = {
+                num_sets_to_generate: parseInt(numSets),
+                prioritize_monthly_hot: prioritizeMonthlyHot,
+                prioritize_grouped_patterns: prioritizeGroupedPatterns,
+                prioritize_special_patterns: prioritizeSpecialPatterns,
+                prioritize_consecutive_patterns: prioritizeConsecutivePatterns,
+                num_from_group_a: parseInt(groupANumbersCount),
+                odd_even_choice: oddEvenChoiceSmart,
+                sum_range_filter: sumRangeFilterSmart,
+                excluded_numbers: excludedNumbersSmart,
+                force_specific_pattern: forceSpecificPatternInput
+            };
+
+            try {
+                const response = await fetch('/generate_smart_picks_route', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json' 
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    let resultsHtml = '<h3 class="text-3xl font-bold text-white text-center mb-6">Your Smart Picks!</h3>';
+                    resultsHtml += '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">';
+
+                    if (data.generated_sets && data.generated_sets.length > 0) {
+                        data.generated_sets.forEach(pick => {
+                            resultsHtml += `
+                                <div class="bg-white bg-opacity-20 backdrop-filter backdrop-blur-sm p-6 rounded-xl shadow-lg flex flex-col items-center justify-center space-y-4 generated-pick-item"
+                                     data-white-balls="${pick.white_balls.join(',')}"
+                                     data-powerball="${pick.powerball}">
+                                    <div class="flex space-x-2">
+                                        ${pick.white_balls.map(num => `<span class="flex items-center justify-center w-10 h-10 rounded-full bg-yellow-400 text-gray-900 font-extrabold text-lg shadow-md">${num}</span>`).join('')}
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-lg font-semibold">Powerball:</span>
+                                        <span class="flex items-center justify-center w-10 h-10 rounded-full bg-red-600 text-white font-extrabold text-lg shadow-md">${pick.powerball}</span>
+                                    </div>
+                                    <button class="btn-secondary save-pick-btn w-full">Save This Pick</button>
+                                    <button class="btn-secondary analyze-pick-btn w-full">Analyze This Pick</button>
+                                </div>
+                            `;
+                        });
+                        resultsHtml += '</div>'; // Close grid div
+
+                        // Add Last Drawn Dates
+                        if (data.last_draw_dates && Object.keys(data.last_draw_dates).length > 0) {
+                            resultsHtml += `<div class="mt-4 p-4 bg-blue-800 rounded-lg text-white text-sm"><h4 class="font-semibold mb-2">Last Drawn Dates for These Numbers:</h4><ul class="list-disc list-inside">`;
+                            for (const [number, date] of Object.entries(data.last_draw_dates)) {
+                                resultsHtml += `<li><strong>${number}:</strong> ${date}</li>`;
+                            }
+                            resultsHtml += `</ul></div>`;
+                        }
+
+                        if (saveAllSmartPicksActions) { // Check if element exists before showing
+                            saveAllSmartPicksActions.classList.remove('hidden');
+                        }
+
+                    } else {
+                        resultsHtml = '<p class="text-white text-center">No picks could be generated with the selected criteria. Try adjusting your filters.</p>';
+                    }
+                    
+                    smartPicksResultsDiv.innerHTML = resultsHtml;
+                    smartPicksResultsDiv.classList.remove('hidden');
+                    smartPicksResultsDiv.classList.add('bg-gradient-to-br', 'from-blue-500', 'to-indigo-600', 'p-8', 'rounded-2xl', 'shadow-xl'); // Re-add styling
+
+                } else {
+                    showFlashMessage(data.error || 'An unknown error occurred during generation.', 'error');
+                    smartPicksResultsDiv.classList.add('hidden'); // Hide on error
+                }
+            } catch (error) {
+                console.error('Error generating smart picks:', error);
+                showFlashMessage(`An unexpected error occurred: ${error.message}`, 'error');
+                smartPicksResultsDiv.classList.add('hidden'); // Hide on error
+            } finally {
+                generateSmartPicksBtn.disabled = false;
+                loadingSpinner.classList.add('hidden');
+                generateSmartPicksBtn.textContent = 'Generate Smart Picks';
+            }
+        });
 
         // --- Save Single Pick Logic ---
+        // Delegated event listener for dynamically added buttons
         document.body.addEventListener('click', async function(event) {
             if (event.target.classList.contains('save-pick-btn')) {
                 const pickItem = event.target.closest('.generated-pick-item');
@@ -282,6 +387,7 @@
         }
 
         // --- Analyze Single Pick Logic (Modal) ---
+        // Delegated event listener for dynamically added buttons
         document.body.addEventListener('click', async function(event) {
             if (event.target.classList.contains('analyze-pick-btn')) {
                 const pickItem = event.target.closest('.generated-pick-item');
