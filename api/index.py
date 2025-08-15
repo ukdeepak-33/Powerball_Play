@@ -1750,51 +1750,45 @@ def get_special_patterns_analysis(df_source):
     Analyzes historical draws for special number patterns (tens-apart, same last digit,
     repeating digit) and returns their counts per year,
     and also recent trends (last 12 months) indicating pattern presence per draw.
-
-    Args:
-        df_source (pd.DataFrame): The historical Powerball draw data, expected to have
-                                  'Draw Date_dt' (datetime) and 'Number 1' through 'Number 5'.
-
-    Returns:
-        dict: A dictionary containing:
-              - 'yearly_data': A list of dictionaries, each representing a year's pattern analysis.
-              - 'recent_trends': A list of dictionaries for draws in the last 12 months,
-                                 indicating if each pattern type was present.
-              Example:
-              {
-                  'yearly_data': [
-                      {
-                          'year': 2025,
-                          'total_draws': 50,
-                          'tens_apart_patterns': [{'pattern': [10, 20], 'count': 5}, ...],
-                          'same_last_digit_patterns': [{'pattern': [1, 11], 'count': 3}, ...],
-                          'repeating_digit_patterns': [{'pattern': [11, 22], 'count': 2}, ...]
-                      },
-                      ...
-                  ],
-                  'recent_trends': [
-                      {'draw_date': '2024-07-31', 'tens_apart': 'Yes', 'same_last_digit': 'No', 'repeating_digit': 'Yes', 'white_balls': [1,2,3,4,5]},
-                      ...
-                  ]
-              }
+    Crucially, it now also returns *overall* aggregated counts for these patterns.
     """
     if df_source.empty:
-        return {'yearly_data': [], 'recent_trends': []}
+        # Include the new overall pattern keys even if empty
+        return {
+            'yearly_data': [], 
+            'recent_trends': [],
+            'tens_apart_patterns_overall': [],
+            'same_last_digit_patterns_overall': [],
+            'repeating_digit_patterns_overall': []
+        }
 
-    # Get unique years from the data, limited from 2017 to current year
+    df_copy = df_source.copy()
+    if 'Draw Date_dt' not in df_copy.columns:
+        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
+
+    if df_copy.empty:
+         return {
+            'yearly_data': [], 
+            'recent_trends': [],
+            'tens_apart_patterns_overall': [],
+            'same_last_digit_patterns_overall': [],
+            'repeating_digit_patterns_overall': []
+        }
+
     current_year = datetime.now().year
-    years_in_data = sorted([y for y in df_source['Draw Date_dt'].dt.year.unique() if y >= 2017 and y <= current_year])
+    years_in_data = sorted([y for y in df_copy['Draw Date_dt'].dt.year.unique() if y >= 2017 and y <= current_year])
 
     all_yearly_patterns_data = []
     recent_special_trends = []
 
     # Pre-calculate all possible tens-apart pairs for efficiency
-    all_tens_apart_pairs = set()
+    all_tens_apart_pairs_set = set() # Renamed to avoid confusion with counts
     for n1 in range(1, 60):
         for diff in [10, 20, 30, 40, 50]:
             n2 = n1 + diff
             if n2 <= 69:
-                all_tens_apart_pairs.add(tuple(sorted((n1, n2))))
+                all_tens_apart_pairs_set.add(tuple(sorted((n1, n2))))
 
     # Pre-group numbers by last digit
     same_last_digit_groups_full = defaultdict(list)
@@ -1805,9 +1799,49 @@ def get_special_patterns_analysis(df_source):
     # Pre-define repeating digit numbers
     repeating_digit_numbers = [11, 22, 33, 44, 55, 66]
 
-    # --- Yearly Data Calculation ---
+    # --- Overall Aggregated Data Calculation (NEW) ---
+    overall_tens_apart_counts = defaultdict(int)
+    overall_same_last_digit_counts = defaultdict(int)
+    overall_repeating_digit_counts = defaultdict(int)
+
+    for idx, row in df_copy.iterrows(): # Iterate over the full dataset for overall counts
+        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+        white_ball_set = set(white_balls)
+        
+        # Tens-Apart
+        for pair in combinations(white_balls, 2):
+            sorted_pair = tuple(sorted(pair))
+            if sorted_pair in all_tens_apart_pairs_set:
+                overall_tens_apart_counts[sorted_pair] += 1
+
+        # Same Last Digit
+        for last_digit, full_group_numbers in same_last_digit_groups_full.items():
+            intersection_with_draw = white_ball_set.intersection(set(full_group_numbers))
+            if len(intersection_with_draw) >= 2:
+                for r in range(2, len(intersection_with_draw) + 1):
+                    for pattern_combo in combinations(sorted(list(intersection_with_draw)), r):
+                        overall_same_last_digit_counts[pattern_combo] += 1
+
+        # Repeating Digit
+        drawn_repeating_digits = [n for n in repeating_digit_numbers if n in white_ball_set]
+        if len(drawn_repeating_digits) >= 2:
+            for r in range(2, len(drawn_repeating_digits) + 1):
+                for pattern_combo in combinations(sorted(drawn_repeating_digits), r):
+                    overall_repeating_digit_counts[pattern_combo] += 1
+
+    formatted_tens_apart_overall = [{'pattern': list(p), 'count': c} for p, c in overall_tens_apart_counts.items()]
+    formatted_tens_apart_overall.sort(key=lambda x: (-x['count'], str(x['pattern'])))
+
+    formatted_same_last_digit_overall = [{'pattern': list(p), 'count': c} for p, c in overall_same_last_digit_counts.items()]
+    formatted_same_last_digit_overall.sort(key=lambda x: (-x['count'], str(x['pattern'])))
+
+    formatted_repeating_digit_overall = [{'pattern': list(p), 'count': c} for p, c in overall_repeating_digit_counts.items()]
+    formatted_repeating_digit_overall.sort(key=lambda x: (-x['count'], str(x['pattern'])))
+
+
+    # --- Yearly Data Calculation (Existing Logic) ---
     for year in years_in_data:
-        yearly_df = df_source[df_source['Draw Date_dt'].dt.year == year].copy()
+        yearly_df = df_copy[df_copy['Draw Date_dt'].dt.year == year].copy()
         
         if yearly_df.empty:
             all_yearly_patterns_data.append({
@@ -1819,9 +1853,9 @@ def get_special_patterns_analysis(df_source):
             })
             continue
 
-        tens_apart_counts = defaultdict(int)
-        same_last_digit_counts = defaultdict(int)
-        repeating_digit_counts = defaultdict(int)
+        tens_apart_counts_year = defaultdict(int)
+        same_last_digit_counts_year = defaultdict(int)
+        repeating_digit_counts_year = defaultdict(int)
         
         total_draws_in_year = len(yearly_df)
 
@@ -1832,8 +1866,8 @@ def get_special_patterns_analysis(df_source):
             # Tens-Apart
             for pair in combinations(white_balls, 2):
                 sorted_pair = tuple(sorted(pair))
-                if sorted_pair in all_tens_apart_pairs:
-                    tens_apart_counts[sorted_pair] += 1
+                if sorted_pair in all_tens_apart_pairs_set:
+                    tens_apart_counts_year[sorted_pair] += 1
 
             # Same Last Digit
             for last_digit, full_group_numbers in same_last_digit_groups_full.items():
@@ -1841,37 +1875,37 @@ def get_special_patterns_analysis(df_source):
                 if len(intersection_with_draw) >= 2:
                     for r in range(2, len(intersection_with_draw) + 1):
                         for pattern_combo in combinations(sorted(list(intersection_with_draw)), r):
-                            same_last_digit_counts[pattern_combo] += 1
+                            same_last_digit_counts_year[pattern_combo] += 1
 
             # Repeating Digit
             drawn_repeating_digits = [n for n in repeating_digit_numbers if n in white_ball_set]
             if len(drawn_repeating_digits) >= 2:
                 for r in range(2, len(drawn_repeating_digits) + 1):
                     for pattern_combo in combinations(sorted(drawn_repeating_digits), r):
-                        repeating_digit_counts[pattern_combo] += 1
+                        repeating_digit_counts_year[pattern_combo] += 1
 
-        formatted_tens_apart = [{'pattern': list(p), 'count': c} for p, c in tens_apart_counts.items()]
-        formatted_tens_apart.sort(key=lambda x: (-x['count'], str(x['pattern'])))
+        formatted_tens_apart_year = [{'pattern': list(p), 'count': c} for p, c in tens_apart_counts_year.items()]
+        formatted_tens_apart_year.sort(key=lambda x: (-x['count'], str(x['pattern'])))
 
-        formatted_same_last_digit = [{'pattern': list(p), 'count': c} for p, c in same_last_digit_counts.items()]
-        formatted_same_last_digit.sort(key=lambda x: (-x['count'], str(x['pattern'])))
+        formatted_same_last_digit_year = [{'pattern': list(p), 'count': c} for p, c in same_last_digit_counts_year.items()]
+        formatted_same_last_digit_year.sort(key=lambda x: (-x['count'], str(x['pattern'])))
 
-        formatted_repeating_digit = [{'pattern': list(p), 'count': c} for p, c in repeating_digit_counts.items()]
-        formatted_repeating_digit.sort(key=lambda x: (-x['count'], str(x['pattern'])))
+        formatted_repeating_digit_year = [{'pattern': list(p), 'count': c} for p, c in repeating_digit_counts_year.items()]
+        formatted_repeating_digit_year.sort(key=lambda x: (-x['count'], str(x['pattern'])))
 
         all_yearly_patterns_data.append({
             'year': int(year),
             'total_draws': total_draws_in_year,
-            'tens_apart_patterns': formatted_tens_apart,
-            'same_last_digit_patterns': formatted_same_last_digit,
-            'repeating_digit_patterns': formatted_repeating_digit
+            'tens_apart_patterns': formatted_tens_apart_year,
+            'same_last_digit_patterns': formatted_same_last_digit_year,
+            'repeating_digit_patterns': formatted_repeating_digit_year
         })
     
     all_yearly_patterns_data.sort(key=lambda x: x['year'], reverse=True)
 
     # --- Recent Trends (Last 12 Months) Calculation ---
     one_year_ago = datetime.now() - timedelta(days=365)
-    recent_data_df = df_source[df_source['Draw Date_dt'] >= one_year_ago].copy()
+    recent_data_df = df_copy[df_copy['Draw Date_dt'] >= one_year_ago].copy()
     recent_data_df = recent_data_df.sort_values(by='Draw Date_dt', ascending=False) # Sort newest first
 
     for idx, row in recent_data_df.iterrows():
@@ -1881,21 +1915,20 @@ def get_special_patterns_analysis(df_source):
 
         tens_apart_present = "No"
         for pair in combinations(white_balls, 2):
-            if tuple(sorted(pair)) in all_tens_apart_pairs:
+            if tuple(sorted(pair)) in all_tens_apart_pairs_set: # Use the overall set
                 tens_apart_present = "Yes"
                 break
         
         same_last_digit_present = "No"
-        # Check for presence of any same last digit pattern (pairs, triplets, etc.)
         for last_digit, full_group_numbers in same_last_digit_groups_full.items():
             intersection_with_draw = white_ball_set.intersection(set(full_group_numbers))
-            if len(intersection_with_draw) >= 2: # Any combination of 2 or more
+            if len(intersection_with_draw) >= 2:
                 same_last_digit_present = "Yes"
                 break
         
         repeating_digit_present = "No"
         drawn_repeating_digits = [n for n in repeating_digit_numbers if n in white_ball_set]
-        if len(drawn_repeating_digits) >= 2: # Any combination of 2 or more
+        if len(drawn_repeating_digits) >= 2:
             repeating_digit_present = "Yes"
 
         recent_special_trends.append({
@@ -1903,12 +1936,15 @@ def get_special_patterns_analysis(df_source):
             'tens_apart': tens_apart_present,
             'same_last_digit': same_last_digit_present,
             'repeating_digit': repeating_digit_present,
-            'white_balls': white_balls # Added white_balls to the data
+            'white_balls': white_balls
         })
 
     return {
         'yearly_data': all_yearly_patterns_data,
-        'recent_trends': recent_special_trends
+        'recent_trends': recent_special_trends,
+        'tens_apart_patterns_overall': formatted_tens_apart_overall, # NEW
+        'same_last_digit_patterns_overall': formatted_same_last_digit_overall, # NEW
+        'repeating_digit_patterns_overall': formatted_repeating_digit_overall # NEW
     }
 
 def get_white_ball_frequency_by_period(df_source, period_type='year'):
@@ -3658,41 +3694,39 @@ def _score_pick_for_patterns(white_balls, criteria_data):
     sorted_wb = sorted(white_balls)
 
     # 1. Grouped Patterns Score
+    # The `most_frequent_grouped_patterns` passed here is already a sorted list of top patterns
     if criteria_data['prioritize_grouped_patterns'] and criteria_data['most_frequent_grouped_patterns']:
         for pattern_info in criteria_data['most_frequent_grouped_patterns']:
             pattern_set = set(pattern_info['pattern'])
             if pattern_set.issubset(wb_set):
-                # Give higher score for more frequent patterns
                 score += pattern_info['count'] * 0.1 # Adjust multiplier as needed
 
-    # 2. Special Patterns Score
-    if criteria_data['prioritize_special_patterns'] and criteria_data['most_frequent_special_patterns']:
-        # Combine all special patterns for scoring
-        all_special_patterns = []
-        all_special_patterns.extend(criteria_data['most_frequent_special_patterns']['tens_apart_patterns'])
-        all_special_patterns.extend(criteria_data['most_frequent_special_patterns']['same_last_digit_patterns'])
-        all_special_patterns.extend(criteria_data['most_frequent_special_patterns']['repeating_digit_patterns'])
+    # 2. Special Patterns Score (MODIFIED ACCESS)
+    if criteria_data['prioritize_special_patterns']:
+        # Now access the overall lists directly from criteria_data
+        all_special_patterns_for_scoring = []
+        all_special_patterns_for_scoring.extend(criteria_data['most_frequent_special_patterns'].get('tens_apart_patterns_overall', []))
+        all_special_patterns_for_scoring.extend(criteria_data['most_frequent_special_patterns'].get('same_last_digit_patterns_overall', []))
+        all_special_patterns_for_scoring.extend(criteria_data['most_frequent_special_patterns'].get('repeating_digit_patterns_overall', []))
         
-        for pattern_info in all_special_patterns:
+        for pattern_info in all_special_patterns_for_scoring:
             pattern_set = set(pattern_info['pattern'])
             if pattern_set.issubset(wb_set):
                 score += pattern_info['count'] * 0.05 # Smaller multiplier for special patterns
 
     # 3. Consecutive Trends Score
     if criteria_data['prioritize_consecutive_patterns']:
-        consecutive_sequences = _find_consecutive_sequences(white_balls) # Use the correct function
-        score += len(consecutive_sequences) * 5 # Score for each consecutive sequence found
-        # Add bonus for triplets if present (check if any sequence is length 3)
+        consecutive_sequences = _find_consecutive_sequences(white_balls)
+        score += len(consecutive_sequences) * 5 
         if any(len(s) >= 3 for s in consecutive_sequences):
-            score += 10 # Bonus for a triplet
+            score += 10 
 
     # 4. Monthly Hot Numbers Score
     if criteria_data['prioritize_monthly_hot'] and criteria_data['current_month_hot_numbers']:
         hot_count = len(wb_set.intersection(criteria_data['current_month_hot_numbers']))
-        score += hot_count * 2 # Score for each hot number included
+        score += hot_count * 2 
 
     return score
-
 def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a, odd_even_choice, sum_range_tuple, prioritize_monthly_hot, prioritize_grouped_patterns, prioritize_special_patterns, prioritize_consecutive_patterns, force_specific_pattern):
     """
     Generates Powerball picks based on a combination of hard and soft criteria.
@@ -3701,35 +3735,38 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
         raise ValueError("Historical data is empty. Cannot generate smart picks.")
 
     generated_sets = []
-    max_overall_attempts = 5000 * num_sets # Increased attempts for complex criteria
+    max_overall_attempts = 5000 * num_sets 
 
-    # Pre-calculate historical data needed for soft constraints
-    # These are cached, so calling them here is efficient
     all_grouped_patterns = get_cached_analysis('grouped_patterns', get_grouped_patterns_over_years, df_source)
     all_special_patterns = get_cached_analysis('special_patterns_analysis', get_special_patterns_analysis, df_source)
     
-    # For scoring, we need a flat list of most frequent patterns
-    most_frequent_grouped_patterns = sorted(all_grouped_patterns, key=lambda x: x['count'], reverse=True)[:50] # Top 50 grouped patterns
+    # For scoring, we need a flat list of most frequent patterns from grouped_patterns_over_years.
+    # The get_grouped_patterns_over_years function returns a list of dictionaries with 'year', 'range', 'type', 'pattern', 'count'.
+    # We want to aggregate counts across years if necessary, or just take the top overall patterns.
+    # For now, let's just use the `all_grouped_patterns` directly if it's already aggregated.
+    # Assuming get_grouped_patterns_over_years returns patterns with overall counts.
+    # If not, a separate aggregation step here would be needed.
+    most_frequent_grouped_patterns = sorted(all_grouped_patterns, key=lambda x: x['count'], reverse=True)[:50] 
     
-    # Combine all special patterns into one list for easier scoring
+    # Pass the overall special patterns directly for scoring
+    # These are the new keys from the modified get_special_patterns_analysis
     most_frequent_special_patterns = {
-        'tens_apart_patterns': sorted(all_special_patterns['tens_apart_patterns'], key=lambda x: x['count'], reverse=True)[:20],
-        'same_last_digit_patterns': sorted(all_special_patterns['same_last_digit_patterns'], key=lambda x: x['count'], reverse=True)[:20],
-        'repeating_digit_patterns': sorted(all_special_patterns['repeating_digit_patterns'], key=lambda x: x['count'], reverse=True)[:20]
+        'tens_apart_patterns_overall': all_special_patterns.get('tens_apart_patterns_overall', []),
+        'same_last_digit_patterns_overall': all_special_patterns.get('same_last_digit_patterns_overall', []),
+        'repeating_digit_patterns_overall': all_special_patterns.get('repeating_digit_patterns_overall', [])
     }
 
     current_month_hot_numbers = set()
     if prioritize_monthly_hot:
         current_month_hot_numbers = _get_current_month_hot_numbers(df_source)
 
-    # Prepare criteria data for scoring function
     criteria_for_scoring = {
         'prioritize_monthly_hot': prioritize_monthly_hot,
         'current_month_hot_numbers': current_month_hot_numbers,
         'prioritize_grouped_patterns': prioritize_grouped_patterns,
         'most_frequent_grouped_patterns': most_frequent_grouped_patterns,
         'prioritize_special_patterns': prioritize_special_patterns,
-        'most_frequent_special_patterns': most_frequent_special_patterns,
+        'most_frequent_special_patterns': most_frequent_special_patterns, # Pass the refined dictionary
         'prioritize_consecutive_patterns': prioritize_consecutive_patterns,
     }
 
@@ -3738,7 +3775,7 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
         best_pick_powerball = None
         highest_score = -1
         current_set_attempts = 0
-        max_attempts_per_set = max_overall_attempts // num_sets # Distribute attempts
+        max_attempts_per_set = max_overall_attempts // num_sets 
 
         while current_set_attempts < max_attempts_per_set:
             current_set_attempts += 1
@@ -3753,33 +3790,30 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
             if force_specific_pattern:
                 for num in force_specific_pattern:
                     if not (GLOBAL_WHITE_BALL_RANGE[0] <= num <= GLOBAL_WHITE_BALL_RANGE[1]) or num in temp_excluded:
-                        # If forced number is invalid or excluded, this attempt fails
                         continue 
                 candidate_white_balls.extend(force_specific_pattern)
                 temp_excluded.update(force_specific_pattern)
                 remaining_to_pick -= len(force_specific_pattern)
                 
-            # Ensure we have enough numbers left to pick
-            if remaining_to_pick < 0: # Should not happen with valid input
+            if remaining_to_pick < 0: 
                 continue
             
             available_pool = [n for n in range(GLOBAL_WHITE_BALL_RANGE[0], GLOBAL_WHITE_BALL_RANGE[1] + 1)
                               if n not in temp_excluded and n not in candidate_white_balls]
 
             if len(available_pool) < remaining_to_pick:
-                continue # Not enough numbers to complete the pick
+                continue 
 
             # 2. Handle Group A Numbers (Hard Constraint)
-            # Determine how many more Group A numbers are needed
             current_group_a_count = sum(1 for num in candidate_white_balls if num in group_a)
             needed_from_group_a = num_from_group_a - current_group_a_count
 
-            temp_available_pool = list(available_pool) # Copy to modify
+            temp_available_pool = list(available_pool) 
             
             if needed_from_group_a > 0:
                 possible_group_a_from_pool = [n for n in temp_available_pool if n in group_a]
                 if len(possible_group_a_from_pool) < needed_from_group_a:
-                    continue # Not enough Group A numbers available
+                    continue 
                 
                 try:
                     selected_group_a = random.sample(possible_group_a_from_pool, needed_from_group_a)
@@ -3787,27 +3821,22 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
                     temp_excluded.update(selected_group_a)
                     remaining_to_pick -= needed_from_group_a
                     
-                    # Update available pool after selecting Group A numbers
                     available_pool = [n for n in available_pool if n not in selected_group_a]
-                except ValueError: # Not enough elements to sample
+                except ValueError: 
                     continue
-            elif needed_from_group_a < 0: # Already have too many Group A numbers from forced pattern
-                # This scenario means the forced pattern already violates the Group A count.
-                # We should probably raise an error earlier or ensure the UI prevents this.
-                # For now, just skip this candidate.
+            elif needed_from_group_a < 0: 
                 continue
 
             # 3. Fill remaining spots randomly from available pool
             if remaining_to_pick > 0:
                 if len(available_pool) < remaining_to_pick:
-                    continue # Not enough numbers left
+                    continue 
                 try:
                     random_fill = random.sample(available_pool, remaining_to_pick)
                     candidate_white_balls.extend(random_fill)
-                except ValueError: # Not enough elements to sample
+                except ValueError: 
                     continue
             
-            # Ensure 5 unique white balls
             if len(set(candidate_white_balls)) != 5:
                 continue
             
@@ -3817,18 +3846,13 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
             even_count = sum(1 for num in candidate_white_balls if num % 2 == 0)
             odd_count = 5 - even_count
             
-            # Adjusted for expected format from form (e.g., "3 Even / 2 Odd")
             expected_odd_even_split = odd_even_choice
             
-            # If a specific odd/even choice is made, apply it strictly
             if expected_odd_even_split != "Any":
                 current_split_str = f"{odd_count} Odd / {even_count} Even"
-                if current_split_str != expected_odd_even_split:
-                    # Special handling for "All Even" or "All Odd" which are specific cases
-                    if expected_odd_even_split == "All Even" and even_count != 5: continue
-                    if expected_odd_even_split == "All Odd" and odd_count != 5: continue
-                    # For other named splits, check for exact match
-                    if expected_odd_even_split not in ["All Even", "All Odd"] and current_split_str != expected_odd_even_split: continue
+                if expected_odd_even_split == "All Even" and even_count != 5: continue
+                if expected_odd_even_split == "All Odd" and odd_count != 5: continue
+                if expected_odd_even_split not in ["All Even", "All Odd"] and current_split_str != expected_odd_even_split: continue
 
             # 5. Check Sum Range (Hard Constraint)
             current_sum = sum(candidate_white_balls)
@@ -3853,10 +3877,7 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
                 best_pick_white_balls = candidate_white_balls
                 best_pick_powerball = candidate_powerball
             
-            # If we found a perfect pick (can define "perfect" as score > threshold or just the first valid one)
-            # For now, if a pick has a positive score and meets all hard constraints, we can consider it "good enough"
-            # to prevent excessive iterations if many options exist, especially for lower `num_sets`.
-            if highest_score > 0 and current_set_attempts > max_attempts_per_set / 2: # Found a good one relatively early
+            if highest_score > 0 and current_set_attempts > max_attempts_per_set / 2: 
                  break
         
         if best_pick_white_balls:
@@ -3881,40 +3902,36 @@ def generate_smart_picks_route():
         return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
 
     try:
-        num_sets_to_generate = int(request.form.get('num_sets_to_generate', 1))
-        excluded_numbers_input = request.form.get('excluded_numbers', '')
+        # --- IMPORTANT CHANGE: Use request.json.get() for JSON payload ---
+        data = request.json 
+        num_sets_to_generate = int(data.get('num_sets_to_generate', 1))
+        excluded_numbers_input = data.get('excluded_numbers', '')
         excluded_numbers_local = [int(num.strip()) for num in excluded_numbers_input.split(',') if num.strip().isdigit()] if excluded_numbers_input else []
         
-        num_from_group_a = int(request.form.get('num_from_group_a', 0))
-        odd_even_choice = request.form.get('odd_even_choice', 'Any')
+        num_from_group_a = int(data.get('num_from_group_a', 0))
+        odd_even_choice = data.get('odd_even_choice', 'Any')
         
-        selected_sum_range_label = request.form.get('sum_range_filter', 'Any')
+        selected_sum_range_label = data.get('sum_range_filter', 'Any')
         selected_sum_range_tuple = SUM_RANGES.get(selected_sum_range_label)
 
-        prioritize_monthly_hot = 'prioritize_monthly_hot' in request.form
-        prioritize_grouped_patterns = 'prioritize_grouped_patterns' in request.form
-        prioritize_special_patterns = 'prioritize_special_patterns' in request.form
-        prioritize_consecutive_patterns = 'prioritize_consecutive_patterns' in request.form
+        prioritize_monthly_hot = data.get('prioritize_monthly_hot', False)
+        prioritize_grouped_patterns = data.get('prioritize_grouped_patterns', False)
+        prioritize_special_patterns = data.get('prioritize_special_patterns', False)
+        prioritize_consecutive_patterns = data.get('prioritize_consecutive_patterns', False)
         
-        force_specific_pattern_input = request.form.get('force_specific_pattern', '')
+        force_specific_pattern_input = data.get('force_specific_pattern', '')
         force_specific_pattern = []
         if force_specific_pattern_input:
             force_specific_pattern = sorted([int(num.strip()) for num in force_specific_pattern_input.split(',') if num.strip().isdigit()])
             if not (2 <= len(force_specific_pattern) <= 3):
-                flash("Forced specific pattern must contain 2 or 3 numbers.", 'error')
-                return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
-            # Check if forced numbers are within range and not excluded
+                raise ValueError("Forced specific pattern must contain 2 or 3 numbers.")
             for num in force_specific_pattern:
                 if not (GLOBAL_WHITE_BALL_RANGE[0] <= num <= GLOBAL_WHITE_BALL_RANGE[1]):
-                    flash(f"Forced number {num} is outside the valid white ball range (1-69).", 'error')
-                    return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
+                    raise ValueError(f"Forced number {num} is outside the valid white ball range (1-69).")
                 if num in excluded_numbers_local:
-                    flash(f"Forced number {num} is also in the excluded numbers list. Please remove it from excluded.", 'error')
-                    return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
+                    raise ValueError(f"Forced number {num} is also in the excluded numbers list. Please remove it from excluded.")
             if len(set(force_specific_pattern)) != len(force_specific_pattern):
-                flash("Forced specific pattern numbers must be unique.", 'error')
-                return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
-
+                raise ValueError("Forced specific pattern numbers must be unique.")
 
         generated_sets = generate_smart_picks(
             df_source=df,
@@ -3930,33 +3947,21 @@ def generate_smart_picks_route():
             force_specific_pattern=force_specific_pattern
         )
         
-        # For display, get last draw dates for the *last* generated set
         last_draw_dates = {}
         if generated_sets:
             last_draw_dates = find_last_draw_dates_for_numbers(df, generated_sets[-1]['white_balls'], generated_sets[-1]['powerball'])
 
-        return render_template('smart_pick_generator.html', 
-                               generated_sets=generated_sets, 
-                               last_draw_dates=last_draw_dates,
-                               sum_ranges=SUM_RANGES,
-                               group_a=group_a,
-                               # Pass back selected values to re-populate form
-                               num_sets_to_generate=num_sets_to_generate,
-                               excluded_numbers=excluded_numbers_input,
-                               num_from_group_a=num_from_group_a,
-                               odd_even_choice=odd_even_choice,
-                               selected_sum_range=selected_sum_range_label,
-                               prioritize_monthly_hot=prioritize_monthly_hot,
-                               prioritize_grouped_patterns=prioritize_grouped_patterns,
-                               prioritize_special_patterns=prioritize_special_patterns,
-                               prioritize_consecutive_patterns=prioritize_consecutive_patterns,
-                               force_specific_pattern_input=force_specific_pattern_input
-                               )
+        # Return JSON response for AJAX call
+        return jsonify({
+            'success': True,
+            'generated_sets': generated_sets,
+            'last_draw_dates': last_draw_dates
+            # You might want to return the form values for repopulation too, if needed on frontend
+        })
 
     except ValueError as e:
-        flash(str(e), 'error')
-        return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
+        return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
         traceback.print_exc()
-        flash(f"An unexpected error occurred: {e}", 'error')
-        return render_template('smart_pick_generator.html', sum_ranges=SUM_RANGES, group_a=group_a)
+        return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
+        
