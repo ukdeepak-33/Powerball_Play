@@ -3313,6 +3313,40 @@ def save_manual_pick_route():
         traceback.print_exc()
         return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
 
+@app.route('/save_official_draw', methods=['POST'])
+def save_official_draw_route():
+    try:
+        draw_date = request.form.get('draw_date')
+        n1 = int(request.form.get('n1'))
+        n2 = int(request.form.get('n2'))
+        n3 = int(request.form.get('n3'))
+        n4 = int(request.form.get('n4'))
+        n5 = int(request.form.get('n5'))
+        pb = int(request.form.get('pb'))
+
+        if not (1 <= n1 <= 69 and 1 <= n2 <= 69 and 1 <= n3 <= 69 and 1 <= n4 <= 69 and 1 <= n5 <= 69 and 1 <= pb <= 26):
+            flash("White balls must be between 1-69 and Powerball between 1-26.", 'error')
+            return redirect(url_for('index'))
+        
+        submitted_white_balls = sorted([n1, n2, n3, n4, n5])
+        if len(set(submitted_white_balls)) != 5:
+            flash("White ball numbers must be unique within a single draw.", 'error')
+            return redirect(url_for('index'))
+
+        success, message = save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb)
+        if success:
+            flash(message, 'info')
+            initialize_core_data() # Re-initialize data to reflect the new draw
+            invalidate_analysis_cache() # Invalidate cache so analyses use new data
+        else:
+            flash(message, 'error')
+    except ValueError:
+        flash("Invalid input. Please ensure all numbers and date are correctly entered.", 'error')
+    except Exception as e:
+        flash(f"An error occurred: {e}", 'error')
+    return redirect(url_for('index'))
+
+
 @app.route('/sum_trends_and_gaps')
 def sum_trends_and_gaps_route():
     if df.empty:
