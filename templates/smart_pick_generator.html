@@ -96,9 +96,11 @@
     </div>
 
     {# Results Display Area #}
-    <div id="smartPicksResults" class="mt-8 space-y-6 {% if not generated_sets %}hidden{% endif %}">
+    {# Changed `if not generated_sets` to `generated_sets | length == 0` for explicit check #}
+    <div id="smartPicksResults" class="mt-8 space-y-6 {% if generated_sets | length == 0 %}hidden{% endif %}">
         {# Generated picks will be displayed here #}
-        {% if generated_sets %}
+        {# Changed `if generated_sets` to `if generated_sets | length > 0` #}
+        {% if generated_sets | length > 0 %}
             <div class="bg-gradient-to-br from-blue-500 to-indigo-600 p-8 rounded-2xl shadow-xl text-white">
                 <h2 class="text-3xl font-extrabold mb-6 text-center">Your Smart Picks!</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -263,15 +265,16 @@
         });
 
         // Handle initial display of results if they were passed from Flask
-        if (smartPicksResultsDiv && smartPicksResultsDiv.querySelectorAll('.generated-pick-item').length > 0) {
-             smartPicksResultsDiv.classList.remove('hidden');
-             const generatedSetsPresent = smartPicksResultsDiv.querySelector('.generated-pick-item');
-             if (generatedSetsPresent) {
-                 if (saveAllSmartPicksActions) {
-                     saveAllSmartPicksActions.classList.remove('hidden');
-                 }
-             }
-         }
+        // Changed `if smartPicksResultsDiv && smartPicksResultsDiv.querySelectorAll('.generated-pick-item').length > 0`
+        // to check `generated_sets | length > 0` which is implicitly handled by the template's hidden class
+        // and also added `saveAllSmartPicksActions` to be shown
+        const initialGeneratedPicks = smartPicksResultsDiv.querySelectorAll('.generated-pick-item');
+        if (initialGeneratedPicks.length > 0) {
+            smartPicksResultsDiv.classList.remove('hidden');
+            if (saveAllSmartPicksActions) {
+                saveAllSmartPicksActions.classList.remove('hidden');
+            }
+        }
 
 
         generateSmartPicksBtn.addEventListener('click', async function(event) {
@@ -335,9 +338,8 @@
                                      data-white-balls="${pick.white_balls.join(',')}"
                                      data-powerball="${pick.powerball}">
                                     <div class="flex space-x-2">
-                                        {% for num in pick.white_balls %}
-                                            <span class="flex items-center justify-center w-10 h-10 rounded-full bg-yellow-400 text-gray-900 font-extrabold text-lg shadow-md">{{ num }}</span>
-                                        {% endfor %}
+                                        {# Accessing pick.white_balls here, ensures pick is defined #}
+                                        ${pick.white_balls.map(num => `<span class="flex items-center justify-center w-10 h-10 rounded-full bg-yellow-400 text-gray-900 font-extrabold text-lg shadow-md">${num}</span>`).join('')}
                                     </div>
                                     <div class="flex items-center space-x-2">
                                         <span class="text-lg font-semibold">Powerball:</span>
@@ -552,4 +554,5 @@
         });
     });
 </script>
+
 {% endblock %}
