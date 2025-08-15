@@ -3635,6 +3635,32 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
             raise ValueError(f"Could not generate a smart pick meeting all criteria after {max_attempts_per_set} attempts. Try adjusting filters or reducing strictness.")
             
     return generated_sets
+    
+@app.route('/smart_pick_generator')
+def smart_pick_generator_route():
+    # Ensure historical data is loaded before rendering the generator page
+    global df, last_draw, historical_white_ball_sets, white_ball_co_occurrence_lookup, analysis_cache, last_analysis_cache_update
+
+    if df.empty or last_draw.empty:
+        # Attempt to load data if not already loaded
+        success = load_data_from_supabase()
+        if not success:
+            flash("Failed to load historical data. Please try again later.", 'error')
+            return redirect(url_for('index')) # Redirect to home or show an error page
+    
+    # Pass necessary data for rendering the form
+    return render_template('smart_pick_generator.html', 
+                           sum_ranges=SUM_RANGES,
+                           group_a=group_a,
+                           # Pass default values for form fields.
+                           # No need to pass 'prioritize_monthly_hot' or 'force_specific_pattern_input'
+                           # as they are removed from the HTML form.
+                           num_sets_to_generate=1, # Default
+                           excluded_numbers='',     # Default
+                           num_from_group_a=2,      # Default
+                           odd_even_choice="Any",   # Default
+                           selected_sum_range="Any" # Default
+                          )
 
 @app.route('/generate_smart_picks_route', methods=['POST'])
 def generate_smart_picks_route():
