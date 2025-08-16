@@ -3544,7 +3544,8 @@ def custom_combinations_route():
                            current_month_unpicked=current_month_unpicked,
                            current_month_most_picked=current_month_most_picked,
                            previous_month_unpicked=previous_month_unpicked,
-                           previous_month_most_picked=previous_month_most_picked
+                           previous_month_most_picked=previous_month_most_picked,
+                           now=datetime.now() # <-- ADD THIS LINE to pass the datetime object
                           )
 
 @app.route('/smart_pick_generator')
