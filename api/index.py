@@ -2480,7 +2480,54 @@ def _score_pick_for_patterns(white_balls, criteria_data):
         score += hot_count * 2 
 
     return score
+# --- New Helper Functions for Monthly Trends ---
+def _get_draws_for_month(year, month):
+    """Fetches all Powerball draws for a given year and month from Supabase."""
+    # Ensure df is loaded
+    global df
+    if df.empty:
+        load_data_from_supabase()
+        if df.empty:
+            return pd.DataFrame() # Return empty if data still not available
 
+    # Filter the global DataFrame by month and year
+    monthly_draws = df[(df['Draw Date'].dt.year == year) & (df['Draw Date'].dt.month == month)]
+    return monthly_draws
+
+def get_monthly_unpicked_and_most_picked(year, month):
+    """
+    Analyzes draws for a specific month to find unpicked and most picked numbers.
+    Most picked: Any number appearing more than once in the month.
+    """
+    cache_key = f"monthly_trends_{year}_{month}"
+    cached_data = get_cached_analysis(cache_key)
+    if cached_data:
+        return cached_data['unpicked'], cached_data['most_picked']
+
+    all_possible_white_balls = set(range(1, 70))
+    
+    monthly_draws = _get_draws_for_month(year, month)
+    
+    if monthly_draws.empty:
+        # If no draws, all are unpicked, and none are most picked
+        set_cached_analysis(cache_key, {'unpicked': sorted(list(all_possible_white_balls)), 'most_picked': []})
+        return sorted(list(all_possible_white_balls)), []
+
+    picked_counts = defaultdict(int)
+    for _, row in monthly_draws.iterrows():
+        white_balls = [row['WB1'], row['WB2'], row['WB3'], row['WB4'], row['WB5']]
+        for num in white_balls:
+            picked_counts[num] += 1
+    
+    picked_numbers = set(picked_counts.keys())
+    
+    unpicked_numbers = sorted(list(all_possible_white_balls - picked_numbers))
+    most_picked_numbers = sorted([num for num, count in picked_counts.items() if count > 1])
+
+    result = {'unpicked': unpicked_numbers, 'most_picked': most_picked_numbers}
+    set_cached_analysis(cache_key, result)
+    
+    return unpicked_numbers, most_picked_numbers
 
 def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a, odd_even_choice, sum_range_tuple, prioritize_monthly_hot, prioritize_grouped_patterns, prioritize_special_patterns, prioritize_consecutive_patterns, force_specific_pattern):
     """
