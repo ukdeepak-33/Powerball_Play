@@ -36,14 +36,11 @@ white_ball_co_occurrence_lookup = {}
 analysis_cache = {}
 last_analysis_cache_update = datetime.min 
 
-# Using the user's CACHE_EXPIRATION_SECONDS
-CACHE_EXPIRATION_SECONDS = 3600
+CACHE_EXPIRATION_SECONDS = 3600 # 1 hour
 
 group_a = [3, 5, 6, 7, 9, 11, 15, 16, 18, 21, 23, 24, 27, 31, 32, 33, 36, 42, 44, 45, 48, 50, 51, 54, 55, 60, 66, 69]
 GLOBAL_WHITE_BALL_RANGE = (1, 69)
 GLOBAL_POWERBALL_RANGE = (1, 26)
-# `excluded_numbers` as a global variable seems to be a remnant, it's generally handled via form input now.
-# excluded_numbers = [] 
 
 NUMBER_RANGES = {
     "1-9": (1, 9),
@@ -88,8 +85,8 @@ BOUNDARY_PAIRS_TO_ANALYZE = [
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 
-# --- Core Utility Functions (All helpers defined here) ---
-#
+# --- Core Utility Functions ---
+
 def _get_supabase_headers(is_service_key=False):
     key = SUPABASE_SERVICE_KEY if is_service_key else SUPABASE_ANON_KEY
     return {
@@ -99,6 +96,7 @@ def _get_supabase_headers(is_service_key=False):
     }
 
 def load_historical_data_from_supabase():
+    """Fetches historical Powerball draw data from Supabase."""
     all_data = []
     offset = 0
     limit = 1000
@@ -158,56 +156,53 @@ def load_historical_data_from_supabase():
         print(f"An unexpected error occurred in load_historical_data_from_supabase: {e}")
         return pd.DataFrame()
 
-def get_last_draw(df):
-    if df.empty:
+def get_last_draw(df_source):
+    """Retrieves the most recent draw from the DataFrame."""
+    if df_source.empty:
         return pd.Series({
             'Draw Date': 'N/A', 'Number 1': 'N/A', 'Number 2': 'N/A',
             'Number 3': 'N/A', 'Number 4': 'N/A', 'Number 5': 'N/A', 'Powerball': 'N/A',
             'Numbers': ['N/A', 'N/A', 'N/A', 'N/A', 'N/A'] 
         }, dtype='object')
     
-    last_row = df.iloc[-1].copy() 
+    last_row = df_source.iloc[-1].copy() 
     
-    # Ensure 'Numbers' field is correctly populated for rendering
-    if 'Number 1' in last_row and pd.notna(last_row['Number 1']): # Check if numbers are present
+    if 'Number 1' in last_row and pd.notna(last_row['Number 1']): 
         last_row['Numbers'] = [
             int(last_row['Number 1']), int(last_row['Number 2']), int(last_row['Number 3']), 
             int(last_row['Number 4']), int(last_row['Number 5'])
         ]
     else:
-        last_row['Numbers'] = ['N/A'] * 5 # Default if numbers are missing
+        last_row['Numbers'] = ['N/A'] * 5 
 
-    # Ensure Draw Date is formatted correctly if it came as datetime
     if 'Draw Date_dt' in last_row and pd.notna(last_row['Draw Date_dt']):
         last_row['Draw Date'] = last_row['Draw Date_dt'].strftime('%Y-%m-%d')
-    elif 'Draw Date' not in last_row: # Fallback if original 'Draw Date' is missing
+    elif 'Draw Date' not in last_row: 
         last_row['Draw Date'] = 'N/A'
     
     return last_row
 
-
 def check_exact_match(white_balls):
+    """Checks if a given set of white balls exactly matches any historical draw."""
     global historical_white_ball_sets
     return frozenset(white_balls) in historical_white_ball_sets
 
-def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, high_low_balance=None, selected_sum_range_tuple=None, is_simulation=False):
+def generate_powerball_numbers(df_source, group_a_list, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, high_low_balance=None, selected_sum_range_tuple=None, is_simulation=False):
+    """Generates a single Powerball combination based on various criteria."""
     if df_source.empty:
         raise ValueError("Cannot generate numbers: Historical data is empty.")
 
-    max_attempts = 5000 # Increased attempts for stricter adherence, especially with odd/even
+    max_attempts = 5000 
     attempts = 0
     
-    # Pre-filter available numbers for white balls
     base_available_white_balls = [num for num in range(white_ball_range[0], white_ball_range[1] + 1) if num not in excluded_numbers]
     if len(base_available_white_balls) < 5:
         raise ValueError("Not enough available white balls after exclusions and range constraints.")
 
     while attempts < max_attempts:
         
-        # 1. Generate candidate white balls
         white_balls_candidate = sorted(random.sample(base_available_white_balls, 5))
 
-        # 2. **STRICT ODD/EVEN CHECK (PRIORITY)**
         even_count = sum(1 for num in white_balls_candidate if num % 2 == 0)
         odd_count = 5 - even_count
 
@@ -229,23 +224,18 @@ def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice
         elif odd_even_choice == "4 Even / 1 Odd" and (even_count != 4 or odd_count != 1):
             attempts += 1
             continue
-        # If odd_even_choice is "Any", this block is skipped, which is fine.
 
-        # 3. Check Sum Range constraint
         if selected_sum_range_tuple:
             current_sum = sum(white_balls_candidate)
             if not (selected_sum_range_tuple[0] <= current_sum <= selected_sum_range_tuple[1]):
                 attempts += 1
                 continue 
 
-        # 4. Check Group A constraint (reverting to original logic from index (2).py, as it does not pass num_from_group_a directly to this function for 'simulate_multiple_draws')
-        group_a_numbers = [num for num in white_balls_candidate if num in group_a]
-        if len(group_a_numbers) < 2: # This condition might make generation very hard if group_a is small or numbers are excluded.
-                                     # The original index (2).py had this, so keeping it.
+        group_a_numbers = [num for num in white_balls_candidate if num in group_a_list]
+        if len(group_a_numbers) < 2: 
             attempts += 1
             continue
             
-        # 5. Check High/Low balance
         if high_low_balance is not None:
             low_numbers_count = sum(1 for num in white_balls_candidate if num <= LOW_NUMBER_MAX)
             high_numbers_count = sum(1 for num in white_balls_candidate if num >= HIGH_NUMBER_MIN)
@@ -253,30 +243,26 @@ def generate_powerball_numbers(df_source, group_a, odd_even_choice, combo_choice
                 attempts += 1
                 continue
         
-        # 6. Check against last draw (if not simulation)
         if not is_simulation:
             last_draw_data = get_last_draw(df_source)
             if not last_draw_data.empty and last_draw_data.get('Draw Date') != 'N/A':
-                # Ensure last_draw_data numbers are properly converted to int for comparison
                 last_white_balls = [int(last_draw_data['Number 1']), int(last_draw_data['Number 2']), int(last_draw_data['Number 3']), int(last_draw_data['Number 4']), int(last_draw_data['Number 5'])]
-                if set(white_balls_candidate) == set(last_white_balls): # Powerball comparison removed here for flexibility
+                if set(white_balls_candidate) == set(last_white_balls): 
                     attempts += 1
                     continue
 
-            # 7. Check for exact historical white ball match
             if check_exact_match(white_balls_candidate): 
                 attempts += 1
                 continue
 
-        # If all checks pass, generate powerball and return
         powerball = random.randint(powerball_range[0], powerball_range[1])
         return white_balls_candidate, powerball
 
-    # If loop finishes without returning, it means we couldn't find a valid combination
     raise ValueError("Could not generate a unique combination meeting all criteria after many attempts. Try adjusting filters or increasing max_attempts.")
 
 
 def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerball_range, excluded_numbers, selected_sum_range_tuple=None):
+    """Generates a Powerball combination ensuring a certain number of Group A numbers."""
     if df_source.empty:
         raise ValueError("Cannot generate numbers: Historical data is empty.")
 
@@ -326,10 +312,7 @@ def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerba
     return white_balls, powerball
 
 def generate_with_user_provided_pair(num1, num2, white_ball_range, powerball_range, excluded_numbers, df_source, selected_sum_range_tuple=None):
-    """
-    Generates a Powerball combination starting with two user-provided white balls.
-    The remaining three numbers are generated in ascending order from specific tens ranges (20s-60s).
-    """
+    """Generates a Powerball combination starting with two user-provided white balls."""
     if df_source.empty:
         raise ValueError("Cannot generate numbers: Historical data is empty.")
 
@@ -418,12 +401,8 @@ def generate_with_user_provided_pair(num1, num2, white_ball_range, powerball_ran
     else:
         raise ValueError("Could not generate a unique combination with the provided pair and ascending range constraint meeting all criteria after many attempts. Try adjusting filters.")
 
-
-def check_historical_match(white_balls, powerball):
-    global historical_white_ball_sets
-    return frozenset(white_balls) in historical_white_ball_sets
-
 def frequency_analysis(df_source):
+    """Calculates and returns frequency of white balls and powerballs."""
     if df_source.empty: 
         return [], []
     white_balls = df_source[['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']].values.flatten()
@@ -436,6 +415,7 @@ def frequency_analysis(df_source):
     return white_ball_freq_list, powerball_freq_list
 
 def hot_cold_numbers(df_source, last_draw_date_str):
+    """Identifies hot and cold numbers based on recent draws."""
     if df_source.empty or last_draw_date_str == 'N/A': 
         return [], []
     
@@ -455,6 +435,10 @@ def hot_cold_numbers(df_source, last_draw_date_str):
     return hot_numbers, cold_numbers
 
 def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=69, num_top_pb=3, num_months_for_top_display=6):
+    """
+    Analyzes monthly white ball and powerball draws, and streak numbers.
+    This function is intended for the /monthly_white_ball_analysis route.
+    """
     if dataframe.empty:
         return {'monthly_data': [], 'streak_numbers': {'3_month_streaks': [], '4_month_streaks': [], '5_month_streaks': []}}
 
@@ -464,8 +448,7 @@ def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=69, num_top_pb=3,
 
     monthly_display_data = [] 
     
-    # Iterate through the last 'num_months_for_top_display' months
-    for period in unique_months_periods[:num_months_for_top_display]:
+    for period in unique_months_periods[:num_months_for_top_display]: # Limiting to N months for display
         month_df = df_sorted[df_sorted['YearMonth'] == period]
         if month_df.empty:
             continue
@@ -509,12 +492,12 @@ def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=69, num_top_pb=3,
     
     monthly_display_data.sort(key=lambda x: datetime.strptime(x['month'], '%B %Y'))
 
-    # Streaks calculation (remains the same as it needs all completed months)
+    # Streaks calculation (needs all completed months)
     numbers_per_completed_month = defaultdict(set)
     for period in unique_months_periods:
-        current_period = pd.Period(datetime.now(), freq='M')
-        if period == current_period: 
-            continue # Skip current (incomplete) month for streak calculation
+        current_period_dt = pd.Period(datetime.now(), freq='M')
+        if period == current_period_dt: 
+            continue 
         month_df = df_sorted[df_sorted['YearMonth'] == period]
         if not month_df.empty:
             for _, row in month_df.iterrows():
@@ -555,8 +538,8 @@ def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=69, num_top_pb=3,
         'streak_numbers': streak_numbers
     }
 
-
 def sum_of_main_balls(df_source):
+    """Calculates sum of main balls, their frequency, and min/max/avg sums."""
     if df_source.empty:
         return pd.DataFrame(), [], 0, 0, 0.0
     
@@ -577,6 +560,7 @@ def sum_of_main_balls(df_source):
     return temp_df[['Draw Date', 'Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Powerball', 'Sum', 'Draw Date_dt']], sum_freq_list, min_sum, max_sum, avg_sum
 
 def find_results_by_sum(df_source, target_sum):
+    """Finds historical draws matching a specific sum."""
     if df_source.empty: return pd.DataFrame()
     temp_df = df_source.copy()
     for col in ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Powerball']: 
@@ -589,7 +573,8 @@ def find_results_by_sum(df_source, target_sum):
     results = temp_df[temp_df['Sum'] == target_sum]
     return results[['Draw Date', 'Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5', 'Powerball', 'Sum', 'Draw Date_dt']]
 
-def simulate_multiple_draws(df_source, group_a, odd_even_choice, white_ball_range, powerball_range, excluded_numbers, num_draws=100):
+def simulate_multiple_draws(df_source, group_a_list, odd_even_choice, white_ball_range, powerball_range, excluded_numbers, num_draws=100):
+    """Simulates multiple Powerball draws based on criteria and returns frequencies."""
     if df_source.empty: 
         return {'white_ball_freq': [], 'powerball_freq': []}
     
@@ -598,10 +583,8 @@ def simulate_multiple_draws(df_source, group_a, odd_even_choice, white_ball_rang
 
     for _ in range(num_draws):
         try:
-            # Pass the selected_sum_range_tuple as None here, as it's not a direct filter for simulate_multiple_draws
-            # Also, high_low_balance is not used in this context.
             white_balls, powerball = generate_powerball_numbers(
-                df_source, group_a, odd_even_choice, "No Combo", 
+                df_source, group_a_list, odd_even_choice, "No Combo", 
                 white_ball_range, powerball_range, excluded_numbers, 
                 high_low_balance=None, selected_sum_range_tuple=None, is_simulation=True
             )
@@ -610,7 +593,7 @@ def simulate_multiple_draws(df_source, group_a, odd_even_choice, white_ball_rang
                 white_ball_results[wb] += 1
             powerball_results[powerball] += 1
 
-        except ValueError: # Catch ValueErrors from generate_powerball_numbers if constraints too tight
+        except ValueError: 
             pass 
     
     full_white_ball_range_list = list(range(GLOBAL_WHITE_BALL_RANGE[0], GLOBAL_WHITE_BALL_RANGE[1] + 1))
@@ -627,11 +610,13 @@ def simulate_multiple_draws(df_source, group_a, odd_even_choice, white_ball_rang
 
 
 def calculate_combinations(n, k):
+    """Calculates combinations (nCk)."""
     if k < 0 or k > n:
         return 0
     return math.comb(n, k)
 
 def winning_probability(white_ball_range_tuple, powerball_range_tuple):
+    """Calculates the odds of winning Powerball given specified ranges."""
     total_white_balls_in_range = white_ball_range_tuple[1] - white_ball_range_tuple[0] + 1
     white_ball_combinations = calculate_combinations(total_white_balls_in_range, 5)
 
@@ -645,11 +630,10 @@ def winning_probability(white_ball_range_tuple, powerball_range_tuple):
     return probability_1_in_x, probability_percentage
 
 def partial_match_probabilities(white_ball_range_tuple, powerball_range_tuple):
+    """Calculates probabilities for partial Powerball matches."""
     total_white_balls_in_range = white_ball_range_tuple[1] - white_ball_range_tuple[0] + 1
     total_powerballs_in_range = powerball_range_tuple[1] - powerball_range_tuple[0] + 1
 
-    total_white_ball_combinations_possible = calculate_combinations(total_white_balls_in_range, 5)
-    
     probabilities = {}
 
     prizes = {
@@ -688,6 +672,7 @@ def partial_match_probabilities(white_ball_range_tuple, powerball_range_tuple):
     return probabilities
 
 def find_last_draw_dates_for_numbers(df_source, white_balls, powerball):
+    """Finds the last draw date for each given number."""
     if df_source.empty: return {}
     last_draw_dates = {}
     
@@ -716,6 +701,7 @@ def find_last_draw_dates_for_numbers(df_source, white_balls, powerball):
     return last_draw_dates
 
 def _get_last_drawn_date_for_single_number(df_source, number):
+    """Helper to get the last drawn date for a single number (white or powerball)."""
     if df_source.empty:
         return "N/A"
 
@@ -741,6 +727,7 @@ def _get_last_drawn_date_for_single_number(df_source, number):
     return "N/A" 
 
 def _get_last_co_occurrence_date_for_pattern(df_source, pattern_numbers):
+    """Finds the last co-occurrence date for a given pattern of numbers."""
     if not pattern_numbers:
         return "N/A"
 
@@ -762,6 +749,7 @@ def _get_last_co_occurrence_date_for_pattern(df_source, pattern_numbers):
     return latest_date 
 
 def get_number_age_distribution(df_source):
+    """Calculates the 'age' (miss streak) for each number."""
     if df_source.empty: return [], []
     df_source['Draw Date_dt'] = pd.to_datetime(df_source['Draw Date'])
     all_draw_dates = sorted(df_source['Draw Date_dt'].drop_duplicates().tolist())
@@ -812,6 +800,7 @@ def get_number_age_distribution(df_source):
     return age_counts_list, detailed_ages
 
 def get_co_occurrence_matrix(df_source):
+    """Calculates the co-occurrence frequency of all white ball pairs."""
     if df_source.empty: return [], 0
     co_occurrence = defaultdict(int)
     
@@ -831,16 +820,12 @@ def get_co_occurrence_matrix(df_source):
     return co_occurrence_data, max_co_occurrence
 
 def _find_consecutive_sequences(numbers_list):
-    """
-    Identifies and returns all consecutive sequences (pairs, triplets, etc.)
-    from a list of numbers.
-    Example: [1, 2, 3, 5, 6] -> [[1, 2, 3], [5, 6]]
-    """
+    """Identifies consecutive sequences in a list of numbers."""
     sequences = []
     if not numbers_list:
         return sequences
 
-    sorted_nums = sorted(list(set(numbers_list))) # Ensure unique and sorted
+    sorted_nums = sorted(list(set(numbers_list))) 
     if not sorted_nums:
         return sequences
 
@@ -849,17 +834,17 @@ def _find_consecutive_sequences(numbers_list):
         if sorted_nums[i] == current_sequence[-1] + 1:
             current_sequence.append(sorted_nums[i])
         else:
-            if len(current_sequence) >= 2: # Only add sequences of 2 or more
+            if len(current_sequence) >= 2: 
                 sequences.append(current_sequence)
             current_sequence = [sorted_nums[i]]
     
-    # Add the last sequence if it's long enough
     if len(current_sequence) >= 2:
         sequences.append(current_sequence)
         
     return sequences
 
 def get_consecutive_numbers_trends(df_source, last_draw_date_str):
+    """Analyzes recent draws for presence of consecutive numbers."""
     if df_source.empty or last_draw_date_str == 'N/A':
         return []
 
@@ -868,14 +853,12 @@ def get_consecutive_numbers_trends(df_source, last_draw_date_str):
     except Exception as e:
         return []
 
-    # Change this line from 6 months to 12 months (1 year)
-    one_year_ago = last_draw_date - pd.DateOffset(years=1) # Changed from months=6 to years=1
+    one_year_ago = last_draw_date - pd.DateOffset(years=1) 
 
     if 'Draw Date_dt' not in df_source.columns or not pd.api.types.is_datetime64_any_dtype(df_source['Draw Date_dt']):
         return []
 
-    # Filter data for the last 12 months
-    recent_data = df_source[df_source['Draw Date_dt'] >= one_year_ago].copy() # Changed to one_year_ago
+    recent_data = df_source[df_source['Draw Date_dt'] >= one_year_ago].copy() 
     recent_data = recent_data.sort_values(by='Draw Date_dt', ascending=False)
     if recent_data.empty:
         return []
@@ -883,21 +866,18 @@ def get_consecutive_numbers_trends(df_source, last_draw_date_str):
     trend_data = []
     for idx, row in recent_data.iterrows():
         white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])]
-        
-        # Call the new function _find_consecutive_sequences
         consecutive_sequences = _find_consecutive_sequences(white_balls)
         
         trend_data.append({
             'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
-            # Use the new variable name 'consecutive_sequences'
             'consecutive_present': "Yes" if consecutive_sequences else "No",
-            # Use the new key 'consecutive_sequences'
             'consecutive_sequences': consecutive_sequences
         })
     
     return trend_data
 
 def get_most_frequent_triplets(df_source): 
+    """Finds the most frequent triplets of white balls."""
     if df_source.empty:
         return []
 
@@ -920,8 +900,8 @@ def get_most_frequent_triplets(df_source):
     
     return formatted_triplets
 
-
 def get_odd_even_split_trends(df_source, last_draw_date_str):
+    """Analyzes odd/even splits, sum, and Group A numbers in recent draws."""
     if df_source.empty or last_draw_date_str == 'N/A':
         return []
 
@@ -949,7 +929,7 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
         group_a_numbers_present = sorted([num for num in white_balls if num in group_a])
 
         even_count = sum(1 for num in white_balls if num % 2 == 0)
-        odd_count = 5 - even_count # Correct calculation for even count
+        odd_count = 5 - even_count 
 
         split_category = "Other"
 
@@ -976,12 +956,12 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
     return trend_data
     
 def get_powerball_frequency_by_year(df_source):
+    """Calculates Powerball frequency per year."""
     if df_source.empty:
         return [], []
 
     current_year = datetime.now().year
-    # Dynamically set start_year to ensure a rolling 10-year window (current year + 9 previous years)
-    start_year = max(2017, current_year - 9) # Ensure it doesn't go before 2017 if data starts then
+    start_year = max(2017, current_year - 9) 
     years = [y for y in range(start_year, current_year + 1)]
 
     if 'Draw Date_dt' not in df_source.columns or not pd.api.types.is_datetime64_any_dtype(df_source['Draw Date_dt']):
@@ -1025,6 +1005,7 @@ def get_powerball_frequency_by_year(df_source):
     return formatted_data, years
 
 def _get_generated_picks_for_date_from_db(date_str):
+    """Fetches generated picks from the database for a specific date."""
     url = f"{SUPABASE_PROJECT_URL}/rest/v1/{GENERATED_NUMBERS_TABLE_NAME}"
     headers = _get_supabase_headers(is_service_key=False)
     
@@ -1055,7 +1036,7 @@ def _get_generated_picks_for_date_from_db(date_str):
                 int(record['number_4']), int(record['number_5'])
             ])
             formatted_picks.append({
-                'time': datetime.fromisoformat(record['generated_date'].replace('Z', '+00:00')).strftime('%I:%M %p'), # Add time for display
+                'time': datetime.fromisoformat(record['generated_date'].replace('Z', '+00:00')).strftime('%I:%M %p'), 
                 'white_balls': white_balls,
                 'powerball': int(record['powerball'])
             })
@@ -1066,6 +1047,7 @@ def _get_generated_picks_for_date_from_db(date_str):
         return []
 
 def _get_official_draw_for_date_from_db(date_str):
+    """Fetches an official draw from the database for a specific date."""
     url = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
     headers = _get_supabase_headers(is_service_key=False)
     
@@ -1087,6 +1069,7 @@ def _get_official_draw_for_date_from_db(date_str):
         return []
 
 def analyze_generated_batch_against_official_draw(generated_picks_list, official_draw):
+    """Compares a batch of generated picks against an official draw."""
     summary = {
         "Match 5 White Balls + Powerball": {"count": 0, "draws": []}, 
         "Match 5 White Balls Only": {"count": 0, "draws": []},
@@ -1148,6 +1131,7 @@ def analyze_generated_batch_against_official_draw(generated_picks_list, official
     return summary
 
 def save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb):
+    """Saves a manually entered official draw to Supabase."""
     url = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
     headers = _get_supabase_headers(is_service_key=True)
 
@@ -1183,6 +1167,7 @@ def save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb):
         return False, f"Error saving official draw: {insert_response.status_code} - {insert_response.text}"
 
 def save_generated_numbers_to_db(numbers, powerball):
+    """Saves a generated Powerball combination to Supabase."""
     url = f"{SUPABASE_PROJECT_URL}/rest/v1/{GENERATED_NUMBERS_TABLE_NAME}"
     headers = _get_supabase_headers(is_service_key=True)
 
@@ -1226,6 +1211,7 @@ def save_generated_numbers_to_db(numbers, powerball):
         return False, f"Error saving generated numbers: {insert_response.status_code} - {insert_response.text}"
 
 def get_generated_numbers_history():
+    """Fetches the history of generated numbers from Supabase."""
     all_data = []
     offset = 0
     limit = 1000
@@ -1258,7 +1244,6 @@ def get_generated_numbers_history():
         for record in all_data:
             gen_dt = datetime.fromisoformat(record['generated_date'].replace('Z', '+00:00'))
             date_key = gen_dt.strftime('%Y-%m-%d')
-            
             formatted_time = gen_dt.strftime('%I:%M %p')
 
             generated_balls = sorted([
@@ -1288,8 +1273,8 @@ def get_generated_numbers_history():
         traceback.print_exc()
         return {}
 
-
 def check_generated_against_history(generated_white_balls, generated_powerball, df_historical):
+    """Compares a generated pick against historical official draws."""
     results = {
         "generated_balls": generated_white_balls,
         "generated_powerball": generated_powerball,
@@ -1364,8 +1349,8 @@ def check_generated_against_history(generated_white_balls, generated_powerball, 
 
     return results
 
-
 def get_grouped_patterns_over_years(df_source):
+    """Analyzes grouped patterns (pairs and triplets) within defined ranges across years."""
     if df_source.empty:
         return []
 
@@ -1381,9 +1366,6 @@ def get_grouped_patterns_over_years(df_source):
         col = f'Number {i}'
         if col in df_source_copy.columns:
             df_source_copy[col] = pd.to_numeric(df_source_copy[col], errors='coerce').fillna(0).astype(int)
-        else:
-            pass
-
 
     all_patterns_data = []
     
@@ -1430,6 +1412,7 @@ def get_grouped_patterns_over_years(df_source):
     return all_patterns_data
 
 def get_sum_trends_and_gaps_data(df_source):
+    """Analyzes sum trends and identifies missing sums."""
     if df_source.empty:
         return {
             'min_possible_sum': 15,
@@ -1440,7 +1423,6 @@ def get_sum_trends_and_gaps_data(df_source):
         }
 
     df_copy = df_source.copy()
-    
     df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
     df_copy = df_copy.dropna(subset=['Draw Date_dt'])
     for i in range(1, 6):
@@ -1516,6 +1498,7 @@ def get_sum_trends_and_gaps_data(df_source):
     }
 
 def get_weekday_draw_trends(df_source, group_a_numbers_def=None): 
+    """Analyzes Powerball draw trends by weekday."""
     if df_source.empty:
         return {}
 
@@ -1552,7 +1535,7 @@ def get_weekday_draw_trends(df_source, group_a_numbers_def=None):
         high_count = sum(1 for num in white_balls if HIGH_NUMBER_MIN <= num <= GLOBAL_WHITE_BALL_RANGE[1])
         
         odd_count = sum(1 for num in white_balls if num % 2 != 0)
-        even_count = 5 - odd_count # Correct calculation for even count
+        even_count = 5 - odd_count 
 
         current_sum = sum(white_balls)
 
@@ -1610,10 +1593,7 @@ def get_weekday_draw_trends(df_source, group_a_numbers_def=None):
     return final_results
 
 def _get_yearly_patterns_for_range(df_source, selected_range_name):
-    """
-    Analyzes grouped patterns (pairs and triplets) within a specific number range,
-    grouped by year. Returns data structured for yearly comparison in the frontend.
-    """
+    """Analyzes grouped patterns (pairs and triplets) within a specific number range, grouped by year."""
     if df_source.empty:
         return []
 
@@ -1629,11 +1609,8 @@ def _get_yearly_patterns_for_range(df_source, selected_range_name):
         col = f'Number {i}'
         if col in df_copy.columns:
             df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce').fillna(0).astype(int)
-        else:
-            pass
 
 
-    # Filter for the selected range only
     min_val, max_val = NUMBER_RANGES.get(selected_range_name, (1, 69))
 
     yearly_data_structured = []
@@ -1657,7 +1634,6 @@ def _get_yearly_patterns_for_range(df_source, selected_range_name):
                 for triplet_combo in combinations(numbers_in_current_range, 3):
                     year_triplets[tuple(sorted(triplet_combo))] += 1
         
-        # Convert defaultdicts to lists of dicts for JSON serialization
         formatted_pairs = [{'pattern': list(p), 'count': c} for p, c in year_pairs.items()]
         formatted_triplets = [{'pattern': list(t), 'count': c} for t, c in year_triplets.items()]
 
@@ -1668,12 +1644,12 @@ def _get_yearly_patterns_for_range(df_source, selected_range_name):
             "total_unique_patterns": len(formatted_pairs) + len(formatted_triplets)
         })
 
-    # Sort the overall yearly data by year
     yearly_data_structured.sort(key=lambda x: x['year'])
     
     return yearly_data_structured
 
 def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
+    """Analyzes trends of numbers crossing decade boundaries."""
     if df_source.empty:
         return {
             'all_boundary_patterns_summary': [],
@@ -1699,7 +1675,6 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
             df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce').fillna(0).astype(int)
 
     current_year = datetime.now().year
-    # Dynamically set start_year for a rolling 10-year window
     start_year = max(2017, current_year - 9) 
     all_years = sorted([y for y in df_copy['Draw Date_dt'].dt.year.unique().tolist() if y >= start_year])
 
@@ -1709,7 +1684,7 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
 
     for _, row in df_copy.iterrows():
         year = row['Draw Date_dt'].year
-        if year < start_year: # Filter out years outside the rolling window
+        if year < start_year: 
             continue
         white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
         current_draw_pairs = set(combinations(white_balls, 2))
@@ -1736,16 +1711,9 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
         'all_years_in_data': all_years
     }
 
-
 def get_special_patterns_analysis(df_source):
-    """
-    Analyzes historical draws for special number patterns (tens-apart, same last digit,
-    repeating digit) and returns their counts per year,
-    and also recent trends (last 12 months) indicating pattern presence per draw.
-    Crucially, it now also returns *overall* aggregated counts for these patterns.
-    """
+    """Analyzes historical draws for special number patterns (tens-apart, same last digit, repeating digit)."""
     if df_source.empty:
-        # Include the new overall pattern keys even if empty
         return {
             'yearly_data': [], 
             'recent_trends': [],
@@ -1774,39 +1742,33 @@ def get_special_patterns_analysis(df_source):
     all_yearly_patterns_data = []
     recent_special_trends = []
 
-    # Pre-calculate all possible tens-apart pairs for efficiency
-    all_tens_apart_pairs_set = set() # Renamed to avoid confusion with counts
+    all_tens_apart_pairs_set = set() 
     for n1 in range(1, 60):
         for diff in [10, 20, 30, 40, 50]:
             n2 = n1 + diff
             if n2 <= 69:
                 all_tens_apart_pairs_set.add(tuple(sorted((n1, n2))))
 
-    # Pre-group numbers by last digit
     same_last_digit_groups_full = defaultdict(list)
     for i in range(1, 70):
         last_digit = i % 10
         same_last_digit_groups_full[last_digit].append(i)
     
-    # Pre-define repeating digit numbers
     repeating_digit_numbers = [11, 22, 33, 44, 55, 66]
 
-    # --- Overall Aggregated Data Calculation (NEW) ---
     overall_tens_apart_counts = defaultdict(int)
     overall_same_last_digit_counts = defaultdict(int)
     overall_repeating_digit_counts = defaultdict(int)
 
-    for idx, row in df_copy.iterrows(): # Iterate over the full dataset for overall counts
+    for idx, row in df_copy.iterrows(): 
         white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])] )
         white_ball_set = set(white_balls)
         
-        # Tens-Apart
         for pair in combinations(white_balls, 2):
             sorted_pair = tuple(sorted(pair))
             if sorted_pair in all_tens_apart_pairs_set:
                 overall_tens_apart_counts[sorted_pair] += 1
 
-        # Same Last Digit
         for last_digit, full_group_numbers in same_last_digit_groups_full.items():
             intersection_with_draw = white_ball_set.intersection(set(full_group_numbers))
             if len(intersection_with_draw) >= 2:
@@ -1814,7 +1776,6 @@ def get_special_patterns_analysis(df_source):
                     for pattern_combo in combinations(sorted(list(intersection_with_draw)), r):
                         overall_same_last_digit_counts[pattern_combo] += 1
 
-        # Repeating Digit
         drawn_repeating_digits = [n for n in repeating_digit_numbers if n in white_ball_set]
         if len(drawn_repeating_digits) >= 2:
             for r in range(2, len(drawn_repeating_digits) + 1):
@@ -1830,8 +1791,6 @@ def get_special_patterns_analysis(df_source):
     formatted_repeating_digit_overall = [{'pattern': list(p), 'count': c} for p, c in overall_repeating_digit_counts.items()]
     formatted_repeating_digit_overall.sort(key=lambda x: (-x['count'], str(x['pattern'])))
 
-
-    # --- Yearly Data Calculation (Existing Logic) ---
     for year in years_in_data:
         yearly_df = df_copy[df_copy['Draw Date_dt'].dt.year == year].copy()
         
@@ -1855,13 +1814,11 @@ def get_special_patterns_analysis(df_source):
             white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])] )
             white_ball_set = set(white_balls)
             
-            # Tens-Apart
             for pair in combinations(white_balls, 2):
                 sorted_pair = tuple(sorted(pair))
                 if sorted_pair in all_tens_apart_pairs_set:
                     tens_apart_counts_year[sorted_pair] += 1
 
-            # Same Last Digit
             for last_digit, full_group_numbers in same_last_digit_groups_full.items():
                 intersection_with_draw = white_ball_set.intersection(set(full_group_numbers))
                 if len(intersection_with_draw) >= 2:
@@ -1869,7 +1826,6 @@ def get_special_patterns_analysis(df_source):
                         for pattern_combo in combinations(sorted(list(intersection_with_draw)), r):
                             same_last_digit_counts_year[pattern_combo] += 1
 
-            # Repeating Digit
             drawn_repeating_digits = [n for n in repeating_digit_numbers if n in white_ball_set]
             if len(drawn_repeating_digits) >= 2:
                 for r in range(2, len(drawn_repeating_digits) + 1):
@@ -1895,10 +1851,9 @@ def get_special_patterns_analysis(df_source):
     
     all_yearly_patterns_data.sort(key=lambda x: x['year'], reverse=True)
 
-    # --- Recent Trends (Last 12 Months) Calculation ---
     one_year_ago = datetime.now() - timedelta(days=365)
     recent_data_df = df_copy[df_copy['Draw Date_dt'] >= one_year_ago].copy()
-    recent_data_df = recent_data_df.sort_values(by='Draw Date_dt', ascending=False) # Sort newest first
+    recent_data_df = recent_data_df.sort_values(by='Draw Date_dt', ascending=False) 
 
     for idx, row in recent_data_df.iterrows():
         white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])] )
@@ -1907,7 +1862,7 @@ def get_special_patterns_analysis(df_source):
 
         tens_apart_present = "No"
         for pair in combinations(white_balls, 2):
-            if tuple(sorted(pair)) in all_tens_apart_pairs_set: # Use the overall set
+            if tuple(sorted(pair)) in all_tens_apart_pairs_set: 
                 tens_apart_present = "Yes"
                 break
         
@@ -1934,16 +1889,13 @@ def get_special_patterns_analysis(df_source):
     return {
         'yearly_data': all_yearly_patterns_data,
         'recent_trends': recent_special_trends,
-        'tens_apart_patterns_overall': formatted_tens_apart_overall, # NEW
-        'same_last_digit_patterns_overall': formatted_same_last_digit_overall, # NEW
-        'repeating_digit_patterns_overall': formatted_repeating_digit_overall # NEW
+        'tens_apart_patterns_overall': formatted_tens_apart_overall,
+        'same_last_digit_patterns_overall': formatted_same_last_digit_overall,
+        'repeating_digit_patterns_overall': formatted_repeating_digit_overall
     }
 
 def get_white_ball_frequency_by_period(df_source, period_type='year'):
-    """
-    Calculates the frequency of each white ball (1-69) per specified period (year, half_year, quarter).
-    Defaults to a rolling 10-year window.
-    """
+    """Calculates the frequency of each white ball per specified period."""
     if df_source.empty:
         return {}, []
 
@@ -1956,14 +1908,11 @@ def get_white_ball_frequency_by_period(df_source, period_type='year'):
         return {}, []
 
     current_year = datetime.now().year
-    # Dynamically set start_year for a rolling 10-year window (current year + 9 previous years)
     start_year = max(2017, current_year - 9) 
     years_to_analyze = range(start_year, current_year + 1)
 
-    # Filter data to only include relevant years
     df_filtered_years = df_copy[df_copy['Draw Date_dt'].dt.year.isin(years_to_analyze)].copy()
 
-    # Determine period_label based on period_type
     if period_type == 'year':
         df_filtered_years['period_label'] = df_filtered_years['Draw Date_dt'].dt.year.astype(str)
     elif period_type == 'half_year':
@@ -1972,41 +1921,31 @@ def get_white_ball_frequency_by_period(df_source, period_type='year'):
     elif period_type == 'quarter':
         df_filtered_years['period_label'] = df_filtered_years['Draw Date_dt'].dt.year.astype(str) + ' Q' + df_filtered_years['Draw Date_dt'].dt.quarter.astype(str)
     else:
-        # Default to year if an invalid period_type is provided
         df_filtered_years['period_label'] = df_filtered_years['Draw Date_dt'].dt.year.astype(str)
-        period_type = 'year' # Reset period_type to 'year' for consistent behavior
+        period_type = 'year' 
 
-    # Get all unique period labels in chronological order
     all_period_labels = sorted(df_filtered_years['period_label'].unique().tolist())
 
-    # Initialize a nested dictionary for all white balls and all periods
     period_freq_data = {wb: {label: 0 for label in all_period_labels} for wb in range(1, 70)}
 
-    # Iterate through each draw and populate frequencies
     for _, row in df_filtered_years.iterrows():
         period_label = row['period_label']
         white_balls = [int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])]
         for wb in white_balls:
-            if 1 <= wb <= 69: # Ensure number is within valid range
+            if 1 <= wb <= 69: 
                 period_freq_data[wb][period_label] += 1
     
-    # Format the data for JSON/template
     formatted_data = {}
     for wb_num, period_counts in period_freq_data.items():
         formatted_data[wb_num] = sorted([
             {'period_label': label, 'frequency': count} 
             for label, count in period_counts.items()
-        ], key=lambda x: x['period_label']) # Sort by period label for chronological order
+        ], key=lambda x: x['period_label'])
         
-    return formatted_data, all_period_labels # Also return all_period_labels for frontend chart axes
+    return formatted_data, all_period_labels 
 
 def get_consecutive_numbers_yearly_trends(df_source):
-    """
-    Calculates the percentage of draws containing consecutive numbers for each year
-    within a rolling 10-year window.
-    Also generates a flat list of all unique consecutive sequences found in the data,
-    with their total counts and all associated draw dates.
-    """
+    """Calculates the percentage of draws containing consecutive numbers for each year."""
     if df_source.empty:
         return {'yearly_data': [], 'years': [], 'all_consecutive_pairs_flat': []}
 
@@ -2019,11 +1958,10 @@ def get_consecutive_numbers_yearly_trends(df_source):
         return {'yearly_data': [], 'years': [], 'all_consecutive_pairs_flat': []}
 
     current_year = datetime.now().year
-    start_year = max(2017, current_year - 9) # Rolling 10-year window
+    start_year = max(2017, current_year - 9) 
     years_to_analyze = range(start_year, current_year + 1)
 
     yearly_trends = []
-    # This will store {sequence_tuple: {'count': X, 'dates': [date1, date2, ...]}}
     all_consecutive_sequences_aggregated = defaultdict(lambda: {'count': 0, 'dates': []}) 
 
     for year in years_to_analyze:
@@ -2041,12 +1979,12 @@ def get_consecutive_numbers_yearly_trends(df_source):
                 
                 if current_draw_consecutive_sequences:
                     consecutive_draws_count += 1
-                    for sequence in current_draw_consecutive_sequences: # Iterate through sequences
-                        sequence_tuple = tuple(sequence) # Use tuple for dict key
+                    for sequence in current_draw_consecutive_sequences: 
+                        sequence_tuple = tuple(sequence) 
                         all_consecutive_sequences_aggregated[sequence_tuple]['count'] += 1
                         all_consecutive_sequences_aggregated[sequence_tuple]['dates'].append(draw_date_str)
                         
-            percentage = round((consecutive_draws_count / total_draws_in_year) * 100, 2) # Corrected variable name
+            percentage = round((consecutive_draws_count / total_draws_in_year) * 100, 2) 
         else:
             percentage = 0.0
         
@@ -2057,26 +1995,23 @@ def get_consecutive_numbers_yearly_trends(df_source):
             'consecutive_draws': consecutive_draws_count
         })
 
-    # Convert the aggregated dictionary to a flat list of dictionaries
     flat_consecutive_sequences_list = []
     for sequence_tuple, data in all_consecutive_sequences_aggregated.items(): 
         flat_consecutive_sequences_list.append({
             'sequence': list(sequence_tuple), 
             'count': data['count'],
-            'dates': sorted(list(set(data['dates'])), reverse=True) # Deduplicate and sort dates descending
+            'dates': sorted(list(set(data['dates'])), reverse=True) 
         })
     
-    # Sort the flat list by count (descending) then by sequence (ascending)
     flat_consecutive_sequences_list.sort(key=lambda x: (-x['count'], x['sequence'])) 
-    
     yearly_trends.sort(key=lambda x: x['year'])
     
     return {
         'yearly_data': yearly_trends, 
         'years': list(years_to_analyze), 
-        'all_consecutive_pairs_flat': flat_consecutive_sequences_list # Also corrected return key
+        'all_consecutive_pairs_flat': flat_consecutive_sequences_list 
     }
-# Define the specific ranges and target positions as per your request
+
 POSITIONAL_ANALYSIS_CONFIG = {
     "1-10": {"range": (1, 10), "positions": [1]},
     "11-20": {"range": (11, 20), "positions": [2, 3]},
@@ -2088,30 +2023,10 @@ POSITIONAL_ANALYSIS_CONFIG = {
 }
 
 def get_positional_range_frequency_analysis(df_source):
-    """
-    Analyzes the frequency and percentage of white balls appearing at specific
-    sorted positions within predefined number ranges, broken down by year.
-
-    Args:
-        df_source (pd.DataFrame): The historical Powerball draw data, expected to have
-                                  'Draw Date_dt' (datetime) and 'Number 1' through 'Number 5'.
-
-    Returns:
-        list: A list of dictionaries, each representing a year's positional analysis.
-              Each yearly dictionary contains:
-              - 'year': The year (e.g., 2017)
-              - 'total_draws': Total number of draws in that year.
-              - 'data': A list of dictionaries, each for a configured number range/position combo.
-                        Each combo dictionary contains:
-                        - 'range_label': e.g., "1-10"
-                        - 'position': e.g., 1 (for 1st ball)
-                        - 'count': Number of times this combination occurred.
-                        - 'percentage': Percentage of total draws in that year where this occurred.
-    """
+    """Analyzes frequency and percentage of white balls appearing at specific sorted positions within predefined ranges, by year."""
     if df_source.empty:
         return []
 
-    # Ensure 'Draw Date_dt' is datetime and numbers are int
     df_copy = df_source.copy()
     if 'Draw Date_dt' not in df_copy.columns:
         df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
@@ -2125,7 +2040,6 @@ def get_positional_range_frequency_analysis(df_source):
         if col in df_copy.columns:
             df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce').fillna(0).astype(int)
 
-    # Filter years from 2017 to current year
     current_year = datetime.now().year
     years_to_analyze = sorted([y for y in df_copy['Draw Date_dt'].dt.year.unique() if 2017 <= y <= current_year])
 
@@ -2143,12 +2057,9 @@ def get_positional_range_frequency_analysis(df_source):
             })
             continue
 
-        # Use defaultdict to count occurrences for each configured combination
-        # Key: (range_label, position)
         counts = defaultdict(int)
 
         for idx, row in yearly_df.iterrows():
-            # Get the sorted white balls for the current draw
             white_balls_sorted = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
 
             for range_label, config in POSITIONAL_ANALYSIS_CONFIG.items():
@@ -2156,16 +2067,12 @@ def get_positional_range_frequency_analysis(df_source):
                 target_positions = config["positions"]
 
                 for pos_idx in range(len(white_balls_sorted)):
-                    # Adjust to 1-based position for user-friendly labels (1st, 2nd, etc.)
                     current_position = pos_idx + 1
                     current_ball_value = white_balls_sorted[pos_idx]
 
-                    # Check if the ball's value is within the specified range
-                    # AND if its position is one of the target positions for that range
                     if min_val <= current_ball_value <= max_val and current_position in target_positions:
                         counts[(range_label, current_position)] += 1
 
-        # Format results for the current year
         year_data = []
         for (range_label, position), count in counts.items():
             percentage = round((count / total_draws_in_year) * 100, 2) if total_draws_in_year > 0 else 0.0
@@ -2176,7 +2083,6 @@ def get_positional_range_frequency_analysis(df_source):
                 'percentage': percentage
             })
         
-        # Sort data for consistent display (e.g., by range_label then position)
         year_data.sort(key=lambda x: (x['range_label'], x['position']))
 
         yearly_analysis_results.append({
@@ -2185,12 +2091,12 @@ def get_positional_range_frequency_analysis(df_source):
             'data': year_data
         })
     
-    # Sort years in descending order for display (most recent first)
     yearly_analysis_results.sort(key=lambda x: x['year'], reverse=True)
 
     return yearly_analysis_results
     
 def get_powerball_position_frequency(df_source):
+    """Calculates the frequency of each Powerball number."""
     if df_source.empty:
         return {}
     
@@ -2200,31 +2106,13 @@ def get_powerball_position_frequency(df_source):
         powerball = int(row['Powerball'])
         white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6)])
         
-        # Determine the "position" of the Powerball relative to the white balls
-        # This is a conceptual position, not an actual draw position.
-        # For simplicity, we can categorize it into ranges or relative to the white balls.
-        # For now, let's just count its frequency. If a more complex "position" is needed,
-        # we'd need a more specific definition.
-        
-        # Example: Is Powerball lower than all white balls?
         if white_balls and powerball < white_balls[0]:
             position_freq[powerball]['Lower than all WB'] += 1
-        # Is Powerball higher than the highest white ball?
         elif white_balls and powerball > white_balls[-1]:
             position_freq[powerball]['Higher than all WB'] += 1
         else:
-            position_freq[powerball]['Within WB Range'] += 1 # This needs refinement for real positional analysis
+            position_freq[powerball]['Within WB Range'] += 1 
         
-        # For now, let's just return the raw frequency of the Powerball
-        # as the concept of "position" without more specific criteria is ambiguous.
-        # If the user wants "Powerball frequency by its value", the existing powerball_freq
-        # function is better.
-        # If they want "Powerball relative to white balls", we need specific categories.
-        
-        # Let's assume for this function, they want the raw frequency of Powerball numbers
-        # without complex positional logic, as the name might imply.
-        # This function name is a bit misleading given its current implementation.
-        # I'll provide a basic frequency for now.
         position_freq[powerball]['Total Draws'] += 1
 
     formatted_data = []
@@ -2233,12 +2121,11 @@ def get_powerball_position_frequency(df_source):
         formatted_data.append({
             'Powerball': int(pb_num),
             'Total Draws': int(total_draws)
-            # Add more specific positional data if defined later
         })
     return formatted_data
 
-
 def initialize_core_data():
+    """Initializes global DataFrame, last draw, and historical sets from Supabase."""
     global df, last_draw, historical_white_ball_sets, white_ball_co_occurrence_lookup
     print("Attempting to load core historical data...")
     try:
@@ -2267,7 +2154,7 @@ def initialize_core_data():
                     white_ball_co_occurrence_lookup[frozenset_white_balls] = current_draw_date
 
             print("Core historical data loaded successfully and co-occurrence lookup populated.")
-            return True # Indicate success
+            return True 
         else:
             print("Core historical data is empty after loading. df remains empty.")
             last_draw = pd.Series({
@@ -2275,18 +2162,16 @@ def initialize_core_data():
                 'Number 3': 'N/A', 'Number 4': 'N/A', 'Number 5': 'N/A', 'Powerball': 'N/A',
                 'Numbers': ['N/A', 'N/A', 'N/A', 'N/A', 'N/A']
             }, dtype='object')
-            return False # Indicate failure
+            return False 
     except Exception as e:
         print(f"An error occurred during initial core data loading: {e}")
         traceback.print_exc()
-        return False # Indicate failure
-
+        return False 
 
 def get_cached_analysis(key, compute_function, *args, **kwargs):
+    """Retrieves cached analysis results or computes and caches them."""
     global analysis_cache, last_analysis_cache_update
     
-    # Filter out DataFrame objects from args/kwargs for JSON serialization in cache key
-    # The actual compute_function will still receive all original args/kwargs
     serializable_args = [arg for arg in args if not isinstance(arg, pd.DataFrame)]
     serializable_kwargs = {k: v for k, v in kwargs.items() if not isinstance(v, pd.DataFrame)}
 
@@ -2297,74 +2182,74 @@ def get_cached_analysis(key, compute_function, *args, **kwargs):
         return analysis_cache[cache_key_full]
     
     print(f"Computing and caching '{cache_key_full}'.")
-    computed_data = compute_function(*args, **kwargs) # Pass original args/kwargs to the compute function
+    computed_data = compute_function(*args, **kwargs) 
     
     analysis_cache[cache_key_full] = computed_data
     last_analysis_cache_update = datetime.now()
     return computed_data
 
 def invalidate_analysis_cache():
+    """Invalidates the analysis cache."""
     global analysis_cache, last_analysis_cache_update
     analysis_cache = {}
     last_analysis_cache_update = datetime.min
     print("Analysis cache invalidated.")
 
-
-# Function to get consecutive trends for a specific DataFrame (e.g., filtered by year)
 def get_consecutive_trends_for_df(df_to_analyze):
+    """Helper to get consecutive trends for a specific DataFrame."""
     if df_to_analyze.empty:
         return []
 
     trend_data = []
     for idx, row in df_to_analyze.iterrows():
-        # Ensure numbers are integers before sorting and finding pairs
         white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
-        
         consecutive_sequences = _find_consecutive_sequences(white_balls)
         
         trend_data.append({
             'draw_date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
             'consecutive_present': "Yes" if consecutive_sequences else "No", 
-            'consecutive_sequences': consecutive_sequences # Changed key to sequences
+            'consecutive_sequences': consecutive_sequences 
         })
     return trend_data
 
-# --- NEW HELPER FUNCTIONS FOR CUSTOM COMBINATIONS PAGE (PHASE 1) ---
+# --- New Helper Functions for Custom Combinations Page ---
 
 def _get_draws_for_month(year, month):
-    """Fetches all Powerball draws for a given year and month from Supabase.
-       Filters the global DataFrame `df` if already loaded."""
+    """
+    Fetches all Powerball draws for a given year and month from the global DataFrame `df`.
+    Ensures `df` is loaded if empty.
+    """
     global df
     if df.empty:
-        # No need to call load_historical_data_from_supabase here, as it's called by initialize_core_data
-        # and _get_two_months_unpicked_and_most_picked will handle `df` being empty.
-        return pd.DataFrame() 
+        initialize_core_data() 
+        if df.empty:
+            return pd.DataFrame() 
 
-    # Ensure 'Draw Date_dt' exists and is datetime
     if 'Draw Date_dt' not in df.columns or not pd.api.types.is_datetime64_any_dtype(df['Draw Date_dt']):
         df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'], errors='coerce')
         df.dropna(subset=['Draw Date_dt'], inplace=True)
         if df.empty: return pd.DataFrame()
 
-    # Filter the global DataFrame by month and year
     monthly_draws = df[(df['Draw Date_dt'].dt.year == year) & (df['Draw Date_dt'].dt.month == month)]
     return monthly_draws
 
-def _compute_two_months_unpicked_and_most_picked(df_source, year, month):
+def _compute_two_months_unpicked_and_most_picked(df_source_placeholder, year, month):
     """
     Actual computation for unpicked and most picked numbers for a month.
     Designed to be called by _get_two_months_unpicked_and_most_picked and cached.
+    `df_source_placeholder` is a placeholder because `get_cached_analysis` passes `df` here,
+    but this function *must* use the global `df` or explicitly fetch to avoid issues with
+    DataFrame being passed as a cache key.
     """
     all_possible_white_balls = set(range(1, 70))
     
-    monthly_draws = _get_draws_for_month(year, month) # Use the helper to get filtered DF
+    monthly_draws = _get_draws_for_month(year, month) 
     
     if monthly_draws.empty:
-        return sorted(list(all_possible_white_balls)), [] # All unpicked, no most picked
+        return sorted(list(all_possible_white_balls)), [] 
 
     picked_counts = defaultdict(int)
     for _, row in monthly_draws.iterrows():
-        # Ensure numbers are integers
         white_balls = [int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])]
         for num in white_balls:
             picked_counts[num] += 1
@@ -2378,23 +2263,17 @@ def _compute_two_months_unpicked_and_most_picked(df_source, year, month):
 
 def _get_two_months_unpicked_and_most_picked(year, month):
     """
-    Wrapper function to get cached unpicked and most picked numbers for a specific month.
-    Uses _compute_two_months_unpicked_and_most_picked as the actual computation function.
+    Wrapper function to get cached unpicked and most picked numbers for a specific month
+    for the custom combinations page.
     """
-    # Using the existing get_cached_analysis for consistency
     cache_key_prefix = f"monthly_trends_custom_{year}_{month}"
     
-    # We pass df as an argument, but get_cached_analysis filters it out of the cache key.
-    # The compute function (_compute_two_months_unpicked_and_most_picked) needs df.
+    # Pass df as a parameter to get_cached_analysis so it's available to _compute_two_months_unpicked_and_most_picked
+    # even though get_cached_analysis will filter it out for the cache key.
     return get_cached_analysis(cache_key_prefix, _compute_two_months_unpicked_and_most_picked, df, year, month)
 
-
 def _get_current_month_hot_numbers(df_source):
-    """
-    Identifies numbers that have appeared more than once in the current (incomplete) month's draws.
-    Returns a set of these hot numbers (both white and powerball).
-    This function is primarily for the smart pick scoring, not for display on custom_combinations.
-    """
+    """Identifies numbers appearing more than once in the current (incomplete) month."""
     if df_source.empty:
         return set()
 
@@ -2417,29 +2296,22 @@ def _get_current_month_hot_numbers(df_source):
         for i in range(1, 6):
             num = int(row[f'Number {i}'])
             monthly_counts[num] += 1
-        monthly_counts[int(row['Powerball'])] += 1 # Include Powerball in hot numbers consideration
+        monthly_counts[int(row['Powerball'])] += 1 
 
     hot_numbers = {num for num, count in monthly_counts.items() if count > 1}
     return hot_numbers
 
 def _score_pick_for_patterns(white_balls, criteria_data):
-    """
-    Scores a generated white ball pick based on how well it aligns with various
-    pattern-based preferences (soft constraints). Higher score means better alignment.
-    """
+    """Scores a generated white ball pick based on how well it aligns with pattern preferences."""
     score = 0
     wb_set = set(white_balls)
-    sorted_wb = sorted(white_balls)
-
-    # 1. Grouped Patterns Score
+    
     if criteria_data['prioritize_grouped_patterns'] and criteria_data['most_frequent_grouped_patterns']:
         for pattern_info in criteria_data['most_frequent_grouped_patterns']:
             pattern_set = set(pattern_info['pattern'])
             if pattern_set.issubset(wb_set):
-                # Ensure count is treated as int for multiplication
                 score += int(pattern_info['count']) * 0.1 
 
-    # 2. Special Patterns Score
     if criteria_data['prioritize_special_patterns']:
         all_special_patterns_for_scoring = []
         all_special_patterns_for_scoring.extend(criteria_data['most_frequent_special_patterns'].get('tens_apart_patterns_overall', []))
@@ -2449,42 +2321,31 @@ def _score_pick_for_patterns(white_balls, criteria_data):
         for pattern_info in all_special_patterns_for_scoring:
             pattern_set = set(pattern_info['pattern'])
             if pattern_set.issubset(wb_set):
-                # Ensure count is treated as int for multiplication
                 score += int(pattern_info['count']) * 0.05 
 
-    # 3. Consecutive Trends Score
     if criteria_data['prioritize_consecutive_patterns']:
         consecutive_sequences = _find_consecutive_sequences(white_balls)
         score += len(consecutive_sequences) * 5 
         if any(len(s) >= 3 for s in consecutive_sequences):
             score += 10 
 
-    # 4. Monthly Hot Numbers Score (This section is kept for the backend, but the frontend control is removed)
     if criteria_data['prioritize_monthly_hot'] and criteria_data['current_month_hot_numbers']:
         hot_count = len(wb_set.intersection(criteria_data['current_month_hot_numbers']))
         score += hot_count * 2 
 
     return score
 
-
 def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a, odd_even_choice, sum_range_tuple, prioritize_monthly_hot, prioritize_grouped_patterns, prioritize_special_patterns, prioritize_consecutive_patterns, force_specific_pattern):
-    """
-    Generates Powerball picks based on a combination of hard and soft criteria.
-    """
+    """Generates Powerball picks based on a combination of hard and soft criteria."""
     if df_source.empty:
         raise ValueError("Historical data is empty. Cannot generate smart picks.")
 
     generated_sets = []
     max_overall_attempts = 5000 * num_sets 
 
-    # Fetch and cache relevant pattern data
     all_grouped_patterns_data = get_cached_analysis('grouped_patterns', get_grouped_patterns_over_years, df_source)
     all_special_patterns_data = get_cached_analysis('special_patterns_analysis', get_special_patterns_analysis, df_source)
     
-    # Extract most frequent grouped patterns (assuming all_grouped_patterns_data is a list of dicts with 'count')
-    # Filter to only get pairs/triplets, not the yearly aggregates if get_grouped_patterns_over_years returns mixed types.
-    # Adjust this based on what get_grouped_patterns_over_years actually returns.
-    # Assuming it returns a flat list of patterns with 'count'
     most_frequent_grouped_patterns = sorted([p for p in all_grouped_patterns_data if 'count' in p], 
                                             key=lambda x: x['count'], reverse=True)[:50]
     
@@ -2495,7 +2356,7 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
     }
 
     current_month_hot_numbers = set()
-    if prioritize_monthly_hot: # This parameter is explicitly passed as False from smart_pick_generator.html
+    if prioritize_monthly_hot: 
         current_month_hot_numbers = _get_current_month_hot_numbers(df_source)
 
     criteria_for_scoring = {
@@ -2521,11 +2382,10 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
             candidate_white_balls = []
             candidate_powerball = random.randint(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1])
             
-            # 1. Handle Forced Specific Pattern (Hard Constraint - removed from UI but still functional if passed)
             remaining_to_pick = 5
             temp_excluded = set(excluded_numbers)
             
-            if force_specific_pattern: # This block remains if you ever want to re-add the UI or use it via API
+            if force_specific_pattern: 
                 for num in force_specific_pattern:
                     if not (GLOBAL_WHITE_BALL_RANGE[0] <= num <= GLOBAL_WHITE_BALL_RANGE[1]) or num in temp_excluded:
                         continue 
@@ -2542,7 +2402,6 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
             if len(available_pool) < remaining_to_pick:
                 continue 
 
-            # 2. Handle Group A Numbers (Hard Constraint)
             current_group_a_count = sum(1 for num in candidate_white_balls if num in group_a)
             needed_from_group_a = num_from_group_a - current_group_a_count
 
@@ -2565,7 +2424,6 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
             elif needed_from_group_a < 0: 
                 continue
 
-            # 3. Fill remaining spots randomly from available pool
             if remaining_to_pick > 0:
                 if len(available_pool) < remaining_to_pick:
                     continue 
@@ -2580,7 +2438,6 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
             
             candidate_white_balls = sorted(candidate_white_balls)
 
-            # 4. Check Odd/Even Split (Hard Constraint)
             even_count = sum(1 for num in candidate_white_balls if num % 2 == 0)
             odd_count = 5 - even_count
             
@@ -2592,12 +2449,10 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
                 if expected_odd_even_split == "All Odd" and odd_count != 5: continue
                 if expected_odd_even_split not in ["All Even", "All Odd"] and current_split_str != expected_odd_even_split: continue
 
-            # 5. Check Sum Range (Hard Constraint)
             current_sum = sum(candidate_white_balls)
             if sum_range_tuple and not (sum_range_tuple[0] <= current_sum <= sum_range_tuple[1]):
                 continue
 
-            # 6. Check against last draw and historical exact matches (Hard Constraint)
             if check_exact_match(candidate_white_balls): 
                 continue
             
@@ -2607,7 +2462,6 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
                 if set(candidate_white_balls) == set(last_white_balls_list) and candidate_powerball == int(last_draw_data['Powerball']):
                     continue
 
-            # All hard constraints met, now score for soft constraints
             current_score = _score_pick_for_patterns(candidate_white_balls, criteria_for_scoring)
 
             if current_score > highest_score:
@@ -2625,10 +2479,10 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
             
     return generated_sets
     
-
+# Initialize core data on app startup
 initialize_core_data() 
 
-# --- Flask Routes (Ordered for Dependency - all UI-facing routes first, then API routes) ---
+# --- Flask Routes ---
 
 @app.route('/')
 def index():
@@ -2650,12 +2504,10 @@ def generate():
     odd_even_choice = request.form.get('odd_even_choice', 'Any')
     combo_choice = request.form.get('combo_choice', 'No Combo') 
     
-    # --- NEW: Retrieve white ball range from form ---
     white_ball_min = int(request.form.get('white_ball_min', 1))
     white_ball_max = int(request.form.get('white_ball_max', 69))
     white_ball_range_local = (white_ball_min, white_ball_max)
     
-    # --- NEW: Retrieve powerball range from form ---
     powerball_min = int(request.form.get('powerball_min', 1))
     powerball_max = int(request.form.get('powerball_max', 26))
     powerball_range_local = (powerball_min, powerball_max)
@@ -2719,7 +2571,6 @@ def generate():
                            num_sets_to_generate=num_sets_to_generate 
                           )
 
-
 @app.route('/generate_with_user_pair', methods=['POST'])
 def generate_with_user_pair_route():
     if df.empty:
@@ -2727,10 +2578,7 @@ def generate_with_user_pair_route():
         return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
 
     user_pair_str = request.form.get('user_pair')
-    
-    # --- NEW: Retrieve excluded numbers from form ---
     excluded_numbers_local = [int(num.strip()) for num in request.form.get('excluded_numbers_pair', '').split(",") if num.strip().isdigit()] if request.form.get('excluded_numbers_pair') else []
-
     selected_sum_range_label = request.form.get('sum_range_filter_pair', 'Any') 
     selected_sum_range_tuple = SUM_RANGES.get(selected_sum_range_label)
 
@@ -2750,7 +2598,7 @@ def generate_with_user_pair_route():
 
         white_balls, powerball = generate_with_user_provided_pair(
             num1, num2, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, 
-            excluded_numbers_local, df, selected_sum_range_tuple # Pass excluded_numbers_local
+            excluded_numbers_local, df, selected_sum_range_tuple 
         )
         last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
 
@@ -2771,7 +2619,6 @@ def generate_with_user_pair_route():
         flash(f"An unexpected error occurred during pair-based generation: {e}", 'error')
         return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
 
-
 @app.route('/generate_group_a_strategy', methods=['POST'])
 def generate_group_a_strategy_route():
     if df.empty:
@@ -2786,7 +2633,6 @@ def generate_group_a_strategy_route():
     powerball_max = int(request.form.get('powerball_max', 26))
     powerball_range_local = (powerball_min, powerball_max)
     
-    # --- NEW: Retrieve excluded numbers from form ---
     excluded_numbers_local = [int(num.strip()) for num in request.form.get('excluded_numbers_group_a', '').split(",") if num.strip().isdigit()] if request.form.get('excluded_numbers_group_a') else []
     
     selected_sum_range_label = request.form.get('sum_range_filter_group_a', 'Any') 
@@ -2799,7 +2645,7 @@ def generate_group_a_strategy_route():
     try:
         white_balls, powerball = generate_from_group_a(
             df, num_from_group_a, white_ball_range_local, powerball_range_local, 
-            excluded_numbers_local, selected_sum_range_tuple # Pass excluded_numbers_local
+            excluded_numbers_local, selected_sum_range_tuple 
         )
         generated_sets = [{'white_balls': white_balls, 'powerball': powerball}]
 
@@ -2850,8 +2696,6 @@ def save_official_draw_route():
         flash(f"An error occurred: {e}", 'error')
     return redirect(url_for('index'))
 
-# --- All other routes (unchanged from your provided index (11).py, or with minimal fixes) ---
-
 @app.route('/save_generated_pick', methods=['POST'])
 def save_generated_pick_route():
     try:
@@ -2885,7 +2729,6 @@ def save_generated_pick_route():
         flash(f"An error occurred while saving generated numbers: {e}", 'error')
     return redirect(url_for('index'))
 
-# NEW ROUTE: Save multiple generated picks
 @app.route('/save_multiple_generated_picks', methods=['POST'])
 def save_multiple_generated_picks_route():
     try:
@@ -2907,7 +2750,6 @@ def save_multiple_generated_picks_route():
                 failed_count += 1
                 continue
             
-            # Ensure numbers are integers and sorted for consistency
             try:
                 white_balls = sorted([int(n) for n in white_balls])
                 powerball = int(powerball)
@@ -2924,7 +2766,7 @@ def save_multiple_generated_picks_route():
                 failed_count += 1
                 messages.append(f"Failed to save {', '.join(map(str, white_balls))} + {powerball}: {message}")
         
-        status_message = f"Successfully saved {saved_count} of {len(picks_to_save)} picks."
+        status_message = f"Successfully saved {saved_count} pick(s). Failed to save {failed_count} pick(s)."
         return jsonify({"success": True, "message": status_message, "details": messages}), 200
 
     except Exception as e:
@@ -2932,10 +2774,8 @@ def save_multiple_generated_picks_route():
         traceback.print_exc()
         return jsonify({"success": False, "message": f"An unexpected error occurred: {str(e)}"}), 500
 
-
 @app.route('/frequency_analysis')
 def frequency_analysis_route():
-    # Pass df directly to the function, not for cache key serialization
     white_ball_freq_list, powerball_freq_list = get_cached_analysis('freq_analysis', frequency_analysis, df)
     return render_template('frequency_analysis.html', 
                            white_ball_freq=white_ball_freq_list, 
@@ -2944,7 +2784,6 @@ def frequency_analysis_route():
 @app.route('/hot_cold_numbers')
 def hot_cold_numbers_route():
     last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
-    # Pass df directly to the function, not for cache key serialization
     hot_numbers_list, cold_numbers_list = get_cached_analysis('hot_cold_numbers', hot_cold_numbers, df, last_draw_date_str_for_cache)
     
     return render_template('hot_cold_numbers.html', 
@@ -2963,7 +2802,7 @@ def monthly_white_ball_analysis_route():
         df, 
         num_top_wb=69, 
         num_top_pb=3,
-        num_months_for_top_display=6 # Explicitly pass for this route
+        num_months_for_top_display=6 
     )
     
     return render_template('monthly_white_ball_analysis.html', 
@@ -2976,11 +2815,9 @@ def sum_of_main_balls_route():
         flash("Cannot display Sum of Main Balls Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
-    # Pass df directly to the function, not for cache key serialization
     sums_data_df, sum_freq_list, min_sum, max_sum, avg_sum = get_cached_analysis('sum_of_main_balls_data', sum_of_main_balls, df)
     
     sums_data = sums_data_df.to_dict('records') 
-    
     sum_freq_json = json.dumps(sum_freq_list)
 
     return render_template('sum_of_main_balls.html', 
@@ -3072,7 +2909,7 @@ def simulate_multiple_draws_route():
             sim_results = simulate_multiple_draws(
                 df, group_a, odd_even_choice_display, 
                 GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, 
-                excluded_numbers, num_draws
+                [], num_draws # Excluded numbers empty list for simulation
             )
             
             simulated_white_ball_freq_list = sim_results['white_ball_freq']
@@ -3085,42 +2922,35 @@ def simulate_multiple_draws_route():
 
 
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            # This is an AJAX request, return JSON
             return jsonify({
                 "simulated_white_ball_freq": simulated_white_ball_freq_list,
                 "simulated_powerball_freq": simulated_powerball_freq_list,
                 "num_simulations": num_draws_display
             })
         else:
-            # Not an AJAX request, render the full template
             return render_template('simulate_multiple_draws.html', 
                                 simulated_white_ball_freq=simulated_white_ball_freq_list, 
                                 simulated_powerball_freq=simulated_powerball_freq_list,   
                                 num_simulations=num_draws_display,
                                 selected_odd_even_choice=odd_even_choice_display)
 
-    # For GET requests, render the initial template
     return render_template('simulate_multiple_draws.html', 
-                           simulated_white_ball_freq=[], # Start with empty data for GET
-                           simulated_powerball_freq=[],   # Start with empty data for GET
-                           num_simulations=100, # Default value for display
+                           simulated_white_ball_freq=[], 
+                           simulated_powerball_freq=[],   
+                           num_simulations=100, 
                            selected_odd_even_choice="Any")
 
-# NEW API endpoint for generating a single draw for animation purposes
 @app.route('/api/generate_single_draw', methods=['GET'])
 def generate_single_draw_api():
     try:
-        # Generate one random set quickly without complex validation
         white_balls = sorted(random.sample(range(GLOBAL_WHITE_BALL_RANGE[0], GLOBAL_WHITE_BALL_RANGE[1] + 1), 5))
         powerball = random.randint(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1])
         return jsonify({'success': True, 'white_balls': white_balls, 'powerball': powerball})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-
 @app.route('/number_age_distribution')
 def number_age_distribution_route():
-    # Pass df directly to the function, not for cache key serialization
     number_age_counts, detailed_number_ages = get_cached_analysis('number_age_distribution', get_number_age_distribution, df)
     return render_template('number_age_distribution.html',
                            number_age_data=number_age_counts,
@@ -3128,7 +2958,6 @@ def number_age_distribution_route():
 
 @app.route('/co_occurrence_analysis')
 def co_occurrence_analysis_route():
-    # Pass df directly to the function, not for cache key serialization
     co_occurrence_data, max_co_occurrence = get_cached_analysis('co_occurrence_analysis', get_co_occurrence_matrix, df)
     return render_template('co_occurrence_analysis.html',
                            co_occurrence_data=co_occurrence_data,
@@ -3136,14 +2965,12 @@ def co_occurrence_analysis_route():
 
 @app.route('/powerball_position_frequency')
 def powerball_position_frequency_route():
-    # Pass df directly to the function, not for cache key serialization
     powerball_position_data = get_cached_analysis('powerball_position_frequency', get_powerball_position_frequency, df)
     return render_template('powerball_position_frequency.html',
                            powerball_position_data=powerball_position_data)
 
 @app.route('/powerball_frequency_by_year')
 def powerball_frequency_by_year_route():
-    # Pass df directly to the function, not for cache key serialization
     yearly_pb_freq_data, years = get_cached_analysis('yearly_pb_freq', get_powerball_frequency_by_year, df)
     return render_template('powerball_frequency_by_year.html',
                            yearly_pb_freq_data=yearly_pb_freq_data,
@@ -3152,7 +2979,6 @@ def powerball_frequency_by_year_route():
 @app.route('/odd_even_trends')
 def odd_even_trends_route():
     last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
-    # Pass df directly to the function, not for cache key serialization
     odd_even_trends = get_cached_analysis('odd_even_trends', get_odd_even_split_trends, df, last_draw_date_str_for_cache)
     return render_template('odd_even_trends.html',
                            odd_even_trends=odd_even_trends)
@@ -3164,14 +2990,10 @@ def consecutive_trends_route():
         return redirect(url_for('index'))
     
     last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
-    
-    # Existing recent trends data
     consecutive_trends = get_cached_analysis('consecutive_trends', get_consecutive_numbers_trends, df, last_draw_date_str_for_cache)
     
-    # New yearly trends data and years for dropdown
     yearly_consecutive_data_full = get_cached_analysis('consecutive_yearly_trends', get_consecutive_numbers_yearly_trends, df)
     
-    # Extract data for template
     yearly_consecutive_percentage_data = yearly_consecutive_data_full['yearly_data']
     years_for_dropdown = yearly_consecutive_data_full['years']
     all_consecutive_pairs_flat = yearly_consecutive_data_full['all_consecutive_pairs_flat']
@@ -3182,7 +3004,6 @@ def consecutive_trends_route():
                            years_for_dropdown=years_for_dropdown,
                            all_consecutive_pairs_flat=all_consecutive_pairs_flat)
 
-# NEW API endpoint for yearly consecutive trends (now returns flat list)
 @app.route('/api/consecutive_yearly_trends')
 def api_consecutive_yearly_trends_route():
     if df.empty:
@@ -3195,28 +3016,21 @@ def api_consecutive_yearly_trends_route():
         'years': yearly_consecutive_data_full['years'],
         'all_consecutive_pairs_flat': yearly_consecutive_data_full['all_consecutive_pairs_flat']
     })
-# Add this new function to your index.py file
+
 @app.route('/consecutive_trends_by_year/<int:year>')
 def consecutive_trends_by_year(year):
-    # Assuming 'df' is your global DataFrame of historical data
     df_year = df[(df['Draw Date_dt'].dt.year == year)].copy()
-
-    # Call your existing function to calculate the consecutive trends for the filtered data
-    trends = get_consecutive_trends_for_df(df_year) # Corrected function call
-
-    # Return the data as a JSON object
+    trends = get_consecutive_trends_for_df(df_year) 
     return jsonify(trends)
 
 @app.route('/triplets_analysis')
 def triplets_analysis_route():
-    # Pass df directly to the function, not for cache key serialization
     triplets_data = get_cached_analysis('triplets_analysis', get_most_frequent_triplets, df) 
     return render_template('triplets_analysis.html',
                            triplets_data=triplets_data)
 
 @app.route('/grouped_patterns_analysis')
 def grouped_patterns_analysis_route():
-    # Pass df directly to the function, not for cache key serialization
     patterns_data = get_cached_analysis('grouped_patterns', get_grouped_patterns_over_years, df)
     return render_template('grouped_patterns_analysis.html', patterns_data=patterns_data)
 
@@ -3234,7 +3048,6 @@ def grouped_patterns_yearly_comparison_route():
 
     cache_key = f'yearly_patterns_{selected_range_label}'
     
-    # Pass df directly to the function, not for cache key serialization
     yearly_patterns_data = get_cached_analysis(
         cache_key,
         _get_yearly_patterns_for_range,
@@ -3264,7 +3077,6 @@ def boundary_crossing_pairs_trends_route():
             flash("Invalid pair format. Please select a valid pair from the dropdown.", 'error')
             selected_pair = None 
 
-    # Pass df directly to the function, not for cache key serialization
     boundary_trends_data = get_cached_analysis(
         f'boundary_crossing_trends_{selected_pair}', 
         get_boundary_crossing_pairs_trends, 
@@ -3294,17 +3106,13 @@ def special_patterns_analysis_route():
             flash("Cannot display Special Patterns Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
             return redirect(url_for('index'))
     
-    # Pass df directly to the function, not for cache key serialization
     special_patterns_data = get_cached_analysis('special_patterns_analysis', get_special_patterns_analysis, df)
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        # This is an AJAX request, return JSON
         return jsonify(special_patterns_data)
     else:
-        # Not an AJAX request, render the full template
         return render_template('special_patterns_analysis.html',
                             special_patterns_data=special_patterns_data)
-
 
 @app.route('/find_results_by_first_white_ball', methods=['GET', 'POST'])
 def find_results_by_first_white_ball():
@@ -3467,7 +3275,6 @@ def strict_positional_search_route():
                            search_results=search_results,
                            total_results=total_results)
 
-
 @app.route('/generated_numbers_history')
 def generated_numbers_history_route():
     generated_history = get_cached_analysis('generated_history', get_generated_numbers_history)
@@ -3482,7 +3289,6 @@ def generated_numbers_history_route():
                            generated_history=generated_history,
                            official_draw_dates=official_draw_dates,
                            last_official_draw=last_draw_for_template) 
-
 
 @app.route('/analyze_batch_vs_official', methods=['POST'])
 def analyze_batch_vs_official_route():
@@ -3625,7 +3431,6 @@ def sum_trends_and_gaps_route():
         flash("Cannot display Sum Trends and Gaps: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
-    # Pass df directly to the function, not for cache key serialization
     sum_data = get_cached_analysis('sum_trends_and_gaps', get_sum_trends_and_gaps_data, df)
     
     return render_template('sum_trends_and_gaps.html', 
@@ -3641,7 +3446,6 @@ def weekday_trends_route():
         flash("Cannot display Weekday Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
-    # Pass df directly to the function, not for cache key serialization
     weekday_data = get_cached_analysis('weekday_all_trends', get_weekday_draw_trends, df, group_a_numbers_def=group_a)
     
     return render_template('weekday_trends.html', 
@@ -3653,26 +3457,20 @@ def yearly_white_ball_trends_route():
         flash("Cannot display Yearly White Ball Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
-    # Get the list of years for the dropdown/chart labels (up to current year + 1 for future-proofing)
     current_year = datetime.now().year
-    # Calculate the start year for a 10-year rolling window
     start_year_for_display = max(2017, current_year - 9) 
     years_for_display = list(range(start_year_for_display, current_year + 1))
 
     return render_template('yearly_white_ball_trends.html',
-                           years=years_for_display) # Pass years for initial dropdown values
+                           years=years_for_display)
 
-# Renamed from /api/yearly_white_ball_data
 @app.route('/api/white_ball_trends')
 def api_white_ball_trends_route():
     if df.empty:
         return jsonify({"error": "Historical data not loaded or is empty."}), 500
     
-    period_type = request.args.get('period', 'year') # Default to 'year'
+    period_type = request.args.get('period', 'year') 
 
-    # Cache the data based on the period type
-    # Pass df directly to the function, not for cache key serialization
-    # Removed start_year parameter, it's now dynamically calculated within the function
     white_ball_data, period_labels = get_cached_analysis(
         f'white_ball_frequency_{period_type}', 
         get_white_ball_frequency_by_period, 
@@ -3694,17 +3492,13 @@ def positional_analysis_route():
             flash("Cannot display Positional Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
             return redirect(url_for('index'))
 
-    # Pass df directly to the function for analysis
     positional_data = get_cached_analysis('positional_range_frequency', get_positional_range_frequency_analysis, df)
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        # This is an AJAX request, return JSON
         return jsonify(positional_data)
     else:
-        # Not an AJAX request, render the full template (we'll create this next)
         return render_template('positional_analysis.html', positional_data=positional_data)
 
-# Add this new route to your index.py file, for example, near the other routes.
 @app.route('/ai_assistant')
 def ai_assistant_route():
     try:
@@ -3714,29 +3508,20 @@ def ai_assistant_route():
         flash("An error occurred loading the AI Assistant page. Please try again.", 'error')
         return redirect(url_for('index'))
         
-# --- Smart Pick Generator Logic (New Functions and Route) ---
-
-# The `generate_smart_picks` and `_score_pick_for_patterns` from your index(3).py
-# have been merged with my suggestions for improved criteria application and caching.
-
 @app.route('/smart_pick_generator')
 def smart_pick_generator_route():
-    # Ensure historical data is loaded before rendering the generator page
-    global df, last_draw, historical_white_ball_sets, white_ball_co_occurrence_lookup, analysis_cache, last_analysis_cache_update
+    global df, last_draw
 
     if df.empty or last_draw.empty:
-        # Attempt to load data if not already loaded
-        success = initialize_core_data() # Use initialize_core_data to load
-        if not success: # initialize_core_data doesn't return bool, so check df.empty again
-            if df.empty: # if still empty after attempt
+        success = initialize_core_data() 
+        if not success: 
+            if df.empty:
                 flash("Failed to load historical data. Please try again later.", 'error')
-                return redirect(url_for('index')) # Redirect to home or show an error page
+                return redirect(url_for('index'))
     
-    # Initialize these variables for GET requests to avoid Jinja2 UndefinedError
     generated_sets = []
     last_draw_dates = {}
 
-    # Pass necessary data for rendering the form
     return render_template('smart_pick_generator.html', 
                            sum_ranges=SUM_RANGES,
                            group_a=group_a,
@@ -3766,12 +3551,12 @@ def generate_smart_picks_route():
         selected_sum_range_label = data.get('sum_range_filter', 'Any')
         selected_sum_range_tuple = SUM_RANGES.get(selected_sum_range_label)
 
-        prioritize_monthly_hot = data.get('prioritize_monthly_hot', False) # This will be False from UI
+        prioritize_monthly_hot = data.get('prioritize_monthly_hot', False) 
         prioritize_grouped_patterns = data.get('prioritize_grouped_patterns', False)
         prioritize_special_patterns = data.get('prioritize_special_patterns', False)
         prioritize_consecutive_patterns = data.get('prioritize_consecutive_patterns', False)
         
-        force_specific_pattern_input = data.get('force_specific_pattern', '') # This will be empty from UI
+        force_specific_pattern_input = data.get('force_specific_pattern', '') 
         force_specific_pattern = []
         if force_specific_pattern_input:
             force_specific_pattern = sorted([int(num.strip()) for num in force_specific_pattern_input.split(',') if num.strip().isdigit()])
