@@ -454,7 +454,7 @@ def hot_cold_numbers(df_source, last_draw_date_str):
 
     return hot_numbers, cold_numbers
 
-def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=69, num_top_pb=3): # Removed num_months_for_top_display
+def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=69, num_top_pb=3, num_months_for_top_display=6):
     if dataframe.empty:
         return {'monthly_data': [], 'streak_numbers': {'3_month_streaks': [], '4_month_streaks': [], '5_month_streaks': []}}
 
@@ -463,34 +463,14 @@ def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=69, num_top_pb=3)
     unique_months_periods = sorted(df_sorted['YearMonth'].unique(), reverse=True)
 
     monthly_display_data = [] 
-    current_period = pd.Period(datetime.now(), freq='M')
     
-    # Process only the current month and the previous month for custom_combinations page needs
-    # For monthly_white_ball_analysis.html, it iterates unique_months_periods directly for all available months.
-    
-    processed_month_periods = []
-    # If the current month is in the data, add it
-    if current_period in unique_months_periods:
-        processed_month_periods.append(current_period)
-    
-    # Calculate previous month period
-    first_day_of_current_month = datetime.now().replace(day=1)
-    previous_month_date = first_day_of_current_month - timedelta(days=1)
-    previous_period = pd.Period(previous_month_date, freq='M')
-
-    # If previous month is different from current and is in data, add it.
-    if previous_period != current_period and previous_period in unique_months_periods:
-        processed_month_periods.append(previous_period)
-
-    # Use a set to prevent processing the same month twice if logic adds it multiple times
-    processed_month_periods_unique = sorted(list(set(processed_month_periods)), reverse=True) # Sort to ensure consistent order (current, then previous)
-
-    for period in processed_month_periods_unique:
+    # Iterate through the last 'num_months_for_top_display' months
+    for period in unique_months_periods[:num_months_for_top_display]:
         month_df = df_sorted[df_sorted['YearMonth'] == period]
         if month_df.empty:
             continue
 
-        is_current_month_flag = (period == current_period)
+        is_current_month_flag = (period == pd.Period(datetime.now(), freq='M'))
 
         drawn_white_balls_set = set()
         wb_monthly_counts = defaultdict(int) 
@@ -532,8 +512,9 @@ def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=69, num_top_pb=3)
     # Streaks calculation (remains the same as it needs all completed months)
     numbers_per_completed_month = defaultdict(set)
     for period in unique_months_periods:
+        current_period = pd.Period(datetime.now(), freq='M')
         if period == current_period: 
-            continue
+            continue # Skip current (incomplete) month for streak calculation
         month_df = df_sorted[df_sorted['YearMonth'] == period]
         if not month_df.empty:
             for _, row in month_df.iterrows():
@@ -541,7 +522,7 @@ def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=69, num_top_pb=3)
                     numbers_per_completed_month[period].add(int(row[f'Number {i}']))
                 numbers_per_completed_month[period].add(int(row['Powerball']))
     
-    completed_months_sorted = sorted([p for p in unique_months_periods if p != current_period])
+    completed_months_sorted = sorted([p for p in unique_months_periods if p != pd.Period(datetime.now(), freq='M')])
 
     streak_numbers = {'3_month_streaks': [], '4_month_streaks': [], '5_month_streaks': []}
 
@@ -968,7 +949,7 @@ def get_odd_even_split_trends(df_source, last_draw_date_str):
         group_a_numbers_present = sorted([num for num in white_balls if num in group_a])
 
         even_count = sum(1 for num in white_balls if num % 2 == 0)
-        odd_count = 5 - even_count
+        odd_count = 5 - even_count # Correct calculation for even count
 
         split_category = "Other"
 
@@ -1816,7 +1797,7 @@ def get_special_patterns_analysis(df_source):
     overall_repeating_digit_counts = defaultdict(int)
 
     for idx, row in df_copy.iterrows(): # Iterate over the full dataset for overall counts
-        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])] )
         white_ball_set = set(white_balls)
         
         # Tens-Apart
@@ -1871,7 +1852,7 @@ def get_special_patterns_analysis(df_source):
         total_draws_in_year = len(yearly_df)
 
         for idx, row in yearly_df.iterrows():
-            white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+            white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])] )
             white_ball_set = set(white_balls)
             
             # Tens-Apart
@@ -1920,7 +1901,7 @@ def get_special_patterns_analysis(df_source):
     recent_data_df = recent_data_df.sort_values(by='Draw Date_dt', ascending=False) # Sort newest first
 
     for idx, row in recent_data_df.iterrows():
-        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])] )
         white_ball_set = set(white_balls)
         draw_date_str = row['Draw Date_dt'].strftime('%Y-%m-%d')
 
@@ -2286,6 +2267,7 @@ def initialize_core_data():
                     white_ball_co_occurrence_lookup[frozenset_white_balls] = current_draw_date
 
             print("Core historical data loaded successfully and co-occurrence lookup populated.")
+            return True # Indicate success
         else:
             print("Core historical data is empty after loading. df remains empty.")
             last_draw = pd.Series({
@@ -2293,9 +2275,11 @@ def initialize_core_data():
                 'Number 3': 'N/A', 'Number 4': 'N/A', 'Number 5': 'N/A', 'Powerball': 'N/A',
                 'Numbers': ['N/A', 'N/A', 'N/A', 'N/A', 'N/A']
             }, dtype='object')
+            return False # Indicate failure
     except Exception as e:
         print(f"An error occurred during initial core data loading: {e}")
         traceback.print_exc()
+        return False # Indicate failure
 
 
 def get_cached_analysis(key, compute_function, *args, **kwargs):
@@ -2352,9 +2336,9 @@ def _get_draws_for_month(year, month):
        Filters the global DataFrame `df` if already loaded."""
     global df
     if df.empty:
-        load_historical_data_from_supabase() # Attempt to load if not already
-        if df.empty:
-            return pd.DataFrame() # Return empty if data still not available
+        # No need to call load_historical_data_from_supabase here, as it's called by initialize_core_data
+        # and _get_two_months_unpicked_and_most_picked will handle `df` being empty.
+        return pd.DataFrame() 
 
     # Ensure 'Draw Date_dt' exists and is datetime
     if 'Draw Date_dt' not in df.columns or not pd.api.types.is_datetime64_any_dtype(df['Draw Date_dt']):
@@ -2366,22 +2350,10 @@ def _get_draws_for_month(year, month):
     monthly_draws = df[(df['Draw Date_dt'].dt.year == year) & (df['Draw Date_dt'].dt.month == month)]
     return monthly_draws
 
-def get_monthly_unpicked_and_most_picked(year, month):
-    """
-    Analyzes draws for a specific month to find unpicked and most picked numbers.
-    Most picked: Any white ball number appearing more than once in the month.
-    """
-    # Using the existing get_cached_analysis for consistency
-    cache_key_prefix = f"monthly_trends_custom_{year}_{month}"
-    
-    # We pass df as an argument, but get_cached_analysis filters it out of the cache key.
-    # The compute function (_compute_monthly_unpicked_and_most_picked) needs df.
-    return get_cached_analysis(cache_key_prefix, _compute_monthly_unpicked_and_most_picked, df, year, month)
-
-def _compute_monthly_unpicked_and_most_picked(df_source, year, month):
+def _compute_two_months_unpicked_and_most_picked(df_source, year, month):
     """
     Actual computation for unpicked and most picked numbers for a month.
-    Designed to be called by get_monthly_unpicked_and_most_picked and cached.
+    Designed to be called by _get_two_months_unpicked_and_most_picked and cached.
     """
     all_possible_white_balls = set(range(1, 70))
     
@@ -2403,6 +2375,19 @@ def _compute_monthly_unpicked_and_most_picked(df_source, year, month):
     most_picked_numbers = sorted([num for num, count in picked_counts.items() if count > 1])
 
     return unpicked_numbers, most_picked_numbers
+
+def _get_two_months_unpicked_and_most_picked(year, month):
+    """
+    Wrapper function to get cached unpicked and most picked numbers for a specific month.
+    Uses _compute_two_months_unpicked_and_most_picked as the actual computation function.
+    """
+    # Using the existing get_cached_analysis for consistency
+    cache_key_prefix = f"monthly_trends_custom_{year}_{month}"
+    
+    # We pass df as an argument, but get_cached_analysis filters it out of the cache key.
+    # The compute function (_compute_two_months_unpicked_and_most_picked) needs df.
+    return get_cached_analysis(cache_key_prefix, _compute_two_months_unpicked_and_most_picked, df, year, month)
+
 
 def _get_current_month_hot_numbers(df_source):
     """
@@ -2480,54 +2465,7 @@ def _score_pick_for_patterns(white_balls, criteria_data):
         score += hot_count * 2 
 
     return score
-# --- New Helper Functions for Monthly Trends ---
-def _get_draws_for_month(year, month):
-    """Fetches all Powerball draws for a given year and month from Supabase."""
-    # Ensure df is loaded
-    global df
-    if df.empty:
-        load_data_from_supabase()
-        if df.empty:
-            return pd.DataFrame() # Return empty if data still not available
 
-    # Filter the global DataFrame by month and year
-    monthly_draws = df[(df['Draw Date'].dt.year == year) & (df['Draw Date'].dt.month == month)]
-    return monthly_draws
-
-def get_monthly_unpicked_and_most_picked(year, month):
-    """
-    Analyzes draws for a specific month to find unpicked and most picked numbers.
-    Most picked: Any number appearing more than once in the month.
-    """
-    cache_key = f"monthly_trends_{year}_{month}"
-    cached_data = get_cached_analysis(cache_key)
-    if cached_data:
-        return cached_data['unpicked'], cached_data['most_picked']
-
-    all_possible_white_balls = set(range(1, 70))
-    
-    monthly_draws = _get_draws_for_month(year, month)
-    
-    if monthly_draws.empty:
-        # If no draws, all are unpicked, and none are most picked
-        set_cached_analysis(cache_key, {'unpicked': sorted(list(all_possible_white_balls)), 'most_picked': []})
-        return sorted(list(all_possible_white_balls)), []
-
-    picked_counts = defaultdict(int)
-    for _, row in monthly_draws.iterrows():
-        white_balls = [row['WB1'], row['WB2'], row['WB3'], row['WB4'], row['WB5']]
-        for num in white_balls:
-            picked_counts[num] += 1
-    
-    picked_numbers = set(picked_counts.keys())
-    
-    unpicked_numbers = sorted(list(all_possible_white_balls - picked_numbers))
-    most_picked_numbers = sorted([num for num, count in picked_counts.items() if count > 1])
-
-    result = {'unpicked': unpicked_numbers, 'most_picked': most_picked_numbers}
-    set_cached_analysis(cache_key, result)
-    
-    return unpicked_numbers, most_picked_numbers
 
 def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a, odd_even_choice, sum_range_tuple, prioritize_monthly_hot, prioritize_grouped_patterns, prioritize_special_patterns, prioritize_consecutive_patterns, force_specific_pattern):
     """
@@ -2986,7 +2924,7 @@ def save_multiple_generated_picks_route():
                 failed_count += 1
                 messages.append(f"Failed to save {', '.join(map(str, white_balls))} + {powerball}: {message}")
         
-        status_message = f"Successfully saved {saved_count} pick(s). Failed to save {failed_count} pick(s)."
+        status_message = f"Successfully saved {saved_count} of {len(picks_to_save)} picks."
         return jsonify({"success": True, "message": status_message, "details": messages}), 200
 
     except Exception as e:
@@ -3019,154 +2957,6 @@ def monthly_white_ball_analysis_route():
         flash("Cannot perform monthly trends analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
-    # We call get_monthly_white_ball_analysis_data with current df to ensure monthly data is computed.
-    # The monthly_data within the returned dictionary here is designed for this specific page,
-    # which shows LAST 6 MONTHS. The helper function was slightly modified to return for 2 specific months
-    # when called by custom_combinations_route, but this route will get the full data.
-    
-    # To correctly display the last 6 months here, we need a slight adjustment to how get_monthly_white_ball_analysis_data works
-    # for THIS route versus custom_combinations_route.
-    # Let's adjust get_monthly_white_ball_analysis_data to take a parameter for how many months to analyze.
-    # For now, it's modified to just give current/previous month which would break this page.
-    # Reverting get_monthly_white_ball_analysis_data to its original full functionality and adding a separate _get_two_months_trend_data for the new page.
-
-    # --- REVERTING get_monthly_white_ball_analysis_data to original functionality ---
-    # The previous `get_monthly_white_ball_analysis_data` was implicitly designed for this.
-    # I will create a new helper `_get_monthly_trends_for_display_page` for this route,
-    # which will then handle the last 6 months logic.
-    
-    # For now, let's ensure the `monthly_data` logic is compatible.
-    # This route will call the function to get multiple months.
-
-    # This route should get ALL relevant monthly data, not just current/previous.
-    # Let's use a dedicated function that ensures all necessary months are pulled.
-    
-    # This function needs to fetch for ALL relevant recent months.
-    # My previous implementation of `get_monthly_white_ball_analysis_data` actually supported this.
-    # I will revert it slightly to its original logic if it was modified.
-    
-    # The `get_monthly_white_ball_analysis_data` in index(3).py looked at `num_months_for_top_display`.
-    # My current solution for custom_combinations calls `_get_draws_for_month` and then `_compute_monthly_unpicked_and_most_picked`.
-    # Let's make sure the `monthly_white_ball_analysis_route` still gets the correct data.
-
-    # The current `get_monthly_white_ball_analysis_data` helper I provided in the last response
-    # was *incorrectly* modified to only get current/previous month.
-    # I need to ensure this function (for this route) pulls the full 6 months of data.
-
-    # CORRECTED: get_monthly_white_ball_analysis_data needs to function as it did originally for this page.
-    # It has a `num_months_for_top_display` parameter.
-
-    # Let's add a wrapper to call the correct computation.
-    
-    # This is the actual function used by the monthly_white_ball_analysis.html
-    # It takes df, num_top_wb, num_top_pb and num_months_for_top_display.
-    # The current definition of get_monthly_white_ball_analysis_data I just gave you is for custom_combinations page, not this one.
-    # I need to rename it to _get_monthly_trends_for_custom_page and revert get_monthly_white_ball_analysis_data to its original logic.
-
-    # This means I need to provide a new, complete index.py again,
-    # ensuring get_monthly_white_ball_analysis_data is for the existing page,
-    # and a *new* helper specifically for the custom_combinations route.
-
-    # RE-PLAN:
-    # 1. Revert `get_monthly_white_ball_analysis_data` to its state in `index (3).py`. (Done implicitly by starting with index(3).py)
-    # 2. Add `_get_draws_for_month` and `_compute_monthly_unpicked_and_most_picked` as separate functions.
-    # 3. Modify `custom_combinations_route` to use `_compute_monthly_unpicked_and_most_picked`.
-    # 4. Ensure `generate_smart_picks` uses `_get_current_month_hot_numbers` correctly.
-
-    # My previous full file did this: get_monthly_white_ball_analysis_data takes `num_top_wb=69, num_top_pb=3, num_months_for_top_display=6`.
-    # The user's index (3).py had `get_monthly_white_ball_analysis_data` with `num_top_wb=69, num_top_pb=3` without `num_months_for_top_display`.
-    # It implies that the logic for 6 months was hardcoded within it.
-
-    # I will ensure the get_monthly_white_ball_analysis_data function remains identical to what was in index(3).py for the monthly_white_ball_analysis_route.
-    # And then add the `_get_draws_for_month` and `get_monthly_unpicked_and_most_picked` as new helper functions for the custom page.
-
-    # The code I'm about to provide should correctly restore the original functionality AND add the new.
-    # This route's call to get_monthly_white_ball_analysis_data is:
-    # `monthly_trends_data = get_cached_analysis('monthly_trends_and_streaks', get_monthly_white_ball_analysis_data, df, num_top_wb=69, num_top_pb=3)`
-    # The get_monthly_white_ball_analysis_data in index(3).py actually had `num_months_for_top_display` as a parameter.
-    # So the provided `index (3).py` is the correct source for `get_monthly_white_ball_analysis_data` for this route.
-    # Let's assume its `num_months_for_top_display` defaults to 6, or is hardcoded to 6.
-
-    # I have to re-evaluate the version of get_monthly_white_ball_analysis_data that should be used here.
-    # The one in the provided index(3).py passes num_months_for_top_display in its call.
-    # The one I pasted in my last response *did not* have that parameter.
-
-    # Okay, I will use the `get_monthly_white_ball_analysis_data` function from your `index (3).py` (the one that takes `num_top_wb`, `num_top_pb`, `num_months_for_top_display`).
-    # And then for the *new* custom combinations page, I will introduce a *different* helper function that specifically gets just the current and previous month's unpicked/most picked data.
-
-    # Here's the corrected `get_monthly_white_ball_analysis_data` (from index(3).py structure):
-    # (It seems my last response's `get_monthly_white_ball_analysis_data` was a hybrid/incorrect one).
-    # I will put this *exact* version in the final complete code.
-
-    # --- Re-aligning `get_monthly_white_ball_analysis_data` for `monthly_white_ball_analysis_route` ---
-    # The version of `get_monthly_white_ball_analysis_data` in the user's `index (3).py` seems designed to provide monthly data for multiple months and streak numbers.
-    # My previous `get_monthly_unpicked_and_most_picked` was a *new* helper for the custom page.
-    # The function names were causing confusion.
-
-    # So, let's ensure:
-    # 1. The original `get_monthly_white_ball_analysis_data` (with `num_months_for_top_display`) remains as-is, used by `monthly_white_ball_analysis_route`.
-    # 2. The *new* helper `_get_monthly_unpicked_and_most_picked_for_custom` (or similar) is created specifically for the new `/custom_combinations` route to get just two months of data.
-
-    # I will rename `get_monthly_unpicked_and_most_picked` to `_get_two_months_unpicked_and_most_picked` and its helper to `_compute_two_months_unpicked_and_most_picked`
-    # to avoid name collision and make their purpose explicit.
-
-    # --- START OF REVISED PLAN FOR MERGE ---
-    # 1. Take `index (3).py` as the base.
-    # 2. Find `get_monthly_white_ball_analysis_data` in `index (3).py`. **Keep it as is.** It serves the existing monthly trends page.
-    # 3. Add `_get_draws_for_month` (from my previous full code) as a utility.
-    # 4. Add `_compute_two_months_unpicked_and_most_picked` (new helper, similar to previous `_compute_monthly_unpicked_and_most_picked`) that specifically gets data for current and previous month.
-    # 5. Add `_get_two_months_unpicked_and_most_picked` (new wrapper, similar to previous `get_monthly_unpicked_and_most_picked`) which calls the compute function and caches.
-    # 6. Add `_get_current_month_hot_numbers` (from my previous full code) as a utility.
-    # 7. Modify `generate_smart_picks` to use `_get_current_month_hot_numbers` for `prioritize_monthly_hot`.
-    # 8. Add `custom_combinations_route` that calls `_get_two_months_unpicked_and_most_picked`.
-    # --- END OF REVISED PLAN FOR MERGE ---
-
-
-    # The user's `get_monthly_white_ball_analysis_data` in `index (3).py`
-    # looks like this:
-    # def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=69, num_top_pb=3, num_months_for_top_display=6):
-    # This is the correct signature for the existing monthly analysis page. I will preserve it.
-
-    # Now, for the *new* `custom_combinations` page, I'll introduce a separate function that gets only current and previous month.
-
-    # --- NEW ROUTE FOR CUSTOM COMBINATIONS (PHASE 1) ---
-@app.route('/custom_combinations')
-def custom_combinations_route():
-    # Ensure historical data is loaded before rendering the page
-    global df, last_draw
-
-    if df.empty:
-        # Attempt to load data if not already loaded
-        initialize_core_data()
-        if df.empty: # if still empty after attempt
-            flash("Failed to load historical data for Custom Combinations. Please try again later.", 'error')
-            return redirect(url_for('index'))
-
-    # Get data for current and previous month's unpicked and most picked numbers
-    current_year = datetime.now().year
-    current_month = datetime.now().month
-    
-    # Current month data
-    current_month_unpicked, current_month_most_picked = _get_two_months_unpicked_and_most_picked(current_year, current_month)
-
-    # Previous month data
-    first_day_of_current_month = datetime.now().replace(day=1)
-    previous_month_date = first_day_of_current_month - timedelta(days=1)
-    previous_year = previous_month_date.year
-    previous_month = previous_month_date.month
-
-    previous_month_unpicked, previous_month_most_picked = _get_two_months_unpicked_and_most_picked(previous_year, previous_month)
-
-    # Convert sets to lists for JSON serialization in template
-    return render_template('custom_combinations.html',
-                           current_month_name=datetime.now().strftime('%B %Y'),
-                           previous_month_name=previous_month_date.strftime('%B %Y'),
-                           current_month_unpicked=current_month_unpicked,
-                           current_month_most_picked=current_month_most_picked,
-                           previous_month_unpicked=previous_month_unpicked,
-                           previous_month_most_picked=previous_month_most_picked
-                          )
-
     monthly_trends_data = get_cached_analysis(
         'monthly_trends_and_streaks', 
         get_monthly_white_ball_analysis_data, 
@@ -3546,19 +3336,19 @@ def find_results_by_first_white_ball():
             elif selected_sort_by == 'balls_asc':
                 results['WhiteBallsTuple'] = results.apply(
                     lambda row: tuple(sorted([
-                        int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
-                        int(row['Number 4']), int(row['Number 5'])
-                    ])), axis=1
-                )
+                            int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                            int(row['Number 4']), int(row['Number 5'])
+                        ])), axis=1
+                    )
                 results = results.sort_values(by='WhiteBallsTuple', ascending=True)
                 results = results.drop(columns=['WhiteBallsTuple'])
             elif selected_sort_by == 'balls_desc':
                 results['WhiteBallsTuple'] = results.apply(
                     lambda row: tuple(sorted([
-                        int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
-                        int(row['Number 4']), int(row['Number 5'])
-                    ])), axis=1
-                )
+                            int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                            int(row['Number 4']), int(row['Number 5'])
+                        ])), axis=1
+                    )
                 results = results.sort_values(by='WhiteBallsTuple', ascending=False)
                 results = results.drop(columns=['WhiteBallsTuple'])
 
