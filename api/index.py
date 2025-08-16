@@ -3507,7 +3507,46 @@ def ai_assistant_route():
         traceback.print_exc()
         flash("An error occurred loading the AI Assistant page. Please try again.", 'error')
         return redirect(url_for('index'))
-        
+
+# --- NEW ROUTE FOR CUSTOM COMBINATIONS (PHASE 1) ---
+@app.route('/custom_combinations')
+def custom_combinations_route():
+    print("--- custom_combinations_route IS BEING CALLED! ---")
+    # Ensure historical data is loaded before rendering the page
+    global df, last_draw
+
+    if df.empty:
+        # Attempt to load data if not already loaded
+        initialize_core_data()
+        if df.empty: # if still empty after attempt
+            flash("Failed to load historical data for Custom Combinations. Please try again later.", 'error')
+            return redirect(url_for('index'))
+
+    # Get data for current and previous month's unpicked and most picked numbers
+    current_year = datetime.now().year
+    current_month = datetime.now().month
+    
+    # Current month data
+    current_month_unpicked, current_month_most_picked = _get_two_months_unpicked_and_most_picked(current_year, current_month)
+
+    # Previous month data
+    first_day_of_current_month = datetime.now().replace(day=1)
+    previous_month_date = first_day_of_current_month - timedelta(days=1)
+    previous_year = previous_month_date.year
+    previous_month = previous_month_date.month
+
+    previous_month_unpicked, previous_month_most_picked = _get_two_months_unpicked_and_most_picked(previous_year, previous_month)
+
+    # Convert sets to lists for JSON serialization in template
+    return render_template('custom_combinations.html',
+                           current_month_name=datetime.now().strftime('%B %Y'),
+                           previous_month_name=previous_month_date.strftime('%B %Y'),
+                           current_month_unpicked=current_month_unpicked,
+                           current_month_most_picked=current_month_most_picked,
+                           previous_month_unpicked=previous_month_unpicked,
+                           previous_month_most_picked=previous_month_most_picked
+                          )
+
 @app.route('/smart_pick_generator')
 def smart_pick_generator_route():
     global df, last_draw
