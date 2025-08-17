@@ -52,20 +52,19 @@
                                 <p class="text-gray-600 text-sm">No unpicked numbers found for this month (or no draws yet).</p>
                             {% endif %}
                         </div>
-                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm">
-                            <h4 class="text-lg font-medium mb-2 text-gray-700">Most Picked Numbers (>1 time):</h4>
-                            {% if current_month_most_picked %}
-                                <div class="flex flex-wrap gap-2">
-                                    {% for num in current_month_most_picked %}
-                                        <span class="number-ball most-picked-ball" data-number="{{ num }}">{{ num }}</span>
-                                    {% endfor %}
-                                </div>
-                            {% else %}
-                                <p class="text-gray-600 text-sm">No numbers picked more than once this month yet.</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
+                        {# Inside current_month_most_picked section #}
+                       <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm">
+                          <h4 class="text-lg font-medium mb-2 text-gray-700">Most Picked Numbers (>1 time):</h4>
+                           {% if current_month_most_picked %}
+                            <div class="flex flex-wrap gap-2">
+                                {% for item in current_month_most_picked %}
+                           <span class="number-ball most-picked-ball" data-number="{{ item.number }}">{{ item.number }} ({{ item.count }})</span>
+                            {% endfor %}
+                       </div>
+                     {% else %}
+                    <p class="text-gray-600 text-sm">No numbers picked more than once this month yet.</p>
+                   {% endif %}
+                   </div>
 
                 {# Previous Month Trends #}
                 <div>
@@ -83,22 +82,19 @@
                                 <p class="text-gray-600 text-sm">No unpicked numbers found for previous month.</p>
                             {% endif %}
                         </div>
-                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm">
-                            <h4 class="text-lg font-medium mb-2 text-gray-700">Most Picked Numbers (>1 time):</h4>
-                            {% if previous_month_most_picked %}
-                                <div class="flex flex-wrap gap-2">
-                                    {% for num in previous_month_most_picked %}
-                                        <span class="number-ball most-picked-ball" data-number="{{ num }}">{{ num }}</span>
-                                    {% endfor %}
-                                </div>
-                            {% else %}
-                                <p class="text-gray-600 text-sm">No numbers picked more than once previous month.</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+                        {# Inside previous_month_most_picked section #}
+                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm">
+                        <h4 class="text-lg font-medium mb-2 text-gray-700">Most Picked Numbers (>1 time):</h4>
+                          {% if previous_month_most_picked %}
+                          <div class="flex flex-wrap gap-2">
+                         {% for item in previous_month_most_picked %}
+                       <span class="number-ball most-picked-ball" data-number="{{ item.number }}">{{ item.number }} ({{ item.count }})</span>
+                    {% endfor %}
+                 </div>
+               {% else %}
+             <p class="text-gray-600 text-sm">No numbers picked more than once previous month.</p>
+             {% endif %}
+           </div>
 
         {# Tab Content - All Numbers #}
         <div id="all_numbers_tab" class="tab-content hidden">
