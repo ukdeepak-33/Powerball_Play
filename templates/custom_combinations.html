@@ -7,7 +7,7 @@
 {% block content %}
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {# Flash messages display (re-using base.html's logic) #}
-    {% with messages = get_flashed_flashed_messages(with_categories=true) %}
+    {% with messages = get_flashed_messages(with_categories=true) %} {# Corrected typo here #}
         {% if messages %}
             <div class="flash-messages space-y-3">
                 {% for category, message in messages %}
