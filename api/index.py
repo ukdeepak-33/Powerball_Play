@@ -3547,6 +3547,7 @@ def custom_combinations_route():
                            previous_month_unpicked=previous_month_unpicked,
                            previous_month_most_picked=previous_month_most_picked,
                            now=datetime.now() # Pass the datetime object as 'now'
+                           timedelta=timedelta,
                           )
 
 @app.route('/smart_pick_generator')
