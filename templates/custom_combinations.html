@@ -21,229 +21,231 @@
 
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Step 1: Select Your Combination Pool</h2>
-        <p class="text-gray-700 mb-6">Click on numbers below to add them to your custom selection pool. You can mix and match from different categories.</p>
+        <p class="text-gray-700 mb-6">Click on numbers below to add them to your custom pool. These are the numbers from which your Powerball picks will be generated.</p>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {# Current Month Trends #}
-            <div>
-                <h3 class="text-xl font-semibold mb-3 text-gray-800">Current Month ({{ now.strftime('%B %Y') }})</h3>
-                <div class="space-y-4">
-                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm">
-                        <h4 class="text-lg font-medium mb-2 text-gray-700">Unpicked Numbers:</h4>
-                        {% if current_month_unpicked %}
-                            <div class="flex flex-wrap gap-2">
-                                {% for num in current_month_unpicked %}
-                                    <span class="number-ball unpicked-ball" data-number="{{ num }}">{{ num }}</span>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <p class="text-gray-600 text-sm">No unpicked numbers found for this month (or no draws yet).</p>
-                        {% endif %}
-                    </div>
-                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm">
-                        <h4 class="text-lg font-medium mb-2 text-gray-700">Most Picked Numbers (>1 time):</h4>
-                        {% if current_month_most_picked %}
-                            <div class="flex flex-wrap gap-2">
-                                {% for num in current_month_most_picked %}
-                                    <span class="number-ball most-picked-ball" data-number="{{ num }}">{{ num }}</span>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <p class="text-gray-600 text-sm">No numbers picked more than once this month yet.</p>
-                        {% endif %}
-                    </div>
+        <div class="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2 mb-6" id="numberGrid">
+            {% for i in range(1, 70) %}
+                <div class="number-ball flex items-center justify-center w-10 h-10 bg-gray-200 text-gray-800 rounded-full font-bold cursor-pointer hover:bg-blue-400 hover:text-white transition duration-200 ease-in-out text-base" data-number="{{ i }}">
+                    {{ i }}
                 </div>
-            </div>
-
-            {# Previous Month Trends #}
-            <div>
-                <h3 class="text-xl font-semibold mb-3 text-gray-800">Previous Month ({{ previous_month_name }})</h3> {# Approximation for previous month #}
-                <div class="space-y-4">
-                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm">
-                        <h4 class="text-lg font-medium mb-2 text-gray-700">Unpicked Numbers:</h4>
-                        {% if previous_month_unpicked %}
-                            <div class="flex flex-wrap gap-2">
-                                {% for num in previous_month_unpicked %}
-                                    <span class="number-ball unpicked-ball" data-number="{{ num }}">{{ num }}</span>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <p class="text-gray-600 text-sm">No unpicked numbers found for previous month.</p>
-                        {% endif %}
-                    </div>
-                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm">
-                        <h4 class="text-lg font-medium mb-2 text-gray-700">Most Picked Numbers (>1 time):</h4>
-                        {% if previous_month_most_picked %}
-                            <div class="flex flex-wrap gap-2">
-                                {% for num in previous_month_most_picked %}
-                                    <span class="number-ball most-picked-ball" data-number="{{ num }}">{{ num }}</span>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <p class="text-gray-600 text-sm">No numbers picked more than once previous month.</p>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
+            {% endfor %}
         </div>
 
-        <div class="border-t border-gray-200 pt-6 mt-8">
-            <h3 class="text-xl font-semibold mb-4 text-gray-800">Your Custom Number Pool:</h3>
-            <div id="selectedNumbersDisplay" class="flex flex-wrap gap-2 p-4 min-h-[60px] border border-blue-300 bg-blue-50 rounded-lg items-center">
-                <p class="text-blue-700 font-medium" id="selectedNumbersPlaceholder">Click numbers above to add them to your pool.</p>
-            </div>
-            <p class="text-sm text-gray-600 mt-2">Current count: <span id="selectedNumbersCount" class="font-bold">0</span></p>
-            <div class="mt-4 flex flex-wrap gap-3">
-                <button type="button" id="clearSelectedBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg shadow-md transition duration-200 ease-in-out">
-                    Clear Selection
-                </button>
-                <input type="text" id="manualNumbersInput" placeholder="Or manually add numbers (e.g., 1,5,10)" class="flex-grow shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                <button type="button" id="addManualNumbersBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200 ease-in-out">
-                    Add Manual
-                </button>
-            </div>
-            
-            <div class="mt-6">
-                <label for="excludedNumbers" class="block text-gray-700 text-sm font-bold mb-2">Exclude Numbers from Pool (comma-separated):</label>
-                <input type="text" id="excludedNumbers" name="excludedNumbers" placeholder="e.g., 4, 18, 55" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                <p class="text-xs text-gray-500 mt-1">These numbers will be removed from your *selected* pool before generation.</p>
-            </div>
+        <div class="flex flex-col sm:flex-row gap-4 mb-6">
+            <input type="text" id="manualNumbers" placeholder="Add numbers manually (e.g., 5,12,30)" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-700">
+            <button id="addManualBtn" class="btn btn-primary bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition duration-200 ease-in-out whitespace-nowrap">Add Manually</button>
+            <button id="clearSelectedBtn" class="btn bg-red-600 text-white px-5 py-2 rounded-lg hover:bg-red-700 transition duration-200 ease-in-out whitespace-nowrap">Clear All</button>
         </div>
 
-        {# Placeholder for Phase 2 and 3 buttons/results #}
-        <div class="border-t border-gray-200 pt-6 mt-8 text-center">
-            <h3 class="text-xl font-semibold mb-4 text-gray-800">Step 2: Generate Picks (Coming Soon!)</h3>
-            <button class="bg-gray-400 text-white font-bold py-3 px-6 rounded-lg cursor-not-allowed">
-                Generate Random Sets (5-50)
+        <div class="p-4 bg-blue-50 rounded-lg border border-blue-200 text-blue-800 flex items-center flex-wrap gap-2 mb-6" id="selectedNumbersDisplay">
+            <span class="font-semibold mr-2">Your Selected Pool:</span>
+            <span id="selectedNumbersList" class="flex flex-wrap gap-1">No numbers selected</span>
+        </div>
+    </div>
+
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Step 2: Generate Picks from Your Pool</h2>
+        <form id="generateForm" class="space-y-4">
+            <div>
+                <label for="numSetsToGenerate" class="block text-sm font-medium text-gray-700 mb-1">Number of Sets to Generate (1-10):</label>
+                <input type="number" id="numSetsToGenerate" name="num_sets_to_generate" min="1" max="10" value="1" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-700">
+            </div>
+
+            <div>
+                <label for="excludedNumbers" class="block text-sm font-medium text-gray-700 mb-1">Numbers to Exclude from Generation (comma-separated):</label>
+                <input type="text" id="excludedNumbers" name="excluded_numbers" placeholder="e.g., 7, 14, 21" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-700">
+                <p class="mt-1 text-sm text-gray-500">These numbers will *not* appear in the generated picks, even if they are in your selected pool.</p>
+            </div>
+
+            <div>
+                <label for="powerballOverride" class="block text-sm font-medium text-gray-700 mb-1">Specific Powerball (Optional, 1-26):</label>
+                <input type="number" id="powerballOverride" name="powerball_override" min="1" max="26" placeholder="Leave blank for random Powerball" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-700">
+                <p class="mt-1 text-sm text-gray-500">If specified, all generated sets will use this Powerball number.</p>
+            </div>
+
+            <button type="submit" id="generatePicksBtn" class="btn btn-accent bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition duration-200 ease-in-out w-full font-semibold text-lg shadow-md">
+                Generate Custom Picks
+            </button>
+            <div id="loadingIndicator" class="hidden text-center text-blue-600 font-medium mt-4">
+                <img src="https://placehold.co/40x40/blue/white?text=..." alt="Loading" class="inline-block animate-spin mr-2"> Generating picks...
+            </div>
+        </form>
+    </div>
+
+    {# Results Display Section #}
+    <div id="generatedResultsSection" class="hidden card p-6 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-xl text-white">
+        <h2 class="text-3xl font-extrabold mb-6 text-center">Generated Custom Picks</h2>
+        <div id="generatedPicksContainer" class="space-y-5">
+            {# Generated picks will be inserted here by JavaScript #}
+        </div>
+        <div class="flex justify-center mt-8 space-x-4" id="saveAllCustomPicksActions">
+            <button id="saveAllCustomPicksBtn" class="btn bg-indigo-700 text-white px-6 py-3 rounded-lg hover:bg-indigo-800 transition duration-200 ease-in-out font-semibold text-lg shadow-lg">
+                Save All Generated Picks
+            </button>
+        </div>
+    </div>
+</div>
+
+{# Analysis Modal Structure (Copied from index.html for consistency) #}
+<div id="analysisModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden transition-opacity duration-300 ease-in-out opacity-0">
+    <div class="bg-white rounded-xl shadow-2xl p-8 max-w-2xl w-full transform transition-transform duration-300 ease-out scale-95 opacity-0" id="analysisModalContent">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-2xl font-bold text-gray-900">Pick Analysis: <span id="analyzedPickDisplay" class="text-blue-700"></span></h3>
+            <button id="closeAnalysisModalBtn" class="text-gray-500 hover:text-gray-700 focus:outline-none">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div id="analysisResultsContent" class="space-y-4 text-gray-700">
+            {# Analysis results will be loaded here #}
+        </div>
+        <div class="mt-6 flex justify-end">
+            <button id="saveAnalyzedPickBtn" class="btn bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-200 ease-in-out">
+                Save This Pick
             </button>
         </div>
     </div>
 </div>
 
 <style>
+    /* Custom styles for number balls */
     .number-ball {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        font-size: 1.1rem;
-        font-weight: bold;
-        color: white;
-        background-color: #6B7280; /* Gray-500 default */
-        cursor: pointer;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out;
-    }
-    .number-ball:hover {
-        transform: translateY(-2px);
+        transition: all 0.2s ease-in-out;
     }
     .number-ball.selected {
-        background-color: #2563EB; /* Blue-600 */
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        background-color: #2563eb; /* blue-600 */
+        color: white;
+        transform: scale(1.1);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    .number-ball:hover:not(.selected) {
         transform: scale(1.05);
     }
-    .unpicked-ball {
-        background-color: #9CA3AF; /* Light Gray */
+
+    /* Ball display styles (similar to index.html for consistency) */
+    .generated-ball {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        width: 50px;
+        height: 50px;
+        background-color: #f0f0f0;
+        border-radius: 50%;
+        border: 2px solid #ccc;
+        font-weight: bold;
+        color: #333;
+        margin: 5px;
+        font-size: 1.2em;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        flex-shrink: 0;
     }
-    .most-picked-ball {
-        background-color: #FBBF24; /* Amber-400 */
-        color: #374151; /* Darker text for visibility */
+    .generated-powerball {
+        background-color: #ef4444; /* Red */
+        color: white;
+        border-color: #dc2626;
     }
-    /* Styles for the custom toast popup (copied from smart_pick_generator.html) */
+
+    /* Custom Toast Popup (Flash Message) */
     .toast-popup {
         position: fixed;
-        bottom: 20px; /* Adjust as needed */
-        right: 20px; /* Adjust as needed */
-        min-width: 250px;
-        padding: 15px 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 0.95em;
         color: white;
-        font-weight: 600;
-        z-index: 1000; /* Ensure it's on top */
         opacity: 0;
-        transform: translateY(20px);
-        transition: opacity 0.3s ease-out, transform 0.3s ease-out;
-        display: flex;
-        align-items: center;
+        transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        min-width: 250px;
+        text-align: center;
     }
     .toast-popup.show {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateX(-50%) translateY(-10px); /* Slight lift */
     }
-    .toast-popup.success {
-        background-color: #4CAF50; /* Green */
+    .toast-popup.animate-fade-out {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
     }
-    .toast-popup.info {
-        background-color: #2196F3; /* Blue */
-    }
-    .toast-popup.error {
-        background-color: #f44336; /* Red */
-    }
-    @keyframes fade-in {
-        from { opacity: 0; transform: translateY(-10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes fade-out {
-        from { opacity: 1; transform: translateY(0); }
-        to { opacity: 0; transform: translateY(-10px); }
-    }
-    .animate-fade-in {
-        animation: fade-in 0.5s ease-out forwards;
-    }
-    .animate-fade-out {
-        animation: fade-out 0.5s ease-in forwards;
-    }
+    .toast-popup.info { background-color: #3b82f6; } /* blue-500 */
+    .toast-popup.success { background-color: #10b981; } /* emerald-500 */
+    .toast-popup.error { background-color: #ef4444; } /* red-500 */
 </style>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const selectedNumbers = new Set(); // Use a Set to store unique selected numbers
+        const numberGrid = document.getElementById('numberGrid');
         const selectedNumbersDisplay = document.getElementById('selectedNumbersDisplay');
-        const selectedNumbersCountSpan = document.getElementById('selectedNumbersCount');
-        const selectedNumbersPlaceholder = document.getElementById('selectedNumbersPlaceholder');
+        const selectedNumbersList = document.getElementById('selectedNumbersList');
+        const manualNumbersInput = document.getElementById('manualNumbers');
+        const addManualBtn = document.getElementById('addManualBtn');
         const clearSelectedBtn = document.getElementById('clearSelectedBtn');
-        const manualNumbersInput = document.getElementById('manualNumbersInput');
-        const addManualNumbersBtn = document.getElementById('addManualNumbersBtn');
 
-        // Function to update the displayed selected numbers
+        const generateForm = document.getElementById('generateForm');
+        const generatePicksBtn = document.getElementById('generatePicksBtn');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const generatedResultsSection = document.getElementById('generatedResultsSection');
+        const generatedPicksContainer = document.getElementById('generatedPicksContainer');
+        const saveAllCustomPicksBtn = document.getElementById('saveAllCustomPicksBtn');
+        const saveAllCustomPicksActions = document.getElementById('saveAllCustomPicksActions');
+
+        const analysisModal = document.getElementById('analysisModal');
+        const analysisModalContent = document.getElementById('analysisModalContent');
+        const closeAnalysisModalBtn = document.getElementById('closeAnalysisModalBtn');
+        const analyzedPickDisplay = document.getElementById('analyzedPickDisplay');
+        const analysisResultsContent = document.getElementById('analysisResultsContent');
+        const saveAnalyzedPickBtn = document.getElementById('saveAnalyzedPickBtn');
+
+        let selectedNumbers = new Set(); // Use a Set for quick lookups and uniqueness
+
+        // Function to update the display of selected numbers
         function updateSelectedNumbersDisplay() {
-            if (selectedNumbers.size === 0) {
-                selectedNumbersDisplay.innerHTML = '<p class="text-blue-700 font-medium" id="selectedNumbersPlaceholder">Click numbers above to add them to your pool.</p>';
+            const sortedNumbers = Array.from(selectedNumbers).sort((a, b) => a - b);
+            if (sortedNumbers.length === 0) {
+                selectedNumbersList.innerHTML = 'No numbers selected';
             } else {
-                const sortedNumbers = Array.from(selectedNumbers).sort((a, b) => a - b);
-                selectedNumbersDisplay.innerHTML = sortedNumbers.map(num => `
-                    <span class="number-ball selected-display-ball flex items-center justify-center w-10 h-10 rounded-full bg-blue-600 text-white font-extrabold text-lg shadow-md" data-number="${num}">
-                        ${num}
-                    </span>
-                `).join('');
+                selectedNumbersList.innerHTML = '';
+                sortedNumbers.forEach(num => {
+                    const span = document.createElement('span');
+                    span.className = 'generated-ball bg-blue-600 text-white !w-8 !h-8 !text-sm !mx-0.5 !my-0.5'; // Smaller, tight balls
+                    span.textContent = num;
+                    selectedNumbersList.appendChild(span);
+                });
             }
-            selectedNumbersCountSpan.textContent = selectedNumbers.size;
         }
 
-        // Event listener for clicking on trend numbers
-        document.querySelectorAll('.number-ball').forEach(ball => {
-            ball.addEventListener('click', function() {
-                const number = parseInt(this.dataset.number);
+        // Event listener for clicking on number balls in the grid
+        numberGrid.addEventListener('click', function(event) {
+            const target = event.target.closest('.number-ball');
+            if (target) {
+                const number = parseInt(target.dataset.number);
                 if (selectedNumbers.has(number)) {
                     selectedNumbers.delete(number);
-                    this.classList.remove('selected');
+                    target.classList.remove('selected');
                 } else {
                     selectedNumbers.add(number);
-                    this.classList.add('selected');
+                    target.classList.add('selected');
                 }
                 updateSelectedNumbersDisplay();
-            });
+            }
         });
 
-        // Event listener for adding manual numbers
-        addManualNumbersBtn.addEventListener('click', function() {
-            const input = manualNumbersInput.value.trim();
-            if (input) {
-                const numbers = input.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n >= 1 && n <= 69);
-                numbers.forEach(num => selectedNumbers.add(num));
+        // Event listener for adding numbers manually
+        addManualBtn.addEventListener('click', function() {
+            const inputVal = manualNumbersInput.value.trim();
+            if (inputVal) {
+                const newNumbers = inputVal.split(',').map(num => parseInt(num.trim())).filter(num => !isNaN(num) && num >= 1 && num <= 69);
+                newNumbers.forEach(num => {
+                    selectedNumbers.add(num);
+                    const ballElement = document.querySelector(`.number-ball[data-number="${num}"]`);
+                    if (ballElement) {
+                        ballElement.classList.add('selected');
+                    }
+                });
                 updateSelectedNumbersDisplay();
                 manualNumbersInput.value = ''; // Clear input field
             }
@@ -256,6 +258,342 @@
                 ball.classList.remove('selected');
             });
             updateSelectedNumbersDisplay();
+        });
+
+        // Initialize display on load
+        updateSelectedNumbersDisplay();
+
+        // --- Handle Custom Generation Form Submission ---
+        generateForm.addEventListener('submit', async function(event) {
+            event.preventDefault(); // Prevent default form submission
+
+            const numSets = parseInt(document.getElementById('numSetsToGenerate').value);
+            const excludedNumbersInput = document.getElementById('excludedNumbers').value.trim();
+            const powerballOverrideInput = document.getElementById('powerballOverride').value.trim();
+
+            let excludedNumbers = [];
+            if (excludedNumbersInput) {
+                excludedNumbers = excludedNumbersInput.split(',').map(num => parseInt(num.trim())).filter(num => !isNaN(num) && num >= 1 && num <= 69);
+                if (new Set(excludedNumbers).size !== excludedNumbers.length) {
+                    showToast("Excluded numbers must be unique.", 'error');
+                    return;
+                }
+            }
+
+            let powerballOverride = null;
+            if (powerballOverrideInput) {
+                const pb = parseInt(powerballOverrideInput);
+                if (isNaN(pb) || pb < 1 || pb > 26) {
+                    showToast("Powerball override must be a number between 1 and 26.", 'error');
+                    return;
+                }
+                powerballOverride = pb;
+            }
+
+            if (selectedNumbers.size < 5) {
+                showToast("Please select at least 5 numbers for your combination pool.", 'error');
+                return;
+            }
+
+            // Check if any selected number is also in excluded numbers
+            for (const num of selectedNumbers) {
+                if (excludedNumbers.includes(num)) {
+                    showToast(`Number ${num} is in both your selected pool and excluded numbers. Please remove it from excluded.`, 'error');
+                    return;
+                }
+            }
+
+            const payload = {
+                selected_pool: Array.from(selectedNumbers).sort((a, b) => a - b),
+                num_sets: numSets,
+                excluded_numbers: excludedNumbers,
+                powerball_override: powerballOverride
+            };
+
+            generatePicksBtn.disabled = true;
+            generatePicksBtn.textContent = 'Generating...';
+            loadingIndicator.classList.remove('hidden');
+            generatedPicksContainer.innerHTML = ''; // Clear previous results
+            generatedResultsSection.classList.add('hidden');
+            saveAllCustomPicksActions.classList.add('hidden'); // Hide save all button initially
+
+            try {
+                const response = await fetch('/api/generate_custom_combinations', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    generatedResultsSection.classList.remove('hidden');
+                    if (result.generated_sets && result.generated_sets.length > 0) {
+                        result.generated_sets.forEach(pick => {
+                            const pickElement = document.createElement('div');
+                            pickElement.className = 'generated-pick-item flex flex-col sm:flex-row items-center justify-between bg-white bg-opacity-10 backdrop-filter backdrop-blur-sm rounded-xl p-4 shadow-inner border border-white border-opacity-20';
+                            pickElement.dataset.whiteBalls = pick.white_balls.join(',');
+                            pickElement.dataset.powerball = pick.powerball;
+
+                            const ballsHtml = pick.white_balls.map(num => `<span class="generated-ball bg-white text-gray-800">${num}</span>`).join('');
+                            const powerballHtml = `<span class="generated-ball generated-powerball">${pick.powerball}</span>`;
+
+                            pickElement.innerHTML = `
+                                <div class="flex items-center flex-wrap justify-center mb-4 sm:mb-0">
+                                    ${ballsHtml}
+                                    <span class="text-white mx-2 text-xl font-bold">+</span>
+                                    ${powerballHtml}
+                                </div>
+                                <div class="flex flex-wrap gap-2 justify-center">
+                                    <button class="btn analyze-btn bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition duration-200 ease-in-out text-sm shadow">Analyze</button>
+                                    <button class="btn save-btn bg-indigo-700 text-white px-4 py-2 rounded-lg hover:bg-indigo-800 transition duration-200 ease-in-out text-sm shadow">Save Pick</button>
+                                </div>
+                            `;
+                            generatedPicksContainer.appendChild(pickElement);
+                        });
+                        saveAllCustomPicksActions.classList.remove('hidden'); // Show save all button
+                        showToast("Custom picks generated successfully!", 'success');
+                    } else {
+                        generatedPicksContainer.innerHTML = `<p class="text-center text-white text-lg">No picks could be generated with the specified criteria.</p>`;
+                    }
+                } else {
+                    showToast(`Error: ${result.error}`, 'error');
+                    generatedPicksContainer.innerHTML = `<p class="text-red-300 text-center text-lg">Error generating picks: ${result.error}</p>`;
+                    generatedResultsSection.classList.remove('bg-gradient-to-br', 'from-blue-500', 'to-indigo-600', 'p-6', 'rounded-2xl', 'shadow-xl'); // Remove gradient on error
+                    saveAllCustomPicksActions.classList.add('hidden');
+                }
+            } catch (error) {
+                console.error('Error generating custom picks:', error);
+                showToast('An unexpected error occurred during generation.', 'error');
+                generatedPicksContainer.innerHTML = `<p class="text-red-300 text-center text-lg">An unexpected error occurred: ${error.message}</p>`;
+                generatedResultsSection.classList.remove('bg-gradient-to-br', 'from-blue-500', 'to-indigo-600', 'p-6', 'rounded-2xl', 'shadow-xl'); // Remove gradient on error
+                saveAllCustomPicksActions.classList.add('hidden');
+            } finally {
+                generatePicksBtn.disabled = false;
+                generatePicksBtn.textContent = 'Generate Custom Picks';
+                loadingIndicator.classList.add('hidden');
+            }
+        });
+
+        // --- Save All Custom Picks Logic ---
+        saveAllCustomPicksBtn.addEventListener('click', async function() {
+            const allPickItems = document.querySelectorAll('#generatedPicksContainer .generated-pick-item');
+            const picksToSave = [];
+            allPickItems.forEach(item => {
+                const whiteBallsStr = item.dataset.whiteBalls;
+                const powerballStr = item.dataset.powerball;
+                if (whiteBallsStr && powerballStr) {
+                    picksToSave.push({
+                        white_balls: whiteBallsStr.split(',').map(Number),
+                        powerball: Number(powerballStr)
+                    });
+                }
+            });
+
+            if (picksToSave.length === 0) {
+                showToast("No picks to save.", 'info');
+                return;
+            }
+
+            saveAllCustomPicksBtn.disabled = true;
+            saveAllCustomPicksBtn.textContent = 'Saving All...';
+
+            try {
+                const response = await fetch('/save_multiple_generated_picks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ picks: picksToSave }),
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast(result.message, 'success');
+                } else {
+                    showToast(`Error saving picks: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error saving multiple picks:', error);
+                showToast('An unexpected error occurred while saving all picks.', 'error');
+            } finally {
+                saveAllCustomPicksBtn.disabled = false;
+                saveAllCustomPicksBtn.textContent = 'Save All Generated Picks';
+            }
+        });
+
+        // --- Event Delegation for Analyze and Save Buttons on Generated Picks ---
+        generatedPicksContainer.addEventListener('click', async function(event) {
+            const target = event.target;
+            const pickItem = target.closest('.generated-pick-item');
+
+            if (!pickItem) return;
+
+            const whiteBallsStr = pickItem.dataset.whiteBalls;
+            const powerballStr = pickItem.dataset.powerball;
+
+            if (!whiteBallsStr || !powerballStr) {
+                showToast("Could not retrieve pick data.", 'error');
+                return;
+            }
+
+            const whiteBalls = whiteBallsStr.split(',').map(Number);
+            const powerball = Number(powerballStr);
+
+            if (target.classList.contains('analyze-btn')) {
+                // Show modal and loading indicator
+                analysisModal.classList.remove('hidden');
+                setTimeout(() => { // Allow hidden to be removed before transition
+                    analysisModal.classList.add('opacity-100');
+                    analysisModalContent.classList.remove('scale-95', 'opacity-0');
+                    analysisModalContent.classList.add('scale-100', 'opacity-100');
+                }, 10);
+                analyzedPickDisplay.textContent = `${whiteBalls.join(', ')} + ${powerball}`;
+                analysisResultsContent.innerHTML = `<p class="text-center text-blue-600"><img src="https://placehold.co/30x30/blue/white?text=..." alt="Loading" class="inline-block animate-spin mr-2"> Loading analysis...</p>`;
+                saveAnalyzedPickBtn.dataset.whiteBalls = whiteBallsStr;
+                saveAnalyzedPickBtn.dataset.powerball = powerballStr;
+
+                try {
+                    const response = await fetch('/analyze_manual_pick', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ white_balls: whiteBalls, powerball: powerball }),
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        let html = '';
+                        html += '<h4 class="font-bold text-gray-800 mb-2">Historical Matches (Last 2 Years):</h4>';
+                        let hasMatches = false;
+                        for (const category in result.match_summary) {
+                            if (result.match_summary[category].count > 0) {
+                                hasMatches = true;
+                                html += `<p class="font-medium">${category}: <span class="text-blue-600">${result.match_summary[category].count} time(s)</span></p>`;
+                                if (result.match_summary[category].draws.length > 0) {
+                                    html += `<ul class="list-disc list-inside text-sm text-gray-600 mb-2">`;
+                                    result.match_summary[category].draws.slice(0, 5).forEach(draw => { // Show up to 5 draws
+                                        html += `<li>Date: ${draw.date}, Balls: ${draw.white_balls.join(', ')} + PB ${draw.powerball}</li>`;
+                                    });
+                                    if (result.match_summary[category].draws.length > 5) {
+                                        html += `<li>...and ${result.match_summary[category].draws.length - 5} more.</li>`;
+                                    }
+                                    html += `</ul>`;
+                                }
+                            }
+                        }
+                        if (!hasMatches) {
+                            html += '<p>No historical matches found in the last 2 years for this combination.</p>';
+                        }
+
+                        html += '<h4 class="font-bold text-gray-800 mt-4 mb-2">Last Drawn Dates for Each Number:</h4>';
+                        html += `<ul class="list-disc list-inside text-sm text-gray-600">`;
+                        for (const [key, date] of Object.entries(result.last_drawn_dates)) {
+                            html += `<li><strong>${key}:</strong> ${date}</li>`;
+                        }
+                        html += `</ul>`;
+                        analysisResultsContent.innerHTML = html;
+                        showToast("Analysis complete!", 'success');
+                    } else {
+                        analysisResultsContent.innerHTML = `<p class="text-red-600">Error: ${result.error}</p>`;
+                        showToast(`Analysis Error: ${result.error}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error analyzing pick:', error);
+                    analysisResultsContent.innerHTML = '<p class="text-red-600">An error occurred during analysis.</p>';
+                    showToast('An unexpected error occurred during analysis.', 'error');
+                }
+            } else if (target.classList.contains('save-btn')) {
+                // Save single pick logic
+                saveAnalyzedPickBtn.dataset.whiteBalls = whiteBallsStr; // Set data attributes for re-use
+                saveAnalyzedPickBtn.dataset.powerball = powerballStr;
+
+                // Perform the actual save
+                try {
+                    const response = await fetch('/save_manual_pick', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ white_balls: whiteBalls, powerball: powerball }),
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        showToast(result.message, 'success');
+                    } else {
+                        showToast(`Error: ${result.error}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error saving pick:', error);
+                    showToast('An unexpected error occurred while saving the pick.', 'error');
+                }
+            }
+        });
+
+        // --- Analysis Modal Close Button ---
+        closeAnalysisModalBtn.addEventListener('click', function() {
+            analysisModalContent.classList.remove('scale-100', 'opacity-100');
+            analysisModalContent.classList.add('scale-95', 'opacity-0');
+            analysisModal.classList.remove('opacity-100');
+            setTimeout(() => {
+                analysisModal.classList.add('hidden');
+            }, 300); // Match transition duration
+        });
+
+        // Close modal if clicked outside content
+        analysisModal.addEventListener('click', function(event) {
+            if (event.target === analysisModal) {
+                closeAnalysisModalBtn.click();
+            }
+        });
+
+        // --- Save Single Analyzed Pick from Modal ---
+        saveAnalyzedPickBtn.addEventListener('click', async function() {
+            const whiteBallsStr = this.dataset.whiteBalls;
+            const powerballStr = this.dataset.powerball;
+
+            if (!whiteBallsStr || !powerballStr) {
+                showToast("No pick data found to save from analysis modal.", 'error');
+                return;
+            }
+
+            const whiteBalls = whiteBallsStr.split(',').map(Number);
+            const powerball = Number(powerballStr);
+
+            saveAnalyzedPickBtn.disabled = true;
+            saveAnalyzedPickBtn.textContent = 'Saving...';
+
+            try {
+                const response = await fetch('/save_manual_pick', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ white_balls: whiteBalls, powerball: powerball }),
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast(result.message, 'success');
+                    closeAnalysisModalBtn.click(); // Close modal after successful save
+                } else {
+                    showToast(`Error: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error saving analyzed pick:', error);
+                showToast('An unexpected error occurred while saving the analyzed pick.', 'error');
+            } finally {
+                saveAnalyzedPickBtn.disabled = false;
+                saveAnalyzedPickBtn.textContent = 'Save This Pick';
+            }
         });
 
         // --- Custom Toast Popup Function (Copied for consistency) ---
