@@ -7,11 +7,11 @@
 {% block content %}
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {# Flash messages display (re-using base.html's logic) #}
-    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% with messages = get_flashed_flashed_messages(with_categories=true) %}
         {% if messages %}
             <div class="flash-messages space-y-3">
                 {% for category, message in messages %}
-                    <div class="p-4 rounded-lg shadow-md text-sm {% if category == 'error' %}bg-red-100 text-red-700 border border-red-200{% elif category == 'info' %}bg-blue-100 text-blue-700 border border-blue-200{% else %}bg-green-100 text-green-700 border border-blue-200{% endif %} animate-fade-in">
+                    <div class="p-4 rounded-lg shadow-md text-sm {% if category == 'error' %}bg-red-100 text-red-700 border border-red-200{% elif category == 'info' %}bg-blue-100 text-blue-700 border border-blue-200{% else %}bg-green-100 text-green-700 border border-green-200{% endif %} animate-fade-in">
                         <p class="font-medium">{{ message }}</p>
                     </div>
                 {% endfor %}
@@ -21,25 +21,110 @@
 
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Step 1: Select Your Combination Pool</h2>
-        <p class="text-gray-700 mb-6">Click on numbers below to add them to your custom pool. These are the numbers from which your Powerball picks will be generated.</p>
+        <p class="text-gray-700 mb-6">Click on numbers below to add them to your custom selection pool. You can mix and match from different categories, or select from all numbers.</p>
 
-        <div class="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2 mb-6" id="numberGrid">
-            {% for i in range(1, 70) %}
-                <div class="number-ball flex items-center justify-center w-10 h-10 bg-gray-200 text-gray-800 rounded-full font-bold cursor-pointer hover:bg-blue-400 hover:text-white transition duration-200 ease-in-out text-base" data-number="{{ i }}">
-                    {{ i }}
+        {# Tabs for different selection methods #}
+        <div class="mb-6">
+            <div class="border-b border-gray-200">
+                <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                    <button type="button" class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm focus:outline-none transition-colors duration-200 ease-in-out text-blue-600 border-blue-600" data-tab="monthly_trends">Monthly Trends</button>
+                    <button type="button" class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm focus:outline-none transition-colors duration-200 ease-in-out border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" data-tab="all_numbers">All Numbers (1-69)</button>
+                </nav>
+            </div>
+        </div>
+
+        {# Tab Content - Monthly Trends #}
+        <div id="monthly_trends_tab" class="tab-content active space-y-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {# Current Month Trends #}
+                <div>
+                    <h3 class="text-xl font-semibold mb-3 text-gray-800">Current Month ({{ current_month_name }})</h3>
+                    <div class="space-y-4">
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm">
+                            <h4 class="text-lg font-medium mb-2 text-gray-700">Unpicked Numbers:</h4>
+                            {% if current_month_unpicked %}
+                                <div class="flex flex-wrap gap-2">
+                                    {% for num in current_month_unpicked %}
+                                        <span class="number-ball unpicked-ball" data-number="{{ num }}">{{ num }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-gray-600 text-sm">No unpicked numbers found for this month (or no draws yet).</p>
+                            {% endif %}
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm">
+                            <h4 class="text-lg font-medium mb-2 text-gray-700">Most Picked Numbers (>1 time):</h4>
+                            {% if current_month_most_picked %}
+                                <div class="flex flex-wrap gap-2">
+                                    {% for num in current_month_most_picked %}
+                                        <span class="number-ball most-picked-ball" data-number="{{ num }}">{{ num }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-gray-600 text-sm">No numbers picked more than once this month yet.</p>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
-            {% endfor %}
+
+                {# Previous Month Trends #}
+                <div>
+                    <h3 class="text-xl font-semibold mb-3 text-gray-800">Previous Month ({{ previous_month_name }})</h3>
+                    <div class="space-y-4">
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm">
+                            <h4 class="text-lg font-medium mb-2 text-gray-700">Unpicked Numbers:</h4>
+                            {% if previous_month_unpicked %}
+                                <div class="flex flex-wrap gap-2">
+                                    {% for num in previous_month_unpicked %}
+                                        <span class="number-ball unpicked-ball" data-number="{{ num }}">{{ num }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-gray-600 text-sm">No unpicked numbers found for previous month.</p>
+                            {% endif %}
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm">
+                            <h4 class="text-lg font-medium mb-2 text-gray-700">Most Picked Numbers (>1 time):</h4>
+                            {% if previous_month_most_picked %}
+                                <div class="flex flex-wrap gap-2">
+                                    {% for num in previous_month_most_picked %}
+                                        <span class="number-ball most-picked-ball" data-number="{{ num }}">{{ num }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-gray-600 text-sm">No numbers picked more than once previous month.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="flex flex-col sm:flex-row gap-4 mb-6">
-            <input type="text" id="manualNumbers" placeholder="Add numbers manually (e.g., 5,12,30)" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-700">
-            <button id="addManualBtn" class="btn btn-primary bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition duration-200 ease-in-out whitespace-nowrap">Add Manually</button>
-            <button id="clearSelectedBtn" class="btn bg-red-600 text-white px-5 py-2 rounded-lg hover:bg-red-700 transition duration-200 ease-in-out whitespace-nowrap">Clear All</button>
+        {# Tab Content - All Numbers #}
+        <div id="all_numbers_tab" class="tab-content hidden">
+            <h3 class="text-xl font-semibold mb-3 text-gray-800">Select from All White Balls (1-69)</h3>
+            <div class="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2 mb-6" id="allNumberGrid">
+                {% for i in range(1, 70) %}
+                    <div class="number-ball flex items-center justify-center w-10 h-10 bg-gray-200 text-gray-800 rounded-full font-bold cursor-pointer hover:bg-blue-400 hover:text-white transition duration-200 ease-in-out text-base" data-number="{{ i }}">
+                        {{ i }}
+                    </div>
+                {% endfor %}
+            </div>
         </div>
 
-        <div class="p-4 bg-blue-50 rounded-lg border border-blue-200 text-blue-800 flex items-center flex-wrap gap-2 mb-6" id="selectedNumbersDisplay">
-            <span class="font-semibold mr-2">Your Selected Pool:</span>
-            <span id="selectedNumbersList" class="flex flex-wrap gap-1">No numbers selected</span>
+
+        <div class="border-t border-gray-200 pt-6 mt-8">
+            <h3 class="text-xl font-bold mb-4 text-gray-800">Your Selected Pool:</h3>
+            <div class="flex flex-col sm:flex-row gap-4 mb-6">
+                <input type="text" id="manualNumbers" placeholder="Add numbers manually (e.g., 5,12,30)" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-700">
+                <button id="addManualBtn" class="btn btn-primary bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition duration-200 ease-in-out whitespace-nowrap">Add Manually</button>
+                <button id="clearSelectedBtn" class="btn bg-red-600 text-white px-5 py-2 rounded-lg hover:bg-red-700 transition duration-200 ease-in-out whitespace-nowrap">Clear All</button>
+            </div>
+
+            <div class="p-4 bg-blue-50 rounded-lg border border-blue-200 text-blue-800 flex items-center flex-wrap gap-2 mb-6" id="selectedNumbersDisplay">
+                <span class="font-semibold mr-2">Numbers in your pool (<span id="selectedNumbersCount">0</span>):</span>
+                <span id="selectedNumbersList" class="flex flex-wrap gap-1">No numbers selected</span>
+            </div>
         </div>
     </div>
 
@@ -111,19 +196,50 @@
 <style>
     /* Custom styles for number balls */
     .number-ball {
-        transition: all 0.2s ease-in-out;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: white; /* Default text color for number balls in trends */
+        background-color: #6B7280; /* Gray-500 default */
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out;
+    }
+    .number-ball:hover {
+        transform: translateY(-2px);
     }
     .number-ball.selected {
-        background-color: #2563eb; /* blue-600 */
-        color: white;
-        transform: scale(1.1);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    }
-    .number-ball:hover:not(.selected) {
+        background-color: #2563EB; /* Blue-600 for selected numbers */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
         transform: scale(1.05);
     }
+    /* Specific styles for trend balls */
+    .unpicked-ball {
+        background-color: #9CA3AF; /* Light Gray */
+        color: #374151; /* Darker text for better contrast */
+    }
+    .most-picked-ball {
+        background-color: #FBBF24; /* Amber-400 */
+        color: #374151; /* Darker text for visibility */
+    }
 
-    /* Ball display styles (similar to index.html for consistency) */
+    /* Styles for the balls in the "Your Selected Pool" display */
+    .selected-display-ball {
+        background-color: #2563EB; /* Blue-600 */
+        color: white;
+        width: 36px; /* Slightly smaller for the display list */
+        height: 36px;
+        font-size: 1rem;
+        margin: 2px; /* Small margin for tight packing */
+        flex-shrink: 0;
+    }
+
+    /* Ball display styles (for generated results, similar to index.html for consistency) */
     .generated-ball {
         display: inline-flex;
         justify-content: center;
@@ -178,12 +294,17 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const numberGrid = document.getElementById('numberGrid');
+        const selectedNumbers = new Set(); // Use a Set to store unique selected numbers
         const selectedNumbersDisplay = document.getElementById('selectedNumbersDisplay');
-        const selectedNumbersList = document.getElementById('selectedNumbersList');
+        const selectedNumbersList = document.getElementById('selectedNumbersList'); // The span inside selectedNumbersDisplay
+        const selectedNumbersCountSpan = document.getElementById('selectedNumbersCount');
+        const clearSelectedBtn = document.getElementById('clearSelectedBtn');
         const manualNumbersInput = document.getElementById('manualNumbers');
         const addManualBtn = document.getElementById('addManualBtn');
-        const clearSelectedBtn = document.getElementById('clearSelectedBtn');
+
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+        const allNumberGrid = document.getElementById('allNumberGrid'); // New: Grid for 1-69
 
         const generateForm = document.getElementById('generateForm');
         const generatePicksBtn = document.getElementById('generatePicksBtn');
@@ -200,9 +321,7 @@
         const analysisResultsContent = document.getElementById('analysisResultsContent');
         const saveAnalyzedPickBtn = document.getElementById('saveAnalyzedPickBtn');
 
-        let selectedNumbers = new Set(); // Use a Set for quick lookups and uniqueness
-
-        // Function to update the display of selected numbers
+        // Function to update the displayed selected numbers
         function updateSelectedNumbersDisplay() {
             const sortedNumbers = Array.from(selectedNumbers).sort((a, b) => a - b);
             if (sortedNumbers.length === 0) {
@@ -211,41 +330,46 @@
                 selectedNumbersList.innerHTML = '';
                 sortedNumbers.forEach(num => {
                     const span = document.createElement('span');
-                    span.className = 'generated-ball bg-blue-600 text-white !w-8 !h-8 !text-sm !mx-0.5 !my-0.5'; // Smaller, tight balls
+                    span.className = 'selected-display-ball'; // Use the new smaller class
                     span.textContent = num;
                     selectedNumbersList.appendChild(span);
                 });
             }
+            selectedNumbersCountSpan.textContent = selectedNumbers.size;
+
+            // Update the visual state of the balls in *all* grids (monthly trends and all numbers grid)
+            document.querySelectorAll('.number-ball').forEach(ball => {
+                const number = parseInt(ball.dataset.number);
+                if (selectedNumbers.has(number)) {
+                    ball.classList.add('selected');
+                } else {
+                    ball.classList.remove('selected');
+                }
+            });
         }
 
-        // Event listener for clicking on number balls in the grid
-        numberGrid.addEventListener('click', function(event) {
-            const target = event.target.closest('.number-ball');
-            if (target) {
-                const number = parseInt(target.dataset.number);
-                if (selectedNumbers.has(number)) {
-                    selectedNumbers.delete(number);
-                    target.classList.remove('selected');
-                } else {
-                    selectedNumbers.add(number);
-                    target.classList.add('selected');
+        // Event listener for clicking on any number ball (delegated for efficiency)
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.addEventListener('click', function(event) {
+                const target = event.target.closest('.number-ball');
+                if (target) {
+                    const number = parseInt(target.dataset.number);
+                    if (selectedNumbers.has(number)) {
+                        selectedNumbers.delete(number);
+                    } else {
+                        selectedNumbers.add(number);
+                    }
+                    updateSelectedNumbersDisplay(); // This will update all relevant balls
                 }
-                updateSelectedNumbersDisplay();
-            }
+            });
         });
 
-        // Event listener for adding numbers manually
+        // Event listener for adding manual numbers
         addManualBtn.addEventListener('click', function() {
             const inputVal = manualNumbersInput.value.trim();
             if (inputVal) {
                 const newNumbers = inputVal.split(',').map(num => parseInt(num.trim())).filter(num => !isNaN(num) && num >= 1 && num <= 69);
-                newNumbers.forEach(num => {
-                    selectedNumbers.add(num);
-                    const ballElement = document.querySelector(`.number-ball[data-number="${num}"]`);
-                    if (ballElement) {
-                        ballElement.classList.add('selected');
-                    }
-                });
+                newNumbers.forEach(num => selectedNumbers.add(num));
                 updateSelectedNumbersDisplay();
                 manualNumbersInput.value = ''; // Clear input field
             }
@@ -254,14 +378,37 @@
         // Event listener for clearing all selected numbers
         clearSelectedBtn.addEventListener('click', function() {
             selectedNumbers.clear();
-            document.querySelectorAll('.number-ball.selected').forEach(ball => {
-                ball.classList.remove('selected');
+            updateSelectedNumbersDisplay(); // This will clear all selected classes
+        });
+
+        // --- Tab Switching Logic ---
+        tabButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const targetTab = this.dataset.tab;
+
+                tabButtons.forEach(btn => {
+                    btn.classList.remove('text-blue-600', 'border-blue-600');
+                    btn.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                });
+
+                this.classList.add('text-blue-600', 'border-blue-600');
+                this.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+
+                tabContents.forEach(content => {
+                    content.classList.add('hidden');
+                });
+                document.getElementById(`${targetTab}_tab`).classList.remove('hidden');
+                
+                // Re-apply selection visual state after tab switch
+                updateSelectedNumbersDisplay();
             });
-            updateSelectedNumbersDisplay();
         });
 
         // Initialize display on load
         updateSelectedNumbersDisplay();
+        // Trigger initial tab selection (Monthly Trends by default)
+        document.querySelector('.tab-button[data-tab="monthly_trends"]').click();
+
 
         // --- Handle Custom Generation Form Submission ---
         generateForm.addEventListener('submit', async function(event) {
