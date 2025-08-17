@@ -1669,11 +1669,6 @@ def get_boundary_crossing_pairs_trends(df_source, selected_pair_tuple=None):
             'all_years_in_data': []
         }
 
-    for i in range(1, 6):
-        col = f'Number {i}'
-        if col in df_copy.columns:
-            df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce').fillna(0).astype(int)
-
     current_year = datetime.now().year
     start_year = max(2017, current_year - 9) 
     all_years = sorted([y for y in df_copy['Draw Date_dt'].dt.year.unique().tolist() if y >= start_year])
@@ -2233,13 +2228,10 @@ def _get_draws_for_month(year, month):
     monthly_draws = df[(df['Draw Date_dt'].dt.year == year) & (df['Draw Date_dt'].dt.month == month)]
     return monthly_draws
 
-def _compute_two_months_unpicked_and_most_picked(df_source_placeholder, year, month):
+def _compute_unpicked_and_most_picked(year, month):
     """
     Actual computation for unpicked and most picked numbers for a month.
     Designed to be called by _get_two_months_unpicked_and_most_picked and cached.
-    `df_source_placeholder` is a placeholder because `get_cached_analysis` passes `df` here,
-    but this function *must* use the global `df` or explicitly fetch to avoid issues with
-    DataFrame being passed as a cache key.
     """
     all_possible_white_balls = set(range(1, 70))
     
@@ -2257,20 +2249,9 @@ def _compute_two_months_unpicked_and_most_picked(df_source_placeholder, year, mo
     picked_numbers_in_month = set(picked_counts.keys())
     
     unpicked_numbers = sorted(list(all_possible_white_balls - picked_numbers_in_month))
-    most_picked_numbers = sorted([num for num, count in picked_counts.items() if count > 1])
+    most_picked_numbers_with_counts = sorted([{'number': num, 'count': count} for num, count in picked_counts.items() if count > 1], key=lambda x: (-x['count'], x['number']))
 
-    return unpicked_numbers, most_picked_numbers
-
-def _get_two_months_unpicked_and_most_picked(year, month):
-    """
-    Wrapper function to get cached unpicked and most picked numbers for a specific month
-    for the custom combinations page.
-    """
-    cache_key_prefix = f"monthly_trends_custom_{year}_{month}"
-    
-    # Pass df as a parameter to get_cached_analysis so it's available to _compute_two_months_unpicked_and_most_picked
-    # even though get_cached_analysis will filter it out for the cache key.
-    return get_cached_analysis(cache_key_prefix, _compute_two_months_unpicked_and_most_picked, df, year, month)
+    return unpicked_numbers, most_picked_numbers_with_counts
 
 def _get_current_month_hot_numbers(df_source):
     """Identifies numbers appearing more than once in the current (incomplete) month."""
@@ -2480,59 +2461,75 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
     return generated_sets
 
 # --- NEW FUNCTION FOR CUSTOM COMBINATIONS ---
-def generate_picks_from_pool(selected_pool, num_sets, excluded_numbers, powerball_override=None):
-    """
-    Generates Powerball picks where white balls are chosen *only* from the selected_pool.
-    Excludes numbers from the final selection if they are in excluded_numbers.
-    """
-    generated_sets = []
+@app.route('/api/generate_custom_combinations', methods=['POST'])
+def generate_custom_combinations_api():
+    if df.empty:
+        return jsonify({'success': False, 'error': "Historical data not loaded or is empty."}), 500
     
-    # Ensure selected_pool and excluded_numbers are sets for efficient lookup
-    selected_pool_set = set(selected_pool)
-    excluded_set = set(excluded_numbers)
-    
-    # Filter the selected pool based on exclusions
-    available_white_balls_in_pool = sorted(list(selected_pool_set - excluded_set))
+    try:
+        data = request.json 
+        selected_pool = data.get('selected_pool')
+        num_sets = int(data.get('num_sets', 1))
+        excluded_numbers = data.get('excluded_numbers', [])
+        powerball_override = data.get('powerball_override')
 
-    if len(available_white_balls_in_pool) < 5:
-        raise ValueError(f"Not enough unique numbers ({len(available_white_balls_in_pool)}) in your selected pool after exclusions to pick 5 white balls. Please select more numbers.")
+        if not selected_pool or not isinstance(selected_pool, list) or len(selected_pool) < 5:
+            return jsonify({'success': False, 'error': "Please select at least 5 numbers for your combination pool."}), 400
 
-    max_attempts_per_set = 1000 # Max attempts to find a valid white ball set from the pool
-    
-    for _ in range(num_sets):
-        attempts = 0
-        white_balls_found = False
+        # Ensure selected_pool and excluded_numbers are sets for efficient lookup
+        selected_pool_set = set(selected_pool)
+        excluded_set = set(excluded_numbers)
         
-        while attempts < max_attempts_per_set:
-            try:
-                # Randomly sample 5 unique white balls from the available pool
-                white_balls_candidate = sorted(random.sample(available_white_balls_in_pool, 5))
-                
-                # Check for exact historical match - important to avoid common picks
-                if check_exact_match(white_balls_candidate):
+        # Filter the selected pool based on exclusions
+        available_white_balls_in_pool = sorted(list(selected_pool_set - excluded_set))
+
+        if len(available_white_balls_in_pool) < 5:
+            return jsonify({'success': False, 'error': f"Not enough unique numbers ({len(available_white_balls_in_pool)}) in your selected pool after exclusions to pick 5 white balls. Please select more numbers."}), 400
+
+        generated_sets = []
+        max_attempts_per_set = 1000 # Max attempts to find a valid white ball set from the pool
+        
+        for _ in range(num_sets):
+            attempts = 0
+            white_balls_found = False
+            
+            while attempts < max_attempts_per_set:
+                try:
+                    # Randomly sample 5 unique white balls from the available pool
+                    white_balls_candidate = sorted(random.sample(available_white_balls_in_pool, 5))
+                    
+                    # Check for exact historical match - important to avoid common picks
+                    if check_exact_match(white_balls_candidate):
+                        attempts += 1
+                        continue
+                    
+                    white_balls_found = True
+                    break
+                except ValueError:
+                    # This could happen if available_white_balls_in_pool becomes too small, or sample size exceeds population
                     attempts += 1
                     continue
-                
-                white_balls_found = True
-                break
-            except ValueError:
-                # This could happen if available_white_balls_in_pool becomes too small
-                attempts += 1
-                continue
-        
-        if not white_balls_found:
-            raise ValueError(f"Could not generate a unique set of 5 white balls from your selected pool after {max_attempts_per_set} attempts. Try increasing the size of your pool or reducing exclusions.")
-
-        # Determine powerball
-        if powerball_override is not None:
-            powerball = powerball_override
-        else:
-            # Pick a random powerball from the global range
-            powerball = random.randint(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1])
-        
-        generated_sets.append({'white_balls': white_balls_candidate, 'powerball': powerball})
             
-    return generated_sets
+            if not white_balls_found:
+                raise ValueError(f"Could not generate a unique set of 5 white balls from your selected pool after {max_attempts_per_set} attempts. Try increasing the size of your pool or reducing exclusions.")
+
+            # Determine powerball
+            if powerball_override is not None:
+                powerball = powerball_override
+            else:
+                # Pick a random powerball from the global range
+                powerball = random.randint(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1])
+            
+            generated_sets.append({'white_balls': white_balls_candidate, 'powerball': powerball})
+                
+        return jsonify({'success': True, 'generated_sets': generated_sets})
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
+
 
 # Initialize core data on app startup
 initialize_core_data() 
@@ -3579,7 +3576,7 @@ def custom_combinations_route():
     current_month = datetime.now().month
     
     # Current month data
-    current_month_unpicked, current_month_most_picked = _get_two_months_unpicked_and_most_picked(current_year, current_month)
+    current_month_unpicked, current_month_most_picked_data = _compute_unpicked_and_most_picked(current_year, current_month)
 
     # Previous month data
     first_day_of_current_month = datetime.now().replace(day=1)
@@ -3587,19 +3584,18 @@ def custom_combinations_route():
     previous_year = previous_month_date.year
     previous_month = previous_month_date.month
 
-    previous_month_unpicked, previous_month_most_picked = _get_two_months_unpicked_and_most_picked(previous_year, previous_month)
+    previous_month_unpicked, previous_month_most_picked_data = _compute_unpicked_and_most_picked(previous_year, previous_month)
 
-    # Convert sets to lists for JSON serialization in template
+    # Pass the data to the template
     return render_template('custom_combinations.html',
                            current_month_name=datetime.now().strftime('%B %Y'),
-                           # Use previous_month_date directly for previous_month_name in template
                            previous_month_name=previous_month_date.strftime('%B %Y'),
                            current_month_unpicked=current_month_unpicked,
-                           current_month_most_picked=current_month_most_picked,
+                           current_month_most_picked=previous_month_most_picked_data, # This was a bug: passing previous month's data
                            previous_month_unpicked=previous_month_unpicked,
-                           previous_month_most_picked=previous_month_most_picked,
-                           now=datetime.now(), # Pass the datetime object as 'now'
+                           previous_month_most_picked=previous_month_most_picked_data,
                           )
+
 
 @app.route('/smart_pick_generator')
 def smart_pick_generator_route():
