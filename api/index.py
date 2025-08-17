@@ -3540,12 +3540,13 @@ def custom_combinations_route():
     # Convert sets to lists for JSON serialization in template
     return render_template('custom_combinations.html',
                            current_month_name=datetime.now().strftime('%B %Y'),
+                           # Use previous_month_date directly for previous_month_name in template
                            previous_month_name=previous_month_date.strftime('%B %Y'),
                            current_month_unpicked=current_month_unpicked,
                            current_month_most_picked=current_month_most_picked,
                            previous_month_unpicked=previous_month_unpicked,
                            previous_month_most_picked=previous_month_most_picked,
-                           now=datetime.now() # <-- ADD THIS LINE to pass the datetime object
+                           now=datetime.now() # Pass the datetime object as 'now'
                           )
 
 @app.route('/smart_pick_generator')
