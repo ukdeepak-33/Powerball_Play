@@ -57,7 +57,7 @@
 
             {# Previous Month Trends #}
             <div>
-                <h3 class="text-xl font-semibold mb-3 text-gray-800">Previous Month ({{ (now - timedelta(days=30)).strftime('%B %Y') }})</h3> {# Approximation for previous month #}
+                <h3 class="text-xl font-semibold mb-3 text-gray-800">Previous Month ({{ previous_month_name }})</h3> {# Approximation for previous month #}
                 <div class="space-y-4">
                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 shadow-sm">
                         <h4 class="text-lg font-medium mb-2 text-gray-700">Unpicked Numbers:</h4>
