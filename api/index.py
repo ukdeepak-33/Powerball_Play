@@ -2478,7 +2478,62 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
             raise ValueError(f"Could not generate a smart pick meeting all criteria after {max_attempts_per_set} attempts. Try adjusting filters or reducing strictness.")
             
     return generated_sets
+
+# --- NEW FUNCTION FOR CUSTOM COMBINATIONS ---
+def generate_picks_from_pool(selected_pool, num_sets, excluded_numbers, powerball_override=None):
+    """
+    Generates Powerball picks where white balls are chosen *only* from the selected_pool.
+    Excludes numbers from the final selection if they are in excluded_numbers.
+    """
+    generated_sets = []
     
+    # Ensure selected_pool and excluded_numbers are sets for efficient lookup
+    selected_pool_set = set(selected_pool)
+    excluded_set = set(excluded_numbers)
+    
+    # Filter the selected pool based on exclusions
+    available_white_balls_in_pool = sorted(list(selected_pool_set - excluded_set))
+
+    if len(available_white_balls_in_pool) < 5:
+        raise ValueError(f"Not enough unique numbers ({len(available_white_balls_in_pool)}) in your selected pool after exclusions to pick 5 white balls. Please select more numbers.")
+
+    max_attempts_per_set = 1000 # Max attempts to find a valid white ball set from the pool
+    
+    for _ in range(num_sets):
+        attempts = 0
+        white_balls_found = False
+        
+        while attempts < max_attempts_per_set:
+            try:
+                # Randomly sample 5 unique white balls from the available pool
+                white_balls_candidate = sorted(random.sample(available_white_balls_in_pool, 5))
+                
+                # Check for exact historical match - important to avoid common picks
+                if check_exact_match(white_balls_candidate):
+                    attempts += 1
+                    continue
+                
+                white_balls_found = True
+                break
+            except ValueError:
+                # This could happen if available_white_balls_in_pool becomes too small
+                attempts += 1
+                continue
+        
+        if not white_balls_found:
+            raise ValueError(f"Could not generate a unique set of 5 white balls from your selected pool after {max_attempts_per_set} attempts. Try increasing the size of your pool or reducing exclusions.")
+
+        # Determine powerball
+        if powerball_override is not None:
+            powerball = powerball_override
+        else:
+            # Pick a random powerball from the global range
+            powerball = random.randint(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1])
+        
+        generated_sets.append({'white_balls': white_balls_candidate, 'powerball': powerball})
+            
+    return generated_sets
+
 # Initialize core data on app startup
 initialize_core_data() 
 
@@ -2600,24 +2655,21 @@ def generate_with_user_pair_route():
             num1, num2, GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, 
             excluded_numbers_local, df, selected_sum_range_tuple 
         )
-        last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
-
         generated_sets = [{'white_balls': white_balls, 'powerball': powerball}]
 
-        return render_template('index.html', 
-                               generated_sets=generated_sets, 
-                               powerball=powerball, 
-                               last_draw=last_draw.to_dict(), 
-                               last_draw_dates=last_draw_dates,
-                               generation_type='user_pair',
-                               sum_ranges=SUM_RANGES, 
-                               selected_sum_range_pair=selected_sum_range_label) 
+        last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
     except ValueError as e:
         flash(str(e), 'error')
         return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
-    except Exception as e:
-        flash(f"An unexpected error occurred during pair-based generation: {e}", 'error')
-        return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
+
+    return render_template('index.html', 
+                           generated_sets=generated_sets, 
+                           powerball=powerball, 
+                           last_draw=last_draw.to_dict(), 
+                           last_draw_dates=last_draw_dates,
+                           generation_type='user_pair',
+                           sum_ranges=SUM_RANGES, 
+                           selected_sum_range_pair=selected_sum_range_label)
 
 @app.route('/generate_group_a_strategy', methods=['POST'])
 def generate_group_a_strategy_route():
@@ -3547,7 +3599,6 @@ def custom_combinations_route():
                            previous_month_unpicked=previous_month_unpicked,
                            previous_month_most_picked=previous_month_most_picked,
                            now=datetime.now(), # Pass the datetime object as 'now'
-                           timedelta=timedelta,
                           )
 
 @app.route('/smart_pick_generator')
@@ -3641,67 +3692,3 @@ def generate_smart_picks_route():
     except Exception as e:
         traceback.print_exc()
         return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
-
-}
-Okay, I've reviewed both `index.py` and `custom_combinations.html` after your `TypeError` fix.
-
-You've successfully addressed the `TypeError` by removing the `()` after `now` in your `custom_combinations.html`. That's excellent!
-
-However, I see one small area for improvement in `index.py` related to `timedelta`. While passing `timedelta=timedelta` to the template might technically work in some Jinja2 environments, it's generally not the most robust or explicit way to perform date arithmetic in templates. It's best practice to perform all complex logic and data preparation in your Flask route and then pass the *results* directly to the template.
-
-You're already doing this for `previous_month_name`, which is great! So, the `timedelta=timedelta` line in the `custom_combinations_route` function's `render_template` call is unnecessary.
-
----
-
-### **Minor Adjustment in `index.py` for Clarity:**
-
-Please remove this line from your `custom_combinations_route` function in `index.py`:
-
-```python
-timedelta=timedelta,
-```
-
-The updated `custom_combinations_route` should look like this (it's a small change, but good for code hygiene):
-
-
-```python
-@app.route('/custom_combinations')
-def custom_combinations_route():
-    print("--- custom_combinations_route IS BEING CALLED! ---")
-    # Ensure historical data is loaded before rendering the page
-    global df, last_draw
-
-    if df.empty:
-        # Attempt to load data if not already loaded
-        initialize_core_data()
-        if df.empty: # if still empty after attempt
-            flash("Failed to load historical data for Custom Combinations. Please try again later.", 'error')
-            return redirect(url_for('index'))
-
-    # Get data for current and previous month's unpicked and most picked numbers
-    current_year = datetime.now().year
-    current_month = datetime.now().month
-    
-    # Current month data
-    current_month_unpicked, current_month_most_picked = _get_two_months_unpicked_and_most_picked(current_year, current_month)
-
-    # Previous month data
-    first_day_of_current_month = datetime.now().replace(day=1)
-    previous_month_date = first_day_of_current_month - timedelta(days=1)
-    previous_year = previous_month_date.year
-    previous_month = previous_month_date.month
-
-    previous_month_unpicked, previous_month_most_picked = _get_two_months_unpicked_and_most_picked(previous_year, previous_month)
-
-    # Convert sets to lists for JSON serialization in template
-    return render_template('custom_combinations.html',
-                           current_month_name=datetime.now().strftime('%B %Y'),
-                           # Use previous_month_date directly for previous_month_name in template
-                           previous_month_name=previous_month_date.strftime('%B %Y'),
-                           current_month_unpicked=current_month_unpicked,
-                           current_month_most_picked=current_month_most_picked,
-                           previous_month_unpicked=previous_month_unpicked,
-                           previous_month_most_picked=previous_month_most_picked,
-                           now=datetime.now(), # Pass the datetime object as 'now'
-                           # Removed: timedelta=timedelta,
-                          )
