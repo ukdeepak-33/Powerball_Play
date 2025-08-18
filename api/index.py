@@ -3473,7 +3473,7 @@ def analyze_manual_pick_route():
         if not white_balls or len(white_balls) != 5 or powerball is None:
             return jsonify({"error": "Invalid input. Please provide 5 white balls and 1 powerball."}), 400
         
-        white_balls = sorted([int(n) for n n in white_balls])
+        white_balls = sorted([int(n) for n in white_balls])
         powerball = int(powerball)
 
         historical_match_results = check_generated_against_history(white_balls, powerball, df)
