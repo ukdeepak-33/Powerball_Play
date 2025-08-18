@@ -2,14 +2,14 @@
 
 {% block title %}Special Patterns Analysis{% endblock %}
 
-{% block page_heading %}Special Patterns Analysis{% endblock %}
+{% block page_heading %}Special Patterns Analysis & Trends{% endblock %}
 
 {% block content %}
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {# Flash messages display #}
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-            <div class="flash-messages space-y-3">
+            <div class="flash-messages space-y-3 mb-4">
                 {% for category, message in messages %}
                     <div class="p-4 rounded-lg shadow-md text-sm {% if category == 'error' %}bg-red-100 text-red-700 border border-red-200{% elif category == 'info' %}bg-blue-100 text-blue-700 border border-blue-200{% else %}bg-green-100 text-green-700 border border-green-200{% endif %} animate-fade-in">
                         <p class="font-medium">{{ message }}</p>
@@ -20,53 +20,70 @@
     {% endwith %}
 
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Explore Special Number Patterns</h2>
-        <p class="text-gray-700 mb-6">This page analyzes historical draws for specific "special" number patterns that might be of interest, such as numbers that are a multiple of 10 apart, numbers sharing the same last digit, or repeating digit numbers. You can view recent trends and historical yearly breakdowns.</p>
-
-        <div id="loadingIndicator" class="text-center text-blue-600 font-semibold py-4">
-            <svg class="animate-spin h-5 w-5 mr-3 inline-block" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Loading analysis data...
-        </div>
-
-        <div id="analysisContent" class="space-y-8 hidden">
-            {# Recent Special Patterns Trends Card #}
-            <details class="card p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-100" open>
-                <summary class="text-xl font-bold mb-3 text-gray-800 cursor-pointer flex justify-between items-center">
-                    Recent Special Patterns (Last 12 Months)
-                    <svg class="w-6 h-6 transform transition-transform duration-200 details-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                </summary>
-                <p class="text-gray-700 mb-4 mt-4">This table shows which special patterns were present in each Powerball draw over the last 12 months, along with the drawn numbers.</p>
-                
-                <div class="overflow-x-auto shadow-md rounded-lg pattern-table-scroll">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-blue-100 text-blue-800">
-                            <tr>
-                                <th class="py-3 px-4 text-left text-sm font-semibold">Draw Date</th>
-                                <th class="py-3 px-4 text-left text-sm font-semibold">White Balls</th> {# ADDED THIS HEADER #}
-                                <th class="py-3 px-4 text-left text-sm font-semibold">Tens-Apart Present</th>
-                                <th class="py-3 px-4 text-left text-sm font-semibold">Same Last Digit Present</th>
-                                <th class="py-3 px-4 text-left text-sm font-semibold">Repeating Digit Present</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200" id="recentTrendsTableBody">
-                            <tr><td colspan="5" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">Loading recent trends...</td></tr>
-                        </tbody>
-                    </table>
+        <h2 class="text-2xl font-bold mb-6 text-gray-800">Overall Special Pattern Frequencies</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Tens Apart Patterns -->
+            <div class="col-span-1 bg-gray-50 p-4 rounded-lg border border-gray-100 shadow-sm">
+                <h3 class="text-xl font-semibold mb-3 text-indigo-700">Tens Apart Patterns (e.g., 1, 11)</h3>
+                <p class="text-gray-600 text-sm mb-4">Pairs where numbers are 10, 20, etc., apart.</p>
+                <div id="tensApartPatterns" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+                    <!-- Data will be rendered here by JS -->
                 </div>
-                <div class="text-center mt-4 hidden" id="recentTrendsToggleContainer">
-                    <button id="recentTrendsToggleBtn" class="btn-secondary">Show All</button>
-                </div>
-            </details>
-
-            {# Yearly Patterns Container #}
-            <div id="yearlyPatternsContainer" class="space-y-6">
-                <!-- Yearly pattern data will be dynamically loaded here by JavaScript -->
+                <p class="text-gray-500 text-xs mt-3 text-right" id="tensApartTotalCount"></p>
             </div>
+
+            <!-- Same Last Digit Patterns -->
+            <div class="col-span-1 bg-gray-50 p-4 rounded-lg border border-gray-100 shadow-sm">
+                <h3 class="text-xl font-semibold mb-3 text-green-700">Same Last Digit Patterns (e.g., 1, 11, 21)</h3>
+                <p class="text-gray-600 text-sm mb-4">Pairs sharing the same last digit.</p>
+                <div id="sameLastDigitPatterns" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+                    <!-- Data will be rendered here by JS -->
+                </div>
+                <p class="text-gray-500 text-xs mt-3 text-right" id="sameLastDigitTotalCount"></p>
+            </div>
+
+            <!-- Repeating Digit Patterns -->
+            <div class="col-span-1 bg-gray-50 p-4 rounded-lg border border-gray-100 shadow-sm">
+                <h3 class="text-xl font-semibold mb-3 text-purple-700">Repeating Digit Patterns (e.g., 11, 22)</h3>
+                <p class="text-gray-600 text-sm mb-4">Numbers with repeating digits (e.g., 11, 22, 33).</p>
+                <div id="repeatingDigitPatterns" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+                    <!-- Data will be rendered here by JS -->
+                </div>
+                <p class="text-gray-500 text-xs mt-3 text-right" id="repeatingDigitTotalCount"></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <h2 class="text-2xl font-bold mb-6 text-gray-800">Recent Trends in Special Patterns (Last 12 Months)</h2>
+        <p class="text-gray-700 mb-4">This table shows which special patterns were present in each Powerball draw over the last 12 months, along with the drawn numbers.</p>
+        
+        <div class="overflow-x-auto shadow-md rounded-lg pattern-table-scroll">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-blue-100 text-blue-800">
+                    <tr>
+                        <th class="py-3 px-4 text-left text-sm font-semibold">Draw Date</th>
+                        <th class="py-3 px-4 text-left text-sm font-semibold">White Balls</th>
+                        <th class="py-3 px-4 text-left text-sm font-semibold">Tens-Apart Present</th>
+                        <th class="py-3 px-4 text-left text-sm font-semibold">Same Last Digit Present</th>
+                        <th class="py-3 px-4 text-left text-sm font-semibold">Repeating Digit Present</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="recentTrendsTableBody">
+                    <tr><td colspan="5" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">Loading recent trends...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="text-center mt-4 hidden" id="recentTrendsToggleContainer">
+            <button id="recentTrendsToggleBtn" class="btn-secondary">Show All</button>
+        </div>
+    </div>
+
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <h2 class="text-2xl font-bold mb-6 text-gray-800">Yearly Distribution of Special Patterns</h2>
+        <!-- Yearly Patterns Container -->
+        <div id="yearlyPatternsContainer" class="space-y-6">
+            <!-- Yearly pattern data will be dynamically loaded here by JavaScript -->
         </div>
     </div>
 </div>
@@ -120,10 +137,75 @@
         const recentTrendsToggleBtn = document.getElementById('recentTrendsToggleBtn');
         const recentTrendsToggleContainer = document.getElementById('recentTrendsToggleContainer');
 
-        // Function to render the recent trends table
+        const overallTensApartDiv = document.getElementById('tensApartPatterns');
+        const overallSameLastDigitDiv = document.getElementById('sameLastDigitPatterns');
+        const overallRepeatingDigitDiv = document.getElementById('repeatingDigitPatterns');
+        const overallTensApartTotalCount = document.getElementById('tensApartTotalCount');
+        const overallSameLastDigitTotalCount = document.getElementById('sameLastDigitTotalCount');
+        const overallRepeatingDigitTotalCount = document.getElementById('repeatingDigitTotalCount');
+
+
+        // --- Custom Toast Popup Function (Copied for consistency) ---
+        function showToast(message, category) {
+            const existingToast = document.querySelector('.toast-popup');
+            if (existingToast) {
+                existingToast.remove(); // Remove any existing toast
+            }
+
+            const toastDiv = document.createElement('div');
+            toastDiv.className = `toast-popup ${category}`;
+            toastDiv.textContent = message;
+            document.body.appendChild(toastDiv);
+
+            setTimeout(() => {
+                toastDiv.classList.add('show');
+            }, 10);
+
+            setTimeout(() => {
+                toastDiv.classList.remove('show');
+                toastDiv.classList.add('animate-fade-out');
+                toastDiv.addEventListener('animationend', () => {
+                    toastDiv.remove();
+                }, { once: true });
+            }, 5000);
+        }
+
+        // --- Function to Render Overall Patterns ---
+        function renderOverallPatterns(data, container, type) {
+            container.innerHTML = ''; // Clear previous content
+            if (data && data.length > 0) {
+                let totalCount = 0;
+                data.forEach(item => {
+                    const patternDiv = document.createElement('div');
+                    patternDiv.className = 'flex justify-between items-center bg-white p-2 rounded-md border border-gray-200 shadow-sm';
+                    const patternName = Array.isArray(item.pattern) ? item.pattern.join(', ') : item.pattern;
+                    patternDiv.innerHTML = `
+                        <span class="text-gray-700 text-sm font-semibold">${patternName}</span>
+                        <span class="text-gray-900 font-bold">${item.count}</span>
+                    `;
+                    container.appendChild(patternDiv);
+                    totalCount += item.count;
+                });
+                 // Update total count for overall sections
+                if (type === 'tensApart') {
+                    overallTensApartTotalCount.textContent = `Total unique patterns: ${data.length} | Total occurrences: ${totalCount}`;
+                } else if (type === 'sameLastDigit') {
+                    overallSameLastDigitTotalCount.textContent = `Total unique patterns: ${data.length} | Total occurrences: ${totalCount}`;
+                } else if (type === 'repeatingDigit') {
+                    overallRepeatingDigitTotalCount.textContent = `Total unique patterns: ${data.length} | Total occurrences: ${totalCount}`;
+                }
+            } else {
+                container.innerHTML = '<p class="text-gray-600 text-sm">No patterns found.</p>';
+                if (type === 'tensApart') overallTensApartTotalCount.textContent = '';
+                if (type === 'sameLastDigit') overallSameLastDigitTotalCount.textContent = '';
+                if (type === 'repeatingDigit') overallRepeatingDigitTotalCount.textContent = '';
+            }
+        }
+
+        // --- Function to Render Recent Trends ---
         function renderRecentTrends(trendsData, initialShowCount = 10) {
             recentTrendsTableBody.innerHTML = ''; // Clear existing rows
-            if (trendsData.length === 0) {
+            if (!trendsData || trendsData.length === 0) {
                 const noDataRow = document.createElement('tr');
                 // Updated colspan to 5 for the new 'White Balls' column
                 noDataRow.innerHTML = `<td colspan="5" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No recent special pattern trends found.</td>`;
@@ -136,12 +218,12 @@
                 const row = document.createElement('tr');
                 row.className = `hover:bg-gray-50 ${index >= initialShowCount ? 'hidden-row' : ''}`;
                 
-                // NEW: Generate HTML for white balls
+                // Generate HTML for white balls
                 const whiteBallsHtml = trend.white_balls ? trend.white_balls.map(ball => `<span class="ball">${ball}</span>`).join('') : 'N/A';
 
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${trend.draw_date}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${whiteBallsHtml}</td> {# ADDED WHITE BALLS DISPLAY #}
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${whiteBallsHtml}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${trend.tens_apart}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${trend.same_last_digit}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${trend.repeating_digit}</td>
@@ -194,6 +276,12 @@
 
         // Function to create and render a single pattern table (tens, same last, repeating)
         function renderPatternTable(containerElement, patterns, typeId, totalDraws) {
+            containerElement.innerHTML = ''; // Clear existing content
+            if (!patterns || patterns.length === 0) {
+                containerElement.innerHTML = `<p class="text-gray-600 text-sm">No patterns found for this year.</p>`;
+                return;
+            }
+
             // Create sort dropdown
             const sortDiv = document.createElement('div');
             sortDiv.className = 'mb-4';
@@ -234,17 +322,34 @@
                 sortedData.sort((a, b) => {
                     if (currentSortOrder === 'count_desc') {
                         if (b.count !== a.count) return b.count - a.count;
-                        return a.pattern[0] - b.pattern[0] || (a.pattern[1] !== undefined ? a.pattern[1] - b.pattern[1] : 0) || (a.pattern[2] !== undefined ? a.pattern[2] - b.pattern[2] : 0);
+                        // Handle single number patterns (like repeating digits) vs pairs/triplets
+                        if (Array.isArray(a.pattern) && Array.isArray(b.pattern)) {
+                            if (a.pattern[0] !== b.pattern[0]) return a.pattern[0] - b.pattern[0];
+                            if (a.pattern.length > 1 && b.pattern.length > 1 && a.pattern[1] !== b.pattern[1]) return a.pattern[1] - b.pattern[1];
+                            if (a.pattern.length > 2 && b.pattern.length > 2 && a.pattern[2] !== b.pattern[2]) return a.pattern[2] - b.pattern[2];
+                        } else { // For single number patterns like repeating digits
+                            return a.pattern - b.pattern;
+                        }
                     } else if (currentSortOrder === 'count_asc') {
                         if (a.count !== b.count) return a.count - b.count;
-                        return a.pattern[0] - b.pattern[0] || (a.pattern[1] !== undefined ? a.pattern[1] - b.pattern[1] : 0) || (a.pattern[2] !== undefined ? a.pattern[2] - b.pattern[2] : 0);
+                        if (Array.isArray(a.pattern) && Array.isArray(b.pattern)) {
+                            if (a.pattern[0] !== b.pattern[0]) return a.pattern[0] - b.pattern[0];
+                            if (a.pattern.length > 1 && b.pattern.length > 1 && a.pattern[1] !== b.pattern[1]) return a.pattern[1] - b.pattern[1];
+                            if (a.pattern.length > 2 && b.pattern.length > 2 && a.pattern[2] !== b.pattern[2]) return a.pattern[2] - b.pattern[2];
+                        } else {
+                            return a.pattern - b.pattern;
+                        }
                     } else if (currentSortOrder === 'pattern_asc') {
-                        if (a.pattern[0] !== b.pattern[0]) return a.pattern[0] - b.pattern[0];
-                        if (a.pattern[1] !== undefined && b.pattern[1] !== undefined && a.pattern[1] !== b.pattern[1]) return a.pattern[1] - b.pattern[1];
-                        if (a.pattern[2] !== undefined && b.pattern[2] !== undefined && a.pattern[2] !== b.pattern[2]) return a.pattern[2] - b.pattern[2];
-                        return b.count - a.count;
+                        if (Array.isArray(a.pattern) && Array.isArray(b.pattern)) {
+                            if (a.pattern[0] !== b.pattern[0]) return a.pattern[0] - b.pattern[0];
+                            if (a.pattern.length > 1 && b.pattern.length > 1 && a.pattern[1] !== b.pattern[1]) return a.pattern[1] - b.pattern[1];
+                            if (a.pattern.length > 2 && b.pattern.length > 2 && a.pattern[2] !== b.pattern[2]) return a.pattern[2] - b.pattern[2];
+                        } else {
+                            return a.pattern - b.pattern;
+                        }
+                        return b.count - a.count; // Secondary sort by count descending
                     }
-                    return 0;
+                    return 0; // No change if sort order is not recognized
                 });
 
                 tableBody.innerHTML = '';
@@ -258,8 +363,9 @@
                 sortedData.forEach((pattern, index) => {
                     const row = document.createElement('tr');
                     row.className = `hover:bg-gray-50 ${index >= initialShowCount ? 'hidden-row' : ''}`;
+                    const patternDisplay = Array.isArray(pattern.pattern) ? `(${pattern.pattern.join(', ')})` : pattern.pattern;
                     row.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">(${pattern.pattern.join(', ')})</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${patternDisplay}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${pattern.count}</td>
                     `;
                     tableBody.appendChild(row);
@@ -337,12 +443,17 @@
                     throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                 }
 
-                const data = await response.json(); // Data now contains yearly_data and recent_trends
+                const data = await response.json(); 
 
-                // Render recent trends first
+                // Render Overall Patterns
+                renderOverallPatterns(data.tens_apart_patterns_overall, overallTensApartDiv, 'tensApart');
+                renderOverallPatterns(data.same_last_digit_patterns_overall, overallSameLastDigitDiv, 'sameLastDigit');
+                renderOverallPatterns(data.repeating_digit_patterns_overall, overallRepeatingDigitDiv, 'repeatingDigit');
+
+                // Render Recent Trends
                 renderRecentTrends(data.recent_trends);
 
-                // Then render yearly data
+                // Render Yearly Data
                 yearlyPatternsContainer.innerHTML = ''; // Clear previous yearly content
                 if (data.yearly_data && data.yearly_data.length > 0) {
                     data.yearly_data.forEach(yearData => {
@@ -357,7 +468,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                 </svg>
                             </summary>
-                            <div class="space-y-6 mt-4" id="yearContent-${yearData.year}">
+                            <div class="space-y-6 mt-4">
                                 <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
                                     <h3 class="text-lg font-bold mb-3 text-gray-800">Tens Apart Patterns</h3>
                                     <div id="tensApartPatterns-${yearData.year}" data-year="${yearData.year}"></div>
