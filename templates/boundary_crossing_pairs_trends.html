@@ -24,7 +24,7 @@
                     {% for pattern in all_boundary_patterns_summary %}
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">({{ pattern.pattern | join(', ') }})</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pattern.total_count }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pattern.count }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -70,7 +70,7 @@
                                 {% for data in yearly_data_for_selected_pattern %}
                                 <tr class="hover:bg-gray-50">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ data.year }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ data.count }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ data.draws_with_pattern }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -94,6 +94,7 @@
 
 {% block scripts %}
 {{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const yearlyData = {{ yearly_data_for_selected_pattern | tojson }};
@@ -101,7 +102,8 @@
 
         if (yearlyData && yearlyData.length > 0) {
             const years = yearlyData.map(d => d.year);
-            const counts = yearlyData.map(d => d.count);
+            // Corrected to use 'draws_with_pattern' which is the count from the Python backend
+            const counts = yearlyData.map(d => d.draws_with_pattern); 
 
             const ctx = document.getElementById('yearlyPairChart').getContext('2d');
             new Chart(ctx, {
