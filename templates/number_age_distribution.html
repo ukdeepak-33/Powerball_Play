@@ -1,139 +1,256 @@
 {% extends "base.html" %}
 
-{% block title %}Number Age Distribution{% endblock %}
+{% block title %}Number Age Distribution & Yearly Trends{% endblock %}
 
-{% block page_heading %}Draws Since Last Appearance (Number Age Distribution){% endblock %}
+{% block page_heading %}Draws Since Last Appearance & Yearly Trends{% endblock %}
 
 {% block content %}
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    {# Removed White Ball Age Distribution Chart #}
-    {# Removed Powerball Age Distribution Chart #}
+    {# White Ball Age Distribution and Yearly Trends Section #}
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <button class="w-full flex justify-between items-center text-2xl font-bold text-gray-800 focus:outline-none py-2" data-toggle="whiteBallSection">
+            <span>White Ball Analysis</span>
+            <svg class="w-6 h-6 transform transition-transform duration-200" viewBox="0 0 24 24" fill="currentColor" data-arrow="whiteBallSection">
+                <path fill-rule="evenodd" d="M12.53 16.28a.75.75 0 0 1-1.06 0l-7.5-7.5a.75.75 0 0 1 1.06-1.06L12 14.69l6.97-6.97a.75.75 0 1 1 1.06 1.06l-7.5 7.5Z" clip-rule="evenodd" />
+            </svg>
+        </button>
+        <div id="whiteBallSection" class="mt-4 space-y-6">
+            <h3 class="text-xl font-semibold text-gray-800">Detailed White Ball Ages</h3>
+            {% if detailed_white_ball_ages %}
+            <div class="mb-4 flex flex-col sm:flex-row sm:justify-between sm:items-center">
+                <button id="sortByWhiteBallAgeBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-full focus:outline-none focus:shadow-outline transition duration-200 ease-in-out mb-2 sm:mb-0">
+                    Sort by Current Age (Longest First)
+                </button>
+                <span class="text-sm text-gray-600 text-right">
+                    Current Age (Draws Missed) indicates how many draws have occurred since the number last appeared.
+                </span>
+            </div>
+            <div class="overflow-x-auto shadow-md rounded-lg">
+                <table class="min-w-full divide-y divide-gray-200" id="whiteBallAgesTable">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Number</th>
+                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" data-sort="age">Current Age (Draws Missed) <span class="ml-1 text-gray-400">↑↓</span></th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Drawn Date</th>
+                            {% for year in wb_trend_years %}
+                                <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Freq {{ year }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {# White ball data will be rendered by JavaScript #}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-gray-500">No detailed white ball age data available.</p>
+            {% endif %}
+        </div>
+    </div>
 
-    {# Detailed Ball Ages Table #}
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200 mt-0"> {# Adjusted mt-0 as charts are removed #}
-        <h3 class="text-2xl font-bold mb-4 text-gray-800">Detailed Ball Ages & Historical Pick Ages</h3>
-        
-        {% if detailed_number_ages %}
-        <div class="mb-4 flex flex-col sm:flex-row sm:justify-between sm:items-center">
-            <button id="sortByAgeBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-full focus:outline-none focus:shadow-outline transition duration-200 ease-in-out mb-2 sm:mb-0">
-                Sort by Current Age (Longest First)
-            </button>
-            <span class="text-sm text-gray-600 text-right">
-                "Age at Pick" shows draws missed *before* each historical appearance (0 = picked in consecutive draw).
-            </span>
+    {# Powerball Age Distribution and Yearly Trends Section #}
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <button class="w-full flex justify-between items-center text-2xl font-bold text-gray-800 focus:outline-none py-2" data-toggle="powerBallSection">
+            <span>Powerball Analysis</span>
+            <svg class="w-6 h-6 transform transition-transform duration-200" viewBox="0 0 24 24" fill="currentColor" data-arrow="powerBallSection">
+                <path fill-rule="evenodd" d="M12.53 16.28a.75.75 0 0 1-1.06 0l-7.5-7.5a.75.75 0 0 1 1.06-1.06L12 14.69l6.97-6.97a.75.75 0 1 1 1.06 1.06l-7.5 7.5Z" clip-rule="evenodd" />
+            </svg>
+        </button>
+        <div id="powerBallSection" class="mt-4 space-y-6">
+            <h3 class="text-xl font-semibold text-gray-800">Detailed Powerball Ages</h3>
+            {% if detailed_powerball_ages %}
+            <div class="mb-4 flex flex-col sm:flex-row sm:justify-between sm:items-center">
+                <button id="sortByPowerballAgeBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-full focus:outline-none focus:shadow-outline transition duration-200 ease-in-out mb-2 sm:mb-0">
+                    Sort by Current Age (Longest First)
+                </button>
+                <span class="text-sm text-gray-600 text-right">
+                    Current Age (Draws Missed) indicates how many draws have occurred since the number last appeared.
+                </span>
+            </div>
+            <div class="overflow-x-auto shadow-md rounded-lg">
+                <table class="min-w-full divide-y divide-gray-200" id="powerballAgesTable">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Number</th>
+                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" data-sort="age">Current Age (Draws Missed) <span class="ml-1 text-gray-400">↑↓</span></th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Drawn Date</th>
+                            {% for year in pb_trend_years %}
+                                <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Freq {{ year }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {# Powerball data will be rendered by JavaScript #}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-gray-500">No detailed powerball age data available.</p>
+            {% endif %}
         </div>
-        <div class="overflow-x-auto shadow-md rounded-lg">
-            <table class="min-w-full divide-y divide-gray-200" id="detailedAgesTable">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Number</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" data-sort="age">Current Age (Draws Missed) <span class="ml-1 text-gray-400">↑↓</span></th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Drawn Date</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3">Historical Ages at Pick (Last 15)</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {# Data will be rendered by JavaScript #}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <p class="text-gray-500">No detailed number age data available.</p>
-        {% endif %}
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
-{# Removed: <script src="https://d3js.org/d3.v7.min.js"></script> #}
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Removed D3 chart related code and data parsing for charts
+        // Data for tables
+        var detailedWhiteBallAges = [];
+        var detailedPowerballAges = [];
+        var yearlyWhiteBallTrends = {}; // Object: {number: [{period_label: "2020", frequency: 5}, ...]}
+        var yearlyPowerballTrends = []; // Array of objects: [{Powerball: 1, Year_2020: 5, ...}, ...]
+        var wbTrendYears = [];
+        var pbTrendYears = [];
 
-        var detailedNumberAges = [];
-        {% if detailed_number_ages %}
-            try {
-                detailedNumberAges = {{ detailed_number_ages | tojson | safe }};
-            } catch (e) {
-                console.error("Error parsing detailedNumberAges JSON for table:", e);
-                detailedNumberAges = [];
-            }
+        // Parse data from Jinja
+        {% if detailed_white_ball_ages %}
+            try { detailedWhiteBallAges = {{ detailed_white_ball_ages | tojson | safe }}; } catch (e) { console.error("Error parsing detailedWhiteBallAges JSON:", e); }
         {% endif %}
-        console.log("[Table Debug] number_age_distribution.html - detailedNumberAges (for table):", detailedNumberAges);
-
-        var historicalAgesAtPick = {};
-        {% if historical_ages_at_pick %}
-            try {
-                historicalAgesAtPick = {{ historical_ages_at_pick | tojson | safe }};
-            } catch (e) {
-                console.error("Error parsing historicalAgesAtPick JSON:", e);
-                historicalAgesAtPick = {};
-            }
+        {% if detailed_powerball_ages %}
+            try { detailedPowerballAges = {{ detailed_powerball_ages | tojson | safe }}; } catch (e) { console.error("Error parsing detailedPowerballAges JSON:", e); }
         {% endif %}
-        console.log("[Table Debug] number_age_distribution.html - historicalAgesAtPick:", historicalAgesAtPick);
+        {% if yearly_white_ball_trends %}
+            try { yearlyWhiteBallTrends = {{ yearly_white_ball_trends | tojson | safe }}; } catch (e) { console.error("Error parsing yearlyWhiteBallTrends JSON:", e); }
+        {% endif %}
+        {% if yearly_powerball_trends %}
+            try { yearlyPowerballTrends = {{ yearly_powerball_trends | tojson | safe }}; } catch (e) { console.error("Error parsing yearlyPowerballTrends JSON:", e); }
+        {% endif %}
+        {% if wb_trend_years %}
+            try { wbTrendYears = {{ wb_trend_years | tojson | safe }}; } catch (e) { console.error("Error parsing wb_trend_years JSON:", e); }
+        {% endif %}
+        {% if pb_trend_years %}
+            try { pbTrendYears = {{ pb_trend_years | tojson | safe }}; } catch (e) { console.error("Error parsing pb_trend_years JSON:", e); }
+        {% endif %}
 
+        // DOM elements
+        const whiteBallAgesTableBody = document.querySelector('#whiteBallAgesTable tbody');
+        const powerballAgesTableBody = document.querySelector('#powerballAgesTable tbody');
+        const sortByWhiteBallAgeBtn = document.getElementById('sortByWhiteBallAgeBtn');
+        const sortByPowerballAgeBtn = document.getElementById('sortByPowerballAgeBtn');
 
-        const tableBody = document.querySelector('#detailedAgesTable tbody');
-        const sortByAgeBtn = document.getElementById('sortByAgeBtn');
-        let isSortedAscending = false; // Tracks current sort order for the button
+        let isWhiteBallSortedAscending = false; 
+        let isPowerballSortedAscending = false; 
 
-        function renderTable(data) {
-            tableBody.innerHTML = ''; // Clear existing rows
+        // Render functions
+        function renderWhiteBallTable(data) {
+            whiteBallAgesTableBody.innerHTML = ''; 
             data.forEach(ball => {
-                const row = tableBody.insertRow();
+                const row = whiteBallAgesTableBody.insertRow();
                 row.className = 'hover:bg-gray-50';
                 
-                // Number column - Centered
-                const numberCell = row.insertCell();
-                numberCell.textContent = ball.number;
-                numberCell.classList.add('px-6', 'py-4', 'whitespace-nowrap', 'text-sm', 'font-medium', 'text-gray-900', 'text-center');
+                row.insertCell().textContent = ball.number;
+                row.cells[0].classList.add('px-6', 'py-4', 'whitespace-nowrap', 'text-sm', 'font-medium', 'text-gray-900', 'text-center');
 
-                // Type column - Left aligned (default)
-                row.insertCell().textContent = ball.type;
-
-                // Current Age column - Centered
                 const ageCell = row.insertCell();
                 ageCell.textContent = ball.age;
                 ageCell.classList.add('px-6', 'py-4', 'whitespace-nowrap', 'text-sm', 'text-gray-500', 'text-center');
 
-                // Last Drawn Date column - Left aligned (default)
                 row.insertCell().textContent = ball.last_drawn_date !== 'N/A' ? ball.last_drawn_date : 'Never Drawn';
+                row.cells[2].classList.add('px-6', 'py-4', 'whitespace-nowrap', 'text-sm', 'text-gray-500');
 
-                // Historical Ages at Pick - CORRECTED KEY ACCESS & Wrapping
-                const historicalAgesCell = row.insertCell();
-                const key = `${ball.type}_${ball.number}`; 
-                const ages = historicalAgesAtPick[key];
-
-                if (ages && ages.length > 0) {
-                    const agesToDisplay = ages.slice(Math.max(0, ages.length - 15));
-                    historicalAgesCell.textContent = agesToDisplay.join(', ');
-                    historicalAgesCell.classList.add('whitespace-normal'); // Allow text to wrap
-                } else {
-                    historicalAgesCell.textContent = 'N/A';
-                }
-                // Add common styling to all cells for consistency
-                historicalAgesCell.classList.add('px-6', 'py-4', 'text-sm', 'text-gray-500');
+                // Add yearly frequency cells
+                const wbFreqs = yearlyWhiteBallTrends[ball.number] || [];
+                wbTrendYears.forEach(year => {
+                    const freqData = wbFreqs.find(f => f.period_label === String(year));
+                    const freqCell = row.insertCell();
+                    freqCell.textContent = freqData ? freqData.frequency : '0';
+                    freqCell.classList.add('px-6', 'py-4', 'whitespace-nowrap', 'text-sm', 'text-gray-500', 'text-center');
+                });
             });
         }
 
-        // Initial render (default sort by number, from Python side)
-        renderTable(detailedNumberAges);
+        function renderPowerballTable(data) {
+            powerballAgesTableBody.innerHTML = ''; 
+            data.forEach(ball => {
+                const row = powerballAgesTableBody.insertRow();
+                row.className = 'hover:bg-gray-50';
+                
+                row.insertCell().textContent = ball.number;
+                row.cells[0].classList.add('px-6', 'py-4', 'whitespace-nowrap', 'text-sm', 'font-medium', 'text-gray-900', 'text-center');
 
-        sortByAgeBtn.addEventListener('click', function() {
-            if (isSortedAscending) {
-                detailedNumberAges.sort((a, b) => b.age - a.age); // Sort descending
-                sortByAgeBtn.textContent = 'Sort by Current Age (Shortest First)';
-                isSortedAscending = false;
+                const ageCell = row.insertCell();
+                ageCell.textContent = ball.age;
+                ageCell.classList.add('px-6', 'py-4', 'whitespace-nowrap', 'text-sm', 'text-gray-500', 'text-center');
+
+                row.insertCell().textContent = ball.last_drawn_date !== 'N/A' ? ball.last_drawn_date : 'Never Drawn';
+                row.cells[2].classList.add('px-6', 'py-4', 'whitespace-nowrap', 'text-sm', 'text-gray-500');
+
+                // Add yearly frequency cells for Powerball
+                const pbFreqData = yearlyPowerballTrends.find(p => p.Powerball === ball.number);
+                pbTrendYears.forEach(year => {
+                    const freqCell = row.insertCell();
+                    freqCell.textContent = pbFreqData ? pbFreqData[`Year_${year}`] || '0' : '0';
+                    freqCell.classList.add('px-6', 'py-4', 'whitespace-nowrap', 'text-sm', 'text-gray-500', 'text-center');
+                });
+            });
+        }
+
+
+        // Initial render for both tables
+        renderWhiteBallTable(detailedWhiteBallAges);
+        renderPowerballTable(detailedPowerballAges);
+
+        // Sort event listeners
+        sortByWhiteBallAgeBtn.addEventListener('click', function() {
+            if (isWhiteBallSortedAscending) {
+                detailedWhiteBallAges.sort((a, b) => b.age - a.age); // Sort descending
+                sortByWhiteBallAgeBtn.textContent = 'Sort by Current Age (Shortest First)';
+                isWhiteBallSortedAscending = false;
             } else {
-                detailedNumberAges.sort((a, b) => a.age - b.age); // Sort ascending
-                sortByAgeBtn.textContent = 'Sort by Current Age (Longest First)';
-                isSortedAscending = true;
+                detailedWhiteBallAges.sort((a, b) => a.age - b.age); // Sort ascending
+                sortByWhiteBallAgeBtn.textContent = 'Sort by Current Age (Longest First)';
+                isWhiteBallSortedAscending = true;
             }
-            renderTable(detailedNumberAges);
+            renderWhiteBallTable(detailedWhiteBallAges);
         });
+
+        sortByPowerballAgeBtn.addEventListener('click', function() {
+            if (isPowerballSortedAscending) {
+                detailedPowerballAges.sort((a, b) => b.age - a.age); // Sort descending
+                sortByPowerballAgeBtn.textContent = 'Sort by Current Age (Shortest First)';
+                isPowerballSortedAscending = false;
+            } else {
+                detailedPowerballAges.sort((a, b) => a.age - b.age); // Sort ascending
+                sortByPowerballAgeBtn.textContent = 'Sort by Current Age (Longest First)';
+                isPowerballSortedAscending = true;
+            }
+            renderPowerballTable(detailedPowerballAges);
+        });
+
+        // Expand/Collapse functionality
+        document.querySelectorAll('[data-toggle]').forEach(button => {
+            button.addEventListener('click', function() {
+                const targetId = this.dataset.toggle;
+                const targetElement = document.getElementById(targetId);
+                const arrowIcon = this.querySelector('[data-arrow]');
+
+                if (targetElement) {
+                    const isHidden = targetElement.classList.contains('hidden');
+                    if (isHidden) {
+                        targetElement.classList.remove('hidden');
+                        targetElement.style.maxHeight = targetElement.scrollHeight + "px"; // Set max height for smooth transition
+                        arrowIcon.classList.remove('rotate-0');
+                        arrowIcon.classList.add('rotate-180');
+                    } else {
+                        targetElement.style.maxHeight = "0"; // Collapse by setting max-height to 0
+                        targetElement.classList.add('hidden'); // Hide after transition
+                        arrowIcon.classList.remove('rotate-180');
+                        arrowIcon.classList.add('rotate-0');
+                    }
+                }
+            });
+        });
+
+        // Initial collapse state (optional, can be changed to expand by default)
+        document.getElementById('whiteBallSection').classList.remove('hidden'); // White Ball section expanded by default
+        document.querySelector('[data-toggle="whiteBallSection"] [data-arrow]').classList.add('rotate-180'); // Point up for expanded
+
+        document.getElementById('powerBallSection').classList.add('hidden'); // Powerball section collapsed by default
+        document.querySelector('[data-toggle="powerBallSection"] [data-arrow]').classList.remove('rotate-180'); // Point down for collapsed
+
     });
 </script>
 {% endblock %}
