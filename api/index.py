@@ -609,6 +609,14 @@ def simulate_multiple_draws(df_source, group_a_list, odd_even_choice, white_ball
     return {'white_ball_freq': simulated_white_ball_freq_list, 'powerball_freq': simulated_powerball_freq_list}
 
 
+def calculate_combinations_py(elements, k):
+    """Calculates all unique combinations of k elements from a list of elements."""
+    if k < 0:
+        raise ValueError("Combination size (k) cannot be negative.")
+    if k > len(elements):
+        return [] # No combinations possible if k is greater than the number of elements
+    return list(combinations(elements, k))
+
 def calculate_combinations(n, k):
     """Calculates combinations (nCk)."""
     if k < 0 or k > n:
@@ -2460,7 +2468,7 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
             
     return generated_sets
 
-# --- NEW FUNCTION FOR CUSTOM COMBINATIONS ---
+# --- NEW FUNCTION FOR CUSTOM COMBINATIONS API ---
 @app.route('/api/generate_custom_combinations', methods=['POST'])
 def generate_custom_combinations_api():
     if df.empty:
@@ -2523,6 +2531,44 @@ def generate_custom_combinations_api():
             generated_sets.append({'white_balls': white_balls_candidate, 'powerball': powerball})
                 
         return jsonify({'success': True, 'generated_sets': generated_sets})
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
+
+# --- NEW ROUTE FOR PHASE 3: CREATE COMBINATIONS ---
+@app.route('/api/create_combinations', methods=['POST'])
+def create_combinations_api():
+    try:
+        data = request.json
+        pool_numbers = data.get('pool_numbers')
+        combination_size = data.get('combination_size')
+
+        if not isinstance(pool_numbers, list) or not all(isinstance(n, int) for n in pool_numbers):
+            return jsonify({'success': False, 'error': 'Invalid pool numbers format. Must be a list of integers.'}), 400
+        
+        if not (1 <= combination_size <= len(pool_numbers) and combination_size <= 10): # Limit combination size for performance
+            return jsonify({'success': False, 'error': f'Combination size must be between 1 and the pool size ({len(pool_numbers)}), and no more than 10 for performance reasons.'}), 400
+
+        # Ensure unique numbers in the pool and sort them
+        unique_pool = sorted(list(set(pool_numbers)))
+
+        # Generate combinations
+        all_combinations = calculate_combinations_py(unique_pool, combination_size)
+        
+        # Limit the number of combinations returned for performance/display reasons
+        MAX_COMBINATIONS_DISPLAY = 1000 # You can adjust this limit
+        if len(all_combinations) > MAX_COMBINATIONS_DISPLAY:
+            # Optionally, return a subset and a warning, or just an error
+            return jsonify({'success': False, 'error': f'Too many combinations ({len(all_combinations)}). Please reduce your pool size or combination size. Max allowed: {MAX_COMBINATIONS_DISPLAY}'}), 400
+
+
+        # Convert tuples to lists for JSON serialization
+        formatted_combinations = [list(combo) for combo in all_combinations]
+
+        return jsonify({'success': True, 'combinations': formatted_combinations})
 
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
@@ -3427,7 +3473,7 @@ def analyze_manual_pick_route():
         if not white_balls or len(white_balls) != 5 or powerball is None:
             return jsonify({"error": "Invalid input. Please provide 5 white balls and 1 powerball."}), 400
         
-        white_balls = sorted([int(n) for n in white_balls])
+        white_balls = sorted([int(n) for n n in white_balls])
         powerball = int(powerball)
 
         historical_match_results = check_generated_against_history(white_balls, powerball, df)
@@ -3557,43 +3603,37 @@ def ai_assistant_route():
         flash("An error occurred loading the AI Assistant page. Please try again.", 'error')
         return redirect(url_for('index'))
 
-# --- NEW ROUTE FOR CUSTOM COMBINATIONS (PHASE 1) ---
+# --- CUSTOM COMBINATIONS ROUTE (Corrected to fix data passing) ---
 @app.route('/custom_combinations')
 def custom_combinations_route():
     print("--- custom_combinations_route IS BEING CALLED! ---")
-    # Ensure historical data is loaded before rendering the page
     global df, last_draw
 
     if df.empty:
-        # Attempt to load data if not already loaded
         initialize_core_data()
         if df.empty: # if still empty after attempt
             flash("Failed to load historical data for Custom Combinations. Please try again later.", 'error')
             return redirect(url_for('index'))
 
-    # Get data for current and previous month's unpicked and most picked numbers
     current_year = datetime.now().year
     current_month = datetime.now().month
     
-    # Current month data
     current_month_unpicked, current_month_most_picked_data = _compute_unpicked_and_most_picked(current_year, current_month)
 
-    # Previous month data
     first_day_of_current_month = datetime.now().replace(day=1)
     previous_month_date = first_day_of_current_month - timedelta(days=1)
     previous_year = previous_month_date.year
     previous_month = previous_month_date.month
 
-    previous_month_unpicked, previous_month_most_picked_data = _compute_unpicked_and_most_picked(previous_year, previous_month)
+    previous_month_unpicked, previous_month_most_picked_data_actual = _compute_unpicked_and_most_picked(previous_year, previous_month)
 
-    # Pass the data to the template
     return render_template('custom_combinations.html',
                            current_month_name=datetime.now().strftime('%B %Y'),
                            previous_month_name=previous_month_date.strftime('%B %Y'),
                            current_month_unpicked=current_month_unpicked,
-                           current_month_most_picked=previous_month_most_picked_data, # This was a bug: passing previous month's data
+                           current_month_most_picked=current_month_most_picked_data, # Corrected: Pass current month's data
                            previous_month_unpicked=previous_month_unpicked,
-                           previous_month_most_picked=previous_month_most_picked_data,
+                           previous_month_most_picked=previous_month_most_picked_data_actual,
                           )
 
 
