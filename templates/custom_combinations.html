@@ -57,7 +57,10 @@
                             {% if current_month_most_picked %}
                                 <div class="flex flex-wrap gap-2">
                                     {% for item in current_month_most_picked %}
-                                        <span class="number-ball most-picked-ball" data-number="{{ item.number }}">{{ item.number }} ({{ item.count }})</span>
+                                        <span class="number-ball most-picked-ball" data-number="{{ item.number }}">
+                                            <span class="number-display">{{ item.number }}</span>
+                                            <span class="count-display">({{ item.count }})</span>
+                                        </span>
                                     {% endfor %}
                                 </div>
                             {% else %}
@@ -88,7 +91,10 @@
                             {% if previous_month_most_picked %}
                                 <div class="flex flex-wrap gap-2">
                                     {% for item in previous_month_most_picked %}
-                                        <span class="number-ball most-picked-ball" data-number="{{ item.number }}">{{ item.number }} ({{ item.count }})</span>
+                                        <span class="number-ball most-picked-ball" data-number="{{ item.number }}">
+                                            <span class="number-display">{{ item.number }}</span>
+                                            <span class="count-display">({{ item.count }})</span>
+                                        </span>
                                     {% endfor %}
                                 </div>
                             {% else %}
@@ -233,11 +239,12 @@
 <style>
     /* Custom styles for number balls */
     .number-ball {
-        display: inline-flex;
-        align-items: center;
+        display: flex; /* Use flexbox */
+        flex-direction: column; /* Stack children vertically */
         justify-content: center;
-        width: 40px;
-        height: 40px;
+        align-items: center;
+        width: 45px; /* Slightly increased width */
+        height: 45px; /* Slightly increased height */
         border-radius: 50%;
         font-size: 1.1rem;
         font-weight: bold;
@@ -246,6 +253,8 @@
         cursor: pointer;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out;
+        padding: 2px; /* Add some padding inside the ball */
+        line-height: 1; /* Reduce line height for tighter text */
     }
     .number-ball:hover {
         transform: translateY(-2px);
@@ -263,6 +272,16 @@
     .most-picked-ball {
         background-color: #FBBF24; /* Amber-400 */
         color: #374151; /* Darker text for visibility */
+        font-size: 0.9em; /* Smaller font for most picked balls */
+    }
+    .most-picked-ball .number-display {
+        font-size: 1.1em; /* Larger for the number */
+        font-weight: bold;
+    }
+    .most-picked-ball .count-display {
+        font-size: 0.8em; /* Smaller for the count */
+        font-weight: normal;
+        opacity: 0.8;
     }
 
     /* Styles for the balls in the "Your Selected Pool" display */
@@ -274,6 +293,9 @@
         font-size: 1rem;
         margin: 2px; /* Small margin for tight packing */
         flex-shrink: 0;
+        display: flex; /* Ensure these are also flex for centering */
+        justify-content: center;
+        align-items: center;
     }
 
     /* Ball display styles (for generated picks, similar to index.html for consistency) */
