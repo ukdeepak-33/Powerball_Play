@@ -1004,12 +1004,13 @@ def get_powerball_frequency_by_year(df_source, start_year=2017, end_year=None):
     all_powerballs = pd.Series(range(1, 27))
     yearly_pb_freq_pivot = yearly_pb_freq_pivot.reindex(all_powerballs, fill_value=0)
 
+    # Ensure all `years` are present as columns, filling with 0 if no data
     yearly_pb_freq_pivot = yearly_pb_freq_pivot.reindex(columns=years, fill_value=0)
     
     formatted_data = []
     for powerball_num, row in yearly_pb_freq_pivot.iterrows():
         row_dict = {'Powerball': int(powerball_num)}
-        for year in years:
+        for year in years: # Iterate through the requested years to maintain order
             row_dict[f'Year_{year}'] = int(row[year])
         formatted_data.append(row_dict)
     
@@ -1651,7 +1652,7 @@ def get_white_ball_frequency_by_period(df_source, period_type='year', start_year
         formatted_data[wb_num] = sorted([
             {'period_label': label, 'frequency': count} 
             for label, count in period_counts.items()
-        ], key=lambda x: x['period_label'])
+        ], key=lambda x: x['period_label']) # Keep internal data sorted by period_label (year)
         
     return formatted_data, all_period_labels 
 
@@ -2766,7 +2767,10 @@ def number_age_distribution_route():
     # Set the range from 2020 to the current year, ensuring it doesn't go beyond 2025
     start_trend_year = 2020
     end_trend_year = min(2025, current_year) # Ensure it doesn't go past 2025
-    trend_years = list(range(start_trend_year, end_trend_year + 1))
+    
+    # Generate the list of years and reverse it for the display order (2025 to 2020)
+    trend_years_ordered_desc = list(range(start_trend_year, end_trend_year + 1))
+    trend_years_ordered_desc.reverse() # This reverses the list in place
 
     # Fetch yearly white ball trends
     yearly_white_ball_trends_data, wb_period_labels = get_cached_analysis(
@@ -2778,7 +2782,7 @@ def number_age_distribution_route():
         end_year=end_trend_year
     )
     # The `yearly_white_ball_trends_data` is already a dict {number: [{period_label: "2020", freq: X}, ...]}
-    # We need wb_period_labels for the table headers, which is already returned.
+    # We use wb_period_labels for the actual years found, but for display headers, we use our controlled `trend_years_ordered_desc`.
 
     # Fetch yearly powerball trends
     yearly_powerball_trends_data, pb_period_labels = get_cached_analysis(
@@ -2796,8 +2800,8 @@ def number_age_distribution_route():
                            detailed_powerball_ages=detailed_powerball_ages,
                            yearly_white_ball_trends=yearly_white_ball_trends_data, # Pass as dict
                            yearly_powerball_trends=yearly_powerball_trends_data,   # Pass as list of dicts
-                           wb_trend_years=wb_period_labels, # These are the actual years (e.g., [2020, 2021])
-                           pb_trend_years=pb_period_labels # Same for powerballs
+                           wb_trend_years=trend_years_ordered_desc, # Use the reversed list for HTML headers
+                           pb_trend_years=trend_years_ordered_desc # Same for powerballs
                            )
 
 @app.route('/co_occurrence_analysis')
@@ -2878,6 +2882,76 @@ def grouped_patterns_analysis_route():
     patterns_data = get_cached_analysis('grouped_patterns', get_grouped_patterns_over_years, df)
     return render_template('grouped_patterns_analysis.html', patterns_data=patterns_data)
 
+# Helper function for grouped patterns yearly comparison (re-added)
+def _get_yearly_patterns_for_range(df_source, target_range_label):
+    if df_source.empty:
+        return []
+
+    df_copy = df_source.copy()
+    if 'Draw Date_dt' not in df_copy.columns:
+        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
+    
+    if df_copy.empty:
+        return []
+
+    for i in range(1, 6):
+        col = f'Number {i}'
+        if col in df_copy.columns:
+            df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce').fillna(0).astype(int)
+
+    current_year = datetime.now().year
+    years_to_analyze = sorted([y for y in df_copy['Draw Date_dt'].dt.year.unique() if 2017 <= y <= current_year])
+
+    yearly_data = []
+
+    if target_range_label not in NUMBER_RANGES:
+        return [] # Invalid range requested
+
+    min_val, max_val = NUMBER_RANGES[target_range_label]
+
+    for year in years_to_analyze:
+        yearly_df = df_copy[df_copy['Draw Date_dt'].dt.year == year]
+        
+        pairs_counts = defaultdict(int)
+        triplets_counts = defaultdict(int)
+
+        for _, row in yearly_df.iterrows():
+            white_balls = [int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])]
+            numbers_in_current_range = sorted([num for num in white_balls if min_val <= num <= max_val])
+            
+            if len(numbers_in_current_range) >= 2:
+                for pair in combinations(numbers_in_current_range, 2):
+                    pairs_counts[tuple(sorted(pair))] += 1
+            
+            if len(numbers_in_current_range) >= 3:
+                for triplet_combo in combinations(numbers_in_current_range, 3):
+                    triplets_counts[tuple(sorted(triplet_combo))] += 1
+        
+        formatted_patterns = []
+        for pair, count in pairs_counts.items():
+            formatted_patterns.append({
+                "pattern": list(pair),
+                "type": "Pair",
+                "count": int(count)
+            })
+        for triplet, count in triplets_counts.items():
+            formatted_patterns.append({
+                "pattern": list(triplet),
+                "type": "Triplet",
+                "count": int(count)
+            })
+        
+        formatted_patterns.sort(key=lambda x: (-x['count'], x['pattern']))
+
+        yearly_data.append({
+            'year': int(year),
+            'patterns': formatted_patterns,
+            'total_draws_in_range': len(yearly_df) # Total draws for the year relevant to the analysis
+        })
+    
+    return yearly_data
+
 @app.route('/grouped_patterns_yearly_comparison', methods=['GET', 'POST'])
 def grouped_patterns_yearly_comparison_route():
     if df.empty:
@@ -2903,6 +2977,65 @@ def grouped_patterns_yearly_comparison_route():
                            yearly_patterns_data=yearly_patterns_data,
                            number_ranges=NUMBER_RANGES, 
                            selected_range=selected_range_label) 
+
+# Helper function for boundary crossing pairs trends (re-added)
+def get_boundary_crossing_pairs_trends(df_source, selected_pair=None):
+    """Analyzes trends of numbers crossing specific boundaries (e.g., 9-10, 19-20)."""
+    if df_source.empty:
+        return {'all_boundary_patterns_summary': [], 'yearly_data_for_selected_pattern': [], 'all_years_in_data': []}
+
+    df_copy = df_source.copy()
+    if 'Draw Date_dt' not in df_copy.columns:
+        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
+
+    if df_copy.empty:
+        return {'all_boundary_patterns_summary': [], 'yearly_data_for_selected_pattern': [], 'all_years_in_data': []}
+
+    current_year = datetime.now().year
+    years_in_data = sorted(df_copy['Draw Date_dt'].dt.year.unique())
+    all_years_in_data = [y for y in years_in_data if y >= 2017] # Filter for relevant years
+
+    # --- Overall Summary ---
+    overall_boundary_counts = defaultdict(int)
+    for _, row in df_copy.iterrows():
+        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+        for pair_boundary in BOUNDARY_PAIRS_TO_ANALYZE:
+            if pair_boundary[0] in white_balls and pair_boundary[1] in white_balls:
+                overall_boundary_counts[pair_boundary] += 1
+    
+    all_boundary_patterns_summary = sorted([
+        {'pair': list(p), 'count': c} for p, c in overall_boundary_counts.items()
+    ], key=lambda x: (-x['count'], x['pair']))
+
+    # --- Yearly Data for Selected Pattern ---
+    yearly_data_for_selected_pattern = []
+    if selected_pair:
+        for year in all_years_in_data:
+            yearly_df = df_copy[df_copy['Draw Date_dt'].dt.year == year]
+            draws_with_pattern_in_year = 0
+            for _, row in yearly_df.iterrows():
+                white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+                if selected_pair[0] in white_balls and selected_pair[1] in white_balls:
+                    draws_with_pattern_in_year += 1
+            
+            total_draws_in_year = len(yearly_df)
+            percentage = round((draws_with_pattern_in_year / total_draws_in_year) * 100, 2) if total_draws_in_year > 0 else 0.0
+            
+            yearly_data_for_selected_pattern.append({
+                'year': int(year),
+                'draws_with_pattern': draws_with_pattern_in_year,
+                'total_draws': total_draws_in_year,
+                'percentage': percentage
+            })
+        yearly_data_for_selected_pattern.sort(key=lambda x: x['year']) # Sort ascending by year
+
+    return {
+        'all_boundary_patterns_summary': all_boundary_patterns_summary,
+        'yearly_data_for_selected_pattern': yearly_data_for_selected_pattern,
+        'all_years_in_data': all_years_in_data
+    }
+
 
 @app.route('/boundary_crossing_pairs_trends', methods=['GET', 'POST'])
 def boundary_crossing_pairs_trends_route():
@@ -2940,6 +3073,110 @@ def boundary_crossing_pairs_trends_route():
                            all_years_in_data=all_years_in_data,
                            boundary_pairs_for_dropdown=boundary_pairs_for_dropdown,
                            selected_pair=selected_pair) 
+
+# Helper function for special patterns analysis (re-added)
+def get_special_patterns_analysis(df_source):
+    """Analyzes various 'special' white ball patterns across historical data."""
+    if df_source.empty:
+        return {
+            'tens_apart_patterns_overall': [],
+            'same_last_digit_patterns_overall': [],
+            'repeating_digit_patterns_overall': [],
+            'all_years_for_tens_apart': [],
+            'yearly_tens_apart_counts': {},
+            'all_years_for_same_last_digit': [],
+            'yearly_same_last_digit_counts': {},
+            'all_years_for_repeating_digit': [],
+            'yearly_repeating_digit_counts': {}
+        }
+
+    df_copy = df_source.copy()
+    if 'Draw Date_dt' not in df_copy.columns:
+        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
+
+    if df_copy.empty:
+        return {
+            'tens_apart_patterns_overall': [],
+            'same_last_digit_patterns_overall': [],
+            'repeating_digit_patterns_overall': [],
+            'all_years_for_tens_apart': [],
+            'yearly_tens_apart_counts': {},
+            'all_years_for_same_last_digit': [],
+            'yearly_same_last_digit_counts': {},
+            'all_years_for_repeating_digit': [],
+            'yearly_repeating_digit_counts': {}
+        }
+
+    # --- Overall Pattern Counts ---
+    tens_apart_counts_overall = defaultdict(int)
+    same_last_digit_counts_overall = defaultdict(int)
+    repeating_digit_counts_overall = defaultdict(int)
+
+    # --- Yearly Pattern Counts ---
+    yearly_tens_apart_counts = defaultdict(lambda: defaultdict(int))
+    yearly_same_last_digit_counts = defaultdict(lambda: defaultdict(int))
+    yearly_repeating_digit_counts = defaultdict(lambda: defaultdict(int))
+
+    all_years = sorted(df_copy['Draw Date_dt'].dt.year.unique().tolist())
+
+    for _, row in df_copy.iterrows():
+        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+        draw_year = row['Draw Date_dt'].year
+
+        # Tens Apart Patterns
+        for i in range(len(white_balls)):
+            for j in range(i + 1, len(white_balls)):
+                num1 = white_balls[i]
+                num2 = white_balls[j]
+                if abs(num1 - num2) % 10 == 0 and abs(num1 - num2) > 0:
+                    pair = tuple(sorted((num1, num2)))
+                    tens_apart_counts_overall[pair] += 1
+                    yearly_tens_apart_counts[draw_year][pair] += 1
+
+        # Same Last Digit Patterns
+        last_digits = defaultdict(list)
+        for num in white_balls:
+            last_digits[num % 10].append(num)
+        
+        for digit, nums in last_digits.items():
+            if len(nums) >= 2:
+                for pair in combinations(sorted(nums), 2):
+                    same_last_digit_counts_overall[pair] += 1
+                    yearly_same_last_digit_counts[draw_year][pair] += 1
+
+        # Repeating Digit Patterns (e.g., 11, 22, 33...)
+        for num in white_balls:
+            s_num = str(num)
+            if len(s_num) == 2 and s_num[0] == s_num[1]:
+                repeating_digit_counts_overall[num] += 1
+                yearly_repeating_digit_counts[draw_year][num] += 1
+
+    # Format overall results
+    tens_apart_patterns_overall = sorted([{'pattern': list(p), 'count': c} for p, c in tens_apart_counts_overall.items()], key=lambda x: (-x['count'], x['pattern']))
+    same_last_digit_patterns_overall = sorted([{'pattern': list(p), 'count': c} for p, c in same_last_digit_counts_overall.items()], key=lambda x: (-x['count'], x['pattern']))
+    repeating_digit_patterns_overall = sorted([{'pattern': n, 'count': c} for n, c in repeating_digit_counts_overall.items()], key=lambda x: (-x['count'], x['pattern']))
+
+    # Format yearly results (converting defaultdict to regular dict for JSON serialization)
+    formatted_yearly_tens_apart = {year: sorted([{'pattern': list(p), 'count': c} for p, c in counts.items()], key=lambda x: (-x['count'], x['pattern'])) 
+                                    for year, counts in yearly_tens_apart_counts.items()}
+    formatted_yearly_same_last_digit = {year: sorted([{'pattern': list(p), 'count': c} for p, c in counts.items()], key=lambda x: (-x['count'], x['pattern'])) 
+                                        for year, counts in yearly_same_last_digit_counts.items()}
+    formatted_yearly_repeating_digit = {year: sorted([{'pattern': n, 'count': c} for n, c in counts.items()], key=lambda x: (-x['count'], x['pattern'])) 
+                                        for year, counts in yearly_repeating_digit_counts.items()}
+
+    return {
+        'tens_apart_patterns_overall': tens_apart_patterns_overall,
+        'same_last_digit_patterns_overall': same_last_digit_patterns_overall,
+        'repeating_digit_patterns_overall': repeating_digit_patterns_overall,
+        'all_years_for_tens_apart': all_years,
+        'yearly_tens_apart_counts': formatted_yearly_tens_apart,
+        'all_years_for_same_last_digit': all_years,
+        'yearly_same_last_digit_counts': formatted_yearly_same_last_digit,
+        'all_years_for_repeating_digit': all_years,
+        'yearly_repeating_digit_counts': formatted_yearly_repeating_digit
+    }
+
 
 @app.route('/special_patterns_analysis')
 def special_patterns_analysis_route():
