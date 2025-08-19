@@ -2,14 +2,14 @@
 
 {% block title %}Special Patterns Analysis{% endblock %}
 
-{% block page_heading %}Special Patterns Analysis & Trends{% endblock %}
+{% block page_heading %}Special Patterns Analysis{% endblock %}
 
 {% block content %}
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {# Flash messages display #}
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-            <div class="flash-messages space-y-3 mb-4">
+            <div class="flash-messages space-y-3">
                 {% for category, message in messages %}
                     <div class="p-4 rounded-lg shadow-md text-sm {% if category == 'error' %}bg-red-100 text-red-700 border border-red-200{% elif category == 'info' %}bg-blue-100 text-blue-700 border border-blue-200{% else %}bg-green-100 text-green-700 border border-green-200{% endif %} animate-fade-in">
                         <p class="font-medium">{{ message }}</p>
@@ -20,91 +20,53 @@
     {% endwith %}
 
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <details open> {# Overall Patterns section starts as open #}
-            <summary class="text-2xl font-bold mb-6 text-gray-800 cursor-pointer flex justify-between items-center">
-                Overall Special Pattern Frequencies
-                <svg class="w-6 h-6 transform transition-transform duration-200 details-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-            </summary>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-                <!-- Tens Apart Patterns -->
-                <div class="col-span-1 bg-gray-50 p-4 rounded-lg border border-gray-100 shadow-sm">
-                    <h3 class="text-xl font-semibold mb-3 text-indigo-700">Tens Apart Patterns (e.g., 1, 11)</h3>
-                    <p class="text-gray-600 text-sm mb-4">Pairs where numbers are 10, 20, etc., apart.</p>
-                    <div id="tensApartPatterns" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-                        <!-- Data will be rendered here by JS -->
-                    </div>
-                    <p class="text-gray-500 text-xs mt-3 text-right" id="tensApartTotalCount"></p>
-                </div>
+        <h2 class="text-2xl font-bold mb-4 text-gray-800">Explore Special Number Patterns</h2>
+        <p class="text-gray-700 mb-6">This page analyzes historical draws for specific "special" number patterns that might be of interest, such as numbers that are a multiple of 10 apart, numbers sharing the same last digit, or repeating digit numbers. You can view recent trends and historical yearly breakdowns.</p>
 
-                <!-- Same Last Digit Patterns -->
-                <div class="col-span-1 bg-gray-50 p-4 rounded-lg border border-gray-100 shadow-sm">
-                    <h3 class="text-xl font-semibold mb-3 text-green-700">Same Last Digit Patterns (e.g., 1, 11, 21)</h3>
-                    <p class="text-gray-600 text-sm mb-4">Pairs sharing the same last digit.</p>
-                    <div id="sameLastDigitPatterns" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-                        <!-- Data will be rendered here by JS -->
-                    </div>
-                    <p class="text-gray-500 text-xs mt-3 text-right" id="sameLastDigitTotalCount"></p>
-                </div>
+        <div id="loadingIndicator" class="text-center text-blue-600 font-semibold py-4">
+            <svg class="animate-spin h-5 w-5 mr-3 inline-block" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Loading analysis data...
+        </div>
 
-                <!-- Repeating Digit Patterns -->
-                <div class="col-span-1 bg-gray-50 p-4 rounded-lg border border-gray-100 shadow-sm">
-                    <h3 class="text-xl font-semibold mb-3 text-purple-700">Repeating Digit Patterns (e.g., 11, 22)</h3>
-                    <p class="text-gray-600 text-sm mb-4">Numbers with repeating digits (e.g., 11, 22, 33).</p>
-                    <div id="repeatingDigitPatterns" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-                        <!-- Data will be rendered here by JS -->
-                    </div>
-                    <p class="text-gray-500 text-xs mt-3 text-right" id="repeatingDigitTotalCount"></p>
+        <div id="analysisContent" class="space-y-8 hidden">
+            {# Recent Special Patterns Trends Card #}
+            <details class="card p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-100" open>
+                <summary class="text-xl font-bold mb-3 text-gray-800 cursor-pointer flex justify-between items-center">
+                    Recent Special Patterns (Last 12 Months)
+                    <svg class="w-6 h-6 transform transition-transform duration-200 details-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </summary>
+                <p class="text-gray-700 mb-4 mt-4">This table shows which special patterns were present in each Powerball draw over the last 12 months, along with the drawn numbers.</p>
+                
+                <div class="overflow-x-auto shadow-md rounded-lg pattern-table-scroll">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-blue-100 text-blue-800">
+                            <tr>
+                                <th class="py-3 px-4 text-left text-sm font-semibold">Draw Date</th>
+                                <th class="py-3 px-4 text-left text-sm font-semibold">White Balls</th>
+                                <th class="py-3 px-4 text-left text-sm font-semibold">Tens-Apart Present</th>
+                                <th class="py-3 px-4 text-left text-sm font-semibold">Same Last Digit Present</th>
+                                <th class="py-3 px-4 text-left text-sm font-semibold">Repeating Digit Present</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="recentTrendsTableBody">
+                            <tr><td colspan="5" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">Loading recent trends...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
+                <div class="text-center mt-4 hidden" id="recentTrendsToggleContainer">
+                    <button id="recentTrendsToggleBtn" class="btn-secondary">Show All</button>
+                </div>
+            </details>
+
+            {# Yearly Patterns Container #}
+            <div id="yearlyPatternsContainer" class="space-y-6">
+                <!-- Yearly pattern data will be dynamically loaded here by JavaScript -->
             </div>
-        </details>
-    </div>
-
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-6 text-gray-800">Recent Trends in Special Patterns (Last 12 Months)</h2>
-        <p class="text-gray-700 mb-4">This table shows which special patterns were present in each Powerball draw over the last 12 months, along with the drawn numbers.</p>
-        
-        <div class="overflow-x-auto shadow-md rounded-lg pattern-table-scroll">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-blue-100 text-blue-800">
-                    <tr>
-                        <th class="py-3 px-4 text-left text-sm font-semibold">Draw Date</th>
-                        <th class="py-3 px-4 text-left text-sm font-semibold">White Balls</th>
-                        <th class="py-3 px-4 text-left text-sm font-semibold">Tens-Apart Present</th>
-                        <th class="py-3 px-4 text-left text-sm font-semibold">Same Last Digit Present</th>
-                        <th class="py-3 px-4 text-left text-sm font-semibold">Repeating Digit Present</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200" id="recentTrendsTableBody">
-                    <tr><td colspan="5" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">Loading recent trends...</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <div class="text-center mt-4 hidden" id="recentTrendsToggleContainer">
-            <button id="recentTrendsToggleBtn" class="btn-secondary">Show All</button>
-        </div>
-    </div>
-
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-6 text-gray-800">Yearly Distribution of Special Patterns</h2>
-        <p class="text-gray-700 mb-4">View the occurrences of special patterns per year. Select multiple years to compare trends.</p>
-        
-        <div class="mb-4">
-            <label for="yearMultiSelect" class="block text-sm font-medium text-gray-700 mb-2">Select Year(s):</label>
-            <select id="yearMultiSelect" multiple class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50" style="min-height: 100px;">
-                <!-- Years will be populated by JS -->
-            </select>
-        </div>
-
-        <div class="chart-container mb-6">
-            <canvas id="yearlySpecialPatternsChart"></canvas>
-        </div>
-
-        {# NEW: Container for detailed yearly pattern tables #}
-        <h3 class="text-xl font-bold mb-4 text-gray-800">Detailed Yearly Pattern Breakdown</h3>
-        <div id="detailedYearlyPatternsContainer" class="space-y-6">
-            <p class="text-gray-600 text-center py-4">Select year(s) above to view detailed patterns.</p>
         </div>
     </div>
 </div>
@@ -130,7 +92,12 @@
     .hidden-row {
         display: none;
     }
-    /* ADDED STYLING FOR BALLS */
+    .ball-container { /* Added container for flex display of balls */
+        display: flex;
+        flex-wrap: wrap; /* Allows balls to wrap to next line if space is limited */
+        gap: 4px; /* Space between balls */
+        align-items: center;
+    }
     .ball {
         display: inline-flex;
         justify-content: center;
@@ -141,102 +108,42 @@
         color: white;
         font-weight: bold;
         border-radius: 50%;
-        margin: 0 2px;
+        margin: 0 2px; /* Adjusted margin for consistency */
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
-    /* Add styling for selected multi-select options */
-    #yearMultiSelect option:checked {
-        background-color: #e0e7ff; /* Light blue */
-        color: #4338ca; /* Darker blue text */
+    /* New style for special pattern numbers to distinguish them */
+    .special-pattern-ball {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        width: 30px; /* Same size as regular balls */
+        height: 30px;
+        background-color: #ef4444; /* Tailwind red-500, a distinct color */
+        color: white;
+        font-weight: bold;
+        border-radius: 50%;
+        margin: 0 2px; /* Consistent margin */
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        border: 2px solid #b91c1c; /* Darker red border */
     }
 </style>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const overallTensApartDiv = document.getElementById('tensApartPatterns');
-        const overallSameLastDigitDiv = document.getElementById('sameLastDigitPatterns');
-        const overallRepeatingDigitDiv = document.getElementById('repeatingDigitPatterns');
-        const overallTensApartTotalCount = document.getElementById('tensApartTotalCount');
-        const overallSameLastDigitTotalCount = document.getElementById('sameLastDigitTotalCount');
-        const overallRepeatingDigitTotalCount = document.getElementById('repeatingDigitTotalCount');
-
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const analysisContent = document.getElementById('analysisContent');
+        const yearlyPatternsContainer = document.getElementById('yearlyPatternsContainer');
         const recentTrendsTableBody = document.getElementById('recentTrendsTableBody');
         const recentTrendsToggleBtn = document.getElementById('recentTrendsToggleBtn');
         const recentTrendsToggleContainer = document.getElementById('recentTrendsToggleContainer');
-        
-        const yearMultiSelect = document.getElementById('yearMultiSelect');
-        const yearlySpecialPatternsChartCtx = document.getElementById('yearlySpecialPatternsChart').getContext('2d');
-        let yearlyChartInstance = null; // To store the Chart.js instance
 
-        const detailedYearlyPatternsContainer = document.getElementById('detailedYearlyPatternsContainer');
-
-        let allSpecialPatternsData = null; // To store all fetched data
-
-        // --- Custom Toast Popup Function (Copied for consistency) ---
-        function showToast(message, category) {
-            const existingToast = document.querySelector('.toast-popup');
-            if (existingToast) {
-                existingToast.remove(); // Remove any existing toast
-            }
-
-            const toastDiv = document.createElement('div');
-            toastDiv.className = `toast-popup ${category}`;
-            toastDiv.textContent = message;
-            document.body.appendChild(toastDiv);
-
-            setTimeout(() => {
-                toastDiv.classList.add('show');
-            }, 10);
-
-            setTimeout(() => {
-                toastDiv.classList.remove('show');
-                toastDiv.classList.add('animate-fade-out');
-                toastDiv.addEventListener('animationend', () => {
-                    toastDiv.remove();
-                }, { once: true });
-            }, 5000);
-        }
-
-        // --- Function to Render Overall Patterns ---
-        function renderOverallPatterns(data, container, type) {
-            container.innerHTML = ''; // Clear previous content
-            if (data && data.length > 0) {
-                let totalCount = 0;
-                data.forEach(item => {
-                    const patternDiv = document.createElement('div');
-                    patternDiv.className = 'flex justify-between items-center bg-white p-2 rounded-md border border-gray-200 shadow-sm';
-                    const patternName = Array.isArray(item.pattern) ? item.pattern.join(', ') : item.pattern;
-                    patternDiv.innerHTML = `
-                        <span class="text-gray-700 text-sm font-semibold">${patternName}</span>
-                        <span class="text-gray-900 font-bold">${item.count}</span>
-                    `;
-                    container.appendChild(patternDiv);
-                    totalCount += item.count;
-                });
-                 // Update total count for overall sections
-                if (type === 'tensApart') {
-                    overallTensApartTotalCount.textContent = `Total unique patterns: ${data.length} | Total occurrences: ${totalCount}`;
-                } else if (type === 'sameLastDigit') {
-                    overallSameLastDigitTotalCount.textContent = `Total unique patterns: ${data.length} | Total occurrences: ${totalCount}`;
-                } else if (type === 'repeatingDigit') {
-                    overallRepeatingDigitTotalCount.textContent = `Total unique patterns: ${data.length} | Total occurrences: ${totalCount}`;
-                }
-            } else {
-                container.innerHTML = '<p class="text-gray-600 text-sm">No patterns found.</p>';
-                if (type === 'tensApart') overallTensApartTotalCount.textContent = '';
-                if (type === 'sameLastDigit') overallSameLastDigitTotalCount.textContent = '';
-                if (type === 'repeatingDigit') overallRepeatingDigitTotalCount.textContent = '';
-            }
-        }
-
-        // --- Function to Render Recent Trends ---
+        // Function to render the recent trends table
         function renderRecentTrends(trendsData, initialShowCount = 10) {
             recentTrendsTableBody.innerHTML = ''; // Clear existing rows
-            if (!trendsData || trendsData.length === 0) {
+            if (trendsData.length === 0) {
                 const noDataRow = document.createElement('tr');
                 noDataRow.innerHTML = `<td colspan="5" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No recent special pattern trends found.</td>`;
                 recentTrendsTableBody.appendChild(noDataRow);
@@ -248,8 +155,7 @@
                 const row = document.createElement('tr');
                 row.className = `hover:bg-gray-50 ${index >= initialShowCount ? 'hidden-row' : ''}`;
                 
-                // Generate HTML for white balls
-                const whiteBallsHtml = trend.white_balls ? trend.white_balls.map(ball => `<span class="ball">${ball}</span>`).join('') : 'N/A';
+                const whiteBallsHtml = trend.white_balls ? `<div class="ball-container">${trend.white_balls.map(ball => `<span class="ball">${ball}</span>`).join('')}</div>` : 'N/A';
 
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${trend.draw_date}</td>
@@ -266,19 +172,18 @@
                 recentTrendsToggleContainer.classList.remove('hidden');
                 recentTrendsToggleBtn.textContent = `Show All (${trendsData.length} entries)`;
                 recentTrendsToggleBtn.dataset.isExpanded = 'false';
-                // Reset scroll/max-height for the table when re-rendering
                 recentTrendsTableBody.parentElement.style.maxHeight = '';
                 recentTrendsTableBody.parentElement.style.overflowY = '';
             } else {
                 recentTrendsToggleContainer.classList.add('hidden');
             }
-        }
+        });
 
         // Setup toggle functionality for the recent trends table
         recentTrendsToggleBtn.addEventListener('click', function() {
             let isExpanded = this.dataset.isExpanded === 'true';
             const rows = Array.from(recentTrendsTableBody.children);
-            const initialShowCount = 10; // Must match initial render count
+            const initialShowCount = 10;
 
             isExpanded = !isExpanded;
             rows.forEach((row, index) => {
@@ -303,260 +208,9 @@
             this.dataset.isExpanded = isExpanded.toString();
         });
 
-        // --- Function to Render Yearly Chart ---
-        function renderYearlyChart(chartData, selectedYears) {
-            if (yearlyChartInstance) {
-                yearlyChartInstance.destroy(); // Destroy previous chart instance
-            }
 
-            const filteredData = chartData.filter(d => selectedYears.includes(d.year.toString()));
-            
-            if (filteredData.length === 0) {
-                yearlySpecialPatternsChartCtx.clearRect(0, 0, yearlySpecialPatternsChartCtx.canvas.width, yearlySpecialPatternsChartCtx.canvas.height);
-                yearlySpecialPatternsChartCtx.font = "16px Inter, sans-serif";
-                yearlySpecialPatternsChartCtx.fillStyle = "#6b7280";
-                yearlySpecialPatternsChartCtx.textAlign = "center";
-                yearlySpecialPatternsChartCtx.fillText("No data for selected years.", yearlySpecialPatternsChartCtx.canvas.width / 2, yearlySpecialPatternsChartCtx.canvas.height / 2);
-                return;
-            }
-
-            // Ensure data is sorted by year ascending for the chart
-            filteredData.sort((a, b) => a.year - b.year);
-
-            // Extract labels and datasets based on filtered data
-            const labels = filteredData.map(d => d.year);
-            const tensApartPercentages = filteredData.map(d => d.tens_apart_draw_percentage);
-            const sameLastDigitPercentages = filteredData.map(d => d.same_last_digit_draw_percentage);
-            const repeatingDigitPercentages = filteredData.map(d => d.repeating_digit_draw_percentage);
-
-            const tensApartCounts = filteredData.map(d => d.tens_apart_count);
-            const sameLastDigitCounts = filteredData.map(d => d.same_last_digit_count);
-            const repeatingDigitCounts = filteredData.map(d => d.repeating_digit_count);
-
-
-            yearlyChartInstance = new Chart(yearlySpecialPatternsChartCtx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'Tens Apart Patterns (% of Draws)',
-                            data: tensApartPercentages,
-                            backgroundColor: 'rgba(99, 102, 241, 0.7)', // Indigo
-                            borderColor: 'rgba(79, 70, 229, 1)',
-                            borderWidth: 1,
-                            borderRadius: 4,
-                            yAxisID: 'y_percentage', // Assign to percentage axis
-                        },
-                        {
-                            label: 'Same Last Digit Patterns (% of Draws)',
-                            data: sameLastDigitPercentages,
-                            backgroundColor: 'rgba(16, 185, 129, 0.7)', // Green
-                            borderColor: 'rgba(5, 150, 105, 1)',
-                            borderWidth: 1,
-                            borderRadius: 4,
-                            yAxisID: 'y_percentage',
-                        },
-                        {
-                            label: 'Repeating Digit Patterns (% of Draws)',
-                            data: repeatingDigitPercentages,
-                            backgroundColor: 'rgba(168, 85, 247, 0.7)', // Purple
-                            borderColor: 'rgba(139, 92, 246, 1)',
-                            borderWidth: 1,
-                            borderRadius: 4,
-                            yAxisID: 'y_percentage',
-                        },
-                         {
-                            label: 'Tens Apart Patterns (Count)',
-                            data: tensApartCounts,
-                            backgroundColor: 'rgba(99, 102, 241, 0.3)', // Lighter Indigo
-                            borderColor: 'rgba(79, 70, 229, 0.8)',
-                            borderWidth: 1,
-                            borderRadius: 4,
-                            yAxisID: 'y_count', // Assign to count axis
-                            type: 'line', // Line chart for counts
-                            tension: 0.3,
-                            fill: false,
-                            pointRadius: 3,
-                            pointBackgroundColor: 'rgba(79, 70, 229, 1)'
-                        },
-                        {
-                            label: 'Same Last Digit Patterns (Count)',
-                            data: sameLastDigitCounts,
-                            backgroundColor: 'rgba(16, 185, 129, 0.3)', // Lighter Green
-                            borderColor: 'rgba(5, 150, 105, 0.8)',
-                            borderWidth: 1,
-                            borderRadius: 4,
-                            yAxisID: 'y_count',
-                            type: 'line',
-                            tension: 0.3,
-                            fill: false,
-                            pointRadius: 3,
-                            pointBackgroundColor: 'rgba(5, 150, 105, 1)'
-                        },
-                        {
-                            label: 'Repeating Digit Patterns (Count)',
-                            data: repeatingDigitCounts,
-                            backgroundColor: 'rgba(168, 85, 247, 0.3)', // Lighter Purple
-                            borderColor: 'rgba(139, 92, 246, 0.8)',
-                            borderWidth: 1,
-                            borderRadius: 4,
-                            yAxisID: 'y_count',
-                            type: 'line',
-                            tension: 0.3,
-                            fill: false,
-                            pointRadius: 3,
-                            pointBackgroundColor: 'rgba(139, 92, 246, 1)'
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: 'Yearly Occurrence of Special Patterns (Percentage of Draws & Counts)',
-                            font: {
-                                size: 18,
-                                weight: 'bold',
-                                family: 'Inter, sans-serif'
-                            },
-                            color: '#374151'
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) {
-                                        label += ': ';
-                                    }
-                                    if (context.parsed.y !== null) {
-                                        if (context.dataset.yAxisID === 'y_percentage') {
-                                            label += context.parsed.y + '%';
-                                        } else {
-                                            label += context.parsed.y + ' times';
-                                        }
-                                    }
-                                    return label;
-                                }
-                            }
-                        },
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                font: {
-                                    family: 'Inter, sans-serif'
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Year',
-                                font: {
-                                    size: 14,
-                                    weight: 'bold',
-                                    family: 'Inter, sans-serif'
-                                },
-                                color: '#4b5563'
-                            },
-                            grid: {
-                                display: false
-                            }
-                        },
-                        y_percentage: {
-                            type: 'linear',
-                            position: 'left',
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Percentage of Draws (%)',
-                                font: {
-                                    size: 14,
-                                    weight: 'bold',
-                                    family: 'Inter, sans-serif'
-                                },
-                                color: '#4b5563'
-                            },
-                            max: 100, // Percentage max is 100
-                            ticks: {
-                                callback: function(value) {
-                                    return value + '%';
-                                }
-                            },
-                            grid: {
-                                drawOnChartArea: false, // Only draw grid for one Y-axis
-                            },
-                        },
-                        y_count: {
-                            type: 'linear',
-                            position: 'right',
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Total Occurrences (Count)',
-                                font: {
-                                    size: 14,
-                                    weight: 'bold',
-                                    family: 'Inter, sans-serif'
-                                },
-                                color: '#4b5563'
-                            },
-                            grid: {
-                                drawOnChartArea: true, // Only draw grid for one Y-axis
-                            },
-                            ticks: {
-                                precision: 0 // Ensure integer ticks for counts
-                            }
-                        }
-                    },
-                    animation: {
-                        duration: 1000,
-                        easing: 'easeOutQuart'
-                    }
-                }
-            });
-        }
-
-        // --- Populate Year Multi-Select and Initial Chart Render ---
-        function populateYearMultiSelectAndRenderChart(availableYears, yearlyChartData) {
-            yearMultiSelect.innerHTML = ''; // Clear existing options
-            let defaultSelectedYears = [];
-
-            availableYears.sort((a, b) => b - a).forEach(year => { // Sort years descending for dropdown
-                const option = document.createElement('option');
-                option.value = year;
-                option.textContent = year;
-                // Select all years by default, or you can choose a subset
-                option.selected = true; 
-                yearMultiSelect.appendChild(option);
-                defaultSelectedYears.push(year.toString());
-            });
-
-            // Initial chart render with all years selected
-            renderYearlyChart(yearlyChartData, defaultSelectedYears);
-
-            // Add event listener for changes in year selection
-            yearMultiSelect.addEventListener('change', function() {
-                const selectedOptions = Array.from(this.selectedOptions);
-                const currentSelectedYears = selectedOptions.map(option => option.value);
-                renderYearlyChart(yearlyChartData, currentSelectedYears);
-                renderDetailedYearlyPatterns(allSpecialPatternsData.yearly_data, currentSelectedYears);
-            });
-        }
-
-
-        // --- Function to Render a single pattern table (tens, same last, repeating) ---
+        // Function to create and render a single pattern table (tens, same last, repeating)
         function renderPatternTable(containerElement, patterns, typeId, totalDraws) {
-            containerElement.innerHTML = ''; // Clear existing content
-            if (!patterns || patterns.length === 0) {
-                containerElement.innerHTML = `<p class="text-gray-600 text-sm">No patterns found for this year.</p>`;
-                return;
-            }
-
             // Create sort dropdown
             const sortDiv = document.createElement('div');
             sortDiv.className = 'mb-4';
@@ -597,34 +251,17 @@
                 sortedData.sort((a, b) => {
                     if (currentSortOrder === 'count_desc') {
                         if (b.count !== a.count) return b.count - a.count;
-                        // Handle single number patterns (like repeating digits) vs pairs/triplets
-                        if (Array.isArray(a.pattern) && Array.isArray(b.pattern)) {
-                            if (a.pattern[0] !== b.pattern[0]) return a.pattern[0] - b.pattern[0];
-                            if (a.pattern.length > 1 && b.pattern.length > 1 && a.pattern[1] !== b.pattern[1]) return a.pattern[1] - b.pattern[1];
-                            if (a.pattern.length > 2 && b.pattern.length > 2 && a.pattern[2] !== b.pattern[2]) return a.pattern[2] - b.pattern[2];
-                        } else { // For single number patterns like repeating digits
-                            return a.pattern - b.pattern;
-                        }
+                        return a.pattern[0] - b.pattern[0] || (a.pattern[1] !== undefined ? a.pattern[1] - b.pattern[1] : 0) || (a.pattern[2] !== undefined ? a.pattern[2] - b.pattern[2] : 0);
                     } else if (currentSortOrder === 'count_asc') {
                         if (a.count !== b.count) return a.count - b.count;
-                        if (Array.isArray(a.pattern) && Array.isArray(b.pattern)) {
-                            if (a.pattern[0] !== b.pattern[0]) return a.pattern[0] - b.pattern[0];
-                            if (a.pattern.length > 1 && b.pattern.length > 1 && a.pattern[1] !== b.pattern[1]) return a.pattern[1] - b.pattern[1];
-                            if (a.pattern.length > 2 && b.pattern.length > 2 && a.pattern[2] !== b.pattern[2]) return a.pattern[2] - b.pattern[2];
-                        } else {
-                            return a.pattern - b.pattern;
-                        }
+                        return a.pattern[0] - b.pattern[0] || (a.pattern[1] !== undefined ? a.pattern[1] - b.pattern[1] : 0) || (a.pattern[2] !== undefined ? a.pattern[2] - b.pattern[2] : 0);
                     } else if (currentSortOrder === 'pattern_asc') {
-                        if (Array.isArray(a.pattern) && Array.isArray(b.pattern)) {
-                            if (a.pattern[0] !== b.pattern[0]) return a.pattern[0] - b.pattern[0];
-                            if (a.pattern.length > 1 && b.pattern.length > 1 && a.pattern[1] !== b.pattern[1]) return a.pattern[1] - b.pattern[1];
-                            if (a.pattern.length > 2 && b.pattern.length > 2 && a.pattern[2] !== b.pattern[2]) return a.pattern[2] - b.pattern[2];
-                        } else {
-                            return a.pattern - b.pattern;
-                        }
-                        return b.count - a.count; // Secondary sort by count descending
+                        if (a.pattern[0] !== b.pattern[0]) return a.pattern[0] - b.pattern[0];
+                        if (a.pattern[1] !== undefined && b.pattern[1] !== undefined && a.pattern[1] !== b.pattern[1]) return a.pattern[1] - b.pattern[1];
+                        if (a.pattern[2] !== undefined && b.pattern[2] !== undefined && a.pattern[2] !== b.pattern[2]) return a.pattern[2] - b.pattern[2];
+                        return b.count - a.count;
                     }
-                    return 0; // No change if sort order is not recognized
+                    return 0;
                 });
 
                 tableBody.innerHTML = '';
@@ -638,9 +275,12 @@
                 sortedData.forEach((pattern, index) => {
                     const row = document.createElement('tr');
                     row.className = `hover:bg-gray-50 ${index >= initialShowCount ? 'hidden-row' : ''}`;
-                    const patternDisplay = Array.isArray(pattern.pattern) ? `(${pattern.pattern.join(', ')})` : pattern.pattern;
+                    
+                    // NEW: Generate HTML for special pattern numbers with new styling
+                    const patternNumbersHtml = pattern.pattern ? `<div class="ball-container">${pattern.pattern.map(num => `<span class="special-pattern-ball">${num}</span>`).join('')}</div>` : 'N/A';
+
                     row.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${patternDisplay}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${patternNumbersHtml}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${pattern.count}</td>
                     `;
                     tableBody.appendChild(row);
@@ -700,90 +340,15 @@
             });
         }
 
-
-        // --- Function to Render Detailed Yearly Patterns ---
-        function renderDetailedYearlyPatterns(yearlyDataForTables, selectedYears) {
-            detailedYearlyPatternsContainer.innerHTML = ''; // Clear previous content
-
-            const filteredYearlyData = yearlyDataForTables.filter(d => selectedYears.includes(d.year.toString()));
-
-            if (filteredYearlyData.length === 0) {
-                detailedYearlyPatternsContainer.innerHTML = '<p class="text-gray-600 text-center py-4">Select year(s) above to view detailed patterns.</p>';
-                return;
-            }
-
-            // Sort filtered yearly data by year descending for display
-            filteredYearlyData.sort((a, b) => b.year - a.year);
-
-            filteredYearlyData.forEach(yearData => {
-                const yearDetails = document.createElement('details');
-                yearDetails.className = 'card p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-100 mb-6';
-                yearDetails.setAttribute('open', ''); // Open by default
-
-                yearDetails.innerHTML = `
-                    <summary class="text-xl font-bold mb-3 text-gray-800 cursor-pointer flex justify-between items-center">
-                        Patterns in ${yearData.year} (${yearData.total_draws} Draws)
-                        <svg class="w-6 h-6 transform transition-transform duration-200 details-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </summary>
-                    <div class="space-y-6 mt-4" id="yearContent-${yearData.year}">
-                        <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
-                            <h3 class="text-lg font-bold mb-3 text-gray-800">Tens Apart Patterns</h3>
-                            <div id="tensApartPatterns-${yearData.year}" data-year="${yearData.year}"></div>
-                        </div>
-                        <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
-                            <h3 class="text-lg font-bold mb-3 text-gray-800">Same Last Digit Patterns</h3>
-                            <div id="sameLastDigitPatterns-${yearData.year}" data-year="${yearData.year}"></div>
-                        </div>
-                        <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
-                            <h3 class="text-lg font-bold mb-3 text-gray-800">Repeating Digit Patterns</h3>
-                            <div id="repeatingDigitPatterns-${yearData.year}" data-year="${yearData.year}"></div>
-                        </div>
-                    </div>
-                `;
-                detailedYearlyPatternsContainer.appendChild(yearDetails);
-
-                renderPatternTable(
-                    document.getElementById(`tensApartPatterns-${yearData.year}`),
-                    yearData.tens_apart_patterns,
-                    'tensApart',
-                    yearData.total_draws
-                );
-                renderPatternTable(
-                    document.getElementById(`sameLastDigitPatterns-${yearData.year}`),
-                    yearData.same_last_digit_patterns,
-                    'sameLastDigit',
-                    yearData.total_draws
-                );
-                renderPatternTable(
-                    document.getElementById(`repeatingDigitPatterns-${yearData.year}`),
-                    yearData.repeating_digit_patterns,
-                    'repeatingDigit',
-                    yearData.total_draws
-                );
-
-                // Add event listener to the details element for arrow rotation
-                yearDetails.addEventListener('toggle', () => {
-                    const arrow = yearDetails.querySelector('.details-arrow');
-                    if (yearDetails.open) {
-                        arrow.classList.add('rotate-180');
-                    } else {
-                        arrow.classList.remove('rotate-180');
-                    }
-                });
-            });
-        }
-
-
-        // --- Fetch and Render All Patterns on Load ---
+        // Function to fetch and render all patterns data
         async function fetchAndRenderAllPatterns() {
+            loadingIndicator.classList.remove('hidden');
+            analysisContent.classList.add('hidden');
+
             try {
                 const response = await fetch('/special_patterns_analysis', {
                     method: 'GET',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
                 });
 
                 if (!response.ok) {
@@ -791,57 +356,107 @@
                     throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                 }
 
-                allSpecialPatternsData = await response.json(); 
+                const data = await response.json();
 
-                // Render Overall Patterns
-                renderOverallPatterns(allSpecialPatternsData.tens_apart_patterns_overall, overallTensApartDiv, 'tensApart');
-                renderOverallPatterns(allSpecialPatternsData.same_last_digit_patterns_overall, overallSameLastDigitDiv, 'sameLastDigit');
-                renderOverallPatterns(allSpecialPatternsData.repeating_digit_patterns_overall, overallRepeatingDigitDiv, 'repeatingDigit');
+                renderRecentTrends(data.recent_trends);
 
-                // Render Recent Trends
-                renderRecentTrends(allSpecialPatternsData.recent_trends);
+                yearlyPatternsContainer.innerHTML = '';
+                if (data.yearly_data && data.yearly_data.length > 0) {
+                    data.yearly_data.forEach(yearData => {
+                        const yearDetails = document.createElement('details');
+                        yearDetails.className = 'card p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-100 mb-6';
+                        yearDetails.setAttribute('open', '');
 
-                // Populate year multi-select and render chart
-                populateYearMultiSelectAndRenderChart(
-                    allSpecialPatternsData.available_years,
-                    allSpecialPatternsData.yearly_chart_data
-                );
+                        yearDetails.innerHTML = `
+                            <summary class="text-xl font-bold mb-3 text-gray-800 cursor-pointer flex justify-between items-center">
+                                Patterns in ${yearData.year} (${yearData.total_draws} Draws)
+                                <svg class="w-6 h-6 transform transition-transform duration-200 details-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </summary>
+                            <div class="space-y-6 mt-4" id="yearContent-${yearData.year}">
+                                <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+                                    <h3 class="text-lg font-bold mb-3 text-gray-800">Tens Apart Patterns</h3>
+                                    <div id="tensApartPatterns-${yearData.year}" data-year="${yearData.year}"></div>
+                                </div>
+                                <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+                                    <h3 class="text-lg font-bold mb-3 text-gray-800">Same Last Digit Patterns</h3>
+                                    <div id="sameLastDigitPatterns-${yearData.year}" data-year="${yearData.year}"></div>
+                                </div>
+                                <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+                                    <h3 class="text-lg font-bold mb-3 text-gray-800">Repeating Digit Patterns</h3>
+                                    <div id="repeatingDigitPatterns-${yearData.year}" data-year="${yearData.year}"></div>
+                                </div>
+                            </div>
+                        `;
+                        yearlyPatternsContainer.appendChild(yearDetails);
 
-                // Initial render of detailed yearly patterns (all years selected by default)
-                const initialSelectedYears = Array.from(yearMultiSelect.options).filter(option => option.selected).map(option => option.value);
-                renderDetailedYearlyPatterns(allSpecialPatternsData.yearly_data, initialSelectedYears);
+                        renderPatternTable(
+                            document.getElementById(`tensApartPatterns-${yearData.year}`),
+                            yearData.tens_apart_patterns,
+                            'tensApart',
+                            yearData.total_draws
+                        );
+                        renderPatternTable(
+                            document.getElementById(`sameLastDigitPatterns-${yearData.year}`),
+                            yearData.same_last_digit_patterns,
+                            'sameLastDigit',
+                            yearData.total_draws
+                        );
+                        renderPatternTable(
+                            document.getElementById(`repeatingDigitPatterns-${yearData.year}`),
+                            yearData.repeating_digit_patterns,
+                            'repeatingDigit',
+                            yearData.total_draws
+                        );
 
+                        yearDetails.addEventListener('toggle', () => {
+                            const arrow = yearDetails.querySelector('.details-arrow');
+                            if (yearDetails.open) {
+                                arrow.classList.add('rotate-180');
+                            } else {
+                                arrow.classList.remove('rotate-180');
+                            }
+                        });
+                    });
+                } else {
+                    yearlyPatternsContainer.innerHTML = '<p class="text-gray-600 text-center py-8">No historical special pattern data available for any year.</p>';
+                }
+
+                analysisContent.classList.remove('hidden');
 
             } catch (error) {
                 console.error('Error loading special patterns analysis:', error);
-                showToast(`Failed to load special patterns analysis: ${error.message}. Please try again.`, 'error');
-                // Display error messages in respective sections if data cannot be loaded
-                overallTensApartDiv.innerHTML = '<p class="text-red-600 text-sm">Failed to load patterns.</p>';
-                overallSameLastDigitDiv.innerHTML = '<p class="text-red-600 text-sm">Failed to load patterns.</p>';
-                overallRepeatingDigitDiv.innerHTML = '<p class="text-red-600 text-sm">Failed to load patterns.</p>';
-                recentTrendsTableBody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-center">Failed to load recent trends.</td></tr>';
-                detailedYearlyPatternsContainer.innerHTML = '<p class="text-red-600 text-center py-4">Failed to load detailed yearly patterns.</p>';
-
-                // Clear chart and show error
-                if (yearlyChartInstance) {
-                    yearlyChartInstance.destroy();
-                }
-                yearlySpecialPatternsChartCtx.clearRect(0, 0, yearlySpecialPatternsChartCtx.canvas.width, yearlySpecialPatternsChartCtx.canvas.height);
-                yearlySpecialPatternsChartCtx.font = "16px Inter, sans-serif";
-                yearlySpecialPatternsChartCtx.fillStyle = "#dc2626"; // red-600
-                yearlySpecialPatternsChartCtx.textAlign = "center";
-                yearlySpecialPatternsChartCtx.fillText("Failed to load chart data.", yearlySpecialPatternsChartCtx.canvas.width / 2, yearlySpecialPatternsChartCtx.canvas.height / 2);
+                showFlashMessage(`Failed to load special patterns analysis: ${error.message}. Please try again.`, 'error');
+                analysisContent.innerHTML = '<p class="text-red-600 text-center py-8">An error occurred while loading data. Please check console for details.</p>';
+                analysisContent.classList.remove('hidden');
             } finally {
-                // Ensure loading indicator is hidden and content is shown even if there's an error
-                const loadingIndicator = document.getElementById('loadingIndicator');
-                const analysisContent = document.getElementById('analysisContent');
-                if (loadingIndicator) loadingIndicator.classList.add('hidden');
-                if (analysisContent) analysisContent.classList.remove('hidden');
+                loadingIndicator.classList.add('hidden');
             }
         }
 
-        // Initial fetch and render when the page loads
         fetchAndRenderAllPatterns();
+
+        function showFlashMessage(message, category) {
+            const flashMessagesDiv = document.querySelector('.flash-messages') || document.createElement('div');
+            flashMessagesDiv.className = 'flash-messages space-y-3'; 
+            if (!document.querySelector('.flash-messages')) {
+                document.querySelector('.space-y-8.max-w-6xl.mx-auto.px-4.sm\\:px-6.lg\\:px-8.py-8').prepend(flashMessagesDiv);
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `p-4 rounded-lg shadow-md text-sm animate-fade-in ${
+                category === 'error' ? 'bg-red-100 text-red-700 border border-red-200' :
+                category === 'info' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                'bg-green-100 text-green-700 border border-green-200'
+            }`;
+            messageDiv.innerHTML = `<p class="font-medium">${message}</p>`;
+            flashMessagesDiv.appendChild(messageDiv);
+
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 5000); 
+        }
     });
 </script>
 {% endblock %}
