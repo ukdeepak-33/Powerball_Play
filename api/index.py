@@ -3077,7 +3077,7 @@ def boundary_crossing_pairs_trends_route():
                            boundary_pairs_for_dropdown=boundary_pairs_for_dropdown,
                            selected_pair=selected_pair) 
 
-# Helper function for special patterns analysis (re-added with recent trends)
+# Helper function for special patterns analysis (re-added with recent trends and yearly chart data)
 def get_special_patterns_analysis(df_source):
     """Analyzes various 'special' white ball patterns across historical data and recent trends."""
     if df_source.empty:
@@ -3085,12 +3085,10 @@ def get_special_patterns_analysis(df_source):
             'tens_apart_patterns_overall': [],
             'same_last_digit_patterns_overall': [],
             'repeating_digit_patterns_overall': [],
-            'all_years_for_tens_apart': [],
-            'yearly_tens_apart_counts': {},
-            'all_years_for_same_last_digit': [],
-            'yearly_same_last_digit_counts': {},
-            'all_years_for_repeating_digit': {},
-            'recent_trends': [] # Added for recent trends data
+            'recent_trends': [],
+            'yearly_chart_data': [], # New: For charting
+            'available_years': [], # New: For year selection dropdown
+            'yearly_data': [] # NEW: Detailed yearly data for tables
         }
 
     df_copy = df_source.copy()
@@ -3103,12 +3101,10 @@ def get_special_patterns_analysis(df_source):
             'tens_apart_patterns_overall': [],
             'same_last_digit_patterns_overall': [],
             'repeating_digit_patterns_overall': [],
-            'all_years_for_tens_apart': [],
-            'yearly_tens_apart_counts': {},
-            'all_years_for_same_last_digit': {},
-            'yearly_same_last_digit_counts': {},
-            'all_years_for_repeating_digit': {},
-            'recent_trends': []
+            'recent_trends': [],
+            'yearly_chart_data': [],
+            'available_years': [],
+            'yearly_data': []
         }
 
     # --- Overall Pattern Counts ---
@@ -3116,23 +3112,29 @@ def get_special_patterns_analysis(df_source):
     same_last_digit_counts_overall = defaultdict(int)
     repeating_digit_counts_overall = defaultdict(int)
 
-    # --- Yearly Pattern Counts ---
-    yearly_tens_apart_counts = defaultdict(lambda: defaultdict(int))
-    yearly_same_last_digit_counts = defaultdict(lambda: defaultdict(int))
-    yearly_repeating_digit_counts = defaultdict(lambda: defaultdict(int))
+    # --- Yearly Pattern Counts (for detailed tables and for chart aggregation) ---
+    yearly_tens_apart_counts_raw = defaultdict(lambda: defaultdict(int))
+    yearly_same_last_digit_counts_raw = defaultdict(lambda: defaultdict(int))
+    yearly_repeating_digit_counts_raw = defaultdict(lambda: defaultdict(int))
+    yearly_total_draws = defaultdict(int)
 
     # --- Recent Trends (Last 12 Months) ---
     recent_trends_data = []
     one_year_ago = datetime.now() - pd.DateOffset(months=12)
-    recent_df = df_copy[df_copy['Draw Date_dt'] >= one_year_ago].sort_values(by='Draw Date_dt', ascending=False)
 
-
-    all_years = sorted(df_copy['Draw Date_dt'].dt.year.unique().tolist())
+    all_years_in_data = sorted(df_copy['Draw Date_dt'].dt.year.unique().tolist())
+    # Ensure years include 2016 up to the latest year found, and cap at 2025 as requested
+    min_year_in_data = min(all_years_in_data) if all_years_in_data else datetime.now().year
+    relevant_years = sorted(list(range(max(2016, min_year_in_data), min(datetime.now().year, 2025) + 1)))
 
     for _, row in df_copy.iterrows():
         white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
         draw_year = row['Draw Date_dt'].year
-        draw_date_str = row['Draw Date_dt'].strftime('%Y-%m-%d') # For recent trends
+        draw_date_str = row['Draw Date_dt'].strftime('%Y-%m-%d')
+
+        # Accumulate total draws per year for yearly chart calculations
+        if draw_year in relevant_years:
+            yearly_total_draws[draw_year] += 1
 
         # Tens Apart Patterns
         current_draw_tens_apart = []
@@ -3143,9 +3145,9 @@ def get_special_patterns_analysis(df_source):
                 if abs(num1 - num2) % 10 == 0 and abs(num1 - num2) > 0:
                     pair = tuple(sorted((num1, num2)))
                     tens_apart_counts_overall[pair] += 1
-                    yearly_tens_apart_counts[draw_year][pair] += 1
-                    current_draw_tens_apart.append(list(pair)) # For recent trends
-
+                    if draw_year in relevant_years:
+                        yearly_tens_apart_counts_raw[draw_year][pair] += 1
+                    current_draw_tens_apart.append(list(pair))
 
         # Same Last Digit Patterns
         last_digits = defaultdict(list)
@@ -3157,8 +3159,9 @@ def get_special_patterns_analysis(df_source):
             if len(nums) >= 2:
                 for pair in combinations(sorted(nums), 2):
                     same_last_digit_counts_overall[pair] += 1
-                    yearly_same_last_digit_counts[draw_year][pair] += 1
-                    current_draw_same_last_digit.append(list(pair)) # For recent trends
+                    if draw_year in relevant_years:
+                        yearly_same_last_digit_counts_raw[draw_year][pair] += 1
+                    current_draw_same_last_digit.append(list(pair))
 
         # Repeating Digit Patterns (e.g., 11, 22, 33...)
         current_draw_repeating_digit = []
@@ -3166,8 +3169,9 @@ def get_special_patterns_analysis(df_source):
             s_num = str(num)
             if len(s_num) == 2 and s_num[0] == s_num[1]:
                 repeating_digit_counts_overall[num] += 1
-                yearly_repeating_digit_counts[draw_year][num] += 1
-                current_draw_repeating_digit.append(num) # For recent trends
+                if draw_year in relevant_years:
+                    yearly_repeating_digit_counts_raw[draw_year][num] += 1
+                current_draw_repeating_digit.append(num)
         
         # Add to recent trends data if within the last 12 months
         if row['Draw Date_dt'] >= one_year_ago:
@@ -3175,11 +3179,11 @@ def get_special_patterns_analysis(df_source):
                 'draw_date': draw_date_str,
                 'white_balls': white_balls,
                 'tens_apart': "Yes" if current_draw_tens_apart else "No",
-                'tens_apart_patterns': current_draw_tens_apart,
+                'tens_apart_patterns': current_draw_tens_apart, # List of actual patterns
                 'same_last_digit': "Yes" if current_draw_same_last_digit else "No",
-                'same_last_digit_patterns': current_draw_same_last_digit,
+                'same_last_digit_patterns': current_draw_same_last_digit, # List of actual patterns
                 'repeating_digit': "Yes" if current_draw_repeating_digit else "No",
-                'repeating_digit_patterns': current_draw_repeating_digit
+                'repeating_digit_patterns': current_draw_repeating_digit # List of actual numbers
             })
 
     # Sort recent trends by date descending
@@ -3191,38 +3195,48 @@ def get_special_patterns_analysis(df_source):
     same_last_digit_patterns_overall = sorted([{'pattern': list(p), 'count': c} for p, c in same_last_digit_counts_overall.items()], key=lambda x: (-x['count'], x['pattern']))
     repeating_digit_patterns_overall = sorted([{'pattern': n, 'count': c} for n, c in repeating_digit_counts_overall.items()], key=lambda x: (-x['count'], x['pattern']))
 
-    # Format yearly results (converting defaultdict to regular dict for JSON serialization)
-    formatted_yearly_tens_apart = {year: sorted([{'pattern': list(p), 'count': c} for p, c in counts.items()], key=lambda x: (-x['count'], x['pattern'])) 
-                                    for year, counts in yearly_tens_apart_counts.items()}
-    formatted_yearly_same_last_digit = {year: sorted([{'pattern': list(p), 'count': c} for p, c in counts.items()], key=lambda x: (-x['count'], x['pattern'])) 
-                                        for year, counts in yearly_same_last_digit_counts.items()}
-    formatted_yearly_repeating_digit = {year: sorted([{'pattern': n, 'count': c} for n, c in counts.items()], key=lambda x: (-x['count'], x['pattern'])) 
-                                        for year, counts in yearly_repeating_digit_counts.items()}
+    # --- Prepare Yearly Data for Chart ---
+    yearly_chart_data = []
+    for year in relevant_years:
+        total_draws = yearly_total_draws[year]
+        tens_apart_draws = sum(1 for patterns_for_draw in yearly_tens_apart_counts_raw[year].values() if patterns_for_draw > 0)
+        same_last_digit_draws = sum(1 for patterns_for_draw in yearly_same_last_digit_counts_raw[year].values() if patterns_for_draw > 0)
+        repeating_digit_draws = sum(1 for patterns_for_draw in yearly_repeating_digit_counts_raw[year].values() if patterns_for_draw > 0)
 
-    # Group yearly data for a single structure in frontend
-    yearly_grouped_data = []
-    for year in all_years:
-        yearly_grouped_data.append({
-            'year': year,
-            'total_draws': len(df_copy[df_copy['Draw Date_dt'].dt.year == year]), # Total draws for the year
-            'tens_apart_patterns': formatted_yearly_tens_apart.get(year, []),
-            'same_last_digit_patterns': formatted_yearly_same_last_digit.get(year, []),
-            'repeating_digit_patterns': formatted_yearly_repeating_digit.get(year, [])
+        yearly_chart_data.append({
+            'year': int(year),
+            'total_draws': total_draws,
+            'tens_apart_count': sum(yearly_tens_apart_counts_raw[year].values()),
+            'same_last_digit_count': sum(yearly_same_last_digit_counts_raw[year].values()),
+            'repeating_digit_count': sum(yearly_repeating_digit_counts_raw[year].values()),
+            'tens_apart_draw_percentage': round((tens_apart_draws / total_draws) * 100, 2) if total_draws > 0 else 0.0,
+            'same_last_digit_draw_percentage': round((same_last_digit_draws / total_draws) * 100, 2) if total_draws > 0 else 0.0,
+            'repeating_digit_draw_percentage': round((repeating_digit_draws / total_draws) * 100, 2) if total_draws > 0 else 0.0,
         })
-    yearly_grouped_data.sort(key=lambda x: x['year'], reverse=True) # Sort years descending
+    yearly_chart_data.sort(key=lambda x: x['year']) # Ensure ascending year order for chart
+
+    # --- Group detailed yearly data for frontend tables ---
+    # This structure is needed for the <details> sections with sortable tables
+    yearly_grouped_data_for_tables = []
+    for year in relevant_years:
+        yearly_grouped_data_for_tables.append({
+            'year': int(year),
+            'total_draws': yearly_total_draws[year],
+            'tens_apart_patterns': sorted([{'pattern': list(p), 'count': c} for p, c in yearly_tens_apart_counts_raw[year].items()], key=lambda x: (-x['count'], x['pattern'])),
+            'same_last_digit_patterns': sorted([{'pattern': list(p), 'count': c} for p, c in yearly_same_last_digit_counts_raw[year].items()], key=lambda x: (-x['count'], x['pattern'])),
+            'repeating_digit_patterns': sorted([{'pattern': n, 'count': c} for n, c in yearly_repeating_digit_counts_raw[year].items()], key=lambda x: (-x['count'], x['pattern']))
+        })
+    yearly_grouped_data_for_tables.sort(key=lambda x: x['year'], reverse=True) # Sort years descending for the details sections
 
     return {
         'tens_apart_patterns_overall': tens_apart_patterns_overall,
         'same_last_digit_patterns_overall': same_last_digit_patterns_overall,
         'repeating_digit_patterns_overall': repeating_digit_patterns_overall,
-        'all_years_for_tens_apart': all_years, # Still keep this for general use if needed
-        'yearly_tens_apart_counts': formatted_yearly_tens_apart, # Keep for direct access if needed
-        'yearly_same_last_digit_counts': formatted_yearly_same_last_digit,
-        'yearly_repeating_digit_counts': formatted_yearly_repeating_digit,
-        'recent_trends': recent_trends_data, # New recent trends data
-        'yearly_data': yearly_grouped_data # Consolidated yearly data for easy iteration
+        'recent_trends': recent_trends_data,
+        'yearly_chart_data': yearly_chart_data,
+        'available_years': relevant_years,
+        'yearly_data': yearly_grouped_data_for_tables # This is the data for your detailed yearly tables
     }
-
 
 @app.route('/special_patterns_analysis')
 def special_patterns_analysis_route():
