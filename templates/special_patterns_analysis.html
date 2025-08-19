@@ -47,7 +47,7 @@
                         <thead class="bg-blue-100 text-blue-800">
                             <tr>
                                 <th class="py-3 px-4 text-left text-sm font-semibold">Draw Date</th>
-                                <th class="py-3 px-4 text-left text-sm font-semibold">White Balls</th>
+                                <th class="py-3 px-4 text-left text-sm font-semibold">White Balls</th> {# ADDED THIS HEADER #}
                                 <th class="py-3 px-4 text-left text-sm font-semibold">Tens-Apart Present</th>
                                 <th class="py-3 px-4 text-left text-sm font-semibold">Same Last Digit Present</th>
                                 <th class="py-3 px-4 text-left text-sm font-semibold">Repeating Digit Present</th>
@@ -92,12 +92,7 @@
     .hidden-row {
         display: none;
     }
-    .ball-container { /* Added container for flex display of balls */
-        display: flex;
-        flex-wrap: wrap; /* Allows balls to wrap to next line if space is limited */
-        gap: 4px; /* Space between balls */
-        align-items: center;
-    }
+    /* ADDED STYLING FOR BALLS */
     .ball {
         display: inline-flex;
         justify-content: center;
@@ -108,23 +103,8 @@
         color: white;
         font-weight: bold;
         border-radius: 50%;
-        margin: 0 2px; /* Adjusted margin for consistency */
+        margin: 0 2px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-    /* New style for special pattern numbers to distinguish them */
-    .special-pattern-ball {
-        display: inline-flex;
-        justify-content: center;
-        align-items: center;
-        width: 30px; /* Same size as regular balls */
-        height: 30px;
-        background-color: #ef4444; /* Tailwind red-500, a distinct color */
-        color: white;
-        font-weight: bold;
-        border-radius: 50%;
-        margin: 0 2px; /* Consistent margin */
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        border: 2px solid #b91c1c; /* Darker red border */
     }
 </style>
 {% endblock %}
@@ -145,6 +125,7 @@
             recentTrendsTableBody.innerHTML = ''; // Clear existing rows
             if (trendsData.length === 0) {
                 const noDataRow = document.createElement('tr');
+                // Updated colspan to 5 for the new 'White Balls' column
                 noDataRow.innerHTML = `<td colspan="5" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No recent special pattern trends found.</td>`;
                 recentTrendsTableBody.appendChild(noDataRow);
                 recentTrendsToggleContainer.classList.add('hidden');
@@ -155,17 +136,12 @@
                 const row = document.createElement('tr');
                 row.className = `hover:bg-gray-50 ${index >= initialShowCount ? 'hidden-row' : ''}`;
                 
-                // Construct HTML for white balls, ensuring correct template literal usage
-                const whiteBallsHtml = trend.white_balls ? 
-                    `<div class="ball-container">${trend.white_balls.map(ball => `<span class="ball">${ball}</span>`).join('')}</div>` : 
-                    'N/A';
-
-                // Debugging log for whiteBallsHtml
-                console.log('Generated whiteBallsHtml:', whiteBallsHtml);
+                // NEW: Generate HTML for white balls
+                const whiteBallsHtml = trend.white_balls ? trend.white_balls.map(ball => `<span class="ball">${ball}</span>`).join('') : 'N/A';
 
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${trend.draw_date}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${whiteBallsHtml}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${whiteBallsHtml}</td> {# ADDED WHITE BALLS DISPLAY #}
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${trend.tens_apart}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${trend.same_last_digit}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${trend.repeating_digit}</td>
@@ -178,18 +154,19 @@
                 recentTrendsToggleContainer.classList.remove('hidden');
                 recentTrendsToggleBtn.textContent = `Show All (${trendsData.length} entries)`;
                 recentTrendsToggleBtn.dataset.isExpanded = 'false';
+                // Reset scroll/max-height for the table when re-rendering
                 recentTrendsTableBody.parentElement.style.maxHeight = '';
                 recentTrendsTableBody.parentElement.style.overflowY = '';
             } else {
                 recentTrendsToggleContainer.classList.add('hidden');
             }
-        });
+        }
 
         // Setup toggle functionality for the recent trends table
         recentTrendsToggleBtn.addEventListener('click', function() {
             let isExpanded = this.dataset.isExpanded === 'true';
             const rows = Array.from(recentTrendsTableBody.children);
-            const initialShowCount = 10;
+            const initialShowCount = 10; // Must match initial render count
 
             isExpanded = !isExpanded;
             rows.forEach((row, index) => {
@@ -281,17 +258,8 @@
                 sortedData.forEach((pattern, index) => {
                     const row = document.createElement('tr');
                     row.className = `hover:bg-gray-50 ${index >= initialShowCount ? 'hidden-row' : ''}`;
-                    
-                    // Fixed line: Ensure pattern.pattern is correctly mapped
-                    const patternNumbersHtml = pattern.pattern && pattern.pattern.length > 0 ? 
-                        `<div class="ball-container">${pattern.pattern.map(num => `<span class="special-pattern-ball">${num}</span>`).join('')}</div>` : 
-                        'N/A';
-
-                    // Debugging log for patternNumbersHtml
-                    console.log('Generated patternNumbersHtml:', patternNumbersHtml);
-
                     row.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${patternNumbersHtml}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">(${pattern.pattern.join(', ')})</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${pattern.count}</td>
                     `;
                     tableBody.appendChild(row);
@@ -354,12 +322,14 @@
         // Function to fetch and render all patterns data
         async function fetchAndRenderAllPatterns() {
             loadingIndicator.classList.remove('hidden');
-            analysisContent.classList.add('hidden');
+            analysisContent.classList.add('hidden'); // Hide content until loaded
 
             try {
                 const response = await fetch('/special_patterns_analysis', {
                     method: 'GET',
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
                 });
 
                 if (!response.ok) {
@@ -367,16 +337,18 @@
                     throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                 }
 
-                const data = await response.json();
+                const data = await response.json(); // Data now contains yearly_data and recent_trends
 
+                // Render recent trends first
                 renderRecentTrends(data.recent_trends);
 
-                yearlyPatternsContainer.innerHTML = '';
+                // Then render yearly data
+                yearlyPatternsContainer.innerHTML = ''; // Clear previous yearly content
                 if (data.yearly_data && data.yearly_data.length > 0) {
                     data.yearly_data.forEach(yearData => {
                         const yearDetails = document.createElement('details');
                         yearDetails.className = 'card p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-100 mb-6';
-                        yearDetails.setAttribute('open', '');
+                        yearDetails.setAttribute('open', ''); // Open by default
 
                         yearDetails.innerHTML = `
                             <summary class="text-xl font-bold mb-3 text-gray-800 cursor-pointer flex justify-between items-center">
@@ -421,6 +393,7 @@
                             yearData.total_draws
                         );
 
+                        // Add event listener to the details element for arrow rotation
                         yearDetails.addEventListener('toggle', () => {
                             const arrow = yearDetails.querySelector('.details-arrow');
                             if (yearDetails.open) {
@@ -434,20 +407,22 @@
                     yearlyPatternsContainer.innerHTML = '<p class="text-gray-600 text-center py-8">No historical special pattern data available for any year.</p>';
                 }
 
-                analysisContent.classList.remove('hidden');
+                analysisContent.classList.remove('hidden'); // Show content once loaded
 
             } catch (error) {
                 console.error('Error loading special patterns analysis:', error);
                 showFlashMessage(`Failed to load special patterns analysis: ${error.message}. Please try again.`, 'error');
                 analysisContent.innerHTML = '<p class="text-red-600 text-center py-8">An error occurred while loading data. Please check console for details.</p>';
-                analysisContent.classList.remove('hidden');
+                analysisContent.classList.remove('hidden'); // Show error message
             } finally {
                 loadingIndicator.classList.add('hidden');
             }
         }
 
+        // Initial fetch and render when the page loads
         fetchAndRenderAllPatterns();
 
+        // Helper function to show flash messages
         function showFlashMessage(message, category) {
             const flashMessagesDiv = document.querySelector('.flash-messages') || document.createElement('div');
             flashMessagesDiv.className = 'flash-messages space-y-3'; 
