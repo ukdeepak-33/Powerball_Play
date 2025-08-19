@@ -130,8 +130,7 @@
 {{ super() }}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const loadingIndicator = document.getElementById('loadingIndicator');
-        const analysisContent = document.getElementById('analysisContent');
+        // Removed loadingIndicator and analysisContent as they don't match the HTML structure
         const yearlyPatternsContainer = document.getElementById('yearlyPatternsContainer');
         const recentTrendsTableBody = document.getElementById('recentTrendsTableBody');
         const recentTrendsToggleBtn = document.getElementById('recentTrendsToggleBtn');
@@ -207,7 +206,6 @@
             recentTrendsTableBody.innerHTML = ''; // Clear existing rows
             if (!trendsData || trendsData.length === 0) {
                 const noDataRow = document.createElement('tr');
-                // Updated colspan to 5 for the new 'White Balls' column
                 noDataRow.innerHTML = `<td colspan="5" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No recent special pattern trends found.</td>`;
                 recentTrendsTableBody.appendChild(noDataRow);
                 recentTrendsToggleContainer.classList.add('hidden');
@@ -427,8 +425,9 @@
 
         // Function to fetch and render all patterns data
         async function fetchAndRenderAllPatterns() {
-            loadingIndicator.classList.remove('hidden');
-            analysisContent.classList.add('hidden'); // Hide content until loaded
+            // Removed direct interaction with loadingIndicator and analysisContent
+            // as they are not structured as wrappers in the provided HTML.
+            // If you need a global loading state, consider adding a div that covers the content.
 
             try {
                 const response = await fetch('/special_patterns_analysis', {
@@ -518,15 +517,14 @@
                     yearlyPatternsContainer.innerHTML = '<p class="text-gray-600 text-center py-8">No historical special pattern data available for any year.</p>';
                 }
 
-                analysisContent.classList.remove('hidden'); // Show content once loaded
+                // Removed analysisContent.classList.remove('hidden');
 
             } catch (error) {
                 console.error('Error loading special patterns analysis:', error);
                 showFlashMessage(`Failed to load special patterns analysis: ${error.message}. Please try again.`, 'error');
-                analysisContent.innerHTML = '<p class="text-red-600 text-center py-8">An error occurred while loading data. Please check console for details.</p>';
-                analysisContent.classList.remove('hidden'); // Show error message
+                // Removed analysisContent.innerHTML and analysisContent.classList.remove('hidden');
             } finally {
-                loadingIndicator.classList.add('hidden');
+                // Removed loadingIndicator.classList.add('hidden');
             }
         }
 
