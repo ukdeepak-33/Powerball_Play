@@ -36,7 +36,7 @@ white_ball_co_occurrence_lookup = {}
 analysis_cache = {}
 last_analysis_cache_update = datetime.min 
 
-CACHE_EXPIRATION_SECONDS = 3600 # 1 hour
+CACHE_DURATION = timedelta(minutes=60) # Cache for 60 minutes
 
 group_a = [3, 5, 6, 7, 9, 11, 15, 16, 18, 21, 23, 24, 27, 31, 32, 33, 36, 42, 44, 45, 48, 50, 51, 54, 55, 60, 66, 69]
 GLOBAL_WHITE_BALL_RANGE = (1, 69)
@@ -2981,112 +2981,13 @@ def grouped_patterns_yearly_comparison_route():
                            number_ranges=NUMBER_RANGES, 
                            selected_range=selected_range_label) 
 
-# Helper function for boundary crossing pairs trends (re-added)
-def get_boundary_crossing_pairs_trends(df_source, selected_pair=None):
-    """Analyzes trends of numbers crossing specific boundaries (e.g., 9-10, 19-20)."""
-    if df_source.empty:
-        return {'all_boundary_patterns_summary': [], 'yearly_data_for_selected_pattern': [], 'all_years_in_data': []}
-
-    df_copy = df_source.copy()
-    if 'Draw Date_dt' not in df_copy.columns:
-        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
-    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
-
-    if df_copy.empty:
-        return {'all_boundary_patterns_summary': [], 'yearly_data_for_selected_pattern': [], 'all_years_in_data': []}
-
-    current_year = datetime.now().year
-    years_in_data = sorted(df_copy['Draw Date_dt'].dt.year.unique())
-    all_years_in_data = [y for y in years_in_data if y >= 2017] # Filter for relevant years
-
-    # --- Overall Summary ---
-    overall_boundary_counts = defaultdict(int)
-    for _, row in df_copy.iterrows():
-        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
-        for pair_boundary in BOUNDARY_PAIRS_TO_ANALYZE:
-            if pair_boundary[0] in white_balls and pair_boundary[1] in white_balls:
-                overall_boundary_counts[pair_boundary] += 1
-    
-    all_boundary_patterns_summary = sorted([
-        {'pair': list(p), 'count': c} for p, c in overall_boundary_counts.items()
-    ], key=lambda x: (-x['count'], x['pair']))
-
-    # --- Yearly Data for Selected Pattern ---
-    yearly_data_for_selected_pattern = []
-    if selected_pair:
-        for year in all_years_in_data:
-            yearly_df = df_copy[df_copy['Draw Date_dt'].dt.year == year]
-            draws_with_pattern_in_year = 0
-            for _, row in yearly_df.iterrows():
-                white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
-                if selected_pair[0] in white_balls and selected_pair[1] in white_balls:
-                    draws_with_pattern_in_year += 1
-            
-            total_draws_in_year = len(yearly_df)
-            percentage = round((draws_with_pattern_in_year / total_draws_in_year) * 100, 2) if total_draws_in_year > 0 else 0.0
-            
-            yearly_data_for_selected_pattern.append({
-                'year': int(year),
-                'draws_with_pattern': draws_with_pattern_in_year,
-                'total_draws': total_draws_in_year,
-                'percentage': percentage
-            })
-        yearly_data_for_selected_pattern.sort(key=lambda x: x['year']) # Sort ascending by year
-
-    return {
-        'all_boundary_patterns_summary': all_boundary_patterns_summary,
-        'yearly_data_for_selected_pattern': yearly_data_for_selected_pattern,
-        'all_years_in_data': all_years_in_data
-    }
-
-
-@app.route('/boundary_crossing_pairs_trends', methods=['GET', 'POST'])
-def boundary_crossing_pairs_trends_route():
-    if df.empty:
-        flash("Cannot display Boundary Crossing Pairs Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return redirect(url_for('index'))
-    
-    selected_pair = request.form.get('selected_pair') 
-    selected_pair_tuple = None
-    if selected_pair:
-        try:
-            parts = [int(p.strip()) for p in selected_pair.split(',')]
-            if len(parts) == 2:
-                selected_pair_tuple = tuple(sorted(parts))
-        except ValueError:
-            flash("Invalid pair format. Please select a valid pair from the dropdown.", 'error')
-            selected_pair = None 
-
-    boundary_trends_data = get_cached_analysis(
-        f'boundary_crossing_trends_{selected_pair}', 
-        get_boundary_crossing_pairs_trends, 
-        df, 
-        selected_pair_tuple
-    )
-    
-    all_boundary_patterns_summary = boundary_trends_data['all_boundary_patterns_summary']
-    yearly_data_for_selected_pattern = boundary_trends_data['yearly_data_for_selected_pattern']
-    all_years_in_data = boundary_trends_data['all_years_in_data']
-
-    boundary_pairs_for_dropdown = [f"{p[0]}, {p[1]}" for p in BOUNDARY_PAIRS_TO_ANALYZE]
-
-    return render_template('boundary_crossing_pairs_trends.html',
-                           all_boundary_patterns_summary=all_boundary_patterns_summary,
-                           yearly_data_for_selected_pattern=yearly_data_for_selected_pattern,
-                           all_years_in_data=all_years_in_data,
-                           boundary_pairs_for_dropdown=boundary_pairs_for_dropdown,
-                           selected_pair=selected_pair) 
-
-# Helper function for special patterns analysis (re-added with recent trends and yearly chart data)
-def get_special_patterns_analysis(df_source):
-    """Analyzes historical draws for special number patterns (tens-apart, same last digit, repeating digit)."""
+get_boundary_crossing_pairs_trends (restored)
+def get_boundary_crossing_pairs_trends(df_source):
     if df_source.empty:
         return {
-            'yearly_data': [], 
-            'recent_trends': [],
-            'tens_apart_patterns_overall': [],
-            'same_last_digit_patterns_overall': [],
-            'repeating_digit_patterns_overall': []
+            'all_boundary_patterns_summary': [],
+            'boundary_pairs_for_dropdown': [],
+            'yearly_data_for_selected_pattern': []
         }
 
     df_copy = df_source.copy()
@@ -3095,170 +2996,337 @@ def get_special_patterns_analysis(df_source):
     df_copy = df_copy.dropna(subset=['Draw Date_dt'])
 
     if df_copy.empty:
-         return {
-            'yearly_data': [], 
-            'recent_trends': [],
-            'tens_apart_patterns_overall': [],
-            'same_last_digit_patterns_overall': [],
-            'repeating_digit_patterns_overall': []
+        return {
+            'all_boundary_patterns_summary': [],
+            'boundary_pairs_for_dropdown': [],
+            'yearly_data_for_selected_pattern': []
         }
 
-    current_year = datetime.now().year
-    years_in_data = sorted([y for y in df_copy['Draw Date_dt'].dt.year.unique() if y >= 2017 and y <= current_year])
+    # Pre-define boundary pairs
+    boundary_pairs = []
+    for i in range(1, 69):
+        if (i % 10 == 9 or i % 10 == 0) and i + 1 <= 69: # 9-10, 19-20, etc.
+             if i % 10 == 9: # Check for pairs like (9,10), (19,20)
+                boundary_pairs.append(tuple(sorted((i, i + 1))))
+             elif i % 10 == 0: # Check for pairs like (10,11), (20,21)
+                boundary_pairs.append(tuple(sorted((i, i + 1))))
+    # Refined boundary pairs definition to target specific decade-crossing values
+    # e.g., (9,10), (19,20), (29,30), (39,40), (49,50), (59,60)
+    explicit_boundary_pairs = []
+    for i in range(9, 60, 10):
+        if i + 1 <= 69:
+            explicit_boundary_pairs.append(tuple(sorted((i, i + 1))))
 
-    all_yearly_patterns_data = []
-    recent_special_trends = []
+    all_boundary_patterns_summary = defaultdict(int)
+    yearly_pattern_counts = defaultdict(lambda: defaultdict(int)) # {year: {pair: count}}
 
-    all_tens_apart_pairs_set = set() 
-    for n1 in range(1, 60):
+    for _, row in df_copy.iterrows():
+        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+        draw_year = row['Draw Date_dt'].year
+        
+        drawn_pairs = list(combinations(white_balls, 2))
+        
+        for pair in drawn_pairs:
+            sorted_pair = tuple(sorted(pair))
+            if sorted_pair in explicit_boundary_pairs:
+                all_boundary_patterns_summary[sorted_pair] += 1
+                yearly_pattern_counts[draw_year][sorted_pair] += 1
+
+    formatted_summary = sorted([{'pattern': list(p), 'count': c} for p, c in all_boundary_patterns_summary.items()], key=lambda x: (-x['count'], x['pattern']))
+    
+    # Get all unique boundary pairs that appeared at least once for the dropdown
+    boundary_pairs_for_dropdown = sorted([str(list(p)) for p in all_boundary_patterns_summary.keys()])
+    # Convert from string representation back to tuple for actual lookup if needed, but for dropdown string is fine
+
+    # Placeholder for selected pattern yearly data (will be populated on frontend request)
+    yearly_data_for_selected_pattern = [] 
+
+    return {
+        'all_boundary_patterns_summary': formatted_summary,
+        'boundary_pairs_for_dropdown': boundary_pairs_for_dropdown,
+        'yearly_data_for_selected_pattern': yearly_data_for_selected_pattern # Initially empty
+    }
+
+# Main route for boundary crossing pairs (restored)
+@app.route('/boundary_crossing_pairs_trends', methods=['GET', 'POST'])
+def boundary_crossing_pairs_trends_route():
+    global df
+    if df.empty or last_analysis_cache_update == datetime.min or datetime.now() - last_analysis_cache_update > CACHE_DURATION:
+        fetch_data_from_supabase() # Ensure data is fresh
+    
+    if df.empty:
+        flash("Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return render_template('boundary_crossing_pairs_trends.html', all_boundary_patterns_summary=[], boundary_pairs_for_dropdown=[], yearly_data_for_selected_pattern=[])
+
+    all_data = get_cached_analysis('boundary_crossing_trends', get_boundary_crossing_pairs_trends, df)
+
+    all_boundary_patterns_summary = all_data['all_boundary_patterns_summary']
+    boundary_pairs_for_dropdown = all_data['boundary_pairs_for_dropdown']
+    yearly_data_for_selected_pattern = [] # Will be populated if a specific pair is selected
+
+    selected_pair_str = request.form.get('selected_pair')
+    if selected_pair_str:
+        try:
+            # Convert string representation back to tuple for lookup
+            selected_pair_list = json.loads(selected_pair_str)
+            selected_pair_tuple = tuple(selected_pair_list)
+
+            # Recalculate yearly_pattern_counts for the specific selected pair
+            # This logic needs to be integrated into get_boundary_crossing_pairs_trends if not already,
+            # or fetched separately. For simplicity, assume get_boundary_crossing_pairs_trends
+            # returns a comprehensive yearly_pattern_counts or can be called to get it.
+            
+            # Since get_boundary_crossing_pairs_trends doesn't return yearly_pattern_counts directly
+            # outside of its internal scope, we need to re-run part of its logic or modify it.
+            # For a proper API, it should return yearly_pattern_counts in all_data
+            
+            # Re-running the calculation for yearly_pattern_counts just for the selected pair:
+            yearly_pattern_counts_temp = defaultdict(lambda: defaultdict(int))
+            for _, row in df.iterrows():
+                white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+                draw_year = row['Draw Date_dt'].year
+                
+                drawn_pairs = list(combinations(white_balls, 2))
+                
+                for pair in drawn_pairs:
+                    sorted_pair = tuple(sorted(pair))
+                    if sorted_pair == selected_pair_tuple: # Only count if it's the selected pair
+                        yearly_pattern_counts_temp[draw_year][sorted_pair] += 1
+            
+            raw_yearly_data = yearly_pattern_counts_temp.get(selected_pair_tuple, {}) # This is incorrect, yearly_pattern_counts_temp is by year.
+            
+            # Correct way to get data for selected pair from yearly_pattern_counts_temp:
+            yearly_data_for_selected_pattern_raw = []
+            all_years = sorted(df['Draw Date_dt'].dt.year.unique().tolist())
+            
+            for year in all_years:
+                count_for_year = yearly_pattern_counts_temp.get(year, {}).get(selected_pair_tuple, 0)
+                yearly_data_for_selected_pattern_raw.append({
+                    'year': year,
+                    'draws_with_pattern': count_for_year
+                })
+            yearly_data_for_selected_pattern = sorted(yearly_data_for_selected_pattern_raw, key=lambda x: x['year'])
+
+        except json.JSONDecodeError:
+            flash("Invalid pair selected.", 'error')
+    
+    return render_template('boundary_crossing_pairs_trends.html',
+                           all_boundary_patterns_summary=all_boundary_patterns_summary,
+                           boundary_pairs_for_dropdown=boundary_pairs_for_dropdown,
+                           selected_pair=selected_pair_str,
+                           yearly_data_for_selected_pattern=yearly_data_for_selected_pattern)
+ 
+
+# get_special_patterns_analysis (restored and improved for all requested data)
+def get_special_patterns_analysis(df_source):
+    """
+    Analyzes various 'special' white ball patterns across historical data and recent trends,
+    providing overall frequencies, yearly chart data (percentages and counts), and detailed
+    yearly pattern breakdowns.
+    """
+    if df_source.empty:
+        return {
+            'tens_apart_patterns_overall': [],
+            'same_last_digit_patterns_overall': [],
+            'repeating_digit_patterns_overall': [],
+            'recent_trends': [],
+            'yearly_chart_data': [],
+            'available_years': [],
+            'yearly_data': [] # Detailed yearly data for tables
+        }
+
+    df_copy = df_source.copy()
+    if 'Draw Date_dt' not in df_copy.columns:
+        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
+
+    if df_copy.empty:
+        return {
+            'tens_apart_patterns_overall': [],
+            'same_last_digit_patterns_overall': [],
+            'repeating_digit_patterns_overall': [],
+            'recent_trends': [],
+            'yearly_chart_data': [],
+            'available_years': [],
+            'yearly_data': []
+        }
+
+    # --- Pre-define all possible patterns for efficient lookup ---
+    all_tens_apart_pairs = set()
+    for n1 in range(1, 60): # White balls up to 69
         for diff in [10, 20, 30, 40, 50]:
             n2 = n1 + diff
             if n2 <= 69:
-                all_tens_apart_pairs_set.add(tuple(sorted((n1, n2))))
+                all_tens_apart_pairs.add(tuple(sorted((n1, n2))))
 
     same_last_digit_groups_full = defaultdict(list)
     for i in range(1, 70):
         last_digit = i % 10
         same_last_digit_groups_full[last_digit].append(i)
     
-    repeating_digit_numbers = [11, 22, 33, 44, 55, 66]
+    repeating_digit_numbers = [11, 22, 33, 44, 55, 66] # White balls only go up to 69
 
-    overall_tens_apart_counts = defaultdict(int)
-    overall_same_last_digit_counts = defaultdict(int)
-    overall_repeating_digit_counts = defaultdict(int)
+    # --- Overall Pattern Counts ---
+    tens_apart_counts_overall = defaultdict(int)
+    same_last_digit_counts_overall = defaultdict(int)
+    repeating_digit_counts_overall = defaultdict(int)
 
-    for idx, row in df_copy.iterrows(): 
-        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])] )
-        white_ball_set = set(white_balls)
-        
-        for pair in combinations(white_balls, 2):
-            sorted_pair = tuple(sorted(pair))
-            if sorted_pair in all_tens_apart_pairs_set:
-                overall_tens_apart_counts[sorted_pair] += 1
-
-        for last_digit, full_group_numbers in same_last_digit_groups_full.items():
-            intersection_with_draw = white_ball_set.intersection(set(full_group_numbers))
-            if len(intersection_with_draw) >= 2:
-                for r in range(2, len(intersection_with_draw) + 1):
-                    for pattern_combo in combinations(sorted(list(intersection_with_draw)), r):
-                        overall_same_last_digit_counts[pattern_combo] += 1
-
-        drawn_repeating_digits = [n for n in repeating_digit_numbers if n in white_ball_set]
-        if len(drawn_repeating_digits) >= 2:
-            for r in range(2, len(drawn_repeating_digits) + 1):
-                for pattern_combo in combinations(sorted(drawn_repeating_digits), r):
-                    overall_repeating_digit_counts[pattern_combo] += 1
-
-    formatted_tens_apart_overall = [{'pattern': list(p), 'count': c} for p, c in overall_tens_apart_counts.items()]
-    formatted_tens_apart_overall.sort(key=lambda x: (-x['count'], str(x['pattern'])))
-
-    formatted_same_last_digit_overall = [{'pattern': list(p), 'count': c} for p, c in overall_same_last_digit_counts.items()]
-    formatted_same_last_digit_overall.sort(key=lambda x: (-x['count'], str(x['pattern'])))
-
-    formatted_repeating_digit_overall = [{'pattern': list(p), 'count': c} for p, c in overall_repeating_digit_counts.items()]
-    formatted_repeating_digit_overall.sort(key=lambda x: (-x['count'], str(x['pattern'])))
-
-    for year in years_in_data:
-        yearly_df = df_copy[df_copy['Draw Date_dt'].dt.year == year].copy()
-        
-        if yearly_df.empty:
-            all_yearly_patterns_data.append({
-                'year': int(year),
-                'total_draws': 0,
-                'tens_apart_patterns': [],
-                'same_last_digit_patterns': [],
-                'repeating_digit_patterns': []
-            })
-            continue
-
-        tens_apart_counts_year = defaultdict(int)
-        same_last_digit_counts_year = defaultdict(int)
-        repeating_digit_counts_year = defaultdict(int)
-        
-        total_draws_in_year = len(yearly_df)
-
-        for idx, row in yearly_df.iterrows():
-            white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])] )
-            white_ball_set = set(white_balls)
-            
-            for pair in combinations(white_balls, 2):
-                sorted_pair = tuple(sorted(pair))
-                if sorted_pair in all_tens_apart_pairs_set:
-                    tens_apart_counts_year[sorted_pair] += 1
-
-            for last_digit, full_group_numbers in same_last_digit_groups_full.items():
-                intersection_with_draw = white_ball_set.intersection(set(full_group_numbers))
-                if len(intersection_with_draw) >= 2:
-                    for r in range(2, len(intersection_with_draw) + 1):
-                        for pattern_combo in combinations(sorted(list(intersection_with_draw)), r):
-                            same_last_digit_counts_year[pattern_combo] += 1
-
-            drawn_repeating_digits = [n for n in repeating_digit_numbers if n in white_ball_set]
-            if len(drawn_repeating_digits) >= 2:
-                for r in range(2, len(drawn_repeating_digits) + 1):
-                    for pattern_combo in combinations(sorted(drawn_repeating_digits), r):
-                        repeating_digit_counts_year[pattern_combo] += 1
-
-        formatted_tens_apart_year = [{'pattern': list(p), 'count': c} for p, c in tens_apart_counts_year.items()]
-        formatted_tens_apart_year.sort(key=lambda x: (-x['count'], str(x['pattern'])))
-
-        formatted_same_last_digit_year = [{'pattern': list(p), 'count': c} for p, c in same_last_digit_counts_year.items()]
-        formatted_same_last_digit_year.sort(key=lambda x: (-x['count'], str(x['pattern'])))
-
-        formatted_repeating_digit_year = [{'pattern': list(p), 'count': c} for p, c in repeating_digit_counts_year.items()]
-        formatted_repeating_digit_year.sort(key=lambda x: (-x['count'], str(x['pattern'])))
-
-        all_yearly_patterns_data.append({
-            'year': int(year),
-            'total_draws': total_draws_in_year,
-            'tens_apart_patterns': formatted_tens_apart_year,
-            'same_last_digit_patterns': formatted_same_last_digit_year,
-            'repeating_digit_patterns': formatted_repeating_digit_year
-        })
+    # --- Yearly Pattern Counts (for detailed tables and for chart aggregation) ---
+    yearly_tens_apart_counts_raw = defaultdict(lambda: defaultdict(int)) # {year: {pattern: count}}
+    yearly_same_last_digit_counts_raw = defaultdict(lambda: defaultdict(int))
+    yearly_repeating_digit_counts_raw = defaultdict(lambda: defaultdict(int))
+    yearly_total_draws = defaultdict(int) # Counts total draws per year
     
-    all_yearly_patterns_data.sort(key=lambda x: x['year'], reverse=True)
+    # Track draws where a pattern *type* was present (for percentage calculation)
+    yearly_tens_apart_draws_present = defaultdict(int)
+    yearly_same_last_digit_draws_present = defaultdict(int)
+    yearly_repeating_digit_draws_present = defaultdict(int)
 
-    one_year_ago = datetime.now() - timedelta(days=365)
-    recent_data_df = df_copy[df_copy['Draw Date_dt'] >= one_year_ago].copy()
-    recent_data_df = recent_data_df.sort_values(by='Draw Date_dt', ascending=False) 
 
-    for idx, row in recent_data_df.iterrows():
-        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])] )
-        white_ball_set = set(white_balls)
+    # --- Recent Trends (Last 12 Months) ---
+    recent_trends_data = []
+    one_year_ago = datetime.now() - pd.DateOffset(months=12)
+
+    # Define relevant years for analysis (2017 to current year, capped at 2025 as requested)
+    min_year_in_data = min(df_copy['Draw Date_dt'].dt.year) if not df_copy.empty else datetime.now().year
+    relevant_years = sorted(list(range(max(2017, min_year_in_data), min(datetime.now().year, 2025) + 1)))
+
+    # --- Main Loop: Process each draw ---
+    for _, row in df_copy.iterrows():
+        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+        white_ball_set = set(white_balls) # For faster lookups
+        draw_year = row['Draw Date_dt'].year
         draw_date_str = row['Draw Date_dt'].strftime('%Y-%m-%d')
 
-        tens_apart_present = "No"
+        if draw_year in relevant_years:
+            yearly_total_draws[draw_year] += 1
+
+        # Temp lists to track patterns in the *current draw* for recent trends
+        current_draw_tens_apart_list = []
+        current_draw_same_last_digit_list = []
+        current_draw_repeating_digit_list = []
+
+        # 1. Tens Apart Patterns
+        tens_apart_found_in_draw = False
         for pair in combinations(white_balls, 2):
-            if tuple(sorted(pair)) in all_tens_apart_pairs_set: 
-                tens_apart_present = "Yes"
-                break
-        
-        same_last_digit_present = "No"
+            sorted_pair = tuple(sorted(pair))
+            if sorted_pair in all_tens_apart_pairs:
+                tens_apart_counts_overall[sorted_pair] += 1
+                if draw_year in relevant_years:
+                    yearly_tens_apart_counts_raw[draw_year][sorted_pair] += 1
+                current_draw_tens_apart_list.append(list(sorted_pair))
+                tens_apart_found_in_draw = True
+        if tens_apart_found_in_draw and draw_year in relevant_years:
+            yearly_tens_apart_draws_present[draw_year] += 1
+
+        # 2. Same Last Digit Patterns
+        same_last_digit_found_in_draw = False
         for last_digit, full_group_numbers in same_last_digit_groups_full.items():
             intersection_with_draw = white_ball_set.intersection(set(full_group_numbers))
             if len(intersection_with_draw) >= 2:
-                same_last_digit_present = "Yes"
-                break
-        
-        repeating_digit_present = "No"
-        drawn_repeating_digits = [n for n in repeating_digit_numbers if n in white_ball_set]
-        if len(drawn_repeating_digits) >= 2:
-            repeating_digit_present = "Yes"
+                # Find all combinations of size 2 or more from the intersection for counting
+                for r in range(2, len(intersection_with_draw) + 1):
+                    for pattern_combo in combinations(sorted(list(intersection_with_draw)), r):
+                        same_last_digit_counts_overall[pattern_combo] += 1
+                        if draw_year in relevant_years:
+                            yearly_same_last_digit_counts_raw[draw_year][pattern_combo] += 1
+                current_draw_same_last_digit_list.append(list(sorted(list(intersection_with_draw)))) # For recent trends, just list the numbers with same last digit
+                same_last_digit_found_in_draw = True
+        if same_last_digit_found_in_draw and draw_year in relevant_years:
+            yearly_same_last_digit_draws_present[draw_year] += 1
 
-        recent_special_trends.append({
-            'draw_date': draw_date_str,
-            'tens_apart': tens_apart_present,
-            'same_last_digit': same_last_digit_present,
-            'repeating_digit': repeating_digit_present,
-            'white_balls': white_balls
+        # 3. Repeating Digit Patterns
+        repeating_digit_found_in_draw = False
+        drawn_repeating_digits = [n for n in repeating_digit_numbers if n in white_ball_set]
+        if len(drawn_repeating_digits) > 0: # Check if *any* repeating digit is drawn
+            # If multiple repeating digits are drawn, consider combinations for counting, otherwise just the number itself
+            if len(drawn_repeating_digits) >= 2: # For combinations
+                for r in range(2, len(drawn_repeating_digits) + 1):
+                    for pattern_combo in combinations(sorted(drawn_repeating_digits), r):
+                        repeating_digit_counts_overall[pattern_combo] += 1
+                        if draw_year in relevant_years:
+                            yearly_repeating_digit_counts_raw[draw_year][pattern_combo] += 1
+            else: # If only one repeating digit is drawn
+                repeating_digit_counts_overall[tuple(drawn_repeating_digits)] += 1 # Store as tuple for consistency
+                if draw_year in relevant_years:
+                    yearly_repeating_digit_counts_raw[draw_year][tuple(drawn_repeating_digits)] += 1
+
+            current_draw_repeating_digit_list.extend(drawn_repeating_digits) # Add actual numbers for recent trends
+            repeating_digit_found_in_draw = True
+        if repeating_digit_found_in_draw and draw_year in relevant_years:
+            yearly_repeating_digit_draws_present[draw_year] += 1
+
+
+        # Add to recent trends data if within the last 12 months
+        if row['Draw Date_dt'] >= one_year_ago:
+            # For recent trends, show if *any* pattern of that type was present, and list the patterns
+            recent_trends_data.append({
+                'draw_date': draw_date_str,
+                'white_balls': white_balls,
+                'tens_apart': "Yes" if current_draw_tens_apart_list else "No",
+                'tens_apart_patterns': current_draw_tens_apart_list,
+                'same_last_digit': "Yes" if current_draw_same_last_digit_list else "No",
+                'same_last_digit_patterns': current_draw_same_last_digit_list,
+                'repeating_digit': "Yes" if current_draw_repeating_digit_list else "No",
+                'repeating_digit_patterns': current_draw_repeating_digit_list
+            })
+
+    # Sort recent trends by date descending
+    recent_trends_data.sort(key=lambda x: x['draw_date'], reverse=True)
+
+
+    # --- Format Overall Results ---
+    # Convert pattern tuples back to lists for JSON, sort by count, then pattern
+    tens_apart_patterns_overall = sorted([{'pattern': list(p), 'count': c} for p, c in tens_apart_counts_overall.items()], key=lambda x: (-x['count'], str(x['pattern'])))
+    same_last_digit_patterns_overall = sorted([{'pattern': list(p), 'count': c} for p, c in same_last_digit_counts_overall.items()], key=lambda x: (-x['count'], str(x['pattern'])))
+    repeating_digit_patterns_overall = sorted([{'pattern': list(p), 'count': c} if isinstance(p, tuple) else {'pattern': p, 'count': c} for p, c in repeating_digit_counts_overall.items()], key=lambda x: (-x['count'], str(x['pattern'])))
+
+    # --- Prepare Yearly Chart Data ---
+    yearly_chart_data = []
+    for year in relevant_years:
+        total_draws_for_year = yearly_total_draws.get(year, 0)
+        
+        tens_apart_percent = round((yearly_tens_apart_draws_present.get(year, 0) / total_draws_for_year) * 100, 2) if total_draws_for_year > 0 else 0.0
+        same_last_digit_percent = round((yearly_same_last_digit_draws_present.get(year, 0) / total_draws_for_year) * 100, 2) if total_draws_for_year > 0 else 0.0
+        repeating_digit_percent = round((yearly_repeating_digit_draws_present.get(year, 0) / total_draws_for_year) * 100, 2) if total_draws_for_year > 0 else 0.0
+
+        yearly_chart_data.append({
+            'year': int(year),
+            'total_draws': total_draws_for_year,
+            'tens_apart_count': sum(yearly_tens_apart_counts_raw[year].values()),
+            'same_last_digit_count': sum(yearly_same_last_digit_counts_raw[year].values()),
+            'repeating_digit_count': sum(yearly_repeating_digit_counts_raw[year].values()),
+            'tens_apart_draw_percentage': tens_apart_percent,
+            'same_last_digit_draw_percentage': same_last_digit_percent,
+            'repeating_digit_draw_percentage': repeating_digit_percent,
         })
+    yearly_chart_data.sort(key=lambda x: x['year']) # Ensure ascending year order for chart
+
+    # --- Group detailed yearly data for frontend tables (sortable by count/pattern) ---
+    yearly_grouped_data_for_tables = []
+    for year in relevant_years:
+        # Convert pattern tuples back to lists for JSON and sort by count then pattern string
+        tens_apart_patterns_for_year = sorted([{'pattern': list(p), 'count': c} for p, c in yearly_tens_apart_counts_raw[year].items()], key=lambda x: (-x['count'], str(x['pattern'])))
+        same_last_digit_patterns_for_year = sorted([{'pattern': list(p), 'count': c} for p, c in yearly_same_last_digit_counts_raw[year].items()], key=lambda x: (-x['count'], str(x['pattern'])))
+        repeating_digit_patterns_for_year = sorted([{'pattern': list(p), 'count': c} if isinstance(p, tuple) else {'pattern': p, 'count': c} for p, c in yearly_repeating_digit_counts_raw[year].items()], key=lambda x: (-x['count'], str(x['pattern'])))
+
+        yearly_grouped_data_for_tables.append({
+            'year': int(year),
+            'total_draws': yearly_total_draws.get(year, 0),
+            'tens_apart_patterns': tens_apart_patterns_for_year,
+            'same_last_digit_patterns': same_last_digit_patterns_for_year,
+            'repeating_digit_patterns': repeating_digit_patterns_for_year
+        })
+    yearly_grouped_data_for_tables.sort(key=lambda x: x['year'], reverse=True) # Sort years descending for the details sections
 
     return {
-        'yearly_data': all_yearly_patterns_data,
-        'recent_trends': recent_special_trends,
-        'tens_apart_patterns_overall': formatted_tens_apart_overall,
-        'same_last_digit_patterns_overall': formatted_same_last_digit_overall,
-        'repeating_digit_patterns_overall': formatted_repeating_digit_overall
+        'tens_apart_patterns_overall': tens_apart_patterns_overall,
+        'same_last_digit_patterns_overall': same_last_digit_patterns_overall,
+        'repeating_digit_patterns_overall': repeating_digit_patterns_overall,
+        'recent_trends': recent_trends_data,
+        'yearly_chart_data': yearly_chart_data,
+        'available_years': relevant_years,
+        'yearly_data': yearly_grouped_data_for_tables
     }
 
 @app.route('/special_patterns_analysis')
