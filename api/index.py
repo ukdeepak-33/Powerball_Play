@@ -1138,6 +1138,40 @@ def analyze_generated_batch_against_official_draw(generated_picks_list, official
         elif white_matches == 0 and powerball_match == 1:
             category = "Match Powerball Only"
         
+        # Specific rule from Powerball: only 2WB + PB gives prize. 2WB only does not.
+        if white_matches == 2 and powerball_match == 0:
+            category = "No Match"
+        elif white_matches == 1 and powerball_match == 0:
+             category = "No Match"
+        elif white_matches == 0 and powerball_match == 0:
+            category = "No Match"
+
+        # Special case: If white_matches > 0 but no PB match, ensure it's categorized correctly
+        # This re-evaluation ensures rules like "Match 2 White Balls Only" don't appear if they aren't prizes.
+        # This logic should be carefully aligned with actual Powerball prize tiers.
+        if category == "No Match" and (white_matches >= 1 or powerball_match == 1):
+             if white_matches == 5 and powerball_match == 1:
+                 category = "Match 5 White Balls + Powerball"
+             elif white_matches == 5 and powerball_match == 0:
+                 category = "Match 5 White Balls Only"
+             elif white_matches == 4 and powerball_match == 1:
+                 category = "Match 4 White Balls + Powerball"
+             elif white_matches == 4 and powerball_match == 0:
+                 category = "Match 4 White Balls Only"
+             elif white_matches == 3 and powerball_match == 1:
+                 category = "Match 3 White Balls + Powerball"
+             elif white_matches == 3 and powerball_match == 0:
+                 category = "Match 3 White Balls Only"
+             elif white_matches == 2 and powerball_match == 1:
+                 category = "Match 2 White Balls + Powerball"
+             elif white_matches == 1 and powerball_match == 1:
+                 category = "Match 1 White Ball + Powerball"
+             elif white_matches == 0 and powerball_match == 1:
+                 category = "Match Powerball Only"
+             else:
+                 category = "No Match" # Default for other cases, including 2WB only, 1WB only, 0WB 0PB
+
+
         summary[category]["count"] += 1 
         summary[category]["draws"].append({
             "date": official_draw['Draw Date'], 
@@ -1385,8 +1419,6 @@ def check_generated_against_history(generated_white_balls, generated_powerball, 
             category = "Match 3 White Balls Only"
         elif white_matches == 2 and powerball_match == 1:
             category = "Match 2 White Balls + Powerball"
-        elif white_matches == 2 and powerball_match == 0: # Powerball match = 0
-            category = "No Match" # Only PB match for 2WB + PB
         elif white_matches == 1 and powerball_match == 1:
             category = "Match 1 White Ball + Powerball"
         elif white_matches == 0 and powerball_match == 1:
@@ -2976,11 +3008,88 @@ def consecutive_trends_by_year(year):
     trends = get_consecutive_trends_for_df(df_year) 
     return jsonify(trends)
 
+# Modified: Now triplets_analysis route will be used to initialize the page with default sorting.
+# The actual data fetching will be done via a new API endpoint.
 @app.route('/triplets_analysis')
 def triplets_analysis_route():
-    triplets_data = get_cached_analysis('triplets_analysis', get_most_frequent_triplets, df) 
-    return render_template('triplets_analysis.html',
-                           triplets_data=triplets_data)
+    if df.empty:
+        flash("Cannot display Triplets Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    # This route will primarily render the HTML with controls.
+    # The initial data will be fetched by JavaScript from the new API route.
+    return render_template('triplets_analysis.html')
+
+
+# NEW: Helper function to get detailed triplet analysis (counts + dates)
+def _get_detailed_triplets_analysis(df_source, filter_number=None):
+    """
+    Finds triplets of white balls, their counts, and the dates they appeared.
+    Optionally filters by a specific white ball number.
+    """
+    if df_source.empty:
+        return []
+
+    triplet_details = defaultdict(lambda: {'count': 0, 'draw_dates': []})
+
+    for idx, row in df_source.iterrows():
+        white_balls = [int(row[f'Number {i}']) for i in range(1, 6)]
+        draw_date_str = row['Draw Date_dt'].strftime('%Y-%m-%d')
+        
+        # Filter triplets to only include those containing the filter_number if specified
+        possible_triplets = combinations(sorted(white_balls), 3)
+        
+        for triplet_combo in possible_triplets:
+            if filter_number is None or filter_number in triplet_combo:
+                triplet_details[triplet_combo]['count'] += 1
+                triplet_details[triplet_combo]['draw_dates'].append(draw_date_str)
+    
+    formatted_triplets = []
+    for triplet, details in triplet_details.items():
+        # Sort draw dates for consistent 'newest' / 'oldest' logic
+        sorted_dates = sorted(details['draw_dates'], reverse=True) # Newest first
+        formatted_triplets.append({
+            'triplet': list(triplet),
+            'count': int(details['count']),
+            'first_drawn_date': sorted_dates[-1] if sorted_dates else 'N/A', # Oldest
+            'last_drawn_date': sorted_dates[0] if sorted_dates else 'N/A'    # Newest
+        })
+    
+    return formatted_triplets
+
+# NEW: API endpoint for detailed triplet analysis with filtering and sorting
+@app.route('/api/triplets_detailed_analysis', methods=['GET'])
+def api_triplets_detailed_analysis():
+    if df.empty:
+        return jsonify({'success': False, 'error': "Historical data not loaded or is empty."}), 500
+    
+    filter_number_str = request.args.get('filter_number')
+    sort_by = request.args.get('sort_by', 'most_frequent') # Default sort
+
+    filter_number = None
+    if filter_number_str and filter_number_str.isdigit():
+        filter_number = int(filter_number_str)
+        if not (1 <= filter_number <= 69):
+            return jsonify({'success': False, 'error': 'Filter number must be between 1 and 69.'}), 400
+
+    # Cache based on filter_number and sort_by
+    cache_key = f'triplets_detailed_{filter_number}_{sort_by}'
+    
+    all_triplets = get_cached_analysis(cache_key, _get_detailed_triplets_analysis, df, filter_number)
+
+    # Apply sorting
+    if sort_by == 'most_frequent':
+        all_triplets.sort(key=lambda x: (-x['count'], str(x['triplet'])))
+    elif sort_by == 'least_frequent':
+        all_triplets.sort(key=lambda x: (x['count'], str(x['triplet'])))
+    elif sort_by == 'newest':
+        # Need to handle 'N/A' dates, treat them as very old for sorting
+        all_triplets.sort(key=lambda x: datetime.strptime(x['last_drawn_date'], '%Y-%m-%d') if x['last_drawn_date'] != 'N/A' else datetime.min, reverse=True)
+    elif sort_by == 'oldest':
+        all_triplets.sort(key=lambda x: datetime.strptime(x['first_drawn_date'], '%Y-%m-%d') if x['first_drawn_date'] != 'N/A' else datetime.max)
+    
+    return jsonify({'success': True, 'triplets_data': all_triplets})
+
 
 @app.route('/grouped_patterns_analysis')
 def grouped_patterns_analysis_route():
