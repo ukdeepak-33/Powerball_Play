@@ -1086,7 +1086,7 @@ def _get_official_draw_for_date_from_db(date_str):
         return []
 
 def analyze_generated_batch_against_official_draw(generated_picks_list, official_draw):
-    """Compares a batch of generated picks against an official draw."""
+    """Comparpes a batch of generated picks against an official draw."""
     summary = {
         "Match 5 White Balls + Powerball": {"count": 0, "draws": []}, 
         "Match 5 White Balls Only": {"count": 0, "draws": []},
@@ -1237,6 +1237,7 @@ def delete_generated_numbers_from_db(ids):
 
     try:
         # Supabase DELETE allows filtering by 'in' operator for multiple IDs
+        # IDs are now expected to be strings (UUIDs)
         params = {'id': f'in.({",".join(map(str, ids))})'}
         
         response = requests.delete(url, headers=headers, params=params)
@@ -1326,7 +1327,7 @@ def get_generated_numbers_history():
         return {}
 
 def check_generated_against_history(generated_white_balls, generated_powerball, df_historical):
-    """Compares a generated pick against historical official draws."""
+    """Comparpes a generated pick against historical official draws."""
     results = {
         "generated_balls": generated_white_balls,
         "generated_powerball": generated_powerball,
@@ -2667,9 +2668,9 @@ def api_delete_generated_picks():
         if not ids_to_delete:
             return jsonify({'success': False, 'error': 'No IDs provided for deletion.'}), 400
         
-        # Ensure all IDs are integers
-        ids_to_delete = [int(id_val) for id_val in ids_to_delete]
-
+        # Removed the int() conversion here. IDs are assumed to be strings (UUIDs)
+        # from the frontend and will be passed directly to the deletion function.
+        
         success, message = delete_generated_numbers_from_db(ids_to_delete)
         if success:
             invalidate_analysis_cache() # Invalidate cache to reflect deletions
@@ -2677,8 +2678,6 @@ def api_delete_generated_picks():
         else:
             return jsonify({'success': False, 'error': message}), 500
 
-    except ValueError:
-        return jsonify({'success': False, 'error': 'Invalid ID format provided. IDs must be integers.'}), 400
     except Exception as e:
         traceback.print_exc()
         return jsonify({'success': False, 'error': f"An unexpected error occurred: {str(e)}"}), 500
