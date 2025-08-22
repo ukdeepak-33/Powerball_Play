@@ -1918,7 +1918,7 @@ def initialize_core_data():
     try:
         df_temp = load_historical_data_from_supabase()
         if not df_temp.empty:
-            df = df_temp
+            df = df_temp.sort_values(by='Draw Date_dt').reset_index(drop=True) # Ensure df is sorted
             last_draw = get_last_draw(df)
             if not last_draw.empty and 'Draw Date_dt' in last_draw and pd.notna(last_draw['Draw Date_dt']):
                 last_draw['Draw Date'] = last_draw['Draw Date_dt'].strftime('%Y-%m-%d')
@@ -3968,6 +3968,125 @@ def generate_smart_picks_route():
     except Exception as e:
         traceback.print_exc()
         return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
+
+# NEW: Function to calculate gaps for a given white ball number
+def _calculate_gaps_for_number(df_source, target_number, start_year=None, end_year=None):
+    """
+    Calculates the gap (number of draws missed) between consecutive appearances
+    of a target white ball number within a specified year range.
+
+    Args:
+        df_source (pd.DataFrame): The source DataFrame with historical draw data.
+                                  Assumed to be sorted by 'Draw Date_dt'.
+        target_number (int): The white ball number (1-69) to analyze.
+        start_year (int, optional): The starting year for the analysis. Defaults to min year in data.
+        end_year (int, optional): The ending year for the analysis. Defaults to max year in data.
+
+    Returns:
+        list: A list of dictionaries, each with 'draw_date', 'draw_index', and 'gap'.
+    """
+    if df_source.empty:
+        return []
+
+    # Ensure 'Draw Date_dt' is datetime and sort the DataFrame
+    if 'Draw Date_dt' not in df_source.columns or not pd.api.types.is_datetime64_any_dtype(df_source['Draw Date_dt']):
+        df_source['Draw Date_dt'] = pd.to_datetime(df_source['Draw Date'], errors='coerce')
+        df_source = df_source.dropna(subset=['Draw Date_dt'])
+        df_source = df_source.sort_values(by='Draw Date_dt').reset_index(drop=True)
+
+    if df_source.empty:
+        return []
+
+    # Filter by year if specified
+    filtered_df = df_source.copy()
+    if start_year is not None:
+        filtered_df = filtered_df[filtered_df['Draw Date_dt'].dt.year >= start_year]
+    if end_year is not None:
+        filtered_df = filtered_df[filtered_df['Draw Date_dt'].dt.year <= end_year]
+
+    if filtered_df.empty:
+        return []
+
+    gaps_data = []
+    current_gap = 0
+    draw_counter = 0
+
+    for index, row in filtered_df.iterrows():
+        draw_counter += 1 # Global draw index for the filtered data
+        white_balls = [int(row[f'Number {i}']) for i in range(1, 6)]
+        draw_date = row['Draw Date_dt'].strftime('%Y-%m-%d')
+
+        if target_number in white_balls:
+            gaps_data.append({
+                'draw_date': draw_date,
+                'draw_index': draw_counter, # The chronological index of this draw
+                'gap': current_gap
+            })
+            current_gap = 0 # Reset gap when the number appears
+        else:
+            current_gap += 1 # Increment gap if the number is missed
+
+    # Add an entry for the current gap if the number hasn't appeared recently
+    if current_gap > 0 and (not gaps_data or gaps_data[-1]['gap'] != current_gap): # Avoid duplicates if last entry was a gap
+        gaps_data.append({
+            'draw_date': 'Ongoing', # Indicates it's the current miss streak
+            'draw_index': draw_counter + 1, # Next theoretical draw
+            'gap': current_gap
+        })
+
+    return gaps_data
+
+# NEW: Route for White Ball Gap Analysis
+@app.route('/white_ball_gap_analysis')
+def white_ball_gap_analysis_route():
+    if df.empty:
+        flash("Cannot display White Ball Gap Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    current_year = datetime.now().year
+    years_for_dropdown = sorted(df['Draw Date_dt'].dt.year.unique().tolist(), reverse=True)
+    if not years_for_dropdown:
+        years_for_dropdown = [current_year] # Default to current year if no data
+    
+    # Ensure current_year is in the dropdown if it's not present (e.g., if data ends last year)
+    if current_year not in years_for_dropdown:
+        years_for_dropdown.insert(0, current_year)
+    years_for_dropdown = sorted(list(set(years_for_dropdown)), reverse=True)
+
+
+    return render_template('white_ball_gap_analysis.html',
+                           white_ball_numbers=range(1, 70),
+                           years=years_for_dropdown)
+
+@app.route('/api/white_ball_gaps', methods=['GET'])
+def api_white_ball_gaps():
+    if df.empty:
+        return jsonify({'success': False, 'error': "Historical data not loaded or is empty."}), 500
+
+    target_number_str = request.args.get('number')
+    year_str = request.args.get('year')
+
+    if not target_number_str or not target_number_str.isdigit():
+        return jsonify({'success': False, 'error': 'Invalid white ball number provided.'}), 400
+    
+    target_number = int(target_number_str)
+    if not (1 <= target_number <= 69):
+        return jsonify({'success': False, 'error': 'White ball number must be between 1 and 69.'}), 400
+
+    start_year = None
+    end_year = None
+    if year_str and year_str.isdigit():
+        start_year = int(year_str)
+        end_year = int(year_str)
+    
+    # Using the caching mechanism for gap calculation
+    cache_key = f'white_ball_gaps_{target_number}_{start_year}_{end_year}'
+    gaps_data = get_cached_analysis(cache_key, _calculate_gaps_for_number, df, target_number, start_year, end_year)
+
+    if not gaps_data:
+        return jsonify({'success': False, 'error': f"No appearance data for number {target_number} in the selected year range."}), 404
+
+    return jsonify({'success': True, 'gaps_data': gaps_data})
 
 # Initialize core data on app startup
 initialize_core_data()
