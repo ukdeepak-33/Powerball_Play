@@ -137,13 +137,29 @@
                                 </button>
                                 <div id="month-content-{{ year }}-{{ month_key }}" class="month-content hidden">
                                     {% set sorted_dates = month_data.dates.keys() | sort(reverse=true) %}
+                                    {# Added Delete Selected Button #}
+                                    <div class="flex justify-end pr-4 pt-2">
+                                        <button class="btn-danger-small delete-picks-button flex items-center px-3 py-1.5 text-xs rounded-md" data-date="{{ date_str }}">
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m14 0H5m14 0V5a2 2 0 00-2-2H7a2 2 0 00-2 2v2m14 0h-4m-4 0H5"></path>
+                                            </svg>
+                                            Delete Selected
+                                        </button>
+                                    </div>
                                     {% for date_str in sorted_dates %}
                                         <div class="p-4 border-t border-gray-100 bg-gray-50 pl-12">
-                                            <h4 class="font-bold text-gray-800 mb-3 text-sm">{{ date_str }}</h4>
+                                            <h4 class="font-bold text-gray-800 mb-3 text-sm flex items-center">
+                                                <input type="checkbox" class="form-checkbox h-4 w-4 text-blue-600 rounded mr-2 select-all-day-checkbox" data-date="{{ date_str }}">
+                                                {{ date_str }} ({{ month_data.dates[date_str]|length }} picks)
+                                            </h4>
                                             <div class="space-y-3">
                                                 {% for pick in month_data.dates[date_str] %}
                                                     <li class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b pb-3 mb-3 last:border-b-0 last:pb-0 last:mb-0">
-                                                        <span class="text-gray-600 text-sm mb-2 sm:mb-0 sm:mr-4">Generated at: <span class="font-medium text-gray-800">{{ pick.time }}</span></span>
+                                                        <div class="flex items-center">
+                                                            {# Checkbox for individual pick #}
+                                                            <input type="checkbox" class="form-checkbox h-4 w-4 text-blue-600 rounded mr-2 generated-pick-checkbox" data-id="{{ pick.id }}" data-date="{{ date_str }}">
+                                                            <span class="text-gray-600 text-sm mb-2 sm:mb-0 sm:mr-4">Generated at: <span class="font-medium text-gray-800">{{ pick.time }}</span></span>
+                                                        </div>
                                                         <div class="flex items-center space-x-2 flex-wrap justify-center sm:justify-start">
                                                             {% for ball in pick.white_balls %}
                                                                 <span class="ball-small">{{ ball }}</span>
@@ -179,7 +195,23 @@
     {% endif %}
 </div>
 
+{# Custom Confirmation Modal #}
+<div id="confirmationModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 hidden">
+    <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4">
+        <h3 class="text-xl font-bold mb-4 text-gray-800">Confirm Deletion</h3>
+        <p class="text-gray-700 mb-6" id="modalMessage">Are you sure you want to delete the selected pick(s)? This action cannot be undone.</p>
+        <div class="flex justify-end space-x-4">
+            <button id="cancelDeleteBtn" class="btn-secondary">Cancel</button>
+            <button id="confirmDeleteBtn" class="btn-danger">Delete</button>
+        </div>
+    </div>
+</div>
+
+{# Custom Toast Popup for messages #}
+<div id="toastPopup" class="toast-popup hidden"></div>
+
 <style>
+    /* Custom styles for balls - keeping yours */
     .ball-small {
         display: inline-flex;
         justify-content: center;
@@ -218,46 +250,217 @@
         color: white;
         border-color: #991b1b;
     }
+    /* Buttons - keeping your primary-small and adding danger for consistency */
     .btn-primary-small {
         @apply bg-blue-500 text-white text-xs font-bold py-1.5 px-3 rounded-lg hover:bg-blue-600 focus:outline-none focus:shadow-outline transition duration-200 ease-in-out;
     }
-</style>
+    /* New: danger button styles for consistency */
+    .btn-danger {
+        @apply bg-red-500 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-red-600 transition duration-300 ease-in-out transform hover:scale-105;
+    }
+    .btn-danger-small {
+        @apply bg-red-500 text-white font-bold py-1.5 px-3 rounded-md hover:bg-red-600 transition duration-300 ease-in-out;
+    }
+    .btn-secondary {
+        @apply bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-300 transition duration-300 ease-in-out transform hover:scale-105;
+    }
 
+    /* Existing accordion arrow styles */
+    .year-toggle .year-arrow, .month-toggle .month-arrow {
+        transition: transform 0.2s ease-in-out;
+    }
+    .year-toggle[aria-expanded="true"] .year-arrow, .month-toggle[aria-expanded="true"] .month-arrow {
+        transform: rotate(180deg);
+    }
+    /* Hide default details marker */
+    details > summary::-webkit-details-marker {
+        display: none;
+    }
+    details > summary {
+        list-style: none;
+    }
+    details[open] .details-arrow {
+        transform: rotate(180deg);
+    }
+
+    /* Toast notification styling */
+    .toast-popup {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        color: white;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    .toast-popup.show {
+        opacity: 1;
+        visibility: visible;
+    }
+    .toast-popup.success {
+        background-color: #28a745; /* Green */
+    }
+    .toast-popup.error {
+        background-color: #dc3545; /* Red */
+    }
+    .toast-popup.info {
+        background-color: #007bff; /* Blue */
+    }
+    .toast-popup.animate-fade-out {
+        animation: fadeOut 0.5s forwards;
+    }
+    @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+    }
+
+    /* Ensure text in balls is readable */
+    .ball-small, .ball-large, .powerball-small, .powerball-large {
+        font-family: 'Inter', sans-serif;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Toggle functionality for Year sections
+        // --- Existing Accordion Logic ---
         document.querySelectorAll('.year-toggle').forEach(button => {
             button.addEventListener('click', function() {
                 const targetId = this.dataset.target;
                 const targetContent = document.getElementById(targetId);
-                const arrow = this.querySelector('.year-arrow');
-
-                if (targetContent.classList.contains('hidden')) {
-                    targetContent.classList.remove('hidden');
-                    arrow.classList.add('rotate-180');
-                } else {
-                    targetContent.classList.add('hidden');
-                    arrow.classList.remove('rotate-180');
-                }
+                const isExpanded = targetContent.classList.toggle('hidden');
+                this.setAttribute('aria-expanded', !isExpanded); // ARIA for accessibility
             });
         });
 
-        // Toggle functionality for Month sections
         document.querySelectorAll('.month-toggle').forEach(button => {
             button.addEventListener('click', function() {
                 const targetId = this.dataset.target;
                 const targetContent = document.getElementById(targetId);
-                const arrow = this.querySelector('.month-arrow');
-
-                if (targetContent.classList.contains('hidden')) {
-                    targetContent.classList.remove('hidden');
-                    arrow.classList.add('rotate-180');
-                } else {
-                    targetContent.classList.add('hidden');
-                    arrow.classList.remove('rotate-180');
-                }
+                const isExpanded = targetContent.classList.toggle('hidden');
+                this.setAttribute('aria-expanded', !isExpanded); // ARIA for accessibility
             });
         });
+
+        // --- New Delete Functionality Elements ---
+        const confirmationModal = document.getElementById('confirmationModal');
+        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+        const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+        const modalMessage = document.getElementById('modalMessage');
+        const toastPopup = document.getElementById('toastPopup');
+
+        // --- Custom Toast Popup Function ---
+        function showToast(message, category = 'info') {
+            toastPopup.textContent = message;
+            // Remove previous category classes before adding new ones
+            toastPopup.classList.remove('success', 'error', 'info', 'hidden', 'animate-fade-out');
+            toastPopup.className = `toast-popup show ${category}`; 
+            
+            // Set a timeout to hide the toast
+            setTimeout(() => {
+                toastPopup.classList.remove('show');
+                toastPopup.classList.add('animate-fade-out'); // Add fade-out animation
+                toastPopup.addEventListener('animationend', () => {
+                    toastPopup.classList.add('hidden'); // Fully hide after animation
+                    // Remove all category and animation classes for next use
+                    toastPopup.classList.remove('animate-fade-out', 'success', 'error', 'info');
+                }, { once: true }); // Ensure listener only runs once
+            }, 5000); // Toast disappears after 5 seconds
+        }
+
+
+        // --- Modal Control Functions ---
+        function openModal(message) {
+            modalMessage.textContent = message;
+            confirmationModal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            confirmationModal.classList.add('hidden');
+        }
+
+        cancelDeleteBtn.addEventListener('click', closeModal);
+
+        // --- Delete Logic ---
+
+        // Event listener for "Select All for Day" checkboxes
+        document.querySelectorAll('.select-all-day-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const date = this.dataset.date;
+                const checkboxesInDay = document.querySelectorAll(`.generated-pick-checkbox[data-date="${date}"]`);
+                checkboxesInDay.forEach(pickCheckbox => {
+                    pickCheckbox.checked = this.checked;
+                });
+            });
+        });
+
+        // Event listener for individual generated pick checkboxes (delegated to parent)
+        document.getElementById('accordion-container').addEventListener('change', function(event) {
+            if (event.target.classList.contains('generated-pick-checkbox')) {
+                const changedCheckbox = event.target;
+                const date = changedCheckbox.dataset.date;
+                const selectAllDayCheckbox = document.querySelector(`.select-all-day-checkbox[data-date="${date}"]`);
+                
+                if (selectAllDayCheckbox) {
+                    const checkboxesInDay = document.querySelectorAll(`.generated-pick-checkbox[data-date="${date}"]`);
+                    const allForDaySelected = Array.from(checkboxesInDay).every(cb => cb.checked);
+                    selectAllDayCheckbox.checked = allForDaySelected;
+                }
+            }
+        });
+
+        // Event listener for "Delete Selected" button (per month)
+        document.querySelectorAll('.delete-picks-button').forEach(button => {
+            button.addEventListener('click', function() {
+                const monthDiv = this.closest('.month-content'); // Get the parent month-content div
+                const selectedIds = Array.from(monthDiv.querySelectorAll('.generated-pick-checkbox:checked'))
+                                       .map(cb => cb.dataset.id);
+                
+                if (selectedIds.length === 0) {
+                    showToast("Please select at least one pick to delete in this month.", 'info');
+                    return;
+                }
+
+                openModal(`Are you sure you want to delete ${selectedIds.length} selected pick(s) from this month? This action cannot be undone.`);
+
+                confirmDeleteBtn.onclick = async function() {
+                    closeModal();
+                    try {
+                        const response = await fetch('/api/delete_generated_picks', {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ ids: selectedIds }),
+                        });
+
+                        const result = await response.json();
+
+                        if (response.ok) {
+                            showToast(result.message, 'success');
+                            // Reload the page to reflect changes
+                            location.reload(); 
+                        } else {
+                            showToast(result.error || "Failed to delete picks.", 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error deleting generated picks:', error);
+                        showToast('An unexpected error occurred during deletion.', 'error');
+                    }
+                };
+            });
+        });
+
+
+        // --- Existing Analysis Logic (Re-pasted for completeness) ---
 
         // Elements for Batch Analysis
         const officialDrawDateSelect = document.getElementById('official-draw-date-select');
@@ -280,7 +483,7 @@
         const singleMatchSummaryDetailsDiv = document.getElementById('single-match-summary-details');
 
         // Initial check for official draw dates to enable/disable batch analysis buttons
-        if (officialDrawDateSelect.options.length === 0 || officialDrawDateSelect.value === "") {
+        if (officialDrawDateSelect && (officialDrawDateSelect.options.length === 0 || officialDrawDateSelect.value === "")) {
             analyzeBatchButtons.forEach(btn => btn.disabled = true);
         }
 
@@ -290,7 +493,7 @@
             let foundMatches = false;
             for (const key in summary) {
                 if (summary.hasOwnProperty(key)) {
-                    // Exclude "No Match" from display
+                    // Exclude "No Match" from display unless all picks are "No Match"
                     if (key === "No Match") {
                         continue;
                     }
@@ -304,8 +507,9 @@
                         div.className = 'bg-blue-100 p-2 rounded-md font-medium';
                         let listItemText = `<span class="text-blue-900">${key}:</span> <span class="font-bold text-lg text-blue-700">${count}</span>`;
                         if (draws.length > 0) {
-                            const drawDates = draws.map(d => d.date).join(', ');
-                            listItemText += `<span class="text-sm text-gray-600 ml-2">(Last drawn: ${drawDates})</span>`;
+                            // Display unique draw dates only
+                            const uniqueDrawDates = Array.from(new Set(draws.map(d => d.date))).join(', ');
+                            listItemText += `<span class="text-sm text-gray-600 ml-2">(Last drawn: ${uniqueDrawDates})</span>`;
                         }
                         div.innerHTML = listItemText;
                         targetDiv.appendChild(div);
