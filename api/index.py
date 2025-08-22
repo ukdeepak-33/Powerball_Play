@@ -37,6 +37,8 @@ analysis_cache = {}
 last_analysis_cache_update = datetime.min 
 
 CACHE_DURATION = timedelta(minutes=60) # Cache for 60 minutes
+CACHE_EXPIRATION_SECONDS = CACHE_DURATION.total_seconds()
+
 
 group_a = [3, 5, 6, 7, 9, 11, 15, 16, 18, 21, 23, 24, 27, 31, 32, 33, 36, 42, 44, 45, 48, 50, 51, 54, 55, 60, 66, 69]
 GLOBAL_WHITE_BALL_RANGE = (1, 69)
@@ -540,7 +542,7 @@ def get_monthly_white_ball_analysis_data(dataframe, num_top_wb=69, num_top_pb=3,
 
 def sum_of_main_balls(df_source):
     """Calculates sum of main balls, their frequency, and min/max/avg sums."""
-    if df_source.empty:
+    if df_source.empty: 
         return pd.DataFrame(), [], 0, 0, 0.0
     
     temp_df = df_source.copy()
@@ -1032,7 +1034,7 @@ def _get_generated_picks_for_date_from_db(date_str):
         return []
 
     params = {
-        'select': 'generated_date,number_1,number_2,number_3,number_4,number_5,powerball',
+        'select': 'id,generated_date,number_1,number_2,number_3,number_4,number_5,powerball', # Added 'id'
         'order': 'generated_date.desc', 
         'generated_date': f'gte.{start_of_day_iso}',
         'and': (f'(generated_date.lt.{end_of_day_iso})',) 
@@ -1050,6 +1052,7 @@ def _get_generated_picks_for_date_from_db(date_str):
                 int(record['number_4']), int(record['number_5'])
             ])
             formatted_picks.append({
+                'id': record['id'], # Include id
                 'time': datetime.fromisoformat(record['generated_date'].replace('Z', '+00:00')).strftime('%I:%M %p'), 
                 'white_balls': white_balls,
                 'powerball': int(record['powerball'])
@@ -1224,6 +1227,40 @@ def save_generated_numbers_to_db(numbers, powerball):
         print(f"Failed to insert generated numbers. Status: {insert_response.status_code}, Response: {insert_response.text}")
         return False, f"Error saving generated numbers: {insert_response.status_code} - {insert_response.text}"
 
+def delete_generated_numbers_from_db(ids):
+    """Deletes generated Powerball combinations from Supabase by ID."""
+    if not ids:
+        return True, "No IDs provided for deletion."
+
+    url = f"{SUPABASE_PROJECT_URL}/rest/v1/{GENERATED_NUMBERS_TABLE_NAME}"
+    headers = _get_supabase_headers(is_service_key=True)
+
+    try:
+        # Supabase DELETE allows filtering by 'in' operator for multiple IDs
+        params = {'id': f'in.({",".join(map(str, ids))})'}
+        
+        response = requests.delete(url, headers=headers, params=params)
+        response.raise_for_status() 
+
+        # A successful DELETE usually returns 204 No Content for a single resource
+        # or 200 OK with potentially an empty array for multiple.
+        # Check status code to confirm success
+        if response.status_code == 200 or response.status_code == 204:
+            return True, f"Successfully deleted {len(ids)} generated pick(s)."
+        else:
+            return False, f"Failed to delete picks. Status: {response.status_code}, Response: {response.text}"
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error during Supabase delete request: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"Supabase response content: {e.response.text}")
+        return False, f"Network or API error during deletion: {e}"
+    except Exception as e:
+        print(f"An unexpected error occurred in delete_generated_numbers_from_db: {e}")
+        traceback.print_exc()
+        return False, f"An unexpected error occurred: {e}"
+
+
 def get_generated_numbers_history():
     """Fetches the history of generated numbers from Supabase."""
     all_data = []
@@ -1236,7 +1273,7 @@ def get_generated_numbers_history():
         
         while True:
             params = {
-                'select': 'generated_date,number_1,number_2,number_3,number_4,number_5,powerball',
+                'select': 'id,generated_date,number_1,number_2,number_3,number_4,number_5,powerball', # Added 'id'
                 'order': 'generated_date.desc',
                 'offset': offset,
                 'limit': limit
@@ -1266,6 +1303,7 @@ def get_generated_numbers_history():
             ])
             
             grouped_data[date_key].append({
+                'id': record['id'], # Include id
                 'time': formatted_time,
                 'white_balls': generated_balls,
                 'powerball': int(record['powerball'])
@@ -1346,11 +1384,47 @@ def check_generated_against_history(generated_white_balls, generated_powerball, 
             category = "Match 3 White Balls Only"
         elif white_matches == 2 and powerball_match == 1:
             category = "Match 2 White Balls + Powerball"
+        elif white_matches == 2 and powerball_match == 0: # Powerball match = 0
+            category = "No Match" # Only PB match for 2WB + PB
         elif white_matches == 1 and powerball_match == 1:
             category = "Match 1 White Ball + Powerball"
         elif white_matches == 0 and powerball_match == 1:
             category = "Match Powerball Only"
         
+        # Specific rule from Powerball: only 2WB + PB gives prize. 2WB only does not.
+        if white_matches == 2 and powerball_match == 0:
+            category = "No Match"
+        elif white_matches == 1 and powerball_match == 0:
+             category = "No Match"
+        elif white_matches == 0 and powerball_match == 0:
+            category = "No Match"
+
+        # Special case: If white_matches > 0 but no PB match, ensure it's categorized correctly
+        # This re-evaluation ensures rules like "Match 2 White Balls Only" don't appear if they aren't prizes.
+        # This logic should be carefully aligned with actual Powerball prize tiers.
+        if category == "No Match" and (white_matches >= 1 or powerball_match == 1):
+             if white_matches == 5 and powerball_match == 1:
+                 category = "Match 5 White Balls + Powerball"
+             elif white_matches == 5 and powerball_match == 0:
+                 category = "Match 5 White Balls Only"
+             elif white_matches == 4 and powerball_match == 1:
+                 category = "Match 4 White Balls + Powerball"
+             elif white_matches == 4 and powerball_match == 0:
+                 category = "Match 4 White Balls Only"
+             elif white_matches == 3 and powerball_match == 1:
+                 category = "Match 3 White Balls + Powerball"
+             elif white_matches == 3 and powerball_match == 0:
+                 category = "Match 3 White Balls Only"
+             elif white_matches == 2 and powerball_match == 1:
+                 category = "Match 2 White Balls + Powerball"
+             elif white_matches == 1 and powerball_match == 1:
+                 category = "Match 1 White Ball + Powerball"
+             elif white_matches == 0 and powerball_match == 1:
+                 category = "Match Powerball Only"
+             else:
+                 category = "No Match" # Default for other cases, including 2WB only, 1WB only, 0WB 0PB
+
+
         results["summary"][category]["count"] += 1 
         results["summary"][category]["draws"].append({
             "date": historical_draw_date, 
@@ -2285,9 +2359,15 @@ def create_combinations_api():
         traceback.print_exc()
         return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
 
+# Helper function to ensure data is fetched from Supabase (can be called before analysis functions)
+def fetch_data_from_supabase():
+    global df, last_draw, historical_white_ball_sets, white_ball_co_occurrence_lookup
+    if df.empty or (datetime.now() - last_analysis_cache_update).total_seconds() > CACHE_EXPIRATION_SECONDS:
+        print("Data is stale or empty, re-initializing core data.")
+        initialize_core_data()
+    else:
+        print("Data is fresh, no need to re-initialize.")
 
-# Initialize core data on app startup
-initialize_core_data() 
 
 # --- Flask Routes ---
 
@@ -2577,6 +2657,32 @@ def save_multiple_generated_picks_route():
         print(f"Error in save_multiple_generated_picks_route: {e}")
         traceback.print_exc()
         return jsonify({"success": False, "message": f"An unexpected error occurred: {str(e)}"}), 500
+
+@app.route('/api/delete_generated_picks', methods=['DELETE'])
+def api_delete_generated_picks():
+    try:
+        data = request.get_json()
+        ids_to_delete = data.get('ids', [])
+
+        if not ids_to_delete:
+            return jsonify({'success': False, 'error': 'No IDs provided for deletion.'}), 400
+        
+        # Ensure all IDs are integers
+        ids_to_delete = [int(id_val) for id_val in ids_to_delete]
+
+        success, message = delete_generated_numbers_from_db(ids_to_delete)
+        if success:
+            invalidate_analysis_cache() # Invalidate cache to reflect deletions
+            return jsonify({'success': True, 'message': message}), 200
+        else:
+            return jsonify({'success': False, 'error': message}), 500
+
+    except ValueError:
+        return jsonify({'success': False, 'error': 'Invalid ID format provided. IDs must be integers.'}), 400
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f"An unexpected error occurred: {str(e)}"}), 500
+
 
 @app.route('/frequency_analysis')
 def frequency_analysis_route():
@@ -2981,7 +3087,6 @@ def grouped_patterns_yearly_comparison_route():
                            number_ranges=NUMBER_RANGES, 
                            selected_range=selected_range_label) 
 
-get_boundary_crossing_pairs_trends (restored)
 def get_boundary_crossing_pairs_trends(df_source):
     if df_source.empty:
         return {
@@ -3002,14 +3107,6 @@ def get_boundary_crossing_pairs_trends(df_source):
             'yearly_data_for_selected_pattern': []
         }
 
-    # Pre-define boundary pairs
-    boundary_pairs = []
-    for i in range(1, 69):
-        if (i % 10 == 9 or i % 10 == 0) and i + 1 <= 69: # 9-10, 19-20, etc.
-             if i % 10 == 9: # Check for pairs like (9,10), (19,20)
-                boundary_pairs.append(tuple(sorted((i, i + 1))))
-             elif i % 10 == 0: # Check for pairs like (10,11), (20,21)
-                boundary_pairs.append(tuple(sorted((i, i + 1))))
     # Refined boundary pairs definition to target specific decade-crossing values
     # e.g., (9,10), (19,20), (29,30), (39,40), (49,50), (59,60)
     explicit_boundary_pairs = []
@@ -3092,8 +3189,6 @@ def boundary_crossing_pairs_trends_route():
                     sorted_pair = tuple(sorted(pair))
                     if sorted_pair == selected_pair_tuple: # Only count if it's the selected pair
                         yearly_pattern_counts_temp[draw_year][sorted_pair] += 1
-            
-            raw_yearly_data = yearly_pattern_counts_temp.get(selected_pair_tuple, {}) # This is incorrect, yearly_pattern_counts_temp is by year.
             
             # Correct way to get data for selected pair from yearly_pattern_counts_temp:
             yearly_data_for_selected_pattern_raw = []
@@ -3874,3 +3969,6 @@ def generate_smart_picks_route():
     except Exception as e:
         traceback.print_exc()
         return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
+
+# Initialize core data on app startup
+initialize_core_data()
