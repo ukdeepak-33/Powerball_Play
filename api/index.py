@@ -771,7 +771,7 @@ def _learn_feature_distributions():
         'num_in_range_30_39', 'num_in_range_40_49', 'num_in_range_50_59', 'num_in_range_60_69',
         'is_monday_draw', 'is_wednesday_draw', 'is_saturday_draw', 'powerball_value',
         # NEW: Add the range pattern feature names
-        'is_single_pick_pattern', 'is_two_number_pick_pattern', 'is_three_number_pick_pattern', 'is_two_two_pick_pattern'
+        'is_single_pick_pattern', 'is_two_number_pick_pattern', 'is_three_number_pick_pattern', 'is_two_two_pick_pattern','is_one_two_three_pick_pattern'
     ]
 
     for index, row in df.iterrows():
