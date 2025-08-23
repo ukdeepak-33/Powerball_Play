@@ -94,6 +94,78 @@ BOUNDARY_PAIRS_TO_ANALYZE = [
     (9, 10), (19, 20), (29, 30), (39, 40), (49, 50), (59, 60)
 ]
 
+# NEW: Define the types of range-based patterns observed by the user
+RANGE_PATTERN_TYPES = [
+    "Single Pick (1-1-1-1-1)",     # Each white ball from a different decade range
+    "Two-Number Pick (2-1-1-1)",   # Two balls from one range, one from three others
+    "Three-Number Pick (3-1-1)",   # Three balls from one range, one from two others
+    "Two-Two-Number Pick (2-2-1)",  # Two balls from one range, two from another, one from a third
+    "One-Two-Three Number Pick (1-2-3)" # One ball from one range, two from another, three from a third
+]
+
+# NEW Global Variable for recent odd/even ratios
+recent_odd_even_ratios = [] # To store the last few odd/even splits
+
+# ... (after NUMBER_RANGES definition) ...
+
+def _get_ball_ranges_counts(white_balls):
+    """
+    Counts how many white balls fall into each predefined NUMBER_RANGES decade.
+    Returns a dictionary like {'1-9': 2, '10s': 1, '20s': 0, ...}
+    """
+    range_counts = defaultdict(int)
+    for num in white_balls:
+        for range_name, (min_val, max_val) in NUMBER_RANGES.items():
+            if min_val <= num <= max_val:
+                range_counts[range_name] += 1
+                break
+    return range_counts
+
+# ... (after _get_ball_ranges_counts function) ...
+
+def _classify_range_pattern(white_balls):
+    """
+    Classifies the pattern of white balls based on their distribution across predefined ranges.
+    Patterns include "Single Pick", "Two-Number Pick", "Three-Number Pick", "Two-Two-Number Pick".
+    
+    Args:
+        white_balls (list): A sorted list of 5 white ball numbers.
+        
+    Returns:
+        str: The classification of the pattern (e.g., "Single Pick (1-1-1-1-1)", "Two-Number Pick (2-1-1-1)", "Other").
+    """
+    range_counts = _get_ball_ranges_counts(white_balls)
+    
+    # Get counts of how many numbers fall into each range, ignoring ranges with 0 balls
+    active_range_ball_counts = sorted([count for count in range_counts.values() if count > 0], reverse=True)
+
+    if not active_range_ball_counts: # Should not happen with 5 balls, but as a safeguard
+        return "Other"
+
+    # Pattern: Single Pick (1-1-1-1-1) - each ball from a different range
+    # This means there are 5 active ranges, each with 1 ball
+    if active_range_ball_counts == [1, 1, 1, 1, 1]:
+        return "Single Pick (1-1-1-1-1)"
+
+    # Pattern: Two-Number Pick (2-1-1-1) - two balls from one range, one from three others
+    if active_range_ball_counts == [2, 1, 1, 1]:
+        return "Two-Number Pick (2-1-1-1)"
+
+    # Pattern: Three-Number Pick (3-1-1) - three balls from one range, one from two others
+    if active_range_ball_counts == [3, 1, 1]:
+        return "Three-Number Pick (3-1-1)"
+    
+    # Pattern: Two-Two-Number Pick (2-2-1) - two from one range, two from another, one from a third
+    if active_range_ball_counts == [2, 2, 1]:
+        return "Two-Two-Number Pick (2-2-1)"
+
+   # Pattern: One-Two-Three Number Pick (1-2-3) - one from one range, two from another, three from a third
+    if active_range_ball_counts == [3, 2, 1]:
+        return "One-Two-Three Number Pick (1-2-3)"
+
+    # Other patterns not explicitly defined by user's observation (e.g., 4-1, 5-0, or other combinations)
+    return "Other" 
+
 # --- Gemini API Configuration ---
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
@@ -415,10 +487,13 @@ def generate_with_user_provided_pair(num1, num2, white_ball_range, powerball_ran
         raise ValueError("Could not generate a unique combination with the provided pair and ascending range constraint meeting all criteria after many attempts. Try adjusting filters.")
 
 
+
+
+# --- Update _extract_features_for_draw ---
 def _extract_features_for_draw(draw_row):
     """
     Extracts a numerical feature vector from a single Powerball draw row.
-    This vector will be used for clustering.
+    This vector will be used for generative model training.
     """
     if pd.isna(draw_row['Number 1']): # Ensure draw data is valid
         return None
@@ -429,24 +504,16 @@ def _extract_features_for_draw(draw_row):
     ])
     powerball = int(draw_row['Powerball'])
     
-    # Feature 1-2: Odd/Even Split
     odd_count = sum(1 for num in white_balls if num % 2 != 0)
     even_count = 5 - odd_count
-
-    # Feature 3: Sum of White Balls
     white_ball_sum = sum(white_balls)
-
-    # Feature 4: Group-A Count
     group_a_count = sum(1 for num in white_balls if num in group_a)
 
-    # Feature 5: Consecutive Pairs Count
     consecutive_pairs_count = 0
     for i in range(len(white_balls) - 1):
         if white_balls[i] + 1 == white_balls[i+1]:
             consecutive_pairs_count += 1
-            # For longer sequences like (1,2,3), this counts (1,2) and (2,3) as 2 pairs
 
-    # Feature 6: Tens Apart Pairs Count (e.g., 1-11, 2-12)
     tens_apart_pairs_count = 0
     for i in range(len(white_balls)):
         for j in range(i + 1, len(white_balls)):
@@ -454,17 +521,14 @@ def _extract_features_for_draw(draw_row):
             if diff in [10, 20, 30, 40, 50]:
                 tens_apart_pairs_count += 1
 
-    # Feature 7: Same Last Digit Count (count of numbers that share a last digit with another)
     last_digit_counts = defaultdict(int)
     for num in white_balls:
         last_digit_counts[num % 10] += 1
     same_last_digit_count = sum(count for count in last_digit_counts.values() if count >= 2)
 
-    # Feature 8: Repeating Digit Count (11, 22, 33, etc.)
     repeating_digit_numbers = [11, 22, 33, 44, 55, 66]
     repeating_digit_count = sum(1 for num in white_balls if num in repeating_digit_numbers)
 
-    # Features 9-15: Number Range Counts
     num_in_range = defaultdict(int)
     for num in white_balls:
         if 1 <= num <= 9: num_in_range['1-9'] += 1
@@ -475,65 +539,65 @@ def _extract_features_for_draw(draw_row):
         elif 50 <= num <= 59: num_in_range['50s'] += 1
         elif 60 <= num <= 69: num_in_range['60s'] += 1
     
-    # Features 16-18: Weekday (One-Hot Encoded)
     draw_weekday = draw_row['Draw Date_dt'].day_name()
     is_monday_draw = 1 if draw_weekday == 'Monday' else 0
     is_wednesday_draw = 1 if draw_weekday == 'Wednesday' else 0
     is_saturday_draw = 1 if draw_weekday == 'Saturday' else 0
 
-    # Feature 19: Powerball Value
     powerball_value = powerball
+
+    # NEW: Classify and one-hot encode the range pattern
+    current_range_pattern_type = _classify_range_pattern(white_balls)
+    is_single_pick_pattern = 1 if current_range_pattern_type == "Single Pick (1-1-1-1-1)" else 0
+    is_two_number_pick_pattern = 1 if current_range_pattern_type == "Two-Number Pick (2-1-1-1)" else 0
+    is_three_number_pick_pattern = 1 if current_range_pattern_type == "Three-Number Pick (3-1-1)" else 0
+    is_two_two_pick_pattern = 1 if current_range_pattern_type == "Two-Two-Number Pick (2-2-1)" else 0
+    is_one_two_three_pick_pattern = 1 if current_range_pattern_type == "One-Two-Three Number Pick (1-2-3)" else 0 # NEW LINE Pick (2-2-1)" else 0
+
 
     features = [
         odd_count, even_count, white_ball_sum, group_a_count, consecutive_pairs_count,
         tens_apart_pairs_count, same_last_digit_count, repeating_digit_count,
         num_in_range['1-9'], num_in_range['10s'], num_in_range['20s'],
         num_in_range['30s'], num_in_range['40s'], num_in_range['50s'], num_in_range['60s'],
-        is_monday_draw, is_wednesday_draw, is_saturday_draw, powerball_value
+        is_monday_draw, is_wednesday_draw, is_saturday_draw, powerball_value,
+        # NEW: Add the range pattern features
+        is_single_pick_pattern, is_two_number_pick_pattern, is_three_number_pick_pattern, is_two_two_pick_pattern
     ]
     return features
 
 
+# --- Update _extract_features_for_candidate ---
 def _extract_features_for_candidate(white_balls, powerball, draw_date_dt):
     """
     Extracts a numerical feature vector from a candidate Powerball pick
     (list of white balls, powerball, and a datetime object for the draw date).
     Used for evaluating candidate picks against cluster centroids.
     """
-    # Ensure inputs are valid
     if not isinstance(white_balls, list) or len(white_balls) != 5:
         return None
     if not isinstance(powerball, int) or not (GLOBAL_POWERBALL_RANGE[0] <= powerball <= GLOBAL_POWERBALL_RANGE[1]):
         return None
-    if not isinstance(draw_date_dt, datetime): # Expecting a datetime object
-        # Fallback to current date if not provided or invalid, but ideal is a valid datetime
+    if not isinstance(draw_date_dt, datetime):
         draw_date_dt = datetime.now() 
 
-    # All numbers must be within range and unique
     if not all(GLOBAL_WHITE_BALL_RANGE[0] <= num <= GLOBAL_WHITE_BALL_RANGE[1] for num in white_balls):
         return None
     if len(set(white_balls)) != 5:
         return None
 
-    sorted_white_balls = sorted(white_balls) # Ensure sorted for consistent feature extraction
+    sorted_white_balls = sorted(white_balls)
 
-    # Feature 1-2: Odd/Even Split
     odd_count = sum(1 for num in sorted_white_balls if num % 2 != 0)
     even_count = 5 - odd_count
-
-    # Feature 3: Sum of White Balls
     white_ball_sum = sum(sorted_white_balls)
-
-    # Feature 4: Group-A Count
     group_a_count = sum(1 for num in sorted_white_balls if num in group_a)
 
-    # Feature 5: Consecutive Pairs Count
     consecutive_pairs_count = 0
     for i in range(len(sorted_white_balls) - 1):
         if sorted_white_balls[i] + 1 == sorted_white_balls[i+1]:
             consecutive_pairs_count += 1
 
-    # Feature 6: Tens Apart Pairs Count (e.g., 1-11, 2-12)
     tens_apart_pairs_count = 0
     for i in range(len(sorted_white_balls)):
         for j in range(i + 1, len(sorted_white_balls)):
@@ -541,17 +605,14 @@ def _extract_features_for_candidate(white_balls, powerball, draw_date_dt):
             if diff in [10, 20, 30, 40, 50]:
                 tens_apart_pairs_count += 1
 
-    # Feature 7: Same Last Digit Count (count of numbers that share a last digit with another)
     last_digit_counts = defaultdict(int)
     for num in sorted_white_balls:
         last_digit_counts[num % 10] += 1
     same_last_digit_count = sum(count for count in last_digit_counts.values() if count >= 2)
 
-    # Feature 8: Repeating Digit Count (11, 22, 33, etc.)
     repeating_digit_numbers = [11, 22, 33, 44, 55, 66]
     repeating_digit_count = sum(1 for num in sorted_white_balls if num in repeating_digit_numbers)
 
-    # Features 9-15: Number Range Counts
     num_in_range = defaultdict(int)
     for num in sorted_white_balls:
         if 1 <= num <= 9: num_in_range['1-9'] += 1
@@ -562,21 +623,29 @@ def _extract_features_for_candidate(white_balls, powerball, draw_date_dt):
         elif 50 <= num <= 59: num_in_range['50s'] += 1
         elif 60 <= num <= 69: num_in_range['60s'] += 1
     
-    # Features 16-18: Weekday (One-Hot Encoded)
     draw_weekday = draw_date_dt.day_name()
     is_monday_draw = 1 if draw_weekday == 'Monday' else 0
     is_wednesday_draw = 1 if draw_weekday == 'Wednesday' else 0
     is_saturday_draw = 1 if draw_weekday == 'Saturday' else 0
 
-    # Feature 19: Powerball Value (just the number itself)
     powerball_value = powerball
+
+    # NEW: Classify and one-hot encode the range pattern
+    current_range_pattern_type = _classify_range_pattern(white_balls)
+    is_single_pick_pattern = 1 if current_range_pattern_type == "Single Pick (1-1-1-1-1)" else 0
+    is_two_number_pick_pattern = 1 if current_range_pattern_type == "Two-Number Pick (2-1-1-1)" else 0
+    is_three_number_pick_pattern = 1 if current_range_pattern_type == "Three-Number Pick (3-1-1)" else 0
+    is_two_two_pick_pattern = 1 if current_range_pattern_type == "Two-Two-Number Pick (2-2-1)" else 0
+    is_one_two_three_pick_pattern = 1 if current_range_pattern_type == "One-Two-Three Number Pick (1-2-3)" else 0 # NEW LINE
 
     features = [
         odd_count, even_count, white_ball_sum, group_a_count, consecutive_pairs_count,
         tens_apart_pairs_count, same_last_digit_count, repeating_digit_count,
         num_in_range['1-9'], num_in_range['10s'], num_in_range['20s'],
         num_in_range['30s'], num_in_range['40s'], num_in_range['50s'], num_in_range['60s'],
-        is_monday_draw, is_wednesday_draw, is_saturday_draw, powerball_value
+        is_monday_draw, is_wednesday_draw, is_saturday_draw, powerball_value,
+        # NEW: Add the range pattern features
+        is_single_pick_pattern, is_two_number_pick_pattern, is_three_number_pick_pattern, is_two_two_pick_pattern
     ]
     return features
 
@@ -669,6 +738,7 @@ def _generate_pick_for_cluster(target_cluster_centroid, current_draw_date_dt, ex
 
 # ... (existing _extract_features_for_candidate function) ...
 
+# --- Update _learn_feature_distributions ---
 def _learn_feature_distributions():
     """
     Learns the mean, standard deviation, and min/max for each feature
@@ -683,7 +753,6 @@ def _learn_feature_distributions():
         vae_features_columns = []
         return
 
-    # Ensure Draw Date_dt is available and up-to-date
     if 'Draw Date_dt' not in df.columns or not pd.api.types.is_datetime64_any_dtype(df['Draw Date_dt']):
         df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'], errors='coerce')
         df.dropna(subset=['Draw Date_dt'], inplace=True)
@@ -700,7 +769,9 @@ def _learn_feature_distributions():
         'tens_apart_pairs_count', 'same_last_digit_count', 'repeating_digit_count',
         'num_in_range_1_9', 'num_in_range_10_19', 'num_in_range_20_29',
         'num_in_range_30_39', 'num_in_range_40_49', 'num_in_range_50_59', 'num_in_range_60_69',
-        'is_monday_draw', 'is_wednesday_draw', 'is_saturday_draw', 'powerball_value'
+        'is_monday_draw', 'is_wednesday_draw', 'is_saturday_draw', 'powerball_value',
+        # NEW: Add the range pattern feature names
+        'is_single_pick_pattern', 'is_two_number_pick_pattern', 'is_three_number_pick_pattern', 'is_two_two_pick_pattern'
     ]
 
     for index, row in df.iterrows():
@@ -716,11 +787,9 @@ def _learn_feature_distributions():
 
     X = np.array(feature_data)
 
-    # Calculate means and standard deviations for each feature
     feature_means = np.mean(X, axis=0)
     feature_stds = np.std(X, axis=0)
 
-    # Also store min/max for clamping generated feature values later
     feature_min_max = []
     for i in range(X.shape[1]):
         feature_min_max.append((np.min(X[:, i]), np.max(X[:, i])))
@@ -728,15 +797,40 @@ def _learn_feature_distributions():
     print(f"Learned statistical distributions for {len(vae_features_columns)} features.")
     print(f"Feature columns: {vae_features_columns}")
 
+    # --- New function to get recent odd/even ratios (after _learn_feature_distributions) ---
+def _update_recent_odd_even_ratios(df_source, num_recent_draws=5):
+    """
+    Updates a global list with the odd/even splits of the most recent draws.
+    """
+    global recent_odd_even_ratios
+
+    if df_source.empty:
+        recent_odd_even_ratios = []
+        return
+
+    # Ensure df is sorted by date before taking tail
+    df_source_sorted = df_source.sort_values(by='Draw Date_dt', ascending=True)
+
+    recent_df = df_source_sorted.tail(num_recent_draws).copy()
+    temp_ratios = []
+    for _, row in recent_df.iterrows():
+        white_balls = [int(row[f'Number {i}']) for i in range(1, 6)]
+        odd_count = sum(1 for num in white_balls if num % 2 != 0)
+        even_count = 5 - odd_count
+        temp_ratios.append(f"{odd_count}O/{even_count}E")
+    
+    recent_odd_even_ratios = temp_ratios[::-1] # Newest first, so index 0 is most recent
+
 # ... (existing _learn_feature_distributions function) ...
 
+# --- Modify _generate_vae_like_feature_vector ---
 def _generate_vae_like_feature_vector():
     """
     Generates a new, synthetic feature vector by sampling from the learned
     statistical distributions (mean/std) of historical features.
     This simulates the "decoder" output of a VAE.
     """
-    global feature_means, feature_stds, feature_min_max, vae_features_columns
+    global feature_means, feature_stds, feature_min_max, vae_features_columns, recent_odd_even_ratios
 
     if feature_means is None or feature_stds is None or feature_min_max is None:
         raise ValueError("Feature distributions not learned. Cannot generate VAE-like feature vector.")
@@ -748,14 +842,10 @@ def _generate_vae_like_feature_vector():
         min_val, max_val = feature_min_max[i]
 
         # Sample from a normal distribution. Clamp to observed min/max to prevent extreme values.
-        # This is a simplification of a true VAE's latent space sampling.
         sampled_value = np.random.normal(loc=mean, scale=std)
         sampled_value = np.clip(sampled_value, min_val, max_val) # Clamp to historical range
 
         # Special handling for discrete/integer features
-        # Odd/Even counts, group_a_count, consecutive counts, range counts, etc. are integers.
-        # Weekday flags are binary (0 or 1). Powerball value is integer.
-        # Adjusting the sampled value to be more realistic for discrete features
         if vae_features_columns[i] in ['odd_count', 'even_count', 'group_a_count',
                                     'consecutive_pairs_count', 'tens_apart_pairs_count',
                                     'same_last_digit_count', 'repeating_digit_count',
@@ -763,57 +853,145 @@ def _generate_vae_like_feature_vector():
                                     'num_in_range_30_39', 'num_in_range_40_49', 'num_in_range_50_59',
                                     'num_in_range_60_69', 'powerball_value']:
             sampled_value = int(round(sampled_value))
-        elif vae_features_columns[i] in ['is_monday_draw', 'is_wednesday_draw', 'is_saturday_draw']:
+        elif vae_features_columns[i] in ['is_monday_draw', 'is_wednesday_draw', 'is_saturday_draw',
+                                        'is_single_pick_pattern', 'is_two_number_pick_pattern',
+                                        'is_three_number_pick_pattern', 'is_two_two_pick_pattern']: # Added new pattern features
             sampled_value = 1 if sampled_value > 0.5 else 0 # Force binary for one-hot
         
         synthetic_features.append(sampled_value)
 
     # Post-processing for logical consistency (e.g., odd_count + even_count == 5)
-    # This ensures the generated feature vector is logically sound before reconstruction
     if len(synthetic_features) >= 2:
         # Enforce odd_count + even_count = 5 for white balls
-        actual_odd = int(synthetic_features[0])
-        actual_even = int(synthetic_features[1])
+        odd_idx = vae_features_columns.index('odd_count')
+        even_idx = vae_features_columns.index('even_count')
+        actual_odd = int(synthetic_features[odd_idx])
+        actual_even = int(synthetic_features[even_idx])
+        
         if actual_odd + actual_even != 5:
             # Simple heuristic: adjust the larger count to make sum 5, or prioritize one over other
             if actual_odd > actual_even:
-                synthetic_features[0] = min(actual_odd, 5)
-                synthetic_features[1] = 5 - synthetic_features[0]
+                synthetic_features[odd_idx] = min(actual_odd, 5)
+                synthetic_features[even_idx] = 5 - synthetic_features[odd_idx]
             else:
-                synthetic_features[1] = min(actual_even, 5)
-                synthetic_features[0] = 5 - synthetic_features[1]
+                synthetic_features[even_idx] = min(actual_even, 5)
+                synthetic_features[odd_idx] = 5 - synthetic_features[even_idx]
     
-    # Clamp counts to their logical maximums (e.g., consecutive_pairs_count <= 4)
-    synthetic_features[4] = min(synthetic_features[4], 4) # consecutive_pairs_count
-    synthetic_features[5] = min(synthetic_features[5], 4) # tens_apart_pairs_count
-    synthetic_features[6] = min(synthetic_features[6], 5) # same_last_digit_count
-    synthetic_features[7] = min(synthetic_features[7], 5) # repeating_digit_count
+    # Clamp other counts to their logical maximums (e.g., consecutive_pairs_count <= 4)
+    # Ensure these indices are correct after adding new features
+    # Adjust indices based on the full vae_features_columns list
+    # Assuming the order is preserved:
+    consecutive_idx = vae_features_columns.index('consecutive_pairs_count')
+    tens_apart_idx = vae_features_columns.index('tens_apart_pairs_count')
+    same_last_digit_idx = vae_features_columns.index('same_last_digit_count')
+    repeating_digit_idx = vae_features_columns.index('repeating_digit_count')
+    
+    synthetic_features[consecutive_idx] = min(synthetic_features[consecutive_idx], 4) 
+    synthetic_features[tens_apart_idx] = min(synthetic_features[tens_apart_idx], 4) 
+    synthetic_features[same_last_digit_idx] = min(synthetic_features[same_last_digit_idx], 5) 
+    synthetic_features[repeating_digit_idx] = min(synthetic_features[repeating_digit_idx], 5) 
 
-    # Sum of ranges should not exceed 5
-    range_sum = sum(synthetic_features[8:15])
-    if range_sum > 5:
-        # Simple proportional reduction
-        factor = 5 / range_sum
-        for i in range(8, 15):
+    # Sum of range counts should not exceed 5
+    range_start_idx = vae_features_columns.index('num_in_range_1_9')
+    range_end_idx = vae_features_columns.index('num_in_range_60_69') + 1 # Slice is exclusive at end
+    current_range_counts = synthetic_features[range_start_idx:range_end_idx]
+    
+    current_range_sum = sum(current_range_counts)
+    if current_range_sum > 5:
+        # Reduce values proportionally to make sum 5
+        factor = 5 / current_range_sum
+        for i in range(range_start_idx, range_end_idx):
             synthetic_features[i] = int(round(synthetic_features[i] * factor))
-        # Re-check and adjust if sum is still not 5 (due to rounding)
-        final_range_sum = sum(synthetic_features[8:15])
-        while final_range_sum < 5 and any(synthetic_features[j] < df[df.columns[8+j]].max() for j in range(len(range(8,15)))): # max() of original feature count
-             idx_to_inc = np.random.randint(8,15)
-             synthetic_features[idx_to_inc] += 1
-             final_range_sum = sum(synthetic_features[8:15])
-        while final_range_sum > 5 and any(synthetic_features[j] > 0 for j in range(len(range(8,15)))):
-             idx_to_dec = np.random.randint(8,15)
-             if synthetic_features[idx_to_dec] > 0:
-                 synthetic_features[idx_to_dec] -= 1
-             final_range_sum = sum(synthetic_features[8:15])
+        
+        # After rounding, might need slight adjustments to ensure sum is exactly 5
+        final_sum = sum(synthetic_features[range_start_idx:range_end_idx])
+        diff = 5 - final_sum
+        if diff != 0:
+            # Adjust one of the non-zero counts
+            non_zero_indices = [i for i in range(range_start_idx, range_end_idx) if synthetic_features[i] > 0]
+            if non_zero_indices:
+                idx_to_adjust = random.choice(non_zero_indices)
+                synthetic_features[idx_to_adjust] += diff # This might make it go negative if diff is large and the count is small.
+                # A safer approach would be to distribute the diff if multiple non_zero_indices are present.
+                # For now, let's keep it simple. It's a heuristic.
+            
+            # Re-sum and re-adjust if sum is still not 5 (due to rounding) or if an index became negative
+            # This is a bit of a tricky heuristic, often better handled by a different generation loop or more complex logic
+            for _ in range(abs(diff)): # Small loop to force the sum to be 5
+                if diff > 0: # Need to increase sum
+                    valid_indices = [i for i in range(range_start_idx, range_end_idx) if synthetic_features[i] < df[f'Number {range(1,6)[0]}'].max() and synthetic_features[i] < 5] # Max per range
+                    if valid_indices:
+                        synthetic_features[random.choice(valid_indices)] += 1
+                elif diff < 0: # Need to decrease sum
+                    valid_indices = [i for i in range(range_start_idx, range_end_idx) if synthetic_features[i] > 0]
+                    if valid_indices:
+                        synthetic_features[random.choice(valid_indices)] -= 1
+            
+
+    # NEW: Adjust range pattern one-hot encoding for logical consistency.
+    # Only one of the range pattern flags should be 1.
+    pattern_flags = [
+        vae_features_columns.index('is_single_pick_pattern'),
+        vae_features_columns.index('is_two_number_pick_pattern'),
+        vae_features_columns.index('is_three_number_pick_pattern'),
+        vae_features_columns.index('is_two_two_pick_pattern'),
+        vae_features_columns.index('is_one_two_three_pick_pattern') # NEW PATTERN FLAG INDEX
+    ]
+    
+    active_pattern_indices = [idx for idx in pattern_flags if synthetic_features[idx] == 1]
+    
+    if len(active_pattern_indices) > 1: # More than one pattern set to true, inconsistent
+        # Randomly choose one to keep, set others to 0
+        keep_idx = random.choice(active_pattern_indices)
+        for idx in pattern_flags:
+            if idx != keep_idx:
+                synthetic_features[idx] = 0
+    elif not active_pattern_indices: # No pattern set to true, assign one randomly if it makes sense, or set to 'Other' later
+        # Default to no specific pattern if none are strongly suggested by sampling, will be classified as 'Other' by _classify_range_pattern
+        pass # The _generate_pick_from_features will handle the final pattern classification.
+
+    # NEW: Odd/Even Ratio Constraint based on recent_odd_even_ratios
+    # Check current generated odd/even ratio
+    generated_odd_count = synthetic_features[vae_features_columns.index('odd_count')]
+    generated_even_count = synthetic_features[vae_features_columns.index('even_count')]
+    current_generated_ratio_str = f"{generated_odd_count}O/{generated_even_count}E"
+
+    # Check the last 3 historical ratios (as per user observation)
+    recent_historical_ratios_check = recent_odd_even_ratios[:3] # Check last 3 draws
+    
+    if all(ratio == current_generated_ratio_str for ratio in recent_historical_ratios_check):
+        # If the generated ratio is the same as the last 3, try to shift it
+        print(f"Adjusting generated odd/even ratio from {current_generated_ratio_str} to break streak.")
+        
+        # Try to find a different, valid odd/even split
+        # Only consider splits that add up to 5
+        possible_new_splits = [
+            (5,0), (0,5), (4,1), (1,4), (3,2), (2,3)
+        ]
+        
+        # Filter out splits that are the same as the current generated one AND in recent history
+        candidate_splits = []
+        for new_odd, new_even in possible_new_splits:
+            if f"{new_odd}O/{new_even}E" != current_generated_ratio_str or \
+               f"{new_odd}O/{new_even}E" not in recent_historical_ratios_check:
+                candidate_splits.append((new_odd, new_even))
+        
+        if candidate_splits:
+            new_odd, new_even = random.choice(candidate_splits)
+            synthetic_features[vae_features_columns.index('odd_count')] = new_odd
+            synthetic_features[vae_features_columns.index('even_count')] = new_even
+            print(f"New odd/even ratio set to {new_odd}O/{new_even}E to break streak.")
+        else:
+            # Fallback if no distinct valid split can be found (very unlikely)
+            print("Warning: Could not find a distinct odd/even ratio to break streak.")
 
 
     return np.array(synthetic_features)
 
 # ... (existing _generate_vae_like_feature_vector function) ...
 
-def _generate_pick_from_features(target_features, current_draw_date_dt, excluded_numbers, max_attempts_per_pick=25000): # Increased attempts for better matching
+# --- _generate_pick_from_features (No change needed for new features, just ensure current state) ---
+def _generate_pick_from_features(target_features, current_draw_date_dt, excluded_numbers, max_attempts_per_pick=25000):
     """
     Generates a single Powerball pick (5 white balls + 1 powerball) that closely
     matches the given target_features vector.
@@ -834,8 +1012,7 @@ def _generate_pick_from_features(target_features, current_draw_date_dt, excluded
         return None, None
     
     # Scale the target features using the learned mean/std for distance calculation
-    # This is effectively standardizing, similar to StandardScaler.transform
-    scaled_target_features = (target_features - feature_means) / (feature_stds + 1e-8) # Add epsilon to prevent div by zero
+    scaled_target_features = (target_features - feature_means) / (feature_stds + 1e-8)
 
     best_pick_white_balls = None
     best_pick_powerball = None
@@ -848,7 +1025,6 @@ def _generate_pick_from_features(target_features, current_draw_date_dt, excluded
         print(f"Not enough white balls in pool ({len(available_white_balls_pool)}) after exclusions for VAE pick generation.")
         return None, None
 
-    # Consider the last few draws to avoid immediately repeating the most recent history
     last_5_white_ball_sets = []
     if not df.empty:
         for _, row in df.tail(5).iterrows():
@@ -862,13 +1038,11 @@ def _generate_pick_from_features(target_features, current_draw_date_dt, excluded
             candidate_white_balls = sorted(random.sample(available_white_balls_pool, 5))
             candidate_powerball = random.randint(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1])
 
-            # Skip if exact historical match (or very recent match)
             if frozenset(candidate_white_balls) in historical_white_ball_sets:
                 continue
             if frozenset(candidate_white_balls) in last_5_white_ball_sets:
                 continue
 
-            # Calculate features for the candidate pick
             candidate_features_raw = _extract_features_for_candidate(
                 candidate_white_balls, candidate_powerball, current_draw_date_dt
             )
@@ -876,10 +1050,8 @@ def _generate_pick_from_features(target_features, current_draw_date_dt, excluded
             if candidate_features_raw is None:
                 continue
 
-            # Scale the candidate features for distance calculation
             scaled_candidate_features = (np.array(candidate_features_raw) - feature_means) / (feature_stds + 1e-8)
 
-            # Calculate Euclidean distance to the scaled target feature vector
             distance = np.linalg.norm(scaled_candidate_features - scaled_target_features)
 
             if distance < min_distance:
@@ -887,7 +1059,6 @@ def _generate_pick_from_features(target_features, current_draw_date_dt, excluded
                 best_pick_white_balls = candidate_white_balls
                 best_pick_powerball = candidate_powerball
                 
-                # Early exit if a reasonably good match is found
                 if min_distance < 0.7: # Tunable threshold for what's "close enough"
                     break
 
@@ -896,7 +1067,6 @@ def _generate_pick_from_features(target_features, current_draw_date_dt, excluded
         except IndexError:
             continue
         except Exception as e:
-            # print(f"Error during VAE pick generation attempt {attempt}: {e}")
             continue
 
     return best_pick_white_balls, best_pick_powerball
@@ -2445,9 +2615,10 @@ def get_powerball_position_frequency(df_source):
 
 # ... (existing initialize_core_data function) ...
 
+# --- Modify initialize_core_data to call _update_recent_odd_even_ratios ---
 def initialize_core_data():
     """Initializes global DataFrame, last draw, and historical sets from Supabase,
-    then learns feature distributions for the VAE-like model.""" # Updated docstring
+    then learns feature distributions for the VAE-like model."""
     global df, last_draw, historical_white_ball_sets, white_ball_co_occurrence_lookup
     print("Attempting to load core historical data...")
     try:
@@ -2477,9 +2648,9 @@ def initialize_core_data():
 
             print("Core historical data loaded successfully and co-occurrence lookup populated.")
             
-            # --- NEW: Learn feature distributions after data is loaded ---
             _learn_feature_distributions()
-            # -----------------------------------------------------------
+            # NEW: Update recent odd/even ratios after df is fully loaded and sorted
+            _update_recent_odd_even_ratios(df, num_recent_draws=5) # Track last 5 draws for this
 
             return True 
         else:
