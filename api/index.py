@@ -10,8 +10,6 @@ import requests
 import json
 import numpy as np
 import traceback 
-from sklearn.preprocessing import StandardScaler
-from sklearn.cluster import KMeans
 import warnings
 warnings.filterwarnings('ignore', category=UserWarning, module='sklearn') # Ignore specific KMeans warning
 
@@ -43,11 +41,15 @@ last_analysis_cache_update = datetime.min
 CACHE_DURATION = timedelta(minutes=60) # Cache for 60 minutes
 CACHE_EXPIRATION_SECONDS = CACHE_DURATION.total_seconds()
 
-
 kmeans_model = None
 scaler_model = None
 clustering_features_columns = [] # To store the names of features for clarity
 
+# NEW Global Variables for VAE-like model
+feature_means = None
+feature_stds = None
+feature_min_max = None # To store min/max for each feature for clamping
+vae_features_columns = [] # Renamed from clustering_features_columns for clarit
 
 group_a = [3, 5, 6, 7, 9, 11, 15, 16, 18, 21, 23, 24, 27, 31, 32, 33, 36, 42, 44, 45, 48, 50, 51, 54, 55, 60, 66, 69]
 GLOBAL_WHITE_BALL_RANGE = (1, 69)
@@ -580,7 +582,7 @@ def _extract_features_for_candidate(white_balls, powerball, draw_date_dt):
 
     # ... (existing _extract_features_for_candidate function) ...
 
-def _generate_pick_for_cluster(target_cluster_centroid, current_draw_date_dt, excluded_numbers, max_attempts_per_pick=10000):
+def _generate_pick_for_cluster(target_cluster_centroid, current_draw_date_dt, excluded_numbers, max_attempts_per_pick=2000):
     """
     Generates a single Powerball pick (5 white balls + 1 powerball) that closely
     matches the given target_cluster_centroid based on features.
@@ -652,7 +654,7 @@ def _generate_pick_for_cluster(target_cluster_centroid, current_draw_date_dt, ex
                 best_pick_powerball = candidate_powerball
                 
                 # Early exit if a very good match is found
-                if min_distance < 0.5: # Threshold can be tuned
+                if min_distance < 0.1: # Threshold can be tuned
                     break
 
         except ValueError: # e.g., random.sample pool too small after exclusions
@@ -665,15 +667,20 @@ def _generate_pick_for_cluster(target_cluster_centroid, current_draw_date_dt, ex
 
     return best_pick_white_balls, best_pick_powerball
 
-def _train_clustering_model():
+# ... (existing _extract_features_for_candidate function) ...
+
+def _learn_feature_distributions():
     """
-    Trains a KMeans clustering model and a StandardScaler on historical draw features.
-    Stores them in global variables.
+    Learns the mean, standard deviation, and min/max for each feature
+    from historical draw features. These represent the learned "distribution"
+    for our VAE-like generator.
     """
-    global df, kmeans_model, scaler_model, clustering_features_columns
+    global df, feature_means, feature_stds, feature_min_max, vae_features_columns
 
     if df.empty:
-        print("DataFrame is empty, cannot train clustering model.")
+        print("DataFrame is empty, cannot learn feature distributions.")
+        feature_means, feature_stds, feature_min_max = None, None, None
+        vae_features_columns = []
         return
 
     # Ensure Draw Date_dt is available and up-to-date
@@ -681,12 +688,14 @@ def _train_clustering_model():
         df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'], errors='coerce')
         df.dropna(subset=['Draw Date_dt'], inplace=True)
         if df.empty:
-            print("DataFrame became empty after datetime conversion, cannot train clustering model.")
+            print("DataFrame became empty after datetime conversion, cannot learn feature distributions.")
+            feature_means, feature_stds, feature_min_max = None, None, None
+            vae_features_columns = []
             return
 
     feature_data = []
-    # Define feature names explicitly for clarity and future use
-    clustering_features_columns = [
+    # Define feature names explicitly here - these must match the order in _extract_features_for_draw
+    vae_features_columns = [
         'odd_count', 'even_count', 'white_ball_sum', 'group_a_count', 'consecutive_pairs_count',
         'tens_apart_pairs_count', 'same_last_digit_count', 'repeating_digit_count',
         'num_in_range_1_9', 'num_in_range_10_19', 'num_in_range_20_29',
@@ -695,34 +704,202 @@ def _train_clustering_model():
     ]
 
     for index, row in df.iterrows():
-        features = _extract_features_for_draw(row)
-        if features:
+        features = _extract_features_for_draw(row) # Use the existing feature extraction
+        if features and len(features) == len(vae_features_columns): # Sanity check
             feature_data.append(features)
     
     if not feature_data:
-        print("No valid feature data extracted, cannot train clustering model.")
-        kmeans_model = None
-        scaler_model = None
-        clustering_features_columns = []
+        print("No valid feature data extracted, cannot learn feature distributions.")
+        feature_means, feature_stds, feature_min_max = None, None, None
+        vae_features_columns = []
         return
 
     X = np.array(feature_data)
 
-    # 1. Scale the features
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-    scaler_model = scaler # Store the trained scaler globally
+    # Calculate means and standard deviations for each feature
+    feature_means = np.mean(X, axis=0)
+    feature_stds = np.std(X, axis=0)
 
-    # 2. Train KMeans clustering (e.g., 10 clusters)
-    # n_init='auto' is the default for newer sklearn versions, for older, set explicitly
-    num_clusters = 10 # You can experiment with this number
-    kmeans = KMeans(n_clusters=num_clusters, random_state=42, n_init='auto') 
-    kmeans.fit(X_scaled)
-    kmeans_model = kmeans # Store the trained KMeans model globally
+    # Also store min/max for clamping generated feature values later
+    feature_min_max = []
+    for i in range(X.shape[1]):
+        feature_min_max.append((np.min(X[:, i]), np.max(X[:, i])))
 
-    print(f"KMeans clustering model trained with {num_clusters} clusters and StandardScaler.")
-    print(f"Feature columns: {clustering_features_columns}")
+    print(f"Learned statistical distributions for {len(vae_features_columns)} features.")
+    print(f"Feature columns: {vae_features_columns}")
 
+# ... (existing _learn_feature_distributions function) ...
+
+def _generate_vae_like_feature_vector():
+    """
+    Generates a new, synthetic feature vector by sampling from the learned
+    statistical distributions (mean/std) of historical features.
+    This simulates the "decoder" output of a VAE.
+    """
+    global feature_means, feature_stds, feature_min_max, vae_features_columns
+
+    if feature_means is None or feature_stds is None or feature_min_max is None:
+        raise ValueError("Feature distributions not learned. Cannot generate VAE-like feature vector.")
+
+    synthetic_features = []
+    for i in range(len(vae_features_columns)):
+        mean = feature_means[i]
+        std = feature_stds[i]
+        min_val, max_val = feature_min_max[i]
+
+        # Sample from a normal distribution. Clamp to observed min/max to prevent extreme values.
+        # This is a simplification of a true VAE's latent space sampling.
+        sampled_value = np.random.normal(loc=mean, scale=std)
+        sampled_value = np.clip(sampled_value, min_val, max_val) # Clamp to historical range
+
+        # Special handling for discrete/integer features
+        # Odd/Even counts, group_a_count, consecutive counts, range counts, etc. are integers.
+        # Weekday flags are binary (0 or 1). Powerball value is integer.
+        # Adjusting the sampled value to be more realistic for discrete features
+        if vae_features_columns[i] in ['odd_count', 'even_count', 'group_a_count',
+                                    'consecutive_pairs_count', 'tens_apart_pairs_count',
+                                    'same_last_digit_count', 'repeating_digit_count',
+                                    'num_in_range_1_9', 'num_in_range_10_19', 'num_in_range_20_29',
+                                    'num_in_range_30_39', 'num_in_range_40_49', 'num_in_range_50_59',
+                                    'num_in_range_60_69', 'powerball_value']:
+            sampled_value = int(round(sampled_value))
+        elif vae_features_columns[i] in ['is_monday_draw', 'is_wednesday_draw', 'is_saturday_draw']:
+            sampled_value = 1 if sampled_value > 0.5 else 0 # Force binary for one-hot
+        
+        synthetic_features.append(sampled_value)
+
+    # Post-processing for logical consistency (e.g., odd_count + even_count == 5)
+    # This ensures the generated feature vector is logically sound before reconstruction
+    if len(synthetic_features) >= 2:
+        # Enforce odd_count + even_count = 5 for white balls
+        actual_odd = int(synthetic_features[0])
+        actual_even = int(synthetic_features[1])
+        if actual_odd + actual_even != 5:
+            # Simple heuristic: adjust the larger count to make sum 5, or prioritize one over other
+            if actual_odd > actual_even:
+                synthetic_features[0] = min(actual_odd, 5)
+                synthetic_features[1] = 5 - synthetic_features[0]
+            else:
+                synthetic_features[1] = min(actual_even, 5)
+                synthetic_features[0] = 5 - synthetic_features[1]
+    
+    # Clamp counts to their logical maximums (e.g., consecutive_pairs_count <= 4)
+    synthetic_features[4] = min(synthetic_features[4], 4) # consecutive_pairs_count
+    synthetic_features[5] = min(synthetic_features[5], 4) # tens_apart_pairs_count
+    synthetic_features[6] = min(synthetic_features[6], 5) # same_last_digit_count
+    synthetic_features[7] = min(synthetic_features[7], 5) # repeating_digit_count
+
+    # Sum of ranges should not exceed 5
+    range_sum = sum(synthetic_features[8:15])
+    if range_sum > 5:
+        # Simple proportional reduction
+        factor = 5 / range_sum
+        for i in range(8, 15):
+            synthetic_features[i] = int(round(synthetic_features[i] * factor))
+        # Re-check and adjust if sum is still not 5 (due to rounding)
+        final_range_sum = sum(synthetic_features[8:15])
+        while final_range_sum < 5 and any(synthetic_features[j] < df[df.columns[8+j]].max() for j in range(len(range(8,15)))): # max() of original feature count
+             idx_to_inc = np.random.randint(8,15)
+             synthetic_features[idx_to_inc] += 1
+             final_range_sum = sum(synthetic_features[8:15])
+        while final_range_sum > 5 and any(synthetic_features[j] > 0 for j in range(len(range(8,15)))):
+             idx_to_dec = np.random.randint(8,15)
+             if synthetic_features[idx_to_dec] > 0:
+                 synthetic_features[idx_to_dec] -= 1
+             final_range_sum = sum(synthetic_features[8:15])
+
+
+    return np.array(synthetic_features)
+
+# ... (existing _generate_vae_like_feature_vector function) ...
+
+def _generate_pick_from_features(target_features, current_draw_date_dt, excluded_numbers, max_attempts_per_pick=25000): # Increased attempts for better matching
+    """
+    Generates a single Powerball pick (5 white balls + 1 powerball) that closely
+    matches the given target_features vector.
+    
+    Args:
+        target_features (np.array): The target feature vector (e.g., generated by VAE-like sampling).
+        current_draw_date_dt (datetime): The datetime object for the hypothetical draw date.
+        excluded_numbers (list): Numbers that should not be included.
+        max_attempts_per_pick (int): Maximum attempts to find a suitable pick.
+        
+    Returns:
+        tuple: (white_balls_list, powerball_num) or (None, None) if unsuccessful.
+    """
+    global feature_means, feature_stds, historical_white_ball_sets
+
+    if feature_means is None or feature_stds is None:
+        print("Feature distributions not learned. Cannot generate VAE-like picks.")
+        return None, None
+    
+    # Scale the target features using the learned mean/std for distance calculation
+    # This is effectively standardizing, similar to StandardScaler.transform
+    scaled_target_features = (target_features - feature_means) / (feature_stds + 1e-8) # Add epsilon to prevent div by zero
+
+    best_pick_white_balls = None
+    best_pick_powerball = None
+    min_distance = float('inf')
+
+    available_white_balls_pool = [num for num in range(GLOBAL_WHITE_BALL_RANGE[0], GLOBAL_WHITE_BALL_RANGE[1] + 1)
+                                  if num not in excluded_numbers]
+
+    if len(available_white_balls_pool) < 5:
+        print(f"Not enough white balls in pool ({len(available_white_balls_pool)}) after exclusions for VAE pick generation.")
+        return None, None
+
+    # Consider the last few draws to avoid immediately repeating the most recent history
+    last_5_white_ball_sets = []
+    if not df.empty:
+        for _, row in df.tail(5).iterrows():
+            last_5_white_ball_sets.append(frozenset([
+                int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                int(row['Number 4']), int(row['Number 5'])
+            ]))
+
+    for attempt in range(max_attempts_per_pick):
+        try:
+            candidate_white_balls = sorted(random.sample(available_white_balls_pool, 5))
+            candidate_powerball = random.randint(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1])
+
+            # Skip if exact historical match (or very recent match)
+            if frozenset(candidate_white_balls) in historical_white_ball_sets:
+                continue
+            if frozenset(candidate_white_balls) in last_5_white_ball_sets:
+                continue
+
+            # Calculate features for the candidate pick
+            candidate_features_raw = _extract_features_for_candidate(
+                candidate_white_balls, candidate_powerball, current_draw_date_dt
+            )
+            
+            if candidate_features_raw is None:
+                continue
+
+            # Scale the candidate features for distance calculation
+            scaled_candidate_features = (np.array(candidate_features_raw) - feature_means) / (feature_stds + 1e-8)
+
+            # Calculate Euclidean distance to the scaled target feature vector
+            distance = np.linalg.norm(scaled_candidate_features - scaled_target_features)
+
+            if distance < min_distance:
+                min_distance = distance
+                best_pick_white_balls = candidate_white_balls
+                best_pick_powerball = candidate_powerball
+                
+                # Early exit if a reasonably good match is found
+                if min_distance < 0.7: # Tunable threshold for what's "close enough"
+                    break
+
+        except ValueError:
+            continue
+        except IndexError:
+            continue
+        except Exception as e:
+            # print(f"Error during VAE pick generation attempt {attempt}: {e}")
+            continue
+
+    return best_pick_white_balls, best_pick_powerball
 
 
 def frequency_analysis(df_source):
@@ -2266,9 +2443,11 @@ def get_powerball_position_frequency(df_source):
     return formatted_data
 
 
+# ... (existing initialize_core_data function) ...
+
 def initialize_core_data():
     """Initializes global DataFrame, last draw, and historical sets from Supabase,
-    then trains the clustering model.""" # Updated docstring
+    then learns feature distributions for the VAE-like model.""" # Updated docstring
     global df, last_draw, historical_white_ball_sets, white_ball_co_occurrence_lookup
     print("Attempting to load core historical data...")
     try:
@@ -2298,8 +2477,8 @@ def initialize_core_data():
 
             print("Core historical data loaded successfully and co-occurrence lookup populated.")
             
-            # --- NEW: Train the clustering model after data is loaded ---
-            _train_clustering_model()
+            # --- NEW: Learn feature distributions after data is loaded ---
+            _learn_feature_distributions()
             # -----------------------------------------------------------
 
             return True 
@@ -2312,7 +2491,7 @@ def initialize_core_data():
             }, dtype='object')
             return False 
     except Exception as e:
-        print(f"An error occurred during initial core data loading or clustering model training: {e}")
+        print(f"An error occurred during initial core data loading or feature distribution learning: {e}")
         traceback.print_exc()
         return False
 
@@ -2682,6 +2861,75 @@ def generate_custom_combinations_api():
     except Exception as e:
         traceback.print_exc()
         return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
+
+
+# ... (existing API endpoints, like /api/generate_ml_smart_picks) ...
+
+@app.route('/api/generate_vae_picks', methods=['POST'])
+def generate_vae_picks_api():
+    """
+    Generates Powerball picks using a VAE-like approach by sampling from learned
+    feature distributions and then finding numbers that match the synthetic feature vector.
+    """
+    global feature_means, feature_stds, vae_features_columns, df
+
+    if df.empty or feature_means is None or feature_stds is None:
+        return jsonify({
+            'success': False,
+            'error': "Generative model not ready. Historical data might be empty or distribution learning failed."
+        }), 500
+
+    try:
+        data = request.json
+        num_sets_to_generate = int(data.get('num_sets', 1))
+        excluded_numbers_input = data.get('excluded_numbers', '')
+        excluded_numbers = [int(num.strip()) for num in excluded_numbers_input.split(',') if num.strip().isdigit()] if excluded_numbers_input else []
+        
+        # We'll use the current date for weekday feature calculation for generated picks
+        current_draw_date_for_features = datetime.now() 
+
+        generated_sets = []
+        last_draw_dates = {}
+
+        for i in range(num_sets_to_generate):
+            # 1. Generate a synthetic target feature vector
+            target_synthetic_features = _generate_vae_like_feature_vector()
+            
+            # 2. Find actual numbers that match this synthetic feature vector
+            white_balls, powerball = _generate_pick_from_features(
+                target_synthetic_features, current_draw_date_for_features, excluded_numbers
+            )
+
+            if white_balls is not None and powerball is not None:
+                generated_sets.append({'white_balls': white_balls, 'powerball': powerball})
+                # For the last generated set, find last drawn dates for its numbers
+                if i == num_sets_to_generate - 1:
+                    last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
+            else:
+                print(f"Warning: Failed to generate a valid VAE-like pick for set {i+1} after many attempts.")
+                
+        if not generated_sets:
+             raise ValueError("Could not generate any VAE-like picks after multiple attempts. Try adjusting excluded numbers or increasing generation attempts.")
+
+        # Optional: Provide insights into the generated feature vector
+        # (For now, let's keep it simple, but we could add this for debugging/info)
+        # generated_feature_info = {
+        #     vae_features_columns[j]: target_synthetic_features[j] for j in range(len(vae_features_columns))
+        # }
+
+        return jsonify({
+            'success': True,
+            'generated_sets': generated_sets,
+            'last_draw_dates': last_draw_dates,
+            'ml_model_info': "Generated based on VAE-like sampling of historical feature distributions."
+        })
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
+
 
 # --- NEW ROUTE FOR PHASE 3: CREATE COMBINATIONS ---
 @app.route('/api/create_combinations', methods=['POST'])
