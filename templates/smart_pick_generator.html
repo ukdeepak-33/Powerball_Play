@@ -2,557 +2,350 @@
 
 {% block title %}Smart Pick Generator{% endblock %}
 
-{% block page_heading %}Smart Pick Generator (AI-Powered){% endblock %}
+{% block page_heading %}Smart Pick Generator with ML Insights{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <style>
+        .ball {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #6366f1; /* Indigo */
+            color: white;
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin: 0.25rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            flex-shrink: 0;
+        }
+        .powerball {
+            background-color: #ef4444; /* Red */
+        }
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #6366f1;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+{% endblock %}
 
 {% block content %}
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    {# Removed Flask's flash messages display block from here #}
-    {# The JavaScript will now create dynamic toast messages #}
+    {# Flash messages display #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages space-y-3 mb-4">
+                {% for category, message in messages %}
+                    <div class="p-4 rounded-lg shadow-md text-sm {% if category == 'error' %}bg-red-100 text-red-700 border border-red-200{% elif category == 'info' %}bg-blue-100 text-blue-700 border border-blue-200{% else %}bg-green-100 text-green-700 border border-blue-200{% endif %} animate-fade-in">
+                        <p class="font-medium">{{ message }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
 
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Define Your Smart Pick Criteria</h2>
-        <p class="text-gray-700 mb-6">Generate Powerball numbers based on advanced historical patterns and your specific preferences. The generator will try to meet all criteria, prioritizing user-forced numbers, Group A count, Odd/Even split, and Sum Range, then favoring historical trends.</p>
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Generate Your Smart Picks</h2>
+        
+        <form id="smartPickForm" class="space-y-6">
+            {# Generation Strategy Selection #}
+            <div class="mb-4">
+                <label class="block text-xl font-semibold text-gray-800 mb-2">Choose Generation Strategy</label>
+                <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="generation_strategy" value="rule_based" class="form-radio text-indigo-600 h-5 w-5" checked>
+                        <span class="ml-2 text-gray-700 font-medium">Rule-Based Smart Pick</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="generation_strategy" value="ml_based" class="form-radio text-indigo-600 h-5 w-5">
+                        <span class="ml-2 text-gray-700 font-medium">ML-Based Smart Pick (Clustering)</span>
+                    </label>
+                </div>
+            </div>
 
-        <form id="smartPickForm" method="POST" action="{{ url_for('generate_smart_picks_route') }}" class="space-y-6">
-            {# General Settings #}
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {# Common Filters for both strategies #}
+            <div>
+                <label for="num_sets_to_generate" class="block text-sm font-medium text-gray-700 mb-1">Number of Picks to Generate (1-10)</label>
+                <input type="number" id="num_sets_to_generate" name="num_sets_to_generate" min="1" max="10" value="1" class="form-input mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+            </div>
+
+            <div>
+                <label for="excluded_numbers" class="block text-sm font-medium text-gray-700 mb-1">Exclude Specific Numbers (comma-separated)</label>
+                <input type="text" id="excluded_numbers" name="excluded_numbers" placeholder="e.g., 4, 18, 55" class="form-input mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+            </div>
+
+            {# Rule-Based Specific Filters (conditionally visible) #}
+            <div id="ruleBasedFilters" class="space-y-6 border-t border-gray-200 pt-6 mt-6">
+                <p class="text-lg font-semibold text-gray-800">Rule-Based Specific Filters</p>
                 <div>
-                    <label for="num_sets_to_generate" class="block text-gray-700 text-sm font-bold mb-2">Number of Picks to Generate (1-5):</label>
-                    <input type="number" id="num_sets_to_generate" name="num_sets_to_generate" min="1" max="5" value="1" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300">
+                    <label for="num_from_group_a" class="block text-sm font-medium text-gray-700 mb-1">Numbers from Group-A (0-5)</label>
+                    <input type="number" id="num_from_group_a" name="num_from_group_a" min="0" max="5" value="2" class="form-input mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                    <p class="text-xs text-gray-500 mt-1">Group-A numbers are: {{ group_a | join(', ') }}</p>
                 </div>
+
                 <div>
-                    <label for="excluded_numbers" class="block text-gray-700 text-sm font-bold mb-2">Excluded Numbers (comma-separated, e.g., 1,5,10):</label>
-                    <input type="text" id="excluded_numbers" name="excluded_numbers" placeholder="e.g., 1, 5, 10" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300">
+                    <label for="odd_even_choice" class="block text-sm font-medium text-gray-700 mb-1">Odd/Even Split</label>
+                    <select id="odd_even_choice" name="odd_even_choice" class="form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                        <option value="Any">Any Split</option>
+                        <option value="All Even">All Even (5E/0O)</option>
+                        <option value="All Odd">All Odd (0E/5O)</option>
+                        <option value="4 Even / 1 Odd">4 Even / 1 Odd</option>
+                        <option value="1 Even / 4 Odd">1 Even / 4 Odd</option>
+                        <option value="3 Even / 2 Odd">3 Even / 2 Odd</option>
+                        <option value="2 Even / 3 Odd">2 Even / 3 Odd</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="sum_range_filter" class="block text-sm font-medium text-gray-700 mb-1">Sum of White Balls Range</label>
+                    <select id="sum_range_filter" name="sum_range_filter" class="form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                        {% for label, _ in sum_ranges.items() %}
+                        <option value="{{ label }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {# Pattern Prioritization Checkboxes #}
+                <div class="mt-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Prioritize Based On:</label>
+                    <div class="flex flex-wrap gap-x-4 gap-y-2">
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" id="prioritize_monthly_hot" name="prioritize_monthly_hot" class="form-checkbox text-indigo-600 h-4 w-4">
+                            <span class="ml-2 text-sm text-gray-700">Monthly Hot Numbers</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" id="prioritize_grouped_patterns" name="prioritize_grouped_patterns" class="form-checkbox text-indigo-600 h-4 w-4">
+                            <span class="ml-2 text-sm text-gray-700">Grouped Patterns (e.g., 10s, 20s)</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" id="prioritize_special_patterns" name="prioritize_special_patterns" class="form-checkbox text-indigo-600 h-4 w-4">
+                            <span class="ml-2 text-sm text-gray-700">Special Patterns (e.g., Tens Apart)</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" id="prioritize_consecutive_patterns" name="prioritize_consecutive_patterns" class="form-checkbox text-indigo-600 h-4 w-4">
+                            <span class="ml-2 text-sm text-gray-700">Consecutive Patterns</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="force_specific_pattern" class="block text-sm font-medium text-gray-700 mb-1">Force Specific Pattern (2 or 3 numbers, comma-separated)</label>
+                    <input type="text" id="force_specific_pattern" name="force_specific_pattern" placeholder="e.g., 1, 2, 3 or 10, 20" class="form-input mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                    <p class="text-xs text-gray-500 mt-1">If specified, 2 or 3 of these numbers will be included. Must be unique and not excluded.</p>
                 </div>
             </div>
 
-            {# Criterion 1: Group A Numbers #}
-            <div class="border-t border-gray-200 pt-6">
-                <h3 class="text-xl font-semibold mb-4 text-gray-800">Group A Numbers</h3>
-                <p class="text-gray-700 mb-4">Select how many numbers should come from the predefined Group A ({{ group_a | join(', ') }}).</p>
-                <label for="num_from_group_a" class="block text-gray-700 text-sm font-bold mb-2">Numbers from Group A (0-5):</label>
-                <input type="number" id="num_from_group_a" name="num_from_group_a" min="0" max="5" value="2" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300">
-            </div>
-
-            {# Criterion 2: Odd/Even Trends #}
-            <div class="border-t border-gray-200 pt-6">
-                <h3 class="text-xl font-semibold mb-4 text-gray-800">Odd/Even Split</h3>
-                <p class="text-gray-700 mb-4">Choose the desired odd/even distribution for the 5 white balls.</p>
-                <label for="odd_even_choice" class="block text-gray-700 text-sm font-bold mb-2">Desired Split:</label>
-                <select id="odd_even_choice" name="odd_even_choice" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300">
-                    <option value="Any">Any Split</option>
-                    <option value="3 Odd / 2 Even">3 Odd / 2 Even</option>
-                    <option value="2 Odd / 3 Even">2 Odd / 3 Even</option>
-                    <option value="4 Odd / 1 Even">4 Odd / 1 Even</option>
-                    <option value="1 Odd / 4 Even">1 Odd / 4 Even</option>
-                    <option value="All Odd">All Odd (5 Odd / 0 Even)</option>
-                    <option value="All Even">All Even (0 Odd / 5 Even)</option>
-                </select>
-            </div>
-
-            {# Criterion 3: Sum Range #}
-            <div class="border-t border-gray-200 pt-6">
-                <h3 class="text-xl font-semibold mb-4 text-gray-800">Sum Range</h3>
-                <p class="text-gray-700 mb-4">Select a sum range for the 5 white balls.</p>
-                <label for="sum_range_filter" class="block text-gray-700 text-sm font-bold mb-2">Sum Range:</label>
-                <select id="sum_range_filter" name="sum_range_filter" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300">
-                    {% for range_name, range_tuple in sum_ranges.items() %}
-                        <option value="{{ range_name }}">{{ range_name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            {# Criterion for Pattern-Based Preferences (Grouped, Special, Consecutive) #}
-            <div class="border-t border-gray-200 pt-6">
-                <h3 class="text-xl font-semibold mb-4 text-gray-800">Pattern-Based Preferences</h3>
-                <p class="text-gray-700 mb-4">Choose to prioritize numbers that frequently form certain patterns.</p>
-
-                <div class="mb-4">
-                    <input type="checkbox" id="prioritize_grouped_patterns" name="prioritize_grouped_patterns" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                    <label for="prioritize_grouped_patterns" class="text-gray-700 text-sm font-bold">Prioritize numbers from historically frequent Grouped Patterns</label>
-                </div>
-
-                <div class="mb-4">
-                    <input type="checkbox" id="prioritize_special_patterns" name="prioritize_special_patterns" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                    <label for="prioritize_special_patterns" class="text-gray-700 text-sm font-bold">Prioritize numbers from historically frequent Special Patterns (Tens-Apart, Same Last Digit, Repeating Digit)</label>
-                </div>
-
-                <div class="mb-4">
-                    <input type="checkbox" id="prioritize_consecutive_patterns" name="prioritize_consecutive_patterns" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                    <label for="prioritize_consecutive_patterns" class="text-gray-700 text-sm font-bold">Prioritize forming Consecutive Pairs/Triplets</label>
-                </div>
-            </div>
-
-            <div class="flex items-center justify-center mt-8">
-                <button type="submit" id="generateSmartPicksBtn" class="btn-primary flex items-center">
-                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" id="loadingSpinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Generate Smart Picks
-                </button>
-            </div>
+            <button type="submit" id="generatePicksBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition ease-in-out duration-150 flex items-center justify-center">
+                <span id="buttonText">Generate Smart Picks</span>
+                <div id="loadingSpinner" class="loading-spinner ml-3 hidden"></div>
+            </button>
         </form>
     </div>
 
-    {# Results Display Area #}
-    {# Changed `if not generated_sets` to `generated_sets | length == 0` for explicit check #}
-    <div id="smartPicksResults" class="mt-8 space-y-6 {% if generated_sets | length == 0 %}hidden{% endif %}">
-        {# Generated picks will be displayed here #}
-        {# Changed `if generated_sets` to `if generated_sets | length > 0` #}
-        {% if generated_sets | length > 0 %}
-            <div class="bg-gradient-to-br from-blue-500 to-indigo-600 p-8 rounded-2xl shadow-xl text-white">
-                <h2 class="text-3xl font-extrabold mb-6 text-center">Your Smart Picks!</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {% for pick in generated_sets %}
-                        <div class="bg-white bg-opacity-20 backdrop-filter backdrop-blur-sm p-6 rounded-xl shadow-lg flex flex-col items-center justify-center space-y-4 generated-pick-item"
-                             data-white-balls="{{ pick.white_balls | join(',') }}"
-                             data-powerball="{{ pick.powerball }}">
-                            <div class="flex space-x-2">
-                                {% for num in pick.white_balls %}
-                                    <span class="flex items-center justify-center w-10 h-10 rounded-full bg-yellow-400 text-gray-900 font-extrabold text-lg shadow-md">{{ num }}</span>
-                                {% endfor %}
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <span class="text-lg font-semibold">Powerball:</span>
-                                <span class="flex items-center justify-center w-10 h-10 rounded-full bg-red-600 text-white font-extrabold text-lg shadow-md">{{ pick.powerball }}</span>
-                            </div>
-                            <button class="btn-secondary save-pick-btn w-full">Save This Pick</button>
-                            <button class="btn-secondary analyze-pick-btn w-full">Analyze This Pick</button>
-                        </div>
-                    {% endfor %}
-                </div>
-                <div id="saveAllSmartPicksActions" class="mt-8 text-center">
-                    <button id="saveAllSmartPicksBtn" class="btn-primary">Save All Generated Picks</button>
-                </div>
-            </div>
-            
-            {# Analysis Modal Structure #}
-            <div id="analysisModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
-                <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-2xl transform transition-all scale-95 opacity-0" id="analysisModalContent">
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-2xl font-bold text-gray-800">Historical Match Analysis</h3>
-                        <button id="closeAnalysisModal" class="text-gray-500 hover:text-gray-700">
-                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
-                        </button>
-                    </div>
-                    <div id="analysisResultsContent" class="space-y-4 text-gray-700">
-                        <p>Loading analysis...</p>
-                    </div>
-                </div>
-            </div>
-        {% endif %}
+    {# Generated Picks Display #}
+    <div id="generatedPicksSection" class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200 hidden">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">Your Generated Picks</h2>
+        <div id="generatedPicksContainer" class="space-y-6">
+            {# Generated picks will be injected here by JavaScript #}
+        </div>
+        <div class="flex justify-end mt-6 space-x-4">
+            <button id="saveAllPicksBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition ease-in-out duration-150">
+                Save All Generated Picks
+            </button>
+        </div>
+    </div>
+
+    {# Last Draw Dates Display #}
+    <div id="lastDrawDatesSection" class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200 hidden">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">Last Drawn Dates for Your Numbers</h2>
+        <div id="lastDrawDatesContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {# Last drawn dates will be injected here by JavaScript #}
+        </div>
     </div>
 </div>
-
-<style>
-    /* Add some basic styles for the number balls */
-    .ball-sm {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 36px; /* Slightly smaller */
-        height: 36px;
-        border-radius: 50%;
-        font-size: 0.9rem; /* Adjusted font size */
-        font-weight: bold;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-
-    .powerball-ball {
-        background-color: #ef4444; /* Red-500 */
-    }
-
-    /* Basic fade-in animation for messages */
-    @keyframes fade-in {
-        from { opacity: 0; transform: translateY(-10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes fade-out {
-        from { opacity: 1; transform: translateY(0); }
-        to { opacity: 0; transform: translateY(-10px); }
-    }
-    .animate-fade-in {
-        animation: fade-in 0.5s ease-out forwards;
-    }
-    .animate-fade-out {
-        animation: fade-out 0.5s ease-in forwards;
-    }
-
-    /* Styles for the custom toast popup */
-    .toast-popup {
-        position: fixed;
-        bottom: 20px; /* Adjust as needed */
-        right: 20px; /* Adjust as needed */
-        min-width: 250px;
-        padding: 15px 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        color: white;
-        font-weight: 600;
-        z-index: 1000; /* Ensure it's on top */
-        opacity: 0;
-        transform: translateY(20px);
-        transition: opacity 0.3s ease-out, transform 0.3s ease-out;
-        display: flex;
-        align-items: center;
-    }
-    .toast-popup.show {
-        opacity: 1;
-        transform: translateY(0);
-    }
-    .toast-popup.success {
-        background-color: #4CAF50; /* Green */
-    }
-    .toast-popup.info {
-        background-color: #2196F3; /* Blue */
-    }
-    .toast-popup.error {
-        background-color: #f44336; /* Red */
-    }
-</style>
-
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const smartPickForm = document.getElementById('smartPickForm');
-        const generateSmartPicksBtn = document.getElementById('generateSmartPicksBtn');
+        const generatePicksBtn = document.getElementById('generatePicksBtn');
+        const buttonText = document.getElementById('buttonText');
         const loadingSpinner = document.getElementById('loadingSpinner');
-        const smartPicksResultsDiv = document.getElementById('smartPicksResults');
-        const saveAllSmartPicksBtn = document.getElementById('saveAllSmartPicksBtn');
-        const saveAllSmartPicksActions = document.getElementById('saveAllSmartPicksActions'); // This might be null if not already rendered
+        const generatedPicksSection = document.getElementById('generatedPicksSection');
+        const generatedPicksContainer = document.getElementById('generatedPicksContainer');
+        const lastDrawDatesSection = document.getElementById('lastDrawDatesSection');
+        const lastDrawDatesContainer = document.getElementById('lastDrawDatesContainer');
+        const saveAllPicksBtn = document.getElementById('saveAllPicksBtn');
+        const generationStrategyRadios = document.querySelectorAll('input[name="generation_strategy"]');
+        const ruleBasedFilters = document.getElementById('ruleBasedFilters');
 
-        const analysisModal = document.getElementById('analysisModal');
-        const analysisModalContent = document.getElementById('analysisModalContent');
-        const closeAnalysisModalBtn = document.getElementById('closeAnalysisModal');
-        const analysisResultsContent = document.getElementById('analysisResultsContent');
+        let currentGeneratedSets = []; // Store the current generated sets for saving
 
-        // Function to show custom toast messages
-        function showToast(message, category) {
-            const existingToast = document.querySelector('.toast-popup');
-            if (existingToast) {
-                existingToast.remove(); // Remove any existing toast
+        // Function to toggle visibility of rule-based filters
+        function toggleRuleBasedFilters() {
+            const selectedStrategy = document.querySelector('input[name="generation_strategy"]:checked').value;
+            if (selectedStrategy === 'rule_based') {
+                ruleBasedFilters.classList.remove('hidden');
+            } else {
+                ruleBasedFilters.classList.add('hidden');
             }
-
-            const toastDiv = document.createElement('div');
-            toastDiv.className = `toast-popup ${category}`;
-            toastDiv.textContent = message;
-            document.body.appendChild(toastDiv);
-
-            // Trigger animation
-            setTimeout(() => {
-                toastDiv.classList.add('show');
-            }, 10); // Small delay to allow render before animation
-
-            // Hide and remove after a few seconds
-            setTimeout(() => {
-                toastDiv.classList.remove('show');
-                toastDiv.classList.add('animate-fade-out'); // Add fade-out animation
-                toastDiv.addEventListener('animationend', () => {
-                    toastDiv.remove();
-                }, { once: true });
-            }, 5000); // 5 seconds display
         }
 
-        // Show loading spinner on form submission
-        smartPickForm.addEventListener('submit', function() {
-            generateSmartPicksBtn.disabled = true;
-            loadingSpinner.classList.remove('hidden');
-            generateSmartPicksBtn.textContent = 'Generating...';
-            smartPicksResultsDiv.innerHTML = ''; // Clear previous results
+        // Add event listeners to strategy radios
+        generationStrategyRadios.forEach(radio => {
+            radio.addEventListener('change', toggleRuleBasedFilters);
         });
 
-        // Handle initial display of results if they were passed from Flask
-        // Changed `if smartPicksResultsDiv && smartPicksResultsDiv.querySelectorAll('.generated-pick-item').length > 0`
-        // to check `generated_sets | length > 0` which is implicitly handled by the template's hidden class
-        // and also added `saveAllSmartPicksActions` to be shown
-        const initialGeneratedPicks = smartPicksResultsDiv.querySelectorAll('.generated-pick-item');
-        if (initialGeneratedPicks.length > 0) {
-            smartPicksResultsDiv.classList.remove('hidden');
-            if (saveAllSmartPicksActions) {
-                saveAllSmartPicksActions.classList.remove('hidden');
-            }
-        }
+        // Initial call to set visibility based on default selected radio
+        toggleRuleBasedFilters();
 
 
-        generateSmartPicksBtn.addEventListener('click', async function(event) {
+        smartPickForm.addEventListener('submit', async function(event) {
             event.preventDefault(); // Prevent default form submission
 
-            generateSmartPicksBtn.disabled = true;
+            buttonText.textContent = 'Generating...';
             loadingSpinner.classList.remove('hidden');
-            generateSmartPicksBtn.textContent = 'Generating...';
-            smartPicksResultsDiv.innerHTML = ''; // Clear previous results
-            if (saveAllSmartPicksActions) {
-                saveAllSmartPicksActions.classList.add('hidden'); // Hide save all button
-            }
-            smartPicksResultsDiv.classList.add('hidden'); // Ensure results area is hidden until populated
-
+            generatePicksBtn.disabled = true;
+            generatedPicksSection.classList.add('hidden');
+            lastDrawDatesSection.classList.add('hidden');
+            generatedPicksContainer.innerHTML = '';
+            lastDrawDatesContainer.innerHTML = '';
+            currentGeneratedSets = []; // Clear previous sets
 
             const numSets = document.getElementById('num_sets_to_generate').value;
-            // Monthly Hot Numbers checkbox is removed from UI, send false
-            const prioritizeMonthlyHot = false; 
-            const prioritizeGroupedPatterns = document.getElementById('prioritize_grouped_patterns').checked;
-            const prioritizeSpecialPatterns = document.getElementById('prioritize_special_patterns').checked;
-            const prioritizeConsecutivePatterns = document.getElementById('prioritize_consecutive_patterns').checked;
-            const groupANumbersCount = document.getElementById('num_from_group_a').value; // Correct ID
-            const oddEvenChoiceSmart = document.getElementById('odd_even_choice').value; // Correct ID
-            const sumRangeFilterSmart = document.getElementById('sum_range_filter').value; // Correct ID
-            const excludedNumbersSmart = document.getElementById('excluded_numbers').value; // Correct ID
-            // Force Specific Pattern field is removed from UI, send empty string
-            const forceSpecificPatternInput = ''; 
+            const excludedNumbers = document.getElementById('excluded_numbers').value;
+            const selectedStrategy = document.querySelector('input[name="generation_strategy"]:checked').value;
 
-            const payload = {
-                num_sets_to_generate: parseInt(numSets),
-                prioritize_monthly_hot: prioritizeMonthlyHot,
-                prioritize_grouped_patterns: prioritizeGroupedPatterns,
-                prioritize_special_patterns: prioritizeSpecialPatterns,
-                prioritize_consecutive_patterns: prioritizeConsecutivePatterns,
-                num_from_group_a: parseInt(groupANumbersCount),
-                odd_even_choice: oddEvenChoiceSmart,
-                sum_range_filter: sumRangeFilterSmart,
-                excluded_numbers: excludedNumbersSmart,
-                force_specific_pattern: forceSpecificPatternInput
+            let apiUrl = '';
+            let payload = {
+                num_sets: parseInt(numSets),
+                excluded_numbers: excludedNumbers
             };
 
+            if (selectedStrategy === 'rule_based') {
+                apiUrl = '/generate_smart_picks_route'; // Your existing Flask route for rule-based
+                payload.num_from_group_a = document.getElementById('num_from_group_a').value;
+                payload.odd_even_choice = document.getElementById('odd_even_choice').value;
+                payload.sum_range_filter = document.getElementById('sum_range_filter').value;
+                payload.prioritize_monthly_hot = document.getElementById('prioritize_monthly_hot').checked;
+                payload.prioritize_grouped_patterns = document.getElementById('prioritize_grouped_patterns').checked;
+                payload.prioritize_special_patterns = document.getElementById('prioritize_special_patterns').checked;
+                payload.prioritize_consecutive_patterns = document.getElementById('prioritize_consecutive_patterns').checked;
+                payload.force_specific_pattern = document.getElementById('force_specific_pattern').value;
+            } else if (selectedStrategy === 'ml_based') {
+                apiUrl = '/api/generate_ml_smart_picks'; // New ML-based API endpoint
+                // ML-based generation doesn't use all the rule-based filters directly
+                // but excluded_numbers and num_sets are common.
+            }
+
             try {
-                const response = await fetch('/generate_smart_picks_route', {
+                const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json' 
+                        'Content-Type': 'application/json',
                     },
                     body: JSON.stringify(payload)
                 });
 
-                const data = await response.json();
+                const result = await response.json();
 
-                if (response.ok) {
-                    let resultsHtml = '<h3 class="text-3xl font-bold text-white text-center mb-6">Your Smart Picks!</h3>';
-                    resultsHtml += '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">';
+                if (response.ok && result.success) {
+                    currentGeneratedSets = result.generated_sets;
+                    generatedPicksContainer.innerHTML = ''; // Clear existing
+                    result.generated_sets.forEach(pick => {
+                        const pickDiv = document.createElement('div');
+                        pickDiv.className = 'flex flex-wrap items-center justify-center sm:justify-start bg-gray-50 p-4 rounded-lg shadow-sm';
+                        const whiteBallsHtml = pick.white_balls.map(ball => `<span class="ball">${ball}</span>`).join('');
+                        pickDiv.innerHTML = `
+                            <div class="flex items-center mb-2 sm:mb-0 sm:mr-4">
+                                ${whiteBallsHtml}
+                                <span class="ball powerball">${pick.powerball}</span>
+                            </div>
+                        `;
+                        generatedPicksContainer.appendChild(pickDiv);
+                    });
+                    generatedPicksSection.classList.remove('hidden');
 
-                    if (data.generated_sets && data.generated_sets.length > 0) {
-                        data.generated_sets.forEach(pick => {
-                            resultsHtml += `
-                                <div class="bg-white bg-opacity-20 backdrop-filter backdrop-blur-sm p-6 rounded-xl shadow-lg flex flex-col items-center justify-center space-y-4 generated-pick-item"
-                                     data-white-balls="${pick.white_balls.join(',')}"
-                                     data-powerball="${pick.powerball}">
-                                    <div class="flex space-x-2">
-                                        {# Accessing pick.white_balls here, ensures pick is defined #}
-                                        ${pick.white_balls.map(num => `<span class="flex items-center justify-center w-10 h-10 rounded-full bg-yellow-400 text-gray-900 font-extrabold text-lg shadow-md">${num}</span>`).join('')}
-                                    </div>
-                                    <div class="flex items-center space-x-2">
-                                        <span class="text-lg font-semibold">Powerball:</span>
-                                        <span class="flex items-center justify-center w-10 h-10 rounded-full bg-red-600 text-white font-extrabold text-lg shadow-md">${pick.powerball}</span>
-                                    </div>
-                                    <button class="btn-secondary save-pick-btn w-full">Save This Pick</button>
-                                    <button class="btn-secondary analyze-pick-btn w-full">Analyze This Pick</button>
-                                </div>
-                            `;
-                        });
-                        resultsHtml += '</div>'; // Close grid div
-
-                        // Add Last Drawn Dates
-                        if (data.last_draw_dates && Object.keys(data.last_draw_dates).length > 0) {
-                            resultsHtml += `<div class="mt-4 p-4 bg-blue-800 rounded-lg text-white text-sm"><h4 class="font-semibold mb-2">Last Drawn Dates for These Numbers:</h4><ul class="list-disc list-inside">`;
-                            for (const [number, date] of Object.entries(data.last_draw_dates)) {
-                                resultsHtml += `<li><strong>${number}:</strong> ${date}</li>`;
-                            }
-                            resultsHtml += `</ul></div>`;
+                    lastDrawDatesContainer.innerHTML = ''; // Clear existing
+                    if (result.last_draw_dates && Object.keys(result.last_draw_dates).length > 0) {
+                        for (const [number, date] of Object.entries(result.last_draw_dates)) {
+                            const dateDiv = document.createElement('div');
+                            dateDiv.className = 'bg-gray-50 p-3 rounded-lg text-sm text-gray-700';
+                            dateDiv.innerHTML = `<strong>${number}:</strong> ${date}`;
+                            lastDrawDatesContainer.appendChild(dateDiv);
                         }
-
-                        if (saveAllSmartPicksActions) { // Check if element exists before showing
-                            saveAllSmartPicksActions.classList.remove('hidden');
-                        }
-
+                        lastDrawDatesSection.classList.remove('hidden');
                     } else {
-                        resultsHtml = '<p class="text-white text-center">No picks could be generated with the selected criteria. Try adjusting your filters.</p>';
+                        lastDrawDatesContainer.innerHTML = '<p class="text-gray-500">No last drawn date info available.</p>';
+                        lastDrawDatesSection.classList.remove('hidden');
                     }
-                    
-                    smartPicksResultsDiv.innerHTML = resultsHtml;
-                    smartPicksResultsDiv.classList.remove('hidden');
-                    smartPicksResultsDiv.classList.add('bg-gradient-to-br', 'from-blue-500', 'to-indigo-600', 'p-8', 'rounded-2xl', 'shadow-xl'); // Re-add styling
+
+                    // Display ML cluster info if available
+                    if (selectedStrategy === 'ml_based' && result.ml_cluster_info) {
+                        const mlInfoDiv = document.createElement('div');
+                        mlInfoDiv.className = 'mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-sm font-medium';
+                        mlInfoDiv.textContent = result.ml_cluster_info;
+                        generatedPicksContainer.prepend(mlInfoDiv); // Add to top of generated picks
+                    }
+
 
                 } else {
-                    showToast(data.error || 'An unknown error occurred during generation.', 'error');
-                    smartPicksResultsDiv.classList.add('hidden'); // Hide on error
+                    alert(result.error || 'An unknown error occurred during generation.');
                 }
             } catch (error) {
-                console.error('Error generating smart picks:', error);
-                showToast(`An unexpected error occurred: ${error.message}`, 'error');
-                smartPicksResultsDiv.classList.add('hidden'); // Hide on error
+                console.error('Error:', error);
+                alert('Failed to connect to the server or an unexpected error occurred.');
             } finally {
-                generateSmartPicksBtn.disabled = false;
+                buttonText.textContent = 'Generate Smart Picks';
                 loadingSpinner.classList.add('hidden');
-                generateSmartPicksBtn.textContent = 'Generate Smart Picks';
+                generatePicksBtn.disabled = false;
             }
         });
 
-        // --- Save Single Pick Logic ---
-        // Delegated event listener for dynamically added buttons
-        document.body.addEventListener('click', async function(event) {
-            if (event.target.classList.contains('save-pick-btn')) {
-                const pickItem = event.target.closest('.generated-pick-item');
-                if (pickItem) {
-                    const whiteBallsStr = pickItem.dataset.whiteBalls;
-                    const powerballStr = pickItem.dataset.powerball;
-                    const whiteBalls = whiteBallsStr.split(',').map(Number);
-                    const powerball = Number(powerballStr);
-
-                    try {
-                        const response = await fetch('/save_manual_pick', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ white_balls: whiteBalls, powerball: powerball })
-                        });
-                        const result = await response.json();
-                        if (result.success) {
-                            showToast(result.message, 'info'); // Changed to showToast
-                        } else {
-                            showToast(result.error, 'error'); // Changed to showToast
-                        }
-                    } catch (error) {
-                        console.error('Error saving pick:', error);
-                        showToast('An error occurred while saving the pick.', 'error'); // Changed to showToast
-                    }
-                }
+        // Event listener for saving all generated picks
+        saveAllPicksBtn.addEventListener('click', async function() {
+            if (currentGeneratedSets.length === 0) {
+                alert('No picks to save.');
+                return;
             }
-        });
 
-        // --- Save All Smart Picks Button Logic ---
-        if (saveAllSmartPicksBtn) {
-            saveAllSmartPicksBtn.addEventListener('click', async function() {
-                const allSmartPickItems = document.querySelectorAll('#smartPicksResults .generated-pick-item');
-                const picksToSave = [];
-                allSmartPickItems.forEach(item => {
-                    const whiteBallsStr = item.dataset.whiteBalls;
-                    const powerballStr = item.dataset.powerball;
-                    if (whiteBallsStr && powerballStr) {
-                        picksToSave.push({
-                            white_balls: whiteBallsStr.split(',').map(Number),
-                            powerball: Number(powerballStr)
-                        });
-                    }
+            // Prepare picks for the /save_multiple_generated_picks endpoint
+            const picksToSave = currentGeneratedSets.map(pick => ({
+                white_balls: pick.white_balls,
+                powerball: pick.powerball
+            }));
+
+            try {
+                const response = await fetch('/save_multiple_generated_picks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ picks: picksToSave })
                 });
 
-                if (picksToSave.length === 0) {
-                    showToast("No picks to save.", 'info'); // Changed to showToast
-                    return;
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    alert(result.message);
+                } else {
+                    alert(result.message || result.error || 'Failed to save picks.');
                 }
-
-                try {
-                    const response = await fetch('/save_multiple_generated_picks', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ picks: picksToSave })
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                        showToast(result.message, 'info'); // Changed to showToast
-                    } else {
-                        showToast(result.message || result.error, 'error'); // Changed to showToast
-                    }
-                } catch (error) {
-                    console.error('Error saving multiple picks:', error);
-                    showToast('An error occurred while saving multiple picks.', 'error'); // Changed to showToast
-                }
-            });
-        }
-
-        // --- Analyze Single Pick Logic (Modal) ---
-        // Delegated event listener for dynamically added buttons
-        document.body.addEventListener('click', async function(event) {
-            if (event.target.classList.contains('analyze-pick-btn')) {
-                const pickItem = event.target.closest('.generated-pick-item');
-                if (pickItem) {
-                    const whiteBallsStr = pickItem.dataset.whiteBalls;
-                    const powerballStr = pickItem.dataset.powerball;
-                    const whiteBalls = whiteBallsStr.split(',').map(Number);
-                    const powerball = Number(powerballStr);
-
-                    analysisResultsContent.innerHTML = '<p>Loading analysis...</p>';
-                    analysisModal.classList.remove('hidden');
-                    setTimeout(() => { // Animate modal in
-                        analysisModalContent.classList.remove('scale-95', 'opacity-0');
-                        analysisModalContent.classList.add('scale-100', 'opacity-100');
-                    }, 10);
-
-                    try {
-                        const response = await fetch('/analyze_generated_historical_matches', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ generated_white_balls: whiteBalls, generated_powerball: powerball })
-                        });
-                        const result = await response.json();
-
-                        if (result.success) {
-                            let html = `<p class="mb-4">Analysis for pick: <span class="font-bold">${whiteBalls.join(', ')}</span> Powerball: <span class="font-bold">${powerball}</span></p>`;
-                            html += `<h4 class="text-lg font-semibold mb-2">Match Summary (Last 2 Years):</h4>`;
-                            html += `<ul class="list-disc list-inside space-y-1">`;
-                            
-                            // Sort categories for consistent display, showing matches first
-                            const sortedCategories = Object.keys(result.match_summary).sort((a, b) => {
-                                if (a === "No Match") return 1;
-                                if (b === "No Match") return -1;
-                                return 0; // Keep original order for other matches
-                            });
-
-                            sortedCategories.forEach(category => {
-                                const summary = result.match_summary[category];
-                                if (summary.count > 0) {
-                                    html += `<li><strong>${category}:</strong> ${summary.count} time(s)`;
-                                    if (summary.draws && summary.draws.length > 0) {
-                                        html += ` (Last seen: ${summary.draws[0].date})`;
-                                    }
-                                    html += `</li>`;
-                                }
-                            });
-                            html += `</ul>`;
-
-                            // Last drawn dates for individual numbers
-                            if (result.last_drawn_dates) {
-                                html += `<h4 class="text-lg font-semibold mt-6 mb-2">Last Drawn Dates for Individual Numbers:</h4>`;
-                                html += `<ul class="list-disc list-inside space-y-1">`;
-                                for (const [key, date] of Object.entries(result.last_drawn_dates)) {
-                                    html += `<li><strong>${key}:</strong> ${date}</li>`;
-                                }
-                                html += `</ul>`;
-                            }
-
-                            analysisResultsContent.innerHTML = html;
-
-                        } else {
-                            analysisResultsContent.innerHTML = `<p class="text-red-600">Error: ${result.error}</p>`;
-                        }
-                    } catch (error) {
-                        console.error('Error analyzing pick:', error);
-                        analysisResultsContent.innerHTML = '<p class="text-red-600">An error occurred during analysis.</p>';
-                    }
-                }
-            }
-        });
-
-        // Close modal logic
-        closeAnalysisModalBtn.addEventListener('click', function() {
-            analysisModalContent.classList.remove('scale-100', 'opacity-100');
-            analysisModalContent.classList.add('scale-95', 'opacity-0');
-            setTimeout(() => {
-                analysisModal.classList.add('hidden');
-            }, 300); // Match transition duration
-        });
-
-        analysisModal.addEventListener('click', function(event) {
-            if (event.target === analysisModal) { // Only close if clicked on overlay, not content
-                closeAnalysisModalBtn.click();
+            } catch (error) {
+                console.error('Error saving picks:', error);
+                alert('Failed to connect to the server or an unexpected error occurred while saving picks.');
             }
         });
     });
 </script>
-
 {% endblock %}
