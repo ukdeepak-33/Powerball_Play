@@ -10,6 +10,10 @@ import requests
 import json
 import numpy as np
 import traceback 
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='sklearn') # Ignore specific KMeans warning
 
 # --- Supabase Configuration ---
 SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
@@ -38,6 +42,11 @@ last_analysis_cache_update = datetime.min
 
 CACHE_DURATION = timedelta(minutes=60) # Cache for 60 minutes
 CACHE_EXPIRATION_SECONDS = CACHE_DURATION.total_seconds()
+
+
+kmeans_model = None
+scaler_model = None
+clustering_features_columns = [] # To store the names of features for clarity
 
 
 group_a = [3, 5, 6, 7, 9, 11, 15, 16, 18, 21, 23, 24, 27, 31, 32, 33, 36, 42, 44, 45, 48, 50, 51, 54, 55, 60, 66, 69]
@@ -402,6 +411,319 @@ def generate_with_user_provided_pair(num1, num2, white_ball_range, powerball_ran
             continue
     else:
         raise ValueError("Could not generate a unique combination with the provided pair and ascending range constraint meeting all criteria after many attempts. Try adjusting filters.")
+
+
+def _extract_features_for_draw(draw_row):
+    """
+    Extracts a numerical feature vector from a single Powerball draw row.
+    This vector will be used for clustering.
+    """
+    if pd.isna(draw_row['Number 1']): # Ensure draw data is valid
+        return None
+
+    white_balls = sorted([
+        int(draw_row['Number 1']), int(draw_row['Number 2']), int(draw_row['Number 3']),
+        int(draw_row['Number 4']), int(draw_row['Number 5'])
+    ])
+    powerball = int(draw_row['Powerball'])
+    
+    # Feature 1-2: Odd/Even Split
+    odd_count = sum(1 for num in white_balls if num % 2 != 0)
+    even_count = 5 - odd_count
+
+    # Feature 3: Sum of White Balls
+    white_ball_sum = sum(white_balls)
+
+    # Feature 4: Group-A Count
+    group_a_count = sum(1 for num in white_balls if num in group_a)
+
+    # Feature 5: Consecutive Pairs Count
+    consecutive_pairs_count = 0
+    for i in range(len(white_balls) - 1):
+        if white_balls[i] + 1 == white_balls[i+1]:
+            consecutive_pairs_count += 1
+            # For longer sequences like (1,2,3), this counts (1,2) and (2,3) as 2 pairs
+
+    # Feature 6: Tens Apart Pairs Count (e.g., 1-11, 2-12)
+    tens_apart_pairs_count = 0
+    for i in range(len(white_balls)):
+        for j in range(i + 1, len(white_balls)):
+            diff = abs(white_balls[i] - white_balls[j])
+            if diff in [10, 20, 30, 40, 50]:
+                tens_apart_pairs_count += 1
+
+    # Feature 7: Same Last Digit Count (count of numbers that share a last digit with another)
+    last_digit_counts = defaultdict(int)
+    for num in white_balls:
+        last_digit_counts[num % 10] += 1
+    same_last_digit_count = sum(count for count in last_digit_counts.values() if count >= 2)
+
+    # Feature 8: Repeating Digit Count (11, 22, 33, etc.)
+    repeating_digit_numbers = [11, 22, 33, 44, 55, 66]
+    repeating_digit_count = sum(1 for num in white_balls if num in repeating_digit_numbers)
+
+    # Features 9-15: Number Range Counts
+    num_in_range = defaultdict(int)
+    for num in white_balls:
+        if 1 <= num <= 9: num_in_range['1-9'] += 1
+        elif 10 <= num <= 19: num_in_range['10s'] += 1
+        elif 20 <= num <= 29: num_in_range['20s'] += 1
+        elif 30 <= num <= 39: num_in_range['30s'] += 1
+        elif 40 <= num <= 49: num_in_range['40s'] += 1
+        elif 50 <= num <= 59: num_in_range['50s'] += 1
+        elif 60 <= num <= 69: num_in_range['60s'] += 1
+    
+    # Features 16-18: Weekday (One-Hot Encoded)
+    draw_weekday = draw_row['Draw Date_dt'].day_name()
+    is_monday_draw = 1 if draw_weekday == 'Monday' else 0
+    is_wednesday_draw = 1 if draw_weekday == 'Wednesday' else 0
+    is_saturday_draw = 1 if draw_weekday == 'Saturday' else 0
+
+    # Feature 19: Powerball Value
+    powerball_value = powerball
+
+    features = [
+        odd_count, even_count, white_ball_sum, group_a_count, consecutive_pairs_count,
+        tens_apart_pairs_count, same_last_digit_count, repeating_digit_count,
+        num_in_range['1-9'], num_in_range['10s'], num_in_range['20s'],
+        num_in_range['30s'], num_in_range['40s'], num_in_range['50s'], num_in_range['60s'],
+        is_monday_draw, is_wednesday_draw, is_saturday_draw, powerball_value
+    ]
+    return features
+
+
+def _extract_features_for_candidate(white_balls, powerball, draw_date_dt):
+    """
+    Extracts a numerical feature vector from a candidate Powerball pick
+    (list of white balls, powerball, and a datetime object for the draw date).
+    Used for evaluating candidate picks against cluster centroids.
+    """
+    # Ensure inputs are valid
+    if not isinstance(white_balls, list) or len(white_balls) != 5:
+        return None
+    if not isinstance(powerball, int) or not (GLOBAL_POWERBALL_RANGE[0] <= powerball <= GLOBAL_POWERBALL_RANGE[1]):
+        return None
+    if not isinstance(draw_date_dt, datetime): # Expecting a datetime object
+        # Fallback to current date if not provided or invalid, but ideal is a valid datetime
+        draw_date_dt = datetime.now() 
+
+    # All numbers must be within range and unique
+    if not all(GLOBAL_WHITE_BALL_RANGE[0] <= num <= GLOBAL_WHITE_BALL_RANGE[1] for num in white_balls):
+        return None
+    if len(set(white_balls)) != 5:
+        return None
+
+    sorted_white_balls = sorted(white_balls) # Ensure sorted for consistent feature extraction
+
+    # Feature 1-2: Odd/Even Split
+    odd_count = sum(1 for num in sorted_white_balls if num % 2 != 0)
+    even_count = 5 - odd_count
+
+    # Feature 3: Sum of White Balls
+    white_ball_sum = sum(sorted_white_balls)
+
+    # Feature 4: Group-A Count
+    group_a_count = sum(1 for num in sorted_white_balls if num in group_a)
+
+    # Feature 5: Consecutive Pairs Count
+    consecutive_pairs_count = 0
+    for i in range(len(sorted_white_balls) - 1):
+        if sorted_white_balls[i] + 1 == sorted_white_balls[i+1]:
+            consecutive_pairs_count += 1
+
+    # Feature 6: Tens Apart Pairs Count (e.g., 1-11, 2-12)
+    tens_apart_pairs_count = 0
+    for i in range(len(sorted_white_balls)):
+        for j in range(i + 1, len(sorted_white_balls)):
+            diff = abs(sorted_white_balls[i] - sorted_white_balls[j])
+            if diff in [10, 20, 30, 40, 50]:
+                tens_apart_pairs_count += 1
+
+    # Feature 7: Same Last Digit Count (count of numbers that share a last digit with another)
+    last_digit_counts = defaultdict(int)
+    for num in sorted_white_balls:
+        last_digit_counts[num % 10] += 1
+    same_last_digit_count = sum(count for count in last_digit_counts.values() if count >= 2)
+
+    # Feature 8: Repeating Digit Count (11, 22, 33, etc.)
+    repeating_digit_numbers = [11, 22, 33, 44, 55, 66]
+    repeating_digit_count = sum(1 for num in sorted_white_balls if num in repeating_digit_numbers)
+
+    # Features 9-15: Number Range Counts
+    num_in_range = defaultdict(int)
+    for num in sorted_white_balls:
+        if 1 <= num <= 9: num_in_range['1-9'] += 1
+        elif 10 <= num <= 19: num_in_range['10s'] += 1
+        elif 20 <= num <= 29: num_in_range['20s'] += 1
+        elif 30 <= num <= 39: num_in_range['30s'] += 1
+        elif 40 <= num <= 49: num_in_range['40s'] += 1
+        elif 50 <= num <= 59: num_in_range['50s'] += 1
+        elif 60 <= num <= 69: num_in_range['60s'] += 1
+    
+    # Features 16-18: Weekday (One-Hot Encoded)
+    draw_weekday = draw_date_dt.day_name()
+    is_monday_draw = 1 if draw_weekday == 'Monday' else 0
+    is_wednesday_draw = 1 if draw_weekday == 'Wednesday' else 0
+    is_saturday_draw = 1 if draw_weekday == 'Saturday' else 0
+
+    # Feature 19: Powerball Value (just the number itself)
+    powerball_value = powerball
+
+    features = [
+        odd_count, even_count, white_ball_sum, group_a_count, consecutive_pairs_count,
+        tens_apart_pairs_count, same_last_digit_count, repeating_digit_count,
+        num_in_range['1-9'], num_in_range['10s'], num_in_range['20s'],
+        num_in_range['30s'], num_in_range['40s'], num_in_range['50s'], num_in_range['60s'],
+        is_monday_draw, is_wednesday_draw, is_saturday_draw, powerball_value
+    ]
+    return features
+
+    # ... (existing _extract_features_for_candidate function) ...
+
+def _generate_pick_for_cluster(target_cluster_centroid, current_draw_date_dt, excluded_numbers, max_attempts_per_pick=2000):
+    """
+    Generates a single Powerball pick (5 white balls + 1 powerball) that closely
+    matches the given target_cluster_centroid based on features.
+    
+    Args:
+        target_cluster_centroid (np.array): The feature vector of the target cluster.
+        current_draw_date_dt (datetime): The datetime object for the hypothetical draw date,
+                                        used for weekday feature calculation.
+        excluded_numbers (list): Numbers that should not be included in the generated pick.
+        max_attempts_per_pick (int): Maximum attempts to generate a single pick.
+        
+    Returns:
+        tuple: (white_balls_list, powerball_num) or (None, None) if unsuccessful.
+    """
+    global kmeans_model, scaler_model, df, historical_white_ball_sets
+
+    if kmeans_model is None or scaler_model is None:
+        print("Clustering model or scaler not trained. Cannot generate ML picks.")
+        return None, None
+    
+    best_pick_white_balls = None
+    best_pick_powerball = None
+    min_distance = float('inf')
+
+    available_white_balls_pool = [num for num in range(GLOBAL_WHITE_BALL_RANGE[0], GLOBAL_WHITE_BALL_RANGE[1] + 1)
+                                  if num not in excluded_numbers]
+
+    if len(available_white_balls_pool) < 5:
+        print(f"Not enough white balls in pool ({len(available_white_balls_pool)}) after exclusions for ML pick generation.")
+        return None, None
+
+    # Consider the last few draws to avoid immediately repeating the most recent history
+    last_5_white_ball_sets = []
+    if not df.empty:
+        for _, row in df.tail(5).iterrows():
+            last_5_white_ball_sets.append(frozenset([
+                int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                int(row['Number 4']), int(row['Number 5'])
+            ]))
+
+    for attempt in range(max_attempts_per_pick):
+        try:
+            candidate_white_balls = sorted(random.sample(available_white_balls_pool, 5))
+            candidate_powerball = random.randint(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1])
+
+            # Skip if exact historical match (or very recent match)
+            if frozenset(candidate_white_balls) in historical_white_ball_sets:
+                continue
+            if frozenset(candidate_white_balls) in last_5_white_ball_sets:
+                continue
+
+            # Calculate features for the candidate pick
+            candidate_features = _extract_features_for_candidate(
+                candidate_white_balls, candidate_powerball, current_draw_date_dt
+            )
+            
+            if candidate_features is None: # Should not happen if previous checks pass, but good safeguard
+                continue
+
+            # Scale the candidate features using the *trained* scaler
+            scaled_candidate_features = scaler_model.transform(np.array(candidate_features).reshape(1, -1))[0]
+
+            # Calculate Euclidean distance to the target cluster centroid
+            distance = np.linalg.norm(scaled_candidate_features - target_cluster_centroid)
+
+            if distance < min_distance:
+                min_distance = distance
+                best_pick_white_balls = candidate_white_balls
+                best_pick_powerball = candidate_powerball
+                
+                # Early exit if a very good match is found
+                if min_distance < 0.1: # Threshold can be tuned
+                    break
+
+        except ValueError: # e.g., random.sample pool too small after exclusions
+            continue
+        except IndexError: # e.g. if _extract_features_for_candidate returns None unexpectedly
+            continue
+        except Exception as e:
+            # print(f"Error during ML pick generation attempt {attempt}: {e}")
+            continue
+
+    return best_pick_white_balls, best_pick_powerball
+
+def _train_clustering_model():
+    """
+    Trains a KMeans clustering model and a StandardScaler on historical draw features.
+    Stores them in global variables.
+    """
+    global df, kmeans_model, scaler_model, clustering_features_columns
+
+    if df.empty:
+        print("DataFrame is empty, cannot train clustering model.")
+        return
+
+    # Ensure Draw Date_dt is available and up-to-date
+    if 'Draw Date_dt' not in df.columns or not pd.api.types.is_datetime64_any_dtype(df['Draw Date_dt']):
+        df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'], errors='coerce')
+        df.dropna(subset=['Draw Date_dt'], inplace=True)
+        if df.empty:
+            print("DataFrame became empty after datetime conversion, cannot train clustering model.")
+            return
+
+    feature_data = []
+    # Define feature names explicitly for clarity and future use
+    clustering_features_columns = [
+        'odd_count', 'even_count', 'white_ball_sum', 'group_a_count', 'consecutive_pairs_count',
+        'tens_apart_pairs_count', 'same_last_digit_count', 'repeating_digit_count',
+        'num_in_range_1_9', 'num_in_range_10_19', 'num_in_range_20_29',
+        'num_in_range_30_39', 'num_in_range_40_49', 'num_in_range_50_59', 'num_in_range_60_69',
+        'is_monday_draw', 'is_wednesday_draw', 'is_saturday_draw', 'powerball_value'
+    ]
+
+    for index, row in df.iterrows():
+        features = _extract_features_for_draw(row)
+        if features:
+            feature_data.append(features)
+    
+    if not feature_data:
+        print("No valid feature data extracted, cannot train clustering model.")
+        kmeans_model = None
+        scaler_model = None
+        clustering_features_columns = []
+        return
+
+    X = np.array(feature_data)
+
+    # 1. Scale the features
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    scaler_model = scaler # Store the trained scaler globally
+
+    # 2. Train KMeans clustering (e.g., 10 clusters)
+    # n_init='auto' is the default for newer sklearn versions, for older, set explicitly
+    num_clusters = 10 # You can experiment with this number
+    kmeans = KMeans(n_clusters=num_clusters, random_state=42, n_init='auto') 
+    kmeans.fit(X_scaled)
+    kmeans_model = kmeans # Store the trained KMeans model globally
+
+    print(f"KMeans clustering model trained with {num_clusters} clusters and StandardScaler.")
+    print(f"Feature columns: {clustering_features_columns}")
+
+
 
 def frequency_analysis(df_source):
     """Calculates and returns frequency of white balls and powerballs."""
@@ -1943,14 +2265,16 @@ def get_powerball_position_frequency(df_source):
         })
     return formatted_data
 
+
 def initialize_core_data():
-    """Initializes global DataFrame, last draw, and historical sets from Supabase."""
+    """Initializes global DataFrame, last draw, and historical sets from Supabase,
+    then trains the clustering model.""" # Updated docstring
     global df, last_draw, historical_white_ball_sets, white_ball_co_occurrence_lookup
     print("Attempting to load core historical data...")
     try:
         df_temp = load_historical_data_from_supabase()
         if not df_temp.empty:
-            df = df_temp.sort_values(by='Draw Date_dt').reset_index(drop=True) # Ensure df is sorted
+            df = df_temp.sort_values(by='Draw Date_dt').reset_index(drop=True)
             last_draw = get_last_draw(df)
             if not last_draw.empty and 'Draw Date_dt' in last_draw and pd.notna(last_draw['Draw Date_dt']):
                 last_draw['Draw Date'] = last_draw['Draw Date_dt'].strftime('%Y-%m-%d')
@@ -1973,6 +2297,11 @@ def initialize_core_data():
                     white_ball_co_occurrence_lookup[frozenset_white_balls] = current_draw_date
 
             print("Core historical data loaded successfully and co-occurrence lookup populated.")
+            
+            # --- NEW: Train the clustering model after data is loaded ---
+            _train_clustering_model()
+            # -----------------------------------------------------------
+
             return True 
         else:
             print("Core historical data is empty after loading. df remains empty.")
@@ -1983,9 +2312,9 @@ def initialize_core_data():
             }, dtype='object')
             return False 
     except Exception as e:
-        print(f"An error occurred during initial core data loading: {e}")
+        print(f"An error occurred during initial core data loading or clustering model training: {e}")
         traceback.print_exc()
-        return False 
+        return False
 
 def get_cached_analysis(key, compute_function, *args, **kwargs):
     """Retrieves cached analysis results or computes and caches them."""
@@ -4197,6 +4526,71 @@ def api_white_ball_gaps():
         return jsonify({'success': False, 'error': f"No appearance data for number {target_number} in the selected year range."}), 404
 
     return jsonify({'success': True, 'gaps_data': gaps_data})
+
+    # ... (existing API endpoints, like /api/generate_custom_combinations) ...
+
+@app.route('/api/generate_ml_smart_picks', methods=['POST'])
+def generate_ml_smart_picks_api():
+    """
+    Generates Powerball picks using the trained K-Means clustering model.
+    Picks will conform to patterns learned from historical draws.
+    """
+    global kmeans_model, scaler_model, df
+
+    if df.empty or kmeans_model is None or scaler_model is None:
+        return jsonify({
+            'success': False,
+            'error': "Machine learning model not trained. Historical data might be empty or training failed."
+        }), 500
+
+    try:
+        data = request.json
+        num_sets_to_generate = int(data.get('num_sets', 1))
+        excluded_numbers_input = data.get('excluded_numbers', '')
+        excluded_numbers = [int(num.strip()) for num in excluded_numbers_input.split(',') if num.strip().isdigit()] if excluded_numbers_input else []
+        
+        # We'll use the current date for weekday feature calculation for generated picks
+        current_draw_date_for_features = datetime.now() 
+
+        generated_sets = []
+        last_draw_dates = {}
+
+        # Randomly select a cluster to target for generation
+        # We can make this smarter later (e.g., weighted by cluster size, or user choice)
+        target_cluster_id = random.randint(0, kmeans_model.n_clusters - 1)
+        target_cluster_centroid = kmeans_model.cluster_centers_[target_cluster_id]
+        print(f"Targeting cluster {target_cluster_id} for ML pick generation. Centroid: {target_cluster_centroid[:5]}...") # Print first 5 features
+
+        for i in range(num_sets_to_generate):
+            white_balls, powerball = _generate_pick_for_cluster(
+                target_cluster_centroid, current_draw_date_for_features, excluded_numbers
+            )
+
+            if white_balls is not None and powerball is not None:
+                generated_sets.append({'white_balls': white_balls, 'powerball': powerball})
+                # For the last generated set, find last drawn dates for its numbers
+                if i == num_sets_to_generate - 1:
+                    last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
+            else:
+                print(f"Warning: Failed to generate a valid ML pick for set {i+1} after many attempts.")
+                # If a pick fails, we still try to generate the rest, but might return fewer than requested
+                # or add a placeholder indicating failure. For now, just skip.
+                
+        if not generated_sets:
+             raise ValueError("Could not generate any ML-based picks after multiple attempts. Try adjusting excluded numbers or increasing generation attempts.")
+
+        return jsonify({
+            'success': True,
+            'generated_sets': generated_sets,
+            'last_draw_dates': last_draw_dates,
+            'ml_cluster_info': f"Generated based on characteristics of Cluster {target_cluster_id}."
+        })
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
 
 # Initialize core data on app startup
 initialize_core_data()
