@@ -580,7 +580,7 @@ def _extract_features_for_candidate(white_balls, powerball, draw_date_dt):
 
     # ... (existing _extract_features_for_candidate function) ...
 
-def _generate_pick_for_cluster(target_cluster_centroid, current_draw_date_dt, excluded_numbers, max_attempts_per_pick=2000):
+def _generate_pick_for_cluster(target_cluster_centroid, current_draw_date_dt, excluded_numbers, max_attempts_per_pick=10000):
     """
     Generates a single Powerball pick (5 white balls + 1 powerball) that closely
     matches the given target_cluster_centroid based on features.
@@ -652,7 +652,7 @@ def _generate_pick_for_cluster(target_cluster_centroid, current_draw_date_dt, ex
                 best_pick_powerball = candidate_powerball
                 
                 # Early exit if a very good match is found
-                if min_distance < 0.1: # Threshold can be tuned
+                if min_distance < 0.5: # Threshold can be tuned
                     break
 
         except ValueError: # e.g., random.sample pool too small after exclusions
