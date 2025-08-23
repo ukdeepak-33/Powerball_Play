@@ -4165,8 +4165,9 @@ def white_ball_gap_analysis_route():
 
     return render_template('white_ball_gap_analysis.html',
                            white_ball_numbers=range(1, 70),
-                           years=years_for_dropdown)
-
+                           years=years_for_dropdown,
+                           current_datetime=datetime.now()) # Pass datetime.now() as 'current_datetime'
+    
 @app.route('/api/white_ball_gaps', methods=['GET'])
 def api_white_ball_gaps():
     if df.empty:
