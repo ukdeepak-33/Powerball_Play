@@ -3636,6 +3636,25 @@ def frequency_analysis_route():
                            max_wb_freq=max([f['Frequency'] for f in white_ball_freq]) if white_ball_freq else 0,
                            max_pb_freq=max([f['Frequency'] for f in powerball_freq]) if powerball_freq else 0
                            )
+@app.route('/monthly_white_ball_analysis')
+def monthly_white_ball_analysis_route():
+    if df.empty:
+        flash("Cannot perform monthly trends analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    monthly_trends_data = get_cached_analysis(
+        'monthly_trends_and_streaks', 
+        get_monthly_white_ball_analysis_data, 
+        df, 
+        num_top_wb=69, 
+        num_top_pb=3,
+        num_months_for_top_display=6 
+    )
+    
+    return render_template('monthly_white_ball_analysis.html', 
+                           monthly_data=monthly_trends_data['monthly_data'], 
+                           streak_numbers=monthly_trends_data['streak_numbers'])
+
 @app.route('/hot_cold_numbers')
 def hot_cold_numbers_route():
     if df.empty:
