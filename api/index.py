@@ -4330,6 +4330,15 @@ def find_results_by_sum_route():
                            target_sum=target_sum_display,
                            selected_sort_by=selected_sort_by)
 
+@app.route('/my_jackpot_pick')
+def my_jackpot_pick_route():
+    try:
+        return render_template('my_jackpot_pick.html')
+    except Exception as e:
+        traceback.print_exc() 
+        flash("An error occurred loading the Jackpot Pick page. Please try again.", 'error')
+        return redirect(url_for('index')) 
+
 @app.route('/generate_custom_combinations')
 def generate_custom_combinations_route():
     if df.empty:
