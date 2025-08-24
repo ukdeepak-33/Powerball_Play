@@ -3648,18 +3648,56 @@ def hot_cold_numbers_route():
                            hot_numbers=hot_numbers,
                            cold_numbers=cold_numbers)
 
-@app.route('/number_age_analysis')
-def number_age_analysis_route():
+@app.route('/number_age_distribution')
+def number_age_distribution_route():
     if df.empty:
-        flash("Cannot display Number Age Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        flash("Cannot display Number Age Distribution: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
+
+    # Get separated detailed ages for white balls and powerballs
+    detailed_white_ball_ages, detailed_powerball_ages = get_cached_analysis('number_age_distribution', get_number_age_distribution, df)
+
+    # Define years for yearly trends (2020-2025)
+    current_year = datetime.now().year
+    # Set the range from 2020 to the current year, ensuring it doesn't go beyond 2025
+    start_trend_year = 2020
+    end_trend_year = min(2025, current_year) # Ensure it doesn't go past 2025
     
-    white_ball_ages, powerball_ages = get_cached_analysis('number_age', get_number_age_distribution, df)
+    # Generate the list of years and reverse it for the display order (2025 to 2020)
+    trend_years_ordered_desc = list(range(start_trend_year, end_trend_year + 1))
+    trend_years_ordered_desc.reverse() # This reverses the list in place
 
-    return render_template('number_age_analysis.html',
-                           white_ball_ages=white_ball_ages,
-                           powerball_ages=powerball_ages)
+    # Fetch yearly white ball trends
+    yearly_white_ball_trends_data, wb_period_labels = get_cached_analysis(
+        'yearly_white_ball_trends_specific_range', 
+        get_white_ball_frequency_by_period, 
+        df, 
+        period_type='year', # Ensure it's by year
+        start_year=start_trend_year,
+        end_year=end_trend_year
+    )
+    # The `yearly_white_ball_trends_data` is already a dict {number: [{period_label: "2020", freq: X}, ...]}
+    # We use wb_period_labels for the actual years found, but for display headers, we use our controlled `trend_years_ordered_desc`.
 
+    # Fetch yearly powerball trends
+    yearly_powerball_trends_data, pb_period_labels = get_cached_analysis(
+        'yearly_powerball_trends_specific_range', 
+        get_powerball_frequency_by_year, 
+        df,
+        start_year=start_trend_year,
+        end_year=end_trend_year
+    )
+    # The `yearly_powerball_trends_data` is an array of objects: [{Powerball: 1, Year_2020: 5, ...}, ...]
+    # The `pb_period_labels` is the list of years.
+
+    return render_template('number_age_distribution.html',
+                           detailed_white_ball_ages=detailed_white_ball_ages,
+                           detailed_powerball_ages=detailed_powerball_ages,
+                           yearly_white_ball_trends=yearly_white_ball_trends_data, # Pass as dict
+                           yearly_powerball_trends=yearly_powerball_trends_data,   # Pass as list of dicts
+                           wb_trend_years=trend_years_ordered_desc, # Use the reversed list for HTML headers
+                           pb_trend_years=trend_years_ordered_desc # Same for powerballs
+                           )
 @app.route('/co_occurrence_analysis')
 def co_occurrence_analysis_route():
     if df.empty:
@@ -3684,33 +3722,72 @@ def consecutive_number_trends_route():
                            yearly_data=yearly_consecutive_trends['yearly_data'],
                            years_for_chart=yearly_consecutive_trends['years'],
                            all_consecutive_pairs_flat=yearly_consecutive_trends['all_consecutive_pairs_flat'])
+    
+@app.route('/odd_even_trends')
+def odd_even_trends_route():
+    last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
+    odd_even_trends = get_cached_analysis('odd_even_trends', get_odd_even_split_trends, df, last_draw_date_str_for_cache)
+    return render_template('odd_even_trends.html',
+                           odd_even_trends=odd_even_trends)
 
-@app.route('/odd_even_split_trends')
-def odd_even_split_trends_route():
+@app.route('/yearly_white_ball_trends')
+def yearly_white_ball_trends_route():
     if df.empty:
-        flash("Cannot display Odd/Even Split Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        flash("Cannot display Yearly White Ball Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
-    odd_even_split_trends_data = get_cached_analysis('odd_even_split_trends', get_odd_even_split_trends, df, last_draw['Draw Date'])
-    
-    return render_template('odd_even_split_trends.html',
-                           odd_even_split_trends=odd_even_split_trends_data)
+    current_year = datetime.now().year
+    start_year_for_display = max(2017, current_year - 9) 
+    years_for_display = list(range(start_year_for_display, current_year + 1))
 
-@app.route('/sum_analysis')
-def sum_analysis_route():
+    return render_template('yearly_white_ball_trends.html',
+                           years=years_for_display)
+
+@app.route('/api/white_ball_trends')
+def api_white_ball_trends_route():
     if df.empty:
-        flash("Cannot display Sum Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return redirect(url_for('index'))
-
-    df_with_sum, sum_freq_list, min_sum, max_sum, avg_sum = get_cached_analysis('sum_analysis_data', sum_of_main_balls, df)
-    sum_gaps_data = get_cached_analysis('sum_gaps_data', get_sum_trends_and_gaps_data, df_with_sum)
+        return jsonify({"error": "Historical data not loaded or is empty."}), 500
     
-    return render_template('sum_analysis.html',
-                           sum_frequency=sum_freq_list,
+    period_type = request.args.get('period', 'year') 
+    start_year_param = request.args.get('start_year', type=int)
+    end_year_param = request.args.get('end_year', type=int)
+
+    # Use parameters if provided, otherwise default to a reasonable range
+    current_year = datetime.now().year
+    start_year_filter = start_year_param if start_year_param else max(2017, current_year - 9)
+    end_year_filter = end_year_param if end_year_param else current_year
+
+    white_ball_data, period_labels = get_cached_analysis(
+        f'white_ball_frequency_{period_type}_{start_year_filter}_{end_year_filter}', 
+        get_white_ball_frequency_by_period, 
+        df, 
+        period_type=period_type,
+        start_year=start_year_filter,
+        end_year=end_year_filter
+    )
+    
+    return jsonify({
+        'data': white_ball_data,
+        'period_labels': period_labels
+    })
+
+@app.route('/sum_of_main_balls_analysis')
+def sum_of_main_balls_route():
+    if df.empty:
+        flash("Cannot display Sum of Main Balls Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    sums_data_df, sum_freq_list, min_sum, max_sum, avg_sum = get_cached_analysis('sum_of_main_balls_data', sum_of_main_balls, df)
+    
+    sums_data = sums_data_df.to_dict('records') 
+    sum_freq_json = json.dumps(sum_freq_list)
+
+    return render_template('sum_of_main_balls.html', 
+                           sums_data=sums_data,
+                           sum_freq_json=sum_freq_json,
                            min_sum=min_sum,
                            max_sum=max_sum,
-                           avg_sum=avg_sum,
-                           sum_gaps_data=sum_gaps_data)
+                           avg_sum=avg_sum)
 
 @app.route('/api/get_sums_by_range', methods=['GET'])
 def get_sums_by_range():
@@ -3797,16 +3874,7 @@ def boundary_crossing_pairs_trends_route():
             # Convert string representation back to tuple for lookup
             selected_pair_list = json.loads(selected_pair_str)
             selected_pair_tuple = tuple(selected_pair_list)
-
-            # Recalculate yearly_pattern_counts for the specific selected pair
-            # This logic needs to be integrated into get_boundary_crossing_pairs_trends if not already,
-            # or fetched separately. For simplicity, assume get_boundary_crossing_pairs_trends
-            # returns a comprehensive yearly_pattern_counts or can be called to get it.
-            
-            # Since get_boundary_crossing_pairs_trends doesn't return yearly_pattern_counts directly
-            # outside of its internal scope, we need to re-run part of its logic or modify it.
-            # For a proper API, it should return yearly_pattern_counts in all_data
-            
+ 
             # Re-running the calculation for yearly_pattern_counts just for the selected pair:
             yearly_pattern_counts_temp = defaultdict(lambda: defaultdict(int))
             for _, row in df.iterrows():
@@ -3926,6 +3994,22 @@ def api_yearly_boundary_pair_data():
     yearly_data.sort(key=lambda x: x['year']) 
 
     return jsonify({'success': True, 'data': yearly_data})
+    
+@app.route('/positional_analysis')
+def positional_analysis_route():
+    if df.empty:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({"error": "Historical data not loaded or is empty."}), 500
+        else:
+            flash("Cannot display Positional Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+            return redirect(url_for('index'))
+
+    positional_data = get_cached_analysis('positional_range_frequency', get_positional_range_frequency_analysis, df)
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify(positional_data)
+    else:
+        return render_template('positional_analysis.html', positional_data=positional_data)
 
 
 @app.route('/powerball_frequency_by_year')
