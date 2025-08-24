@@ -3599,7 +3599,7 @@ def initialize_core_data():
 def index():
     if df.empty:
         flash("Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return render_template('index.html', last_official_draw=get_last_draw(df), show_hero=True)
+        return render_template('index.html', last_official_draw=get_last_draw(df), show_hero=True, sum_ranges=SUM_RANGES)
 
     hot_numbers, cold_numbers = get_cached_analysis('hot_cold_numbers', hot_cold_numbers, df, last_draw['Draw Date'])
     white_ball_freq, powerball_freq = get_cached_analysis('overall_frequency', frequency_analysis, df)
@@ -3620,7 +3620,8 @@ def index():
                            powerball_frequency=powerball_freq,
                            recent_consecutive_trends=recent_consecutive_trends,
                            recent_odd_even_trends=recent_odd_even_trends,
-                           show_hero=True)
+                           show_hero=True,
+                           sum_ranges=SUM_RANGES)
 
 @app.route('/frequency_analysis')
 def frequency_analysis_route():
