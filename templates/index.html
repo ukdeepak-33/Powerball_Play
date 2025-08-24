@@ -42,7 +42,7 @@
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Record Official Draw</h2>
         <p class="text-gray-700 mb-6">Manually enter the latest official Powerball draw results to keep the historical data up-to-date. This will update the main historical database.</p>
-        <form method="POST" action="{{ url_for('save_official_draw_route') }}" class="space-y-4">
+        <form method="POST" action="{{ url_for('official_draw_entry_route') }}" class="space-y-4">
             <div class="form-group">
                 <label for="draw_date" class="block text-gray-700 text-sm font-bold mb-2">Draw Date:</label>
                 <input type="date" id="draw_date" name="draw_date" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
