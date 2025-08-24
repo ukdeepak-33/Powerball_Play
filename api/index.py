@@ -3963,65 +3963,7 @@ def api_grouped_patterns_yearly_data():
     
     if filtered_yearly_data:
         return jsonify({'success': True, 'data': filtered_yearly_data[0]})
-    return jsonify({'success': False, 'error': 'No data found for the selected year and range.'}), 404
-
-# Main route for boundary crossing pairs (restored)
-@app.route('/boundary_crossing_pairs_trends', methods=['GET', 'POST'])
-def boundary_crossing_pairs_trends_route():
-    global df
-    if df.empty or last_analysis_cache_update == datetime.min or datetime.now() - last_analysis_cache_update > CACHE_DURATION:
-        fetch_data_from_supabase() # Ensure data is fresh
-    
-    if df.empty:
-        flash("Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return render_template('boundary_crossing_pairs_trends.html', all_boundary_patterns_summary=[], boundary_pairs_for_dropdown=[], yearly_data_for_selected_pattern=[])
-
-    all_data = get_cached_analysis('boundary_crossing_trends', get_boundary_crossing_pairs_trends, df)
-
-    all_boundary_patterns_summary = all_data['all_boundary_patterns_summary']
-    boundary_pairs_for_dropdown = all_data['boundary_pairs_for_dropdown']
-    yearly_data_for_selected_pattern = [] # Will be populated if a specific pair is selected
-
-    selected_pair_str = request.form.get('selected_pair')
-    if selected_pair_str:
-        try:
-            # Convert string representation back to tuple for lookup
-            selected_pair_list = json.loads(selected_pair_str)
-            selected_pair_tuple = tuple(selected_pair_list)
- 
-            # Re-running the calculation for yearly_pattern_counts just for the selected pair:
-            yearly_pattern_counts_temp = defaultdict(lambda: defaultdict(int))
-            for _, row in df.iterrows():
-                white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
-                draw_year = row['Draw Date_dt'].year
-                
-                drawn_pairs = list(combinations(white_balls, 2))
-                
-                for pair in drawn_pairs:
-                    sorted_pair = tuple(sorted(pair))
-                    if sorted_pair == selected_pair_tuple: # Only count if it's the selected pair
-                        yearly_pattern_counts_temp[draw_year][sorted_pair] += 1
-            
-            # Correct way to get data for selected pair from yearly_pattern_counts_temp:
-            yearly_data_for_selected_pattern_raw = []
-            all_years = sorted(df['Draw Date_dt'].dt.year.unique().tolist())
-            
-            for year in all_years:
-                count_for_year = yearly_pattern_counts_temp.get(year, {}).get(selected_pair_tuple, 0)
-                yearly_data_for_selected_pattern_raw.append({
-                    'year': year,
-                    'draws_with_pattern': count_for_year
-                })
-            yearly_data_for_selected_pattern = sorted(yearly_data_for_selected_pattern_raw, key=lambda x: x['year'])
-
-        except json.JSONDecodeError:
-            flash("Invalid pair selected.", 'error')
-    
-    return render_template('boundary_crossing_pairs_trends.html',
-                           all_boundary_patterns_summary=all_boundary_patterns_summary,
-                           boundary_pairs_for_dropdown=boundary_pairs_for_dropdown,
-                           selected_pair=selected_pair_str,
-                           yearly_data_for_selected_pattern=yearly_data_for_selected_pattern)
+    return jsonify({'success': False, 'error': 'No data found for the selected year and range.'}), 
 
 @app.route('/grouped_patterns_yearly_comparison', methods=['GET', 'POST'])
 def grouped_patterns_yearly_comparison_route():
