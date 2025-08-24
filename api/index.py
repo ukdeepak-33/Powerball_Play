@@ -3893,6 +3893,21 @@ def get_sums_by_range():
         return jsonify({'success': True, 'data': sum_gaps_data['grouped_sums_analysis'][range_label]})
     return jsonify({'success': False, 'error': 'Invalid sum range label.'}), 400
 
+@app.route('/sum_trends_and_gaps')
+def sum_trends_and_gaps_route():
+    if df.empty:
+        flash("Cannot display Sum Trends and Gaps: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    sum_data = get_cached_analysis('sum_trends_and_gaps', get_sum_trends_and_gaps_data, df)
+    
+    return render_template('sum_trends_and_gaps.html', 
+                           min_possible_sum=sum_data['min_possible_sum'],
+                           max_possible_sum=sum_data['max_possible_sum'],
+                           appeared_sums_details=sum_data['appeared_sums_details'],
+                           missing_sums=sum_data['missing_sums'],
+                           grouped_sums_analysis=sum_data['grouped_sums_analysis'])
+
 @app.route('/weekday_trends')
 def weekday_trends_route():
     if df.empty:
