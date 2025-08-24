@@ -4430,6 +4430,61 @@ def api_generate_custom_combinations():
 
     return jsonify({'success': True, 'generated_sets': generated_sets, 'last_draw_dates': last_draw_dates})
 
+@app.route('/simulate_multiple_draws', methods=['GET', 'POST'])
+def simulate_multiple_draws_route():
+    if df.empty:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({"error": "Historical data not loaded or is empty."}), 500
+        else:
+            flash("Cannot run simulation: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+            return redirect(url_for('index'))
+
+    simulated_white_ball_freq_list = []
+    simulated_powerball_freq_list = []
+    num_draws_display = None
+    odd_even_choice_display = "Any" 
+
+    if request.method == 'POST':
+        num_draws_str = request.form.get('num_draws')
+        odd_even_choice_display = request.form.get('odd_even_choice', 'Any') 
+
+        if num_draws_str and num_draws_str.isdigit():
+            num_draws = int(num_draws_str)
+            num_draws_display = num_draws
+            
+            sim_results = simulate_multiple_draws(
+                df, group_a, odd_even_choice_display, 
+                GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE, 
+                [], num_draws # Excluded numbers empty list for simulation
+            )
+            
+            simulated_white_ball_freq_list = sim_results['white_ball_freq']
+            simulated_powerball_freq_list = sim_results['powerball_freq']
+        else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({"error": "Please enter a valid number for Number of Simulations."}), 400
+            else:
+                flash("Please enter a valid number for Number of Simulations.", 'error')
+
+
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                "simulated_white_ball_freq": simulated_white_ball_freq_list,
+                "simulated_powerball_freq": simulated_powerball_freq_list,
+                "num_simulations": num_draws_display
+            })
+        else:
+            return render_template('simulate_multiple_draws.html', 
+                                simulated_white_ball_freq=simulated_white_ball_freq_list, 
+                                simulated_powerball_freq=simulated_powerball_freq_list,   
+                                num_simulations=num_draws_display,
+                                selected_odd_even_choice=odd_even_choice_display)
+
+    return render_template('simulate_multiple_draws.html', 
+                           simulated_white_ball_freq=[], 
+                           simulated_powerball_freq=[],   
+                           num_simulations=100, 
+                           selected_odd_even_choice="Any")
 
 @app.route('/generate_smart_picks_route', methods=['POST'])
 def generate_smart_picks_route():
