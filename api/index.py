@@ -3800,18 +3800,27 @@ def co_occurrence_analysis_route():
                            co_occurrence_data_json=json.dumps(co_occurrence_data),
                            max_co_occurrence=max_co_occurrence)
 
-@app.route('/consecutive_number_trends')
-def consecutive_number_trends_route():
+@app.route('/consecutive_trends')
+def consecutive_trends_route():
     if df.empty:
-        flash("Cannot display Consecutive Number Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        flash("Cannot display Consecutive Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
     
-    yearly_consecutive_trends = get_cached_analysis('consecutive_numbers_yearly_trends', get_consecutive_numbers_yearly_trends, df)
+    last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
+    consecutive_trends = get_cached_analysis('consecutive_trends', get_consecutive_numbers_trends, df, last_draw_date_str_for_cache)
     
-    return render_template('consecutive_number_trends.html',
-                           yearly_data=yearly_consecutive_trends['yearly_data'],
-                           years_for_chart=yearly_consecutive_trends['years'],
-                           all_consecutive_pairs_flat=yearly_consecutive_trends['all_consecutive_pairs_flat'])
+    yearly_consecutive_data_full = get_cached_analysis('consecutive_yearly_trends', get_consecutive_numbers_yearly_trends, df)
+    
+    yearly_consecutive_percentage_data = yearly_consecutive_data_full['yearly_data']
+    years_for_dropdown = yearly_consecutive_data_full['years']
+    all_consecutive_pairs_flat = yearly_consecutive_data_full['all_consecutive_pairs_flat']
+
+    return render_template('consecutive_trends.html',
+                           consecutive_trends=consecutive_trends,
+                           yearly_consecutive_percentage_data=yearly_consecutive_percentage_data,
+                           years_for_dropdown=years_for_dropdown,
+                           all_consecutive_pairs_flat=all_consecutive_pairs_flat)
+
     
 @app.route('/odd_even_trends')
 def odd_even_trends_route():
