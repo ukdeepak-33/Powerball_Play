@@ -3870,7 +3870,7 @@ def api_white_ball_trends_route():
         'period_labels': period_labels
     })
 
-@app.route('/sum_of_main_balls_analysis')
+@app.route('/sum_analysis')
 def sum_of_main_balls_route():
     if df.empty:
         flash("Cannot display Sum of Main Balls Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
@@ -3881,7 +3881,7 @@ def sum_of_main_balls_route():
     sums_data = sums_data_df.to_dict('records') 
     sum_freq_json = json.dumps(sum_freq_list)
 
-    return render_template('sum_of_main_balls.html', 
+    return render_template('sum_analysis.html', 
                            sums_data=sums_data,
                            sum_freq_json=sum_freq_json,
                            min_sum=min_sum,
