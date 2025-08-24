@@ -3871,7 +3871,7 @@ def api_white_ball_trends_route():
     })
 
 @app.route('/sum_analysis')
-def sum_of_main_balls_route():
+def sum_analysis_route():
     if df.empty:
         flash("Cannot display Sum of Main Balls Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return redirect(url_for('index'))
