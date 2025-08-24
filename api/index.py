@@ -3717,6 +3717,77 @@ def number_age_distribution_route():
                            wb_trend_years=trend_years_ordered_desc, # Use the reversed list for HTML headers
                            pb_trend_years=trend_years_ordered_desc # Same for powerballs
                            )
+@app.route('/find_results_by_first_white_ball', methods=['GET', 'POST'])
+def find_results_by_first_white_ball():
+    if df.empty:
+        flash("Cannot find results: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+
+    results_dict = []
+    white_ball_number_display = None
+    selected_sort_by = 'date_desc'
+
+    if request.method == 'POST':
+        white_ball_number_str = request.form.get('white_ball_number')
+        selected_sort_by = request.form.get('sort_by', 'date_desc')
+
+        if white_ball_number_str and white_ball_number_str.isdigit():
+            white_ball_number = int(white_ball_number_str)
+            white_ball_number_display = white_ball_number
+            
+            if 'Draw Date_dt' not in df.columns:
+                 df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'], errors='coerce')
+
+            results = df[df['Number 1'].astype(int) == white_ball_number].copy()
+
+            if selected_sort_by == 'date_desc':
+                results = results.sort_values(by='Draw Date_dt', ascending=False)
+            elif selected_sort_by == 'date_asc':
+                results = results.sort_values(by='Draw Date_dt', ascending=True)
+            elif selected_sort_by == 'balls_asc':
+                results['WhiteBallsTuple'] = results.apply(
+                    lambda row: tuple(sorted([
+                            int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                            int(row['Number 4']), int(row['Number 5'])
+                        ])), axis=1
+                    )
+                results = results.sort_values(by='WhiteBallsTuple', ascending=True)
+                results = results.drop(columns=['WhiteBallsTuple'])
+            elif selected_sort_by == 'balls_desc':
+                results['WhiteBallsTuple'] = results.apply(
+                    lambda row: tuple(sorted([
+                            int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                            int(row['Number 4']), int(row['Number 5'])
+                        ])), axis=1
+                    )
+                results = results.sort_values(by='WhiteBallsTuple', ascending=False)
+                results = results.drop(columns=['WhiteBallsTuple'])
+
+            results_dict = results.to_dict('records')
+        else:
+            flash("Please enter a valid number for First White Ball Number.", 'error')
+
+    return render_template('find_results_by_first_white_ball.html', 
+                           results_by_first_white_ball=results_dict, 
+                           white_ball_number=white_ball_number_display,
+                           selected_sort_by=selected_sort_by)
+
+def supabase_search_draws(query_params):
+    url = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
+    headers = _get_supabase_headers(is_service_key=False) 
+
+    try:
+        response = requests.get(url, headers=headers, params=query_params)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        if hasattr(e, 'response') and e.response is not None:
+            pass
+        return []
+    except Exception as e:
+        traceback.print_exc()
+        return []
+
 @app.route('/co_occurrence_analysis')
 def co_occurrence_analysis_route():
     if df.empty:
