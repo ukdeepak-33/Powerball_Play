@@ -4030,6 +4030,96 @@ def positional_analysis_route():
     else:
         return render_template('positional_analysis.html', positional_data=positional_data)
 
+@app.route('/strict_positional_search', methods=['GET', 'POST'])
+def strict_positional_search_route():
+    entered_numbers = {
+        'white_ball_1': '', 'white_ball_2': '', 'white_ball_3': '', 
+        'white_ball_4': '', 'white_ball_5': '', 'powerball_pos': ''
+    }
+    search_results = []
+    total_results = 0
+    
+    if request.method == 'POST':
+        entered_numbers['white_ball_1'] = request.form.get('white_ball_1', '').strip()
+        entered_numbers['white_ball_2'] = request.form.get('white_ball_2', '').strip()
+        entered_numbers['white_ball_3'] = request.form.get('white_ball_3', '').strip()
+        entered_numbers['white_ball_4'] = request.form.get('white_ball_4', '').strip()
+        entered_numbers['white_ball_5'] = request.form.get('white_ball_5', '').strip()
+        entered_numbers['powerball_pos'] = request.form.get('powerball_pos', '').strip()
+
+        if df.empty:
+            flash("Historical data not loaded or is empty. Please check Supabase connection before searching.", 'error')
+            return render_template('strict_positional_search.html', 
+                                   entered_numbers=entered_numbers, 
+                                   search_results=[],
+                                   total_results=0)
+
+        query_params = {'select': 'Draw Date,Number 1,Number 2,Number 3,Number 4,Number 5,Powerball'}
+        filter_count = 0
+
+        for i in range(1, 6):
+            key = f'white_ball_{i}'
+            col_name = f'Number {i}'
+            if entered_numbers[key]:
+                try:
+                    num = int(entered_numbers[key])
+                    if not (1 <= num <= 69):
+                        flash(f"White ball {i} must be between 1 and 69. Please correct your input.", 'error')
+                        return render_template('strict_positional_search.html', 
+                                               entered_numbers=entered_numbers, 
+                                               search_results=[],
+                                               total_results=0)
+                    query_params[col_name] = f'eq.{num}'
+                    filter_count += 1
+                except ValueError:
+                    flash(f"White ball {i} must be a valid number. Please correct your input.", 'error')
+                    return render_template('strict_positional_search.html', 
+                                           entered_numbers=entered_numbers, 
+                                           search_results=[],
+                                           total_results=0)
+
+        if entered_numbers['powerball_pos']:
+            try:
+                pb_num = int(entered_numbers['powerball_pos'])
+                if not (1 <= pb_num <= 26):
+                    flash("Powerball must be between 1 and 26. Please correct your input.", 'error')
+                    return render_template('strict_positional_search.html', 
+                                           entered_numbers=entered_numbers, 
+                                           search_results=[],
+                                           total_results=0)
+                query_params['Powerball'] = f'eq.{pb_num}'
+                filter_count += 1
+            except ValueError:
+                flash("Powerball must be a valid number. Please correct your input.", 'error')
+                return render_template('strict_positional_search.html', 
+                                       entered_numbers=entered_numbers, 
+                                       search_results=[],
+                                       total_results=0)
+        
+        if filter_count == 0:
+            flash("Please enter at least one number to perform a search.", 'info')
+            return render_template('strict_positional_search.html', 
+                                   entered_numbers=entered_numbers, 
+                                   search_results=[],
+                                   total_results=0)
+
+        draws = supabase_search_draws(query_params)
+
+        if draws:
+            search_results = sorted(draws, key=lambda x: x.get('Draw Date', ''), reverse=True)
+            total_results = len(search_results)
+            if total_results == 0:
+                flash("No draws found matching your criteria.", 'info')
+            else:
+                flash(f"Found {total_results} draw(s) matching your criteria.", 'success')
+        else:
+            flash("Error fetching data from Supabase. Please try again later.", 'error')
+
+    return render_template('strict_positional_search.html', 
+                           entered_numbers=entered_numbers, 
+                           search_results=search_results,
+                           total_results=total_results)
+
 
 @app.route('/powerball_frequency_by_year')
 def powerball_frequency_by_year_route():
