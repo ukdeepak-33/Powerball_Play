@@ -4150,7 +4150,63 @@ def white_ball_frequency_by_period_route():
                            selected_period_type=period_type,
                            max_freq=max([max(item['frequency'] for item in data) for data in wb_freq_data_by_period.values()]) if wb_freq_data_by_period else 0
                            )
+    
+@app.route('/find_results_by_sum', methods=['GET', 'POST'])
+def find_results_by_sum_route():
+    if df.empty:
+        flash("Cannot display Search by Sum: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    results = []
+    target_sum_display = None
+    selected_sort_by = request.args.get('sort_by', 'date_desc') 
 
+    if request.method == 'POST':
+        target_sum_str = request.form.get('target_sum')
+        selected_sort_by = request.form.get('sort_by', 'date_desc') 
+        
+        if target_sum_str and target_sum_str.isdigit():
+            target_sum = int(target_sum_str)
+            target_sum_display = target_sum
+            results_df_raw = find_results_by_sum(df, target_sum)
+
+            if not results_df_raw.empty:
+                if 'Draw Date_dt' not in results_df_raw.columns:
+                    results_df_raw['Draw Date_dt'] = pd.to_datetime(results_df_raw['Draw Date'], errors='coerce')
+
+                if selected_sort_by == 'date_desc':
+                    results_df_raw = results_df_raw.sort_values(by='Draw Date_dt', ascending=False)
+                elif selected_sort_by == 'date_asc':
+                    results_df_raw = results_df_raw.sort_values(by='Draw Date_dt', ascending=True)
+                elif selected_sort_by == 'balls_asc':
+                    results_df_raw['WhiteBallsTuple'] = results_df_raw.apply(
+                        lambda row: tuple(sorted([
+                            int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                            int(row['Number 4']), int(row['Number 5'])
+                        ])), axis=1
+                    )
+                    results_df_raw = results_df_raw.sort_values(by='WhiteBallsTuple', ascending=True)
+                    results_df_raw = results_df_raw.drop(columns=['WhiteBallsTuple'])
+                elif selected_sort_by == 'balls_desc':
+                    results_df_raw['WhiteBallsTuple'] = results_df_raw.apply( 
+                        lambda row: tuple(sorted([
+                            int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                            int(row['Number 4']), int(row['Number 5'])
+                        ])), axis=1
+                    )
+                    results_df_raw = results_df_raw.sort_values(by='WhiteBallsTuple', ascending=False)
+                    results_df_raw = results_df_raw.drop(columns=['WhiteBallsTuple'])
+
+            results = results_df_raw.to_dict('records')
+        else:
+            flash("Please enter a valid number for Target Sum.", 'error')
+            results = [] 
+            target_sum_display = None 
+    
+    return render_template('find_results_by_sum.html', 
+                           results=results,
+                           target_sum=target_sum_display,
+                           selected_sort_by=selected_sort_by)
 
 @app.route('/generate_custom_combinations')
 def generate_custom_combinations_route():
