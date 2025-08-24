@@ -4547,7 +4547,7 @@ def generated_numbers_history_route():
     latest_generated_batch = generated_history[latest_date_key] if latest_date_key else []
     
     batch_analysis_summary = {}
-    if latest_generated_batch and last_official_draw and last_official_draw['Draw Date'] != 'N/A':
+    if latest_generated_batch and not last_official_draw.empty and last_official_draw['Draw Date'] != 'N/A':    
         # Ensure the last official draw used for comparison is from the *same date* if possible,
         # or the most recent one overall if no specific match.
         official_draw_for_comparison = _get_official_draw_for_date_from_db(latest_date_key) \
