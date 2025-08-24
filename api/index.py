@@ -3636,6 +3636,17 @@ def frequency_analysis_route():
                            max_wb_freq=max([f['Frequency'] for f in white_ball_freq]) if white_ball_freq else 0,
                            max_pb_freq=max([f['Frequency'] for f in powerball_freq]) if powerball_freq else 0
                            )
+@app.route('/hot_cold_numbers_analysis')
+def hot_cold_numbers_analysis_route():
+    if df.empty:
+        flash("Cannot display Hot/Cold Numbers: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        return redirect(url_for('index'))
+    
+    hot_numbers, cold_numbers = get_cached_analysis('hot_cold_numbers', hot_cold_numbers, df, last_draw['Draw Date'])
+    
+    return render_template('hot_cold_numbers_analysis.html',
+                           hot_numbers=hot_numbers,
+                           cold_numbers=cold_numbers)
 
 @app.route('/number_age_analysis')
 def number_age_analysis_route():
