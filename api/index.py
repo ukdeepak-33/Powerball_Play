@@ -3613,7 +3613,7 @@ def index():
     recent_odd_even_trends = odd_even_trends[:5] # Take only the 5 most recent
 
     return render_template('index.html',
-                           last_official_draw=last_draw,
+                           last_draw=last_draw,
                            hot_numbers=hot_numbers,
                            cold_numbers=cold_numbers,
                            white_ball_frequency=white_ball_freq,
