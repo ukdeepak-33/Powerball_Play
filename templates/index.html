@@ -12,7 +12,7 @@
     {# Latest Powerball Draw Card #}
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200"> {# Updated rounded and shadow #}
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Latest Powerball Draw</h2>
-        {% if last_draw and not last_draw.empty and last_draw['Draw Date'] != 'N/A' %} {# FIXED LINE HERE #}
+        {% if last_draw and last_draw.get('Draw Date', 'N/A') != 'N/A' %} {# FIXED LINE HERE #}
         <div class="flex flex-col sm:flex-row sm:items-center justify-between text-gray-700 mb-6">
             <p class="text-lg mb-2 sm:mb-0">Draw Date: <span class="text-blue-700 font-bold text-lg" id="latestDrawDate">{{ last_draw.get('Draw Date', 'N/A') }}</span></p>
             <div class="flex items-center space-x-2">
