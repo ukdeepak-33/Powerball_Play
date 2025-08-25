@@ -204,34 +204,36 @@ def load_historical_data_from_supabase():
 
     except Exception as e:
         print(f"Error loading data from Supabase: {e}")
-        return pd.DataFrame()
+        return pd.DataFrame() # This return statement ends the `load_historical_data_from_supabase` function.
 
-        def get_last_draw(df_source):
+# IMPORTANT: The 'def get_last_draw' line (and all its content) must start here, with no indentation!
+# This is a new, separate function.
+def get_last_draw(df_source):
     """Retrieves the most recent draw from the DataFrame."""
     if df_source.empty:
         return pd.Series({
             'Draw Date': 'N/A', 'Number 1': 'N/A', 'Number 2': 'N/A',
             'Number 3': 'N/A', 'Number 4': 'N/A', 'Number 5': 'N/A', 'Powerball': 'N/A',
-            'Numbers': ['N/A', 'N/A', 'N/A', 'N/A', 'N/A'] 
+            'Numbers': ['N/A', 'N/A', 'N/A', 'N/A', 'N/A']
         }, dtype='object')
     
-    last_row = df_source.iloc[-1].copy() 
+    last_row = df_source.iloc[-1].copy()
     
-    if 'Number 1' in last_row and pd.notna(last_row['Number 1']): 
+    if 'Number 1' in last_row and pd.notna(last_row['Number 1']):
         last_row['Numbers'] = [
-            int(last_row['Number 1']), int(last_row['Number 2']), int(last_row['Number 3']), 
+            int(last_row['Number 1']), int(last_row['Number 2']), int(last_row['Number 3']),
             int(last_row['Number 4']), int(last_row['Number 5'])
         ]
     else:
-        last_row['Numbers'] = ['N/A'] * 5 
+        last_row['Numbers'] = ['N/A'] * 5
 
     if 'Draw Date_dt' in last_row and pd.notna(last_row['Draw Date_dt']):
         last_row['Draw Date'] = last_row['Draw Date_dt'].strftime('%Y-%m-%d')
-    elif 'Draw Date' not in last_row: 
+    elif 'Draw Date' not in last_row:
         last_row['Draw Date'] = 'N/A'
     
     return last_row
-
+    
 def check_exact_match(white_balls):
     """Checks if a given set of white balls exactly matches any historical draw."""
     global historical_white_ball_sets
