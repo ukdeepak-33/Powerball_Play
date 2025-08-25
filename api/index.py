@@ -3310,34 +3310,41 @@ def initialize_core_data():
 
 
 # --- Flask Routes ---
-
 @app.route('/')
 def index():
+    global df, last_draw # Ensure df and last_draw are accessible and up-to-date
+
+    # Check if df is truly empty, indicating no historical data could be loaded
     if df.empty:
         flash("Historical data not loaded or is empty. Please check Supabase connection.", 'error')
-        return render_template('index.html', 
-                               last_draw=get_last_draw(df), # FIX: last_draw here
+        # Pass a simple dictionary for 'last_draw' when no data is available.
+        # This prevents Jinja from trying to evaluate a Pandas Series as a boolean.
+        return render_template('index.html',
+                               last_draw={'Draw Date': 'N/A', 'Numbers': ['N/A']*5, 'Powerball': 'N/A'},
                                show_hero=True,
-                               sum_ranges=SUM_RANGES, # FIX: sum_ranges added
-                               selected_odd_even_choice="Any", # Default for homepage form
-                               selected_sum_range="Any", # Default for homepage form
-                               num_sets_to_generate=1, # Default for homepage form
-                               excluded_numbers="" # Default for homepage form
+                               sum_ranges=SUM_RANGES,
+                               selected_odd_even_choice="Any",
+                               selected_sum_range="Any",
+                               num_sets_to_generate=1,
+                               excluded_numbers=""
                                )
+
+    # If df is not empty, last_draw will be a properly populated Pandas Series
+    # and the existing logic for getting analysis data can proceed.
+    # The `last_draw` global variable is already set by `initialize_core_data()`
+    # and updated by `get_last_draw()` if `df` is not empty.
 
     hot_numbers, cold_numbers = get_cached_analysis('hot_cold_numbers', hot_cold_numbers, df, last_draw['Draw Date'])
     white_ball_freq, powerball_freq = get_cached_analysis('overall_frequency', frequency_analysis, df)
-    
-    # Get last 5 consecutive trends
+
     consecutive_trends = get_cached_analysis('consecutive_trends_recent', get_consecutive_numbers_trends, df, last_draw['Draw Date'])
-    recent_consecutive_trends = consecutive_trends[:5] # Take only the 5 most recent
-    
-    # Get last 5 odd/even/sum/group A trends
+    recent_consecutive_trends = consecutive_trends[:5]
+
     odd_even_trends = get_cached_analysis('odd_even_trends_recent', get_odd_even_split_trends, df, last_draw['Draw Date'])
-    recent_odd_even_trends = odd_even_trends[:5] # Take only the 5 most recent
+    recent_odd_even_trends = odd_even_trends[:5]
 
     return render_template('index.html',
-                           last_draw=last_draw, # FIX: last_draw here
+                           last_draw=last_draw, # This will be a valid Pandas Series if df is not empty
                            hot_numbers=hot_numbers,
                            cold_numbers=cold_numbers,
                            white_ball_frequency=white_ball_freq,
@@ -3345,11 +3352,11 @@ def index():
                            recent_consecutive_trends=recent_consecutive_trends,
                            recent_odd_even_trends=recent_odd_even_trends,
                            show_hero=True,
-                           sum_ranges=SUM_RANGES, # FIX: sum_ranges added
-                           selected_odd_even_choice="Any", # Default for homepage form
-                           selected_sum_range="Any", # Default for homepage form
-                           num_sets_to_generate=1, # Default for homepage form
-                           excluded_numbers="" # Default for homepage form
+                           sum_ranges=SUM_RANGES,
+                           selected_odd_even_choice="Any",
+                           selected_sum_range="Any",
+                           num_sets_to_generate=1,
+                           excluded_numbers=""
                            )
 
 @app.route('/frequency_analysis')
