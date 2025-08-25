@@ -11,7 +11,15 @@ import json
 import numpy as np
 import traceback 
 import warnings
-warnings.filterwarnings('ignore', category=UserWarning, module='sklearn') # Ignore specific KMeans warning
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+import tensorflow as tf
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, Dense, Lambda
+from tensorflow.keras import backend as K
+
+warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
 
 # --- Supabase Configuration ---
 SUPABASE_PROJECT_URL = os.environ.get("SUPABASE_URL", "https://yksxzbbcoitehdmsxqex.supabase.co")
@@ -21,7 +29,7 @@ SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_ACTUAL_SUPAB
 SUPABASE_TABLE_NAME = 'powerball_draws'
 GENERATED_NUMBERS_TABLE_NAME = 'generated_powerball_numbers'
 
-# --- Flask App Initialization with Template Path ---
+# --- Flask App Initialization ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_DIR = os.path.join(BASE_DIR, '..', 'templates') 
 
@@ -31,29 +39,34 @@ app.secret_key = 'supersecretkey'
 # --- Global Data and Cache ---
 df = pd.DataFrame()
 last_draw = pd.Series(dtype='object') 
-
 historical_white_ball_sets = set() 
 white_ball_co_occurrence_lookup = {}
-
 analysis_cache = {}
 last_analysis_cache_update = datetime.min 
-
-CACHE_DURATION = timedelta(minutes=60) # Cache for 60 minutes
+CACHE_DURATION = timedelta(minutes=60)
 CACHE_EXPIRATION_SECONDS = CACHE_DURATION.total_seconds()
 
+# --- ML Models ---
 kmeans_model = None
 scaler_model = None
-clustering_features_columns = [] # To store the names of features for clarity
+vae_model = None
+vae_encoder = None
+vae_decoder = None
 
-# NEW Global Variables for VAE-like model
+# --- Feature Configuration ---
+clustering_features_columns = []
+vae_features_columns = [] 
 feature_means = None
 feature_stds = None
-feature_min_max = None # To store min/max for each feature for clamping
-vae_features_columns = [] # Renamed from clustering_features_columns for clarit
+feature_min_max = None
 
+# --- Game Configuration ---
 group_a = [3, 5, 6, 7, 9, 11, 15, 16, 18, 21, 23, 24, 27, 31, 32, 33, 36, 42, 44, 45, 48, 50, 51, 54, 55, 60, 66, 69]
 GLOBAL_WHITE_BALL_RANGE = (1, 69)
 GLOBAL_POWERBALL_RANGE = (1, 26)
+LOW_NUMBER_MAX = 34 
+HIGH_NUMBER_MIN = 35 
+POWERBALL_DRAW_DAYS = ['Monday', 'Wednesday', 'Saturday']
 
 NUMBER_RANGES = {
     "1-9": (1, 9),
@@ -64,15 +77,6 @@ NUMBER_RANGES = {
     "50s": (50, 59),
     "60s": (60, 69)
 }
-
-ASCENDING_GEN_RANGES = [
-    (10, 19), 
-    (20, 29), 
-    (30, 39), 
-    (40, 49), 
-    (50, 59), 
-    (60, 69)  
-]
 
 SUM_RANGES = {
     "Any": None, 
@@ -85,43 +89,21 @@ SUM_RANGES = {
     "Zone G (250-300)": (250, 300)  
 }
 
-LOW_NUMBER_MAX = 34 
-HIGH_NUMBER_MIN = 35 
-
-POWERBALL_DRAW_DAYS = ['Monday', 'Wednesday', 'Saturday']
+ASCENDING_GEN_RANGES = [
+    (10, 19), (20, 29), (30, 39), (40, 49), (50, 59), (60, 69)  
+]
 
 BOUNDARY_PAIRS_TO_ANALYZE = [
     (9, 10), (19, 20), (29, 30), (39, 40), (49, 50), (59, 60)
 ]
 
-# NEW: Define the types of range-based patterns observed by the user
 RANGE_PATTERN_TYPES = [
-    "Single Pick (1-1-1-1-1)",     # Each white ball from a different decade range
-    "Two-Number Pick (2-1-1-1)",   # Two balls from one range, one from three others
-    "Three-Number Pick (3-1-1)",   # Three balls from one range, one from two others
-    "Two-Two-Number Pick (2-2-1)",  # Two balls from one range, two from another, one from a third
-    "One-Two-Three Number Pick (1-2-3)" # One ball from one range, two from another, three from a third
+    "Single Pick (1-1-1-1-1)", "Two-Number Pick (2-1-1-1)", 
+    "Three-Number Pick (3-1-1)", "Two-Two-Number Pick (2-2-1)",
+    "One-Two-Three Number Pick (1-2-3)"
 ]
 
-# NEW Global Variable for recent odd/even ratios
-recent_odd_even_ratios = [] # To store the last few odd/even splits
-
-# ... (after NUMBER_RANGES definition) ...
-
-def _get_ball_ranges_counts(white_balls):
-    """
-    Counts how many white balls fall into each predefined NUMBER_RANGES decade.
-    Returns a dictionary like {'1-9': 2, '10s': 1, '20s': 0, ...}
-    """
-    range_counts = defaultdict(int)
-    for num in white_balls:
-        for range_name, (min_val, max_val) in NUMBER_RANGES.items():
-            if min_val <= num <= max_val:
-                range_counts[range_name] += 1
-                break
-    return range_counts
-
-# ... (after _get_ball_ranges_counts function) ...
+recent_odd_even_ratios = []
 
 def _classify_range_pattern(white_balls):
     """
@@ -166,12 +148,7 @@ def _classify_range_pattern(white_balls):
     # Other patterns not explicitly defined by user's observation (e.g., 4-1, 5-0, or other combinations)
     return "Other" 
 
-# --- Gemini API Configuration ---
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-
-
-# --- Core Utility Functions ---
-
+# --- Supabase Utilities ---
 def _get_supabase_headers(is_service_key=False):
     key = SUPABASE_SERVICE_KEY if is_service_key else SUPABASE_ANON_KEY
     return {
@@ -219,29 +196,17 @@ def load_historical_data_from_supabase():
             if col in df_loaded.columns:
                 df_loaded[col] = pd.to_numeric(df_loaded[col], errors='coerce')
                 df_loaded[col] = df_loaded[col].fillna(0).astype(int)
-            else:
-                print(f"Warning: Column '{col}' not found in fetched data. Skipping conversion for this column.")
 
         df_loaded['Draw Date'] = df_loaded['Draw Date_dt'].dt.strftime('%Y-%m-%d')
         
         print(f"Successfully loaded and processed {len(df_loaded)} records from Supabase.")
         return df_loaded
 
-    except requests.exceptions.RequestException as e:
-        print(f"Error during Supabase data fetch request: {e}")
-        if hasattr(e, 'response') and e.response is not None:
-            print(f"Supabase response content: {e.response.text}")
-        return pd.DataFrame()
-    except json.JSONDecodeError as e:
-        print(f"Error decoding JSON response from Supabase: {e}")
-        if 'response' in locals() and response is not None:
-            print(f"Response content that failed JSON decode: {response.text}")
-        return pd.DataFrame()
     except Exception as e:
-        print(f"An unexpected error occurred in load_historical_data_from_supabase: {e}")
+        print(f"Error loading data from Supabase: {e}")
         return pd.DataFrame()
 
-def get_last_draw(df_source):
+        def get_last_draw(df_source):
     """Retrieves the most recent draw from the DataFrame."""
     if df_source.empty:
         return pd.Series({
@@ -486,592 +451,6 @@ def generate_with_user_provided_pair(num1, num2, white_ball_range, powerball_ran
     else:
         raise ValueError("Could not generate a unique combination with the provided pair and ascending range constraint meeting all criteria after many attempts. Try adjusting filters.")
 
-
-
-
-# --- Update _extract_features_for_draw ---
-def _extract_features_for_draw(draw_row):
-    """
-    Extracts a numerical feature vector from a single Powerball draw row.
-    This vector will be used for generative model training.
-    """
-    if pd.isna(draw_row['Number 1']): # Ensure draw data is valid
-        return None
-
-    white_balls = sorted([
-        int(draw_row['Number 1']), int(draw_row['Number 2']), int(draw_row['Number 3']),
-        int(draw_row['Number 4']), int(draw_row['Number 5'])
-    ])
-    powerball = int(draw_row['Powerball'])
-    
-    odd_count = sum(1 for num in white_balls if num % 2 != 0)
-    even_count = 5 - odd_count
-    white_ball_sum = sum(white_balls)
-    group_a_count = sum(1 for num in white_balls if num in group_a)
-
-    consecutive_pairs_count = 0
-    for i in range(len(white_balls) - 1):
-        if white_balls[i] + 1 == white_balls[i+1]:
-            consecutive_pairs_count += 1
-
-    tens_apart_pairs_count = 0
-    for i in range(len(white_balls)):
-        for j in range(i + 1, len(white_balls)):
-            diff = abs(white_balls[i] - white_balls[j])
-            if diff in [10, 20, 30, 40, 50]:
-                tens_apart_pairs_count += 1
-
-    last_digit_counts = defaultdict(int)
-    for num in white_balls:
-        last_digit_counts[num % 10] += 1
-    same_last_digit_count = sum(count for count in last_digit_counts.values() if count >= 2)
-
-    repeating_digit_numbers = [11, 22, 33, 44, 55, 66]
-    repeating_digit_count = sum(1 for num in white_balls if num in repeating_digit_numbers)
-
-    num_in_range = defaultdict(int)
-    for num in white_balls:
-        if 1 <= num <= 9: num_in_range['1-9'] += 1
-        elif 10 <= num <= 19: num_in_range['10s'] += 1
-        elif 20 <= num <= 29: num_in_range['20s'] += 1
-        elif 30 <= num <= 39: num_in_range['30s'] += 1
-        elif 40 <= num <= 49: num_in_range['40s'] += 1
-        elif 50 <= num <= 59: num_in_range['50s'] += 1
-        elif 60 <= num <= 69: num_in_range['60s'] += 1
-    
-    draw_weekday = draw_row['Draw Date_dt'].day_name()
-    is_monday_draw = 1 if draw_weekday == 'Monday' else 0
-    is_wednesday_draw = 1 if draw_weekday == 'Wednesday' else 0
-    is_saturday_draw = 1 if draw_weekday == 'Saturday' else 0
-
-    powerball_value = powerball
-
-    # NEW: Classify and one-hot encode the range pattern
-    current_range_pattern_type = _classify_range_pattern(white_balls)
-    is_single_pick_pattern = 1 if current_range_pattern_type == "Single Pick (1-1-1-1-1)" else 0
-    is_two_number_pick_pattern = 1 if current_range_pattern_type == "Two-Number Pick (2-1-1-1)" else 0
-    is_three_number_pick_pattern = 1 if current_range_pattern_type == "Three-Number Pick (3-1-1)" else 0
-    is_two_two_pick_pattern = 1 if current_range_pattern_type == "Two-Two-Number Pick (2-2-1)" else 0
-    is_one_two_three_pick_pattern = 1 if current_range_pattern_type == "One-Two-Three Number Pick (1-2-3)" else 0 # NEW LINE Pick (2-2-1)" else 0
-
-
-    features = [
-        odd_count, even_count, white_ball_sum, group_a_count, consecutive_pairs_count,
-        tens_apart_pairs_count, same_last_digit_count, repeating_digit_count,
-        num_in_range['1-9'], num_in_range['10s'], num_in_range['20s'],
-        num_in_range['30s'], num_in_range['40s'], num_in_range['50s'], num_in_range['60s'],
-        is_monday_draw, is_wednesday_draw, is_saturday_draw, powerball_value,
-        # NEW: Add the range pattern features
-        is_single_pick_pattern, is_two_number_pick_pattern, is_three_number_pick_pattern, is_two_two_pick_pattern
-    ]
-    return features
-
-
-# --- Update _extract_features_for_candidate ---
-def _extract_features_for_candidate(white_balls, powerball, draw_date_dt):
-    """
-    Extracts a numerical feature vector from a candidate Powerball pick
-    (list of white balls, powerball, and a datetime object for the draw date).
-    Used for evaluating candidate picks against cluster centroids.
-    """
-    if not isinstance(white_balls, list) or len(white_balls) != 5:
-        return None
-    if not isinstance(powerball, int) or not (GLOBAL_POWERBALL_RANGE[0] <= powerball <= GLOBAL_POWERBALL_RANGE[1]):
-        return None
-    if not isinstance(draw_date_dt, datetime):
-        draw_date_dt = datetime.now() 
-
-    if not all(GLOBAL_WHITE_BALL_RANGE[0] <= num <= GLOBAL_WHITE_BALL_RANGE[1] for num in white_balls):
-        return None
-    if len(set(white_balls)) != 5:
-        return None
-
-    sorted_white_balls = sorted(white_balls)
-
-    odd_count = sum(1 for num in sorted_white_balls if num % 2 != 0)
-    even_count = 5 - odd_count
-    white_ball_sum = sum(sorted_white_balls)
-    group_a_count = sum(1 for num in sorted_white_balls if num in group_a)
-
-    consecutive_pairs_count = 0
-    for i in range(len(sorted_white_balls) - 1):
-        if sorted_white_balls[i] + 1 == sorted_white_balls[i+1]:
-            consecutive_pairs_count += 1
-
-    tens_apart_pairs_count = 0
-    for i in range(len(sorted_white_balls)):
-        for j in range(i + 1, len(sorted_white_balls)):
-            diff = abs(sorted_white_balls[i] - sorted_white_balls[j])
-            if diff in [10, 20, 30, 40, 50]:
-                tens_apart_pairs_count += 1
-
-    last_digit_counts = defaultdict(int)
-    for num in sorted_white_balls:
-        last_digit_counts[num % 10] += 1
-    same_last_digit_count = sum(count for count in last_digit_counts.values() if count >= 2)
-
-    repeating_digit_numbers = [11, 22, 33, 44, 55, 66]
-    repeating_digit_count = sum(1 for num in sorted_white_balls if num in repeating_digit_numbers)
-
-    num_in_range = defaultdict(int)
-    for num in sorted_white_balls:
-        if 1 <= num <= 9: num_in_range['1-9'] += 1
-        elif 10 <= num <= 19: num_in_range['10s'] += 1
-        elif 20 <= num <= 29: num_in_range['20s'] += 1
-        elif 30 <= num <= 39: num_in_range['30s'] += 1
-        elif 40 <= num <= 49: num_in_range['40s'] += 1
-        elif 50 <= num <= 59: num_in_range['50s'] += 1
-        elif 60 <= num <= 69: num_in_range['60s'] += 1
-    
-    draw_weekday = draw_date_dt.day_name()
-    is_monday_draw = 1 if draw_weekday == 'Monday' else 0
-    is_wednesday_draw = 1 if draw_weekday == 'Wednesday' else 0
-    is_saturday_draw = 1 if draw_weekday == 'Saturday' else 0
-
-    powerball_value = powerball
-
-    # NEW: Classify and one-hot encode the range pattern
-    current_range_pattern_type = _classify_range_pattern(white_balls)
-    is_single_pick_pattern = 1 if current_range_pattern_type == "Single Pick (1-1-1-1-1)" else 0
-    is_two_number_pick_pattern = 1 if current_range_pattern_type == "Two-Number Pick (2-1-1-1)" else 0
-    is_three_number_pick_pattern = 1 if current_range_pattern_type == "Three-Number Pick (3-1-1)" else 0
-    is_two_two_pick_pattern = 1 if current_range_pattern_type == "Two-Two-Number Pick (2-2-1)" else 0
-    is_one_two_three_pick_pattern = 1 if current_range_pattern_type == "One-Two-Three Number Pick (1-2-3)" else 0 # NEW LINE
-
-    features = [
-        odd_count, even_count, white_ball_sum, group_a_count, consecutive_pairs_count,
-        tens_apart_pairs_count, same_last_digit_count, repeating_digit_count,
-        num_in_range['1-9'], num_in_range['10s'], num_in_range['20s'],
-        num_in_range['30s'], num_in_range['40s'], num_in_range['50s'], num_in_range['60s'],
-        is_monday_draw, is_wednesday_draw, is_saturday_draw, powerball_value,
-        # NEW: Add the range pattern features
-        is_single_pick_pattern, is_two_number_pick_pattern, is_three_number_pick_pattern, is_two_two_pick_pattern
-    ]
-    return features
-
-    # ... (existing _extract_features_for_candidate function) ...
-
-def _generate_pick_for_cluster(target_cluster_centroid, current_draw_date_dt, excluded_numbers, max_attempts_per_pick=2000):
-    """
-    Generates a single Powerball pick (5 white balls + 1 powerball) that closely
-    matches the given target_cluster_centroid based on features.
-    
-    Args:
-        target_cluster_centroid (np.array): The feature vector of the target cluster.
-        current_draw_date_dt (datetime): The datetime object for the hypothetical draw date,
-                                        used for weekday feature calculation.
-        excluded_numbers (list): Numbers that should not be included in the generated pick.
-        max_attempts_per_pick (int): Maximum attempts to generate a single pick.
-        
-    Returns:
-        tuple: (white_balls_list, powerball_num) or (None, None) if unsuccessful.
-    """
-    global kmeans_model, scaler_model, df, historical_white_ball_sets
-
-    if kmeans_model is None or scaler_model is None:
-        print("Clustering model or scaler not trained. Cannot generate ML picks.")
-        return None, None
-    
-    best_pick_white_balls = None
-    best_pick_powerball = None
-    min_distance = float('inf')
-
-    available_white_balls_pool = [num for num in range(GLOBAL_WHITE_BALL_RANGE[0], GLOBAL_WHITE_BALL_RANGE[1] + 1)
-                                  if num not in excluded_numbers]
-
-    if len(available_white_balls_pool) < 5:
-        print(f"Not enough white balls in pool ({len(available_white_balls_pool)}) after exclusions for ML pick generation.")
-        return None, None
-
-    # Consider the last few draws to avoid immediately repeating the most recent history
-    last_5_white_ball_sets = []
-    if not df.empty:
-        for _, row in df.tail(5).iterrows():
-            last_5_white_ball_sets.append(frozenset([
-                int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
-                int(row['Number 4']), int(row['Number 5'])
-            ]))
-
-    for attempt in range(max_attempts_per_pick):
-        try:
-            candidate_white_balls = sorted(random.sample(available_white_balls_pool, 5))
-            candidate_powerball = random.randint(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1])
-
-            # Skip if exact historical match (or very recent match)
-            if frozenset(candidate_white_balls) in historical_white_ball_sets:
-                continue
-            if frozenset(candidate_white_balls) in last_5_white_ball_sets:
-                continue
-
-            # Calculate features for the candidate pick
-            candidate_features = _extract_features_for_candidate(
-                candidate_white_balls, candidate_powerball, current_draw_date_dt
-            )
-            
-            if candidate_features is None: # Should not happen if previous checks pass, but good safeguard
-                continue
-
-            # Scale the candidate features using the *trained* scaler
-            scaled_candidate_features = scaler_model.transform(np.array(candidate_features).reshape(1, -1))[0]
-
-            # Calculate Euclidean distance to the target cluster centroid
-            distance = np.linalg.norm(scaled_candidate_features - target_cluster_centroid)
-
-            if distance < min_distance:
-                min_distance = distance
-                best_pick_white_balls = candidate_white_balls
-                best_pick_powerball = candidate_powerball
-                
-                # Early exit if a very good match is found
-                if min_distance < 0.1: # Threshold can be tuned
-                    break
-
-        except ValueError: # e.g., random.sample pool too small after exclusions
-            continue
-        except IndexError: # e.g. if _extract_features_for_candidate returns None unexpectedly
-            continue
-        except Exception as e:
-            # print(f"Error during ML pick generation attempt {attempt}: {e}")
-            continue
-
-    return best_pick_white_balls, best_pick_powerball
-
-# ... (existing _extract_features_for_candidate function) ...
-
-# --- Update _learn_feature_distributions ---
-def _learn_feature_distributions():
-    """
-    Learns the mean, standard deviation, and min/max for each feature
-    from historical draw features. These represent the learned "distribution"
-    for our VAE-like generator.
-    """
-    global df, feature_means, feature_stds, feature_min_max, vae_features_columns
-
-    if df.empty:
-        print("DataFrame is empty, cannot learn feature distributions.")
-        feature_means, feature_stds, feature_min_max = None, None, None
-        vae_features_columns = []
-        return
-
-    if 'Draw Date_dt' not in df.columns or not pd.api.types.is_datetime64_any_dtype(df['Draw Date_dt']):
-        df['Draw Date_dt'] = pd.to_datetime(df['Draw Date'], errors='coerce')
-        df.dropna(subset=['Draw Date_dt'], inplace=True)
-        if df.empty:
-            print("DataFrame became empty after datetime conversion, cannot learn feature distributions.")
-            feature_means, feature_stds, feature_min_max = None, None, None
-            vae_features_columns = []
-            return
-
-    feature_data = []
-    # Define feature names explicitly here - these must match the order in _extract_features_for_draw
-    vae_features_columns = [
-        'odd_count', 'even_count', 'white_ball_sum', 'group_a_count', 'consecutive_pairs_count',
-        'tens_apart_pairs_count', 'same_last_digit_count', 'repeating_digit_count',
-        'num_in_range_1_9', 'num_in_range_10_19', 'num_in_range_20_29',
-        'num_in_range_30_39', 'num_in_range_40_49', 'num_in_range_50_59', 'num_in_range_60_69',
-        'is_monday_draw', 'is_wednesday_draw', 'is_saturday_draw', 'powerball_value',
-        # NEW: Add the range pattern feature names
-        'is_single_pick_pattern', 'is_two_number_pick_pattern', 'is_three_number_pick_pattern', 'is_two_two_pick_pattern','is_one_two_three_pick_pattern'
-    ]
-
-    for index, row in df.iterrows():
-        features = _extract_features_for_draw(row) # Use the existing feature extraction
-        if features and len(features) == len(vae_features_columns): # Sanity check
-            feature_data.append(features)
-    
-    if not feature_data:
-        print("No valid feature data extracted, cannot learn feature distributions.")
-        feature_means, feature_stds, feature_min_max = None, None, None
-        vae_features_columns = []
-        return
-
-    X = np.array(feature_data)
-
-    feature_means = np.mean(X, axis=0)
-    feature_stds = np.std(X, axis=0)
-
-    feature_min_max = []
-    for i in range(X.shape[1]):
-        feature_min_max.append((np.min(X[:, i]), np.max(X[:, i])))
-
-    print(f"Learned statistical distributions for {len(vae_features_columns)} features.")
-    print(f"Feature columns: {vae_features_columns}")
-
-    # --- New function to get recent odd/even ratios (after _learn_feature_distributions) ---
-def _update_recent_odd_even_ratios(df_source, num_recent_draws=5):
-    """
-    Updates a global list with the odd/even splits of the most recent draws.
-    """
-    global recent_odd_even_ratios
-
-    if df_source.empty:
-        recent_odd_even_ratios = []
-        return
-
-    # Ensure df is sorted by date before taking tail
-    df_source_sorted = df_source.sort_values(by='Draw Date_dt', ascending=True)
-
-    recent_df = df_source_sorted.tail(num_recent_draws).copy()
-    temp_ratios = []
-    for _, row in recent_df.iterrows():
-        white_balls = [int(row[f'Number {i}']) for i in range(1, 6)]
-        odd_count = sum(1 for num in white_balls if num % 2 != 0)
-        even_count = 5 - odd_count
-        temp_ratios.append(f"{odd_count}O/{even_count}E")
-    
-    recent_odd_even_ratios = temp_ratios[::-1] # Newest first, so index 0 is most recent
-
-# ... (existing _learn_feature_distributions function) ...
-
-# --- Modify _generate_vae_like_feature_vector ---
-def _generate_vae_like_feature_vector():
-    """
-    Generates a new, synthetic feature vector by sampling from the learned
-    statistical distributions (mean/std) of historical features.
-    This simulates the "decoder" output of a VAE.
-    """
-    global feature_means, feature_stds, feature_min_max, vae_features_columns, recent_odd_even_ratios
-
-    if feature_means is None or feature_stds is None or feature_min_max is None:
-        raise ValueError("Feature distributions not learned. Cannot generate VAE-like feature vector.")
-
-    synthetic_features = []
-    for i in range(len(vae_features_columns)):
-        mean = feature_means[i]
-        std = feature_stds[i]
-        min_val, max_val = feature_min_max[i]
-
-        # Sample from a normal distribution. Clamp to observed min/max to prevent extreme values.
-        sampled_value = np.random.normal(loc=mean, scale=std)
-        sampled_value = np.clip(sampled_value, min_val, max_val) # Clamp to historical range
-
-        # Special handling for discrete/integer features
-        if vae_features_columns[i] in ['odd_count', 'even_count', 'group_a_count',
-                                    'consecutive_pairs_count', 'tens_apart_pairs_count',
-                                    'same_last_digit_count', 'repeating_digit_count',
-                                    'num_in_range_1_9', 'num_in_range_10_19', 'num_in_range_20_29',
-                                    'num_in_range_30_39', 'num_in_range_40_49', 'num_in_range_50_59',
-                                    'num_in_range_60_69', 'powerball_value']:
-            sampled_value = int(round(sampled_value))
-        elif vae_features_columns[i] in ['is_monday_draw', 'is_wednesday_draw', 'is_saturday_draw',
-                                        'is_single_pick_pattern', 'is_two_number_pick_pattern',
-                                        'is_three_number_pick_pattern', 'is_two_two_pick_pattern']: # Added new pattern features
-            sampled_value = 1 if sampled_value > 0.5 else 0 # Force binary for one-hot
-        
-        synthetic_features.append(sampled_value)
-
-    # Post-processing for logical consistency (e.g., odd_count + even_count == 5)
-    if len(synthetic_features) >= 2:
-        # Enforce odd_count + even_count = 5 for white balls
-        odd_idx = vae_features_columns.index('odd_count')
-        even_idx = vae_features_columns.index('even_count')
-        actual_odd = int(synthetic_features[odd_idx])
-        actual_even = int(synthetic_features[even_idx])
-        
-        if actual_odd + actual_even != 5:
-            # Simple heuristic: adjust the larger count to make sum 5, or prioritize one over other
-            if actual_odd > actual_even:
-                synthetic_features[odd_idx] = min(actual_odd, 5)
-                synthetic_features[even_idx] = 5 - synthetic_features[odd_idx]
-            else:
-                synthetic_features[even_idx] = min(actual_even, 5)
-                synthetic_features[odd_idx] = 5 - synthetic_features[even_idx]
-    
-    # Clamp other counts to their logical maximums (e.g., consecutive_pairs_count <= 4)
-    # Ensure these indices are correct after adding new features
-    # Adjust indices based on the full vae_features_columns list
-    # Assuming the order is preserved:
-    consecutive_idx = vae_features_columns.index('consecutive_pairs_count')
-    tens_apart_idx = vae_features_columns.index('tens_apart_pairs_count')
-    same_last_digit_idx = vae_features_columns.index('same_last_digit_count')
-    repeating_digit_idx = vae_features_columns.index('repeating_digit_count')
-    
-    synthetic_features[consecutive_idx] = min(synthetic_features[consecutive_idx], 4) 
-    synthetic_features[tens_apart_idx] = min(synthetic_features[tens_apart_idx], 4) 
-    synthetic_features[same_last_digit_idx] = min(synthetic_features[same_last_digit_idx], 5) 
-    synthetic_features[repeating_digit_idx] = min(synthetic_features[repeating_digit_idx], 5) 
-
-    # Sum of range counts should not exceed 5
-    range_start_idx = vae_features_columns.index('num_in_range_1_9')
-    range_end_idx = vae_features_columns.index('num_in_range_60_69') + 1 # Slice is exclusive at end
-    current_range_counts = synthetic_features[range_start_idx:range_end_idx]
-    
-    current_range_sum = sum(current_range_counts)
-    if current_range_sum > 5:
-        # Reduce values proportionally to make sum 5
-        factor = 5 / current_range_sum
-        for i in range(range_start_idx, range_end_idx):
-            synthetic_features[i] = int(round(synthetic_features[i] * factor))
-        
-        # After rounding, might need slight adjustments to ensure sum is exactly 5
-        final_sum = sum(synthetic_features[range_start_idx:range_end_idx])
-        diff = 5 - final_sum
-        if diff != 0:
-            # Adjust one of the non-zero counts
-            non_zero_indices = [i for i in range(range_start_idx, range_end_idx) if synthetic_features[i] > 0]
-            if non_zero_indices:
-                idx_to_adjust = random.choice(non_zero_indices)
-                synthetic_features[idx_to_adjust] += diff # This might make it go negative if diff is large and the count is small.
-                # A safer approach would be to distribute the diff if multiple non_zero_indices are present.
-                # For now, let's keep it simple. It's a heuristic.
-            
-            # Re-sum and re-adjust if sum is still not 5 (due to rounding) or if an index became negative
-            # This is a bit of a tricky heuristic, often better handled by a different generation loop or more complex logic
-            for _ in range(abs(diff)): # Small loop to force the sum to be 5
-                if diff > 0: # Need to increase sum
-                    valid_indices = [i for i in range(range_start_idx, range_end_idx) if synthetic_features[i] < df[f'Number {range(1,6)[0]}'].max() and synthetic_features[i] < 5] # Max per range
-                    if valid_indices:
-                        synthetic_features[random.choice(valid_indices)] += 1
-                elif diff < 0: # Need to decrease sum
-                    valid_indices = [i for i in range(range_start_idx, range_end_idx) if synthetic_features[i] > 0]
-                    if valid_indices:
-                        synthetic_features[random.choice(valid_indices)] -= 1
-            
-
-    # NEW: Adjust range pattern one-hot encoding for logical consistency.
-    # Only one of the range pattern flags should be 1.
-    pattern_flags = [
-        vae_features_columns.index('is_single_pick_pattern'),
-        vae_features_columns.index('is_two_number_pick_pattern'),
-        vae_features_columns.index('is_three_number_pick_pattern'),
-        vae_features_columns.index('is_two_two_pick_pattern'),
-        vae_features_columns.index('is_one_two_three_pick_pattern') # NEW PATTERN FLAG INDEX
-    ]
-    
-    active_pattern_indices = [idx for idx in pattern_flags if synthetic_features[idx] == 1]
-    
-    if len(active_pattern_indices) > 1: # More than one pattern set to true, inconsistent
-        # Randomly choose one to keep, set others to 0
-        keep_idx = random.choice(active_pattern_indices)
-        for idx in pattern_flags:
-            if idx != keep_idx:
-                synthetic_features[idx] = 0
-    elif not active_pattern_indices: # No pattern set to true, assign one randomly if it makes sense, or set to 'Other' later
-        # Default to no specific pattern if none are strongly suggested by sampling, will be classified as 'Other' by _classify_range_pattern
-        pass # The _generate_pick_from_features will handle the final pattern classification.
-
-    # NEW: Odd/Even Ratio Constraint based on recent_odd_even_ratios
-    # Check current generated odd/even ratio
-    generated_odd_count = synthetic_features[vae_features_columns.index('odd_count')]
-    generated_even_count = synthetic_features[vae_features_columns.index('even_count')]
-    current_generated_ratio_str = f"{generated_odd_count}O/{generated_even_count}E"
-
-    # Check the last 3 historical ratios (as per user observation)
-    recent_historical_ratios_check = recent_odd_even_ratios[:3] # Check last 3 draws
-    
-    if all(ratio == current_generated_ratio_str for ratio in recent_historical_ratios_check):
-        # If the generated ratio is the same as the last 3, try to shift it
-        print(f"Adjusting generated odd/even ratio from {current_generated_ratio_str} to break streak.")
-        
-        # Try to find a different, valid odd/even split
-        # Only consider splits that add up to 5
-        possible_new_splits = [
-            (5,0), (0,5), (4,1), (1,4), (3,2), (2,3)
-        ]
-        
-        # Filter out splits that are the same as the current generated one AND in recent history
-        candidate_splits = []
-        for new_odd, new_even in possible_new_splits:
-            if f"{new_odd}O/{new_even}E" != current_generated_ratio_str or \
-               f"{new_odd}O/{new_even}E" not in recent_historical_ratios_check:
-                candidate_splits.append((new_odd, new_even))
-        
-        if candidate_splits:
-            new_odd, new_even = random.choice(candidate_splits)
-            synthetic_features[vae_features_columns.index('odd_count')] = new_odd
-            synthetic_features[vae_features_columns.index('even_count')] = new_even
-            print(f"New odd/even ratio set to {new_odd}O/{new_even}E to break streak.")
-        else:
-            # Fallback if no distinct valid split can be found (very unlikely)
-            print("Warning: Could not find a distinct odd/even ratio to break streak.")
-
-
-    return np.array(synthetic_features)
-
-# ... (existing _generate_vae_like_feature_vector function) ...
-
-# --- _generate_pick_from_features (No change needed for new features, just ensure current state) ---
-def _generate_pick_from_features(target_features, current_draw_date_dt, excluded_numbers, max_attempts_per_pick=25000):
-    """
-    Generates a single Powerball pick (5 white balls + 1 powerball) that closely
-    matches the given target_features vector.
-    
-    Args:
-        target_features (np.array): The target feature vector (e.g., generated by VAE-like sampling).
-        current_draw_date_dt (datetime): The datetime object for the hypothetical draw date.
-        excluded_numbers (list): Numbers that should not be included.
-        max_attempts_per_pick (int): Maximum attempts to find a suitable pick.
-        
-    Returns:
-        tuple: (white_balls_list, powerball_num) or (None, None) if unsuccessful.
-    """
-    global feature_means, feature_stds, historical_white_ball_sets
-
-    if feature_means is None or feature_stds is None:
-        print("Feature distributions not learned. Cannot generate VAE-like picks.")
-        return None, None
-    
-    # Scale the target features using the learned mean/std for distance calculation
-    scaled_target_features = (target_features - feature_means) / (feature_stds + 1e-8)
-
-    best_pick_white_balls = None
-    best_pick_powerball = None
-    min_distance = float('inf')
-
-    available_white_balls_pool = [num for num in range(GLOBAL_WHITE_BALL_RANGE[0], GLOBAL_WHITE_BALL_RANGE[1] + 1)
-                                  if num not in excluded_numbers]
-
-    if len(available_white_balls_pool) < 5:
-        print(f"Not enough white balls in pool ({len(available_white_balls_pool)}) after exclusions for VAE pick generation.")
-        return None, None
-
-    last_5_white_ball_sets = []
-    if not df.empty:
-        for _, row in df.tail(5).iterrows():
-            last_5_white_ball_sets.append(frozenset([
-                int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
-                int(row['Number 4']), int(row['Number 5'])
-            ]))
-
-    for attempt in range(max_attempts_per_pick):
-        try:
-            candidate_white_balls = sorted(random.sample(available_white_balls_pool, 5))
-            candidate_powerball = random.randint(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1])
-
-            if frozenset(candidate_white_balls) in historical_white_ball_sets:
-                continue
-            if frozenset(candidate_white_balls) in last_5_white_ball_sets:
-                continue
-
-            candidate_features_raw = _extract_features_for_candidate(
-                candidate_white_balls, candidate_powerball, current_draw_date_dt
-            )
-            
-            if candidate_features_raw is None:
-                continue
-
-            scaled_candidate_features = (np.array(candidate_features_raw) - feature_means) / (feature_stds + 1e-8)
-
-            distance = np.linalg.norm(scaled_candidate_features - scaled_target_features)
-
-            if distance < min_distance:
-                min_distance = distance
-                best_pick_white_balls = candidate_white_balls
-                best_pick_powerball = candidate_powerball
-                
-                if min_distance < 0.7: # Tunable threshold for what's "close enough"
-                    break
-
-        except ValueError:
-            continue
-        except IndexError:
-            continue
-        except Exception as e:
-            continue
-
-    return best_pick_white_balls, best_pick_powerball
-
-
 def frequency_analysis(df_source):
     """Calculates and returns frequency of white balls and powerballs."""
     if df_source.empty: 
@@ -1294,63 +673,205 @@ def calculate_combinations(n, k):
         return 0
     return math.comb(n, k)
 
-def winning_probability(white_ball_range_tuple, powerball_range_tuple):
-    """Calculates the odds of winning Powerball given specified ranges."""
-    total_white_balls_in_range = white_ball_range_tuple[1] - white_ball_range_tuple[0] + 1
-    white_ball_combinations = calculate_combinations(total_white_balls_in_range, 5)
+# --- ML Model Training Functions ---
+def _train_kmeans_model(X, n_clusters=8):
+    """Trains a K-Means clustering model on the feature data."""
+    global kmeans_model, scaler_model
+    
+    # Scale the features
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    scaler_model = scaler
+    
+    # Train K-Means
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+    kmeans.fit(X_scaled)
+    kmeans_model = kmeans
+    
+    print(f"K-Means model trained with {n_clusters} clusters")
+    return kmeans, scaler
 
-    total_powerballs_in_range = powerball_range_tuple[1] - powerball_range_tuple[0] + 1
+def _build_vae(input_dim, latent_dim=10):
+    """Builds a Variational Autoencoder model."""
+    # Encoder
+    inputs = Input(shape=(input_dim,))
+    h = Dense(128, activation='relu')(inputs)
+    h = Dense(64, activation='relu')(h)
+    
+    # Latent space
+    z_mean = Dense(latent_dim)(h)
+    z_log_var = Dense(latent_dim)(h)
+    
+    # Sampling function
+    def sampling(args):
+        z_mean, z_log_var = args
+        batch = K.shape(z_mean)[0]
+        dim = K.int_shape(z_mean)[1]
+        epsilon = K.random_normal(shape=(batch, dim))
+        return z_mean + K.exp(0.5 * z_log_var) * epsilon
+    
+    z = Lambda(sampling, output_shape=(latent_dim,))([z_mean, z_log_var])
+    
+    # Decoder
+    decoder_h = Dense(64, activation='relu')
+    decoder_mean = Dense(input_dim, activation='sigmoid')
+    
+    h_decoded = decoder_h(z)
+    x_decoded_mean = decoder_mean(h_decoded)
+    
+    # VAE model
+    vae = Model(inputs, x_decoded_mean)
+    
+    # Loss function
+    reconstruction_loss = tf.keras.losses.mse(inputs, x_decoded_mean)
+    reconstruction_loss *= input_dim
+    kl_loss = 1 + z_log_var - K.square(z_mean) - K.exp(z_log_var)
+    kl_loss = K.sum(kl_loss, axis=-1)
+    kl_loss *= -0.5
+    vae_loss = K.mean(reconstruction_loss + kl_loss)
+    
+    vae.add_loss(vae_loss)
+    vae.compile(optimizer='adam')
+    
+    return vae, Model(inputs, z_mean)
 
-    total_combinations = white_ball_combinations * total_powerballs_in_range
+def _train_vae_model(X, latent_dim=10, epochs=100, batch_size=32):
+    """Trains the VAE model on historical feature data."""
+    global vae_model, vae_encoder, vae_decoder, feature_means, feature_stds
+    
+    # Normalize features
+    feature_means = np.mean(X, axis=0)
+    feature_stds = np.std(X, axis=0)
+    X_normalized = (X - feature_means) / (feature_stds + 1e-8)
+    
+    # Build and train VAE
+    vae_model, vae_encoder = _build_vae(X.shape[1], latent_dim)
+    vae_model.fit(X_normalized, X_normalized, epochs=epochs, batch_size=batch_size, verbose=0)
+    
+    print(f"VAE model trained with latent dimension {latent_dim}")
+    return vae_model, vae_encoder
 
-    probability_1_in_x = f"1 in {total_combinations:,}" if total_combinations > 0 else "N/A"
-    probability_percentage = f"{1 / total_combinations * 100:.10f}%" if total_combinations > 0 else "N/A"
+# --- Feature Extraction ---
+def _extract_features_for_draw(draw_row):
+    """Extracts features from a single Powerball draw."""
+    if pd.isna(draw_row['Number 1']):
+        return None
 
-    return probability_1_in_x, probability_percentage
+    white_balls = sorted([
+        int(draw_row['Number 1']), int(draw_row['Number 2']), int(draw_row['Number 3']),
+        int(draw_row['Number 4']), int(draw_row['Number 5'])
+    ])
+    powerball = int(draw_row['Powerball'])
+    
+    # Calculate various features
+    odd_count = sum(1 for num in white_balls if num % 2 != 0)
+    even_count = 5 - odd_count
+    white_ball_sum = sum(white_balls)
+    group_a_count = sum(1 for num in white_balls if num in group_a)
 
-def partial_match_probabilities(white_ball_range_tuple, powerball_range_tuple):
-    """Calculates probabilities for partial Powerball matches."""
-    total_white_balls_in_range = white_ball_range_tuple[1] - white_ball_range_tuple[0] + 1
-    total_powerballs_in_range = powerball_range_tuple[1] - powerball_range_tuple[0] + 1
+    consecutive_pairs_count = 0
+    for i in range(len(white_balls) - 1):
+        if white_balls[i] + 1 == white_balls[i+1]:
+            consecutive_pairs_count += 1
 
-    probabilities = {}
+    tens_apart_pairs_count = 0
+    for i in range(len(white_balls)):
+        for j in range(i + 1, len(white_balls)):
+            diff = abs(white_balls[i] - white_balls[j])
+            if diff in [10, 20, 30, 40, 50]:
+                tens_apart_pairs_count += 1
 
-    prizes = {
-        "Match 5 White Balls + Powerball": {"matched_w": 5, "unmatched_w": 0, "matched_p": 1},
-        "Match 5 White Balls Only": {"matched_w": 5, "unmatched_w": 0, "matched_p": 0},
-        "Match 4 White Balls + Powerball": {"matched_w": 4, "unmatched_w": 1, "matched_p": 1},
-        "Match 4 White Balls Only": {"matched_w": 4, "unmatched_w": 1, "matched_p": 0},
-        "Match 3 White Balls + Powerball": {"matched_w": 3, "unmatched_w": 2, "matched_p": 1},
-        "Match 3 White Balls Only": {"matched_w": 3, "unmatched_w": 2, "matched_p": 0},
-        "Match 2 White Balls + Powerball": {"matched_w": 2, "unmatched_w": 3, "matched_p": 1},
-        "Match 1 White Ball + Powerball": {"matched_w": 1, "unmatched_w": 4, "matched_p": 1},
-        "Match Powerball Only": {"matched_w": 0, "unmatched_w": 5, "matched_p": 1},
-    }
+    last_digit_counts = defaultdict(int)
+    for num in white_balls:
+        last_digit_counts[num % 10] += 1
+    same_last_digit_count = sum(count for count in last_digit_counts.values() if count >= 2)
 
-    for scenario, data in prizes.items():
-        comb_matched_w = calculate_combinations(5, data["matched_w"])
-        comb_unmatched_w = calculate_combinations(total_white_balls_in_range - 5, data["unmatched_w"])
+    repeating_digit_numbers = [11, 22, 33, 44, 55, 66]
+    repeating_digit_count = sum(1 for num in white_balls if num in repeating_digit_numbers)
 
-        if data["matched_p"] == 1:
-            comb_p = 1
-        else:
-            comb_p = total_powerballs_in_range - 1
-            if comb_p < 0:
-                comb_p = 0
-        
-        numerator = comb_matched_w * comb_unmatched_w * comb_p
-        
-        if numerator == 0:
-            probabilities[scenario] = "N/A"
-        else:
-            total_possible_combinations_for_draw = calculate_combinations(total_white_balls_in_range, 5) * total_powerballs_in_range
-            
-            probability = total_possible_combinations_for_draw / numerator
-            probabilities[scenario] = f"{probability:,.0f} to 1"
+    num_in_range = defaultdict(int)
+    for num in white_balls:
+        if 1 <= num <= 9: num_in_range['1-9'] += 1
+        elif 10 <= num <= 19: num_in_range['10s'] += 1
+        elif 20 <= num <= 29: num_in_range['20s'] += 1
+        elif 30 <= num <= 39: num_in_range['30s'] += 1
+        elif 40 <= num <= 49: num_in_range['40s'] += 1
+        elif 50 <= num <= 59: num_in_range['50s'] += 1
+        elif 60 <= num <= 69: num_in_range['60s'] += 1
+    
+    draw_weekday = draw_row['Draw Date_dt'].day_name()
+    is_monday_draw = 1 if draw_weekday == 'Monday' else 0
+    is_wednesday_draw = 1 if draw_weekday == 'Wednesday' else 0
+    is_saturday_draw = 1 if draw_weekday == 'Saturday' else 0
 
-    return probabilities
+    powerball_value = powerball
 
-def find_last_draw_dates_for_numbers(df_source, white_balls, powerball):
+    # Range pattern classification
+    current_range_pattern_type = _classify_range_pattern(white_balls)
+    is_single_pick_pattern = 1 if current_range_pattern_type == "Single Pick (1-1-1-1-1)" else 0
+    is_two_number_pick_pattern = 1 if current_range_pattern_type == "Two-Number Pick (2-1-1-1)" else 0
+    is_three_number_pick_pattern = 1 if current_range_pattern_type == "Three-Number Pick (3-1-1)" else 0
+    is_two_two_pick_pattern = 1 if current_range_pattern_type == "Two-Two-Number Pick (2-2-1)" else 0
+    is_one_two_three_pick_pattern = 1 if current_range_pattern_type == "One-Two-Three Number Pick (1-2-3)" else 0
+
+    features = [
+        odd_count, even_count, white_ball_sum, group_a_count, consecutive_pairs_count,
+        tens_apart_pairs_count, same_last_digit_count, repeating_digit_count,
+        num_in_range['1-9'], num_in_range['10s'], num_in_range['20s'],
+        num_in_range['30s'], num_in_range['40s'], num_in_range['50s'], num_in_range['60s'],
+        is_monday_draw, is_wednesday_draw, is_saturday_draw, powerball_value,
+        is_single_pick_pattern, is_two_number_pick_pattern, 
+        is_three_number_pick_pattern, is_two_two_pick_pattern,
+        is_one_two_three_pick_pattern
+    ]
+    
+    return features
+
+# --- ML Generation Functions ---
+def _generate_from_vae(n_samples=1):
+    """Generates new feature vectors using the trained VAE."""
+    global vae_model, feature_means, feature_stds
+    
+    if vae_model is None:
+        raise ValueError("VAE model not trained")
+    
+    # Generate random samples in latent space
+    z_sample = np.random.normal(size=(n_samples, vae_encoder.output_shape[1]))
+    
+    # Decode to feature space
+    generated_features = vae_decoder.predict(z_sample, verbose=0)
+    
+    # Denormalize
+    generated_features = generated_features * feature_stds + feature_means
+    
+    return generated_features
+
+def _generate_from_kmeans(cluster_id=None):
+    """Generates numbers based on a specific cluster's characteristics."""
+    global kmeans_model, scaler_model
+    
+    if kmeans_model is None or scaler_model is None:
+        raise ValueError("K-Means model not trained")
+    
+    if cluster_id is None:
+        cluster_id = random.randint(0, kmeans_model.n_clusters - 1)
+    
+    # Get cluster centroid
+    centroid = kmeans_model.cluster_centers_[cluster_id]
+    
+    # Find historical draws that match this cluster
+    cluster_draws = []
+    for idx, row in df.iterrows():
+        features = _extract_features_for_draw(row)
+        if features:
+            features_scaled = scaler_model.transform([features])[0]
+            predicted_cluster = kmeans_model.predict([features_scaled])[0]
+            if predicted_cluster == cluster_id:
+                cluster_draws.append(row)
+    
+    return cluster_draws, centroid
+
+    def find_last_draw_dates_for_numbers(df_source, white_balls, powerball):
     """Finds the last draw date for each given number."""
     if df_source.empty: return {}
     last_draw_dates = {}
@@ -2613,60 +2134,59 @@ def get_powerball_position_frequency(df_source):
     return formatted_data
 
 
-# ... (existing initialize_core_data function) ...
-
-# --- Modify initialize_core_data to call _update_recent_odd_even_ratios ---
+# --- Core Initialization ---
 def initialize_core_data():
-    """Initializes global DataFrame, last draw, and historical sets from Supabase,
-    then learns feature distributions for the VAE-like model."""
+    """Initializes data and ML models."""
     global df, last_draw, historical_white_ball_sets, white_ball_co_occurrence_lookup
-    print("Attempting to load core historical data...")
+    global kmeans_model, scaler_model, vae_model, vae_encoder
+    
+    print("Loading historical data and training ML models...")
+    
+    # Load data
+    df_temp = load_historical_data_from_supabase()
+    if df_temp.empty:
+        print("Failed to load historical data")
+        return False
+    
+    df = df_temp.sort_values(by='Draw Date_dt').reset_index(drop=True)
+    last_draw = get_last_draw(df)
+    
+    # Prepare historical sets
+    historical_white_ball_sets.clear()
+    white_ball_co_occurrence_lookup.clear()
+    
+    for _, row in df.iterrows():
+        white_balls_tuple = tuple(sorted([
+            int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), 
+            int(row['Number 4']), int(row['Number 5'])
+        ]))
+        historical_white_ball_sets.add(frozenset(white_balls_tuple))
+        white_ball_co_occurrence_lookup[frozenset(white_balls_tuple)] = row['Draw Date']
+    
+    # Extract features for ML training
+    feature_data = []
+    for _, row in df.iterrows():
+        features = _extract_features_for_draw(row)
+        if features:
+            feature_data.append(features)
+    
+    if not feature_data:
+        print("No features extracted for ML training")
+        return False
+    
+    X = np.array(feature_data)
+    
+    # Train ML models
     try:
-        df_temp = load_historical_data_from_supabase()
-        if not df_temp.empty:
-            df = df_temp.sort_values(by='Draw Date_dt').reset_index(drop=True)
-            last_draw = get_last_draw(df)
-            if not last_draw.empty and 'Draw Date_dt' in last_draw and pd.notna(last_draw['Draw Date_dt']):
-                last_draw['Draw Date'] = last_draw['Draw Date_dt'].strftime('%Y-%m-%d')
-            else:
-                 last_draw['Draw Date'] = 'N/A' 
-            
-            historical_white_ball_sets.clear() 
-            white_ball_co_occurrence_lookup.clear() 
-            for _, row in df.iterrows():
-                white_balls_tuple = tuple(sorted([
-                    int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), 
-                    int(row['Number 4']), int(row['Number 5'])
-                ]))
-                frozenset_white_balls = frozenset(white_balls_tuple)
-                historical_white_ball_sets.add(frozenset_white_balls)
-                
-                current_draw_date = row['Draw Date']
-                if frozenset_white_balls not in white_ball_co_occurrence_lookup or \
-                   datetime.strptime(current_draw_date, '%Y-%m-%d') > datetime.strptime(white_ball_co_occurrence_lookup[frozenset_white_balls], '%Y-%m-%d'):
-                    white_ball_co_occurrence_lookup[frozenset_white_balls] = current_draw_date
-
-            print("Core historical data loaded successfully and co-occurrence lookup populated.")
-            
-            _learn_feature_distributions()
-            # NEW: Update recent odd/even ratios after df is fully loaded and sorted
-            _update_recent_odd_even_ratios(df, num_recent_draws=5) # Track last 5 draws for this
-
-            return True 
-        else:
-            print("Core historical data is empty after loading. df remains empty.")
-            last_draw = pd.Series({
-                'Draw Date': 'N/A', 'Number 1': 'N/A', 'Number 2': 'N/A',
-                'Number 3': 'N/A', 'Number 4': 'N/A', 'Number 5': 'N/A', 'Powerball': 'N/A',
-                'Numbers': ['N/A', 'N/A', 'N/A', 'N/A', 'N/A']
-            }, dtype='object')
-            return False 
+        _train_kmeans_model(X)
+        _train_vae_model(X)
+        print("ML models trained successfully")
+        return True
     except Exception as e:
-        print(f"An error occurred during initial core data loading or feature distribution learning: {e}")
-        traceback.print_exc()
+        print(f"Error training ML models: {e}")
         return False
 
-def get_cached_analysis(key, compute_function, *args, **kwargs):
+        def get_cached_analysis(key, compute_function, *args, **kwargs):
     """Retrieves cached analysis results or computes and caches them."""
     global analysis_cache, last_analysis_cache_update
     
@@ -2963,182 +2483,41 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
             
     return generated_sets
 
-# --- NEW FUNCTION FOR CUSTOM COMBINATIONS API ---
-@app.route('/api/generate_custom_combinations', methods=['POST'])
-def generate_custom_combinations_api():
-    if df.empty:
-        return jsonify({'success': False, 'error': "Historical data not loaded or is empty."}), 500
+    # NEW: Helper function to get detailed triplet analysis (counts + dates)
+def _get_detailed_triplets_analysis(df_source, filter_number=None):
+    """
+    Finds triplets of white balls, their counts, and the dates they appeared.
+    Optionally filters by a specific white ball number.
+    """
+    if df_source.empty:
+        return []
+
+    triplet_details = defaultdict(lambda: {'count': 0, 'draw_dates': []})
+
+    for idx, row in df_source.iterrows():
+        white_balls = [int(row[f'Number {i}']) for i in range(1, 6)]
+        draw_date_str = row['Draw Date_dt'].strftime('%Y-%m-%d')
+        
+        # Filter triplets to only include those containing the filter_number if specified
+        possible_triplets = combinations(sorted(white_balls), 3)
+        
+        for triplet_combo in possible_triplets:
+            if filter_number is None or filter_number in triplet_combo:
+                triplet_details[triplet_combo]['count'] += 1
+                triplet_details[triplet_combo]['draw_dates'].append(draw_date_str)
     
-    try:
-        data = request.json 
-        selected_pool = data.get('selected_pool')
-        num_sets = int(data.get('num_sets', 1))
-        excluded_numbers = data.get('excluded_numbers', [])
-        powerball_override = data.get('powerball_override')
-
-        if not selected_pool or not isinstance(selected_pool, list) or len(selected_pool) < 5:
-            return jsonify({'success': False, 'error': "Please select at least 5 numbers for your combination pool."}), 400
-
-        # Ensure selected_pool and excluded_numbers are sets for efficient lookup
-        selected_pool_set = set(selected_pool)
-        excluded_set = set(excluded_numbers)
-        
-        # Filter the selected pool based on exclusions
-        available_white_balls_in_pool = sorted(list(selected_pool_set - excluded_set))
-
-        if len(available_white_balls_in_pool) < 5:
-            return jsonify({'success': False, 'error': f"Not enough unique numbers ({len(available_white_balls_in_pool)}) in your selected pool after exclusions to pick 5 white balls. Please select more numbers."}), 400
-
-        generated_sets = []
-        max_attempts_per_set = 1000 # Max attempts to find a valid white ball set from the pool
-        
-        for _ in range(num_sets):
-            attempts = 0
-            white_balls_found = False
-            
-            while attempts < max_attempts_per_set:
-                try:
-                    # Randomly sample 5 unique white balls from the available pool
-                    white_balls_candidate = sorted(random.sample(available_white_balls_in_pool, 5))
-                    
-                    # Check for exact historical match - important to avoid common picks
-                    if check_exact_match(white_balls_candidate):
-                        attempts += 1
-                        continue
-                    
-                    white_balls_found = True
-                    break
-                except ValueError:
-                    # This could happen if available_white_balls_in_pool becomes too small, or sample size exceeds population
-                    attempts += 1
-                    continue
-            
-            if not white_balls_found:
-                raise ValueError(f"Could not generate a unique set of 5 white balls from your selected pool after {max_attempts_per_set} attempts. Try increasing the size of your pool or reducing exclusions.")
-
-            # Determine powerball
-            if powerball_override is not None:
-                powerball = powerball_override
-            else:
-                # Pick a random powerball from the global range
-                powerball = random.randint(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1])
-            
-            generated_sets.append({'white_balls': white_balls_candidate, 'powerball': powerball})
-                
-        return jsonify({'success': True, 'generated_sets': generated_sets})
-
-    except ValueError as e:
-        return jsonify({'success': False, 'error': str(e)}), 400
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
-
-
-# ... (existing API endpoints, like /api/generate_ml_smart_picks) ...
-
-@app.route('/api/generate_vae_picks', methods=['POST'])
-def generate_vae_picks_api():
-    """
-    Generates Powerball picks using a VAE-like approach by sampling from learned
-    feature distributions and then finding numbers that match the synthetic feature vector.
-    """
-    global feature_means, feature_stds, vae_features_columns, df
-
-    if df.empty or feature_means is None or feature_stds is None:
-        return jsonify({
-            'success': False,
-            'error': "Generative model not ready. Historical data might be empty or distribution learning failed."
-        }), 500
-
-    try:
-        data = request.json
-        num_sets_to_generate = int(data.get('num_sets', 1))
-        excluded_numbers_input = data.get('excluded_numbers', '')
-        excluded_numbers = [int(num.strip()) for num in excluded_numbers_input.split(',') if num.strip().isdigit()] if excluded_numbers_input else []
-        
-        # We'll use the current date for weekday feature calculation for generated picks
-        current_draw_date_for_features = datetime.now() 
-
-        generated_sets = []
-        last_draw_dates = {}
-
-        for i in range(num_sets_to_generate):
-            # 1. Generate a synthetic target feature vector
-            target_synthetic_features = _generate_vae_like_feature_vector()
-            
-            # 2. Find actual numbers that match this synthetic feature vector
-            white_balls, powerball = _generate_pick_from_features(
-                target_synthetic_features, current_draw_date_for_features, excluded_numbers
-            )
-
-            if white_balls is not None and powerball is not None:
-                generated_sets.append({'white_balls': white_balls, 'powerball': powerball})
-                # For the last generated set, find last drawn dates for its numbers
-                if i == num_sets_to_generate - 1:
-                    last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
-            else:
-                print(f"Warning: Failed to generate a valid VAE-like pick for set {i+1} after many attempts.")
-                
-        if not generated_sets:
-             raise ValueError("Could not generate any VAE-like picks after multiple attempts. Try adjusting excluded numbers or increasing generation attempts.")
-
-        # Optional: Provide insights into the generated feature vector
-        # (For now, let's keep it simple, but we could add this for debugging/info)
-        # generated_feature_info = {
-        #     vae_features_columns[j]: target_synthetic_features[j] for j in range(len(vae_features_columns))
-        # }
-
-        return jsonify({
-            'success': True,
-            'generated_sets': generated_sets,
-            'last_draw_dates': last_draw_dates,
-            'ml_model_info': "Generated based on VAE-like sampling of historical feature distributions."
+    formatted_triplets = []
+    for triplet, details in triplet_details.items():
+        # Sort draw dates for consistent 'newest' / 'oldest' logic
+        sorted_dates = sorted(details['draw_dates'], reverse=True) # Newest first
+        formatted_triplets.append({
+            'triplet': list(triplet),
+            'count': int(details['count']),
+            'first_drawn_date': sorted_dates[-1] if sorted_dates else 'N/A', # Oldest
+            'last_drawn_date': sorted_dates[0] if sorted_dates else 'N/A'    # Newest
         })
-
-    except ValueError as e:
-        return jsonify({'success': False, 'error': str(e)}), 400
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
-
-
-# --- NEW ROUTE FOR PHASE 3: CREATE COMBINATIONS ---
-@app.route('/api/create_combinations', methods=['POST'])
-def create_combinations_api():
-    try:
-        data = request.json
-        pool_numbers = data.get('pool_numbers')
-        combination_size = data.get('combination_size')
-
-        if not isinstance(pool_numbers, list) or not all(isinstance(n, int) for n in pool_numbers):
-            return jsonify({'success': False, 'error': 'Invalid pool numbers format. Must be a list of integers.'}), 400
-        
-        if not (1 <= combination_size <= len(pool_numbers) and combination_size <= 10): # Limit combination size for performance
-            return jsonify({'success': False, 'error': f'Combination size must be between 1 and the pool size ({len(pool_numbers)}), and no more than 10 for performance reasons.'}), 400
-
-        # Ensure unique numbers in the pool and sort them
-        unique_pool = sorted(list(set(pool_numbers)))
-
-        # Generate combinations
-        all_combinations = calculate_combinations_py(unique_pool, combination_size)
-        
-        # Limit the number of combinations returned for performance/display reasons
-        MAX_COMBINATIONS_DISPLAY = 1000 # You can adjust this limit
-        if len(all_combinations) > MAX_COMBINATIONS_DISPLAY:
-            # Optionally, return a subset and a warning, or just an error
-            return jsonify({'success': False, 'error': f'Too many combinations ({len(all_combinations)}). Please reduce your pool size or combination size. Max allowed: {MAX_COMBINATIONS_DISPLAY}'}), 400
-
-
-        # Convert tuples to lists for JSON serialization
-        formatted_combinations = [list(combo) for combo in all_combinations]
-
-        return jsonify({'success': True, 'combinations': formatted_combinations})
-
-    except ValueError as e:
-        return jsonify({'success': False, 'error': str(e)}), 400
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
+    
+    return formatted_triplets
 
 # Helper function to ensure data is fetched from Supabase (can be called before analysis functions)
 def fetch_data_from_supabase():
@@ -3149,9 +2528,219 @@ def fetch_data_from_supabase():
     else:
         print("Data is fresh, no need to re-initialize.")
 
+# get_special_patterns_analysis (restored and improved for all requested data)
+def get_special_patterns_analysis(df_source):
+    """
+    Analyzes various 'special' white ball patterns across historical data and recent trends,
+    providing overall frequencies, yearly chart data (percentages and counts), and detailed
+    yearly pattern breakdowns.
+    """
+    if df_source.empty:
+        return {
+            'tens_apart_patterns_overall': [],
+            'same_last_digit_patterns_overall': [],
+            'repeating_digit_patterns_overall': [],
+            'recent_trends': [],
+            'yearly_chart_data': [],
+            'available_years': [],
+            'yearly_data': [] # Detailed yearly data for tables
+        }
+
+    df_copy = df_source.copy()
+    if 'Draw Date_dt' not in df_copy.columns:
+        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
+
+    if df_copy.empty:
+        return {
+            'tens_apart_patterns_overall': [],
+            'same_last_digit_patterns_overall': [],
+            'repeating_digit_patterns_overall': [],
+            'recent_trends': [],
+            'yearly_chart_data': [],
+            'available_years': [],
+            'yearly_data': []
+        }
+
+    # --- Pre-define all possible patterns for efficient lookup ---
+    all_tens_apart_pairs = set()
+    for n1 in range(1, 60): # White balls up to 69
+        for diff in [10, 20, 30, 40, 50]:
+            n2 = n1 + diff
+            if n2 <= 69:
+                all_tens_apart_pairs.add(tuple(sorted((n1, n2))))
+
+    same_last_digit_groups_full = defaultdict(list)
+    for i in range(1, 70):
+        last_digit = i % 10
+        same_last_digit_groups_full[last_digit].append(i)
+    
+    repeating_digit_numbers = [11, 22, 33, 44, 55, 66] # White balls only go up to 69
+
+    # --- Overall Pattern Counts ---
+    tens_apart_counts_overall = defaultdict(int)
+    same_last_digit_counts_overall = defaultdict(int)
+    repeating_digit_counts_overall = defaultdict(int)
+
+    # --- Yearly Pattern Counts (for detailed tables and for chart aggregation) ---
+    yearly_tens_apart_counts_raw = defaultdict(lambda: defaultdict(int)) # {year: {pattern: count}}
+    yearly_same_last_digit_counts_raw = defaultdict(lambda: defaultdict(int))
+    yearly_repeating_digit_counts_raw = defaultdict(lambda: defaultdict(int))
+    yearly_total_draws = defaultdict(int) # Counts total draws per year
+    
+    # Track draws where a pattern *type* was present (for percentage calculation)
+    yearly_tens_apart_draws_present = defaultdict(int)
+    yearly_same_last_digit_draws_present = defaultdict(int)
+    yearly_repeating_digit_draws_present = defaultdict(int)
+
+
+    # --- Recent Trends (Last 12 Months) ---
+    recent_trends_data = []
+    one_year_ago = datetime.now() - pd.DateOffset(months=12)
+
+    # Define relevant years for analysis (2017 to current year, capped at 2025 as requested)
+    min_year_in_data = min(df_copy['Draw Date_dt'].dt.year) if not df_copy.empty else datetime.now().year
+    relevant_years = sorted(list(range(max(2017, min_year_in_data), min(datetime.now().year, 2025) + 1)))
+
+    # --- Main Loop: Process each draw ---
+    for _, row in df_copy.iterrows():
+        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+        white_ball_set = set(white_balls) # For faster lookups
+        draw_year = row['Draw Date_dt'].year
+        draw_date_str = row['Draw Date_dt'].strftime('%Y-%m-%d')
+
+        if draw_year in relevant_years:
+            yearly_total_draws[draw_year] += 1
+
+        # Temp lists to track patterns in the *current draw* for recent trends
+        current_draw_tens_apart_list = []
+        current_draw_same_last_digit_list = []
+        current_draw_repeating_digit_list = []
+
+        # 1. Tens Apart Patterns
+        tens_apart_found_in_draw = False
+        for pair in combinations(white_balls, 2):
+            sorted_pair = tuple(sorted(pair))
+            if sorted_pair in all_tens_apart_pairs:
+                tens_apart_counts_overall[sorted_pair] += 1
+                if draw_year in relevant_years:
+                    yearly_tens_apart_counts_raw[draw_year][sorted_pair] += 1
+                current_draw_tens_apart_list.append(list(sorted_pair))
+                tens_apart_found_in_draw = True
+        if tens_apart_found_in_draw and draw_year in relevant_years:
+            yearly_tens_apart_draws_present[draw_year] += 1
+
+        # 2. Same Last Digit Patterns
+        same_last_digit_found_in_draw = False
+        for last_digit, full_group_numbers in same_last_digit_groups_full.items():
+            intersection_with_draw = white_ball_set.intersection(set(full_group_numbers))
+            if len(intersection_with_draw) >= 2:
+                # Find all combinations of size 2 or more from the intersection for counting
+                for r in range(2, len(intersection_with_draw) + 1):
+                    for pattern_combo in combinations(sorted(list(intersection_with_draw)), r):
+                        same_last_digit_counts_overall[pattern_combo] += 1
+                        if draw_year in relevant_years:
+                            yearly_same_last_digit_counts_raw[draw_year][pattern_combo] += 1
+                current_draw_same_last_digit_list.append(list(sorted(list(intersection_with_draw)))) # For recent trends, just list the numbers with same last digit
+                same_last_digit_found_in_draw = True
+        if same_last_digit_found_in_draw and draw_year in relevant_years:
+            yearly_same_last_digit_draws_present[draw_year] += 1
+
+        # 3. Repeating Digit Patterns
+        repeating_digit_found_in_draw = False
+        drawn_repeating_digits = [n for n in repeating_digit_numbers if n in white_ball_set]
+        if len(drawn_repeating_digits) > 0: # Check if *any* repeating digit is drawn
+            # If multiple repeating digits are drawn, consider combinations for counting, otherwise just the number itself
+            if len(drawn_repeating_digits) >= 2: # For combinations
+                for r in range(2, len(drawn_repeating_digits) + 1):
+                    for pattern_combo in combinations(sorted(drawn_repeating_digits), r):
+                        repeating_digit_counts_overall[pattern_combo] += 1
+                        if draw_year in relevant_years:
+                            yearly_repeating_digit_counts_raw[draw_year][pattern_combo] += 1
+            else: # If only one repeating digit is drawn
+                repeating_digit_counts_overall[tuple(drawn_repeating_digits)] += 1 # Store as tuple for consistency
+                if draw_year in relevant_years:
+                    yearly_repeating_digit_counts_raw[draw_year][tuple(drawn_repeating_digits)] += 1
+
+            current_draw_repeating_digit_list.extend(drawn_repeating_digits) # Add actual numbers for recent trends
+            repeating_digit_found_in_draw = True
+        if repeating_digit_found_in_draw and draw_year in relevant_years:
+            yearly_repeating_digit_draws_present[draw_year] += 1
+
+
+        # Add to recent trends data if within the last 12 months
+        if row['Draw Date_dt'] >= one_year_ago:
+            # For recent trends, show if *any* pattern of that type was present, and list the patterns
+            recent_trends_data.append({
+                'draw_date': draw_date_str,
+                'white_balls': white_balls,
+                'tens_apart': "Yes" if current_draw_tens_apart_list else "No",
+                'tens_apart_patterns': current_draw_tens_apart_list,
+                'same_last_digit': "Yes" if current_draw_same_last_digit_list else "No",
+                'same_last_digit_patterns': current_draw_same_last_digit_list,
+                'repeating_digit': "Yes" if current_draw_repeating_digit_list else "No",
+                'repeating_digit_patterns': current_draw_repeating_digit_list
+            })
+
+    # Sort recent trends by date descending
+    recent_trends_data.sort(key=lambda x: x['draw_date'], reverse=True)
+
+
+    # --- Format Overall Results ---
+    # Convert pattern tuples back to lists for JSON, sort by count, then pattern
+    tens_apart_patterns_overall = sorted([{'pattern': list(p), 'count': c} for p, c in tens_apart_counts_overall.items()], key=lambda x: (-x['count'], str(x['pattern'])))
+    same_last_digit_patterns_overall = sorted([{'pattern': list(p), 'count': c} for p, c in same_last_digit_counts_overall.items()], key=lambda x: (-x['count'], str(x['pattern'])))
+    repeating_digit_patterns_overall = sorted([{'pattern': list(p), 'count': c} if isinstance(p, tuple) else {'pattern': p, 'count': c} for p, c in repeating_digit_counts_overall.items()], key=lambda x: (-x['count'], str(x['pattern'])))
+
+    # --- Prepare Yearly Chart Data ---
+    yearly_chart_data = []
+    for year in relevant_years:
+        total_draws_for_year = yearly_total_draws.get(year, 0)
+        
+        tens_apart_percent = round((yearly_tens_apart_draws_present.get(year, 0) / total_draws_for_year) * 100, 2) if total_draws_for_year > 0 else 0.0
+        same_last_digit_percent = round((yearly_same_last_digit_draws_present.get(year, 0) / total_draws_for_year) * 100, 2) if total_draws_for_year > 0 else 0.0
+        repeating_digit_percent = round((yearly_repeating_digit_draws_present.get(year, 0) / total_draws_for_year) * 100, 2) if total_draws_for_year > 0 else 0.0
+
+        yearly_chart_data.append({
+            'year': int(year),
+            'total_draws': total_draws_for_year,
+            'tens_apart_count': sum(yearly_tens_apart_counts_raw[year].values()),
+            'same_last_digit_count': sum(yearly_same_last_digit_counts_raw[year].values()),
+            'repeating_digit_count': sum(yearly_repeating_digit_counts_raw[year].values()),
+            'tens_apart_draw_percentage': tens_apart_percent,
+            'same_last_digit_draw_percentage': same_last_digit_percent,
+            'repeating_digit_draw_percentage': repeating_digit_percent,
+        })
+    yearly_chart_data.sort(key=lambda x: x['year']) # Ensure ascending year order for chart
+
+    # --- Group detailed yearly data for frontend tables (sortable by count/pattern) ---
+    yearly_grouped_data_for_tables = []
+    for year in relevant_years:
+        # Convert pattern tuples back to lists for JSON and sort by count then pattern string
+        tens_apart_patterns_for_year = sorted([{'pattern': list(p), 'count': c} for p, c in yearly_tens_apart_counts_raw[year].items()], key=lambda x: (-x['count'], str(x['pattern'])))
+        same_last_digit_patterns_for_year = sorted([{'pattern': list(p), 'count': c} for p, c in yearly_same_last_digit_counts_raw[year].items()], key=lambda x: (-x['count'], str(x['pattern'])))
+        repeating_digit_patterns_for_year = sorted([{'pattern': list(p), 'count': c} if isinstance(p, tuple) else {'pattern': p, 'count': c} for p, c in yearly_repeating_digit_counts_raw[year].items()], key=lambda x: (-x['count'], str(x['pattern'])))
+
+        yearly_grouped_data_for_tables.append({
+            'year': int(year),
+            'total_draws': yearly_total_draws.get(year, 0),
+            'tens_apart_patterns': tens_apart_patterns_for_year,
+            'same_last_digit_patterns': same_last_digit_patterns_for_year,
+            'repeating_digit_patterns': repeating_digit_patterns_for_year
+        })
+    yearly_grouped_data_for_tables.sort(key=lambda x: x['year'], reverse=True) # Sort years descending for the details sections
+
+    return {
+        'tens_apart_patterns_overall': tens_apart_patterns_overall,
+        'same_last_digit_patterns_overall': same_last_digit_patterns_overall,
+        'repeating_digit_patterns_overall': repeating_digit_patterns_overall,
+        'recent_trends': recent_trends_data,
+        'yearly_chart_data': yearly_chart_data,
+        'available_years': relevant_years,
+        'yearly_data': yearly_grouped_data_for_tables
+    }
 
 # --- Flask Routes ---
-
 @app.route('/')
 def index():
     last_draw_dict = last_draw.to_dict()
@@ -3769,41 +3358,162 @@ def triplets_analysis_route():
     return render_template('triplets_analysis.html')
 
 
-# NEW: Helper function to get detailed triplet analysis (counts + dates)
-def _get_detailed_triplets_analysis(df_source, filter_number=None):
-    """
-    Finds triplets of white balls, their counts, and the dates they appeared.
-    Optionally filters by a specific white ball number.
-    """
-    if df_source.empty:
-        return []
-
-    triplet_details = defaultdict(lambda: {'count': 0, 'draw_dates': []})
-
-    for idx, row in df_source.iterrows():
-        white_balls = [int(row[f'Number {i}']) for i in range(1, 6)]
-        draw_date_str = row['Draw Date_dt'].strftime('%Y-%m-%d')
-        
-        # Filter triplets to only include those containing the filter_number if specified
-        possible_triplets = combinations(sorted(white_balls), 3)
-        
-        for triplet_combo in possible_triplets:
-            if filter_number is None or filter_number in triplet_combo:
-                triplet_details[triplet_combo]['count'] += 1
-                triplet_details[triplet_combo]['draw_dates'].append(draw_date_str)
+# --- API Endpoints for ML Generation ---
+@app.route('/api/generate_ml_picks', methods=['POST'])
+def generate_ml_picks_api():
+    """Generate numbers using ML models."""
+    global df
     
-    formatted_triplets = []
-    for triplet, details in triplet_details.items():
-        # Sort draw dates for consistent 'newest' / 'oldest' logic
-        sorted_dates = sorted(details['draw_dates'], reverse=True) # Newest first
-        formatted_triplets.append({
-            'triplet': list(triplet),
-            'count': int(details['count']),
-            'first_drawn_date': sorted_dates[-1] if sorted_dates else 'N/A', # Oldest
-            'last_drawn_date': sorted_dates[0] if sorted_dates else 'N/A'    # Newest
-        })
+    if df.empty:
+        return jsonify({'success': False, 'error': 'Historical data not loaded'}), 500
     
-    return formatted_triplets
+    try:
+        data = request.json
+        num_sets = int(data.get('num_sets', 1))
+        method = data.get('method', 'kmeans')  # 'kmeans' or 'vae'
+        
+        generated_sets = []
+        
+        if method == 'kmeans':
+            for _ in range(num_sets):
+                cluster_draws, centroid = _generate_from_kmeans()
+                if cluster_draws:
+                    # Pick a random draw from the cluster
+                    selected_draw = random.choice(cluster_draws)
+                    white_balls = [
+                        int(selected_draw['Number 1']), int(selected_draw['Number 2']),
+                        int(selected_draw['Number 3']), int(selected_draw['Number 4']),
+                        int(selected_draw['Number 5'])
+                    ]
+                    powerball = int(selected_draw['Powerball'])
+                    generated_sets.append({'white_balls': white_balls, 'powerball': powerball})
+        
+        elif method == 'vae':
+            for _ in range(num_sets):
+                features = _generate_from_vae(1)[0]
+                # Convert features to numbers (this would need more sophisticated logic)
+                # For now, use a simple approach
+                white_balls = sorted(random.sample(range(1, 70), 5))
+                powerball = random.randint(1, 26)
+                generated_sets.append({'white_balls': white_balls, 'powerball': powerball})
+        
+        return jsonify({'success': True, 'generated_sets': generated_sets})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# --- Keep your existing utility functions ---
+# (get_last_draw, check_exact_match, generate_powerball_numbers, etc.)
+# These should remain mostly unchanged
+
+
+        # --- NEW FUNCTION FOR CUSTOM COMBINATIONS API ---
+@app.route('/api/generate_custom_combinations', methods=['POST'])
+def generate_custom_combinations_api():
+    if df.empty:
+        return jsonify({'success': False, 'error': "Historical data not loaded or is empty."}), 500
+    
+    try:
+        data = request.json 
+        selected_pool = data.get('selected_pool')
+        num_sets = int(data.get('num_sets', 1))
+        excluded_numbers = data.get('excluded_numbers', [])
+        powerball_override = data.get('powerball_override')
+
+        if not selected_pool or not isinstance(selected_pool, list) or len(selected_pool) < 5:
+            return jsonify({'success': False, 'error': "Please select at least 5 numbers for your combination pool."}), 400
+
+        # Ensure selected_pool and excluded_numbers are sets for efficient lookup
+        selected_pool_set = set(selected_pool)
+        excluded_set = set(excluded_numbers)
+        
+        # Filter the selected pool based on exclusions
+        available_white_balls_in_pool = sorted(list(selected_pool_set - excluded_set))
+
+        if len(available_white_balls_in_pool) < 5:
+            return jsonify({'success': False, 'error': f"Not enough unique numbers ({len(available_white_balls_in_pool)}) in your selected pool after exclusions to pick 5 white balls. Please select more numbers."}), 400
+
+        generated_sets = []
+        max_attempts_per_set = 1000 # Max attempts to find a valid white ball set from the pool
+        
+        for _ in range(num_sets):
+            attempts = 0
+            white_balls_found = False
+            
+            while attempts < max_attempts_per_set:
+                try:
+                    # Randomly sample 5 unique white balls from the available pool
+                    white_balls_candidate = sorted(random.sample(available_white_balls_in_pool, 5))
+                    
+                    # Check for exact historical match - important to avoid common picks
+                    if check_exact_match(white_balls_candidate):
+                        attempts += 1
+                        continue
+                    
+                    white_balls_found = True
+                    break
+                except ValueError:
+                    # This could happen if available_white_balls_in_pool becomes too small, or sample size exceeds population
+                    attempts += 1
+                    continue
+            
+            if not white_balls_found:
+                raise ValueError(f"Could not generate a unique set of 5 white balls from your selected pool after {max_attempts_per_set} attempts. Try increasing the size of your pool or reducing exclusions.")
+
+            # Determine powerball
+            if powerball_override is not None:
+                powerball = powerball_override
+            else:
+                # Pick a random powerball from the global range
+                powerball = random.randint(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1])
+            
+            generated_sets.append({'white_balls': white_balls_candidate, 'powerball': powerball})
+                
+        return jsonify({'success': True, 'generated_sets': generated_sets})
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
+
+# --- NEW ROUTE FOR PHASE 3: CREATE COMBINATIONS ---
+@app.route('/api/create_combinations', methods=['POST'])
+def create_combinations_api():
+    try:
+        data = request.json
+        pool_numbers = data.get('pool_numbers')
+        combination_size = data.get('combination_size')
+
+        if not isinstance(pool_numbers, list) or not all(isinstance(n, int) for n in pool_numbers):
+            return jsonify({'success': False, 'error': 'Invalid pool numbers format. Must be a list of integers.'}), 400
+        
+        if not (1 <= combination_size <= len(pool_numbers) and combination_size <= 10): # Limit combination size for performance
+            return jsonify({'success': False, 'error': f'Combination size must be between 1 and the pool size ({len(pool_numbers)}), and no more than 10 for performance reasons.'}), 400
+
+        # Ensure unique numbers in the pool and sort them
+        unique_pool = sorted(list(set(pool_numbers)))
+
+        # Generate combinations
+        all_combinations = calculate_combinations_py(unique_pool, combination_size)
+        
+        # Limit the number of combinations returned for performance/display reasons
+        MAX_COMBINATIONS_DISPLAY = 1000 # You can adjust this limit
+        if len(all_combinations) > MAX_COMBINATIONS_DISPLAY:
+            # Optionally, return a subset and a warning, or just an error
+            return jsonify({'success': False, 'error': f'Too many combinations ({len(all_combinations)}). Please reduce your pool size or combination size. Max allowed: {MAX_COMBINATIONS_DISPLAY}'}), 400
+
+
+        # Convert tuples to lists for JSON serialization
+        formatted_combinations = [list(combo) for combo in all_combinations]
+
+        return jsonify({'success': True, 'combinations': formatted_combinations})
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
 
 # NEW: API endpoint for detailed triplet analysis with filtering and sorting
 @app.route('/api/triplets_detailed_analysis', methods=['GET'])
@@ -4067,219 +3777,6 @@ def boundary_crossing_pairs_trends_route():
                            selected_pair=selected_pair_str,
                            yearly_data_for_selected_pattern=yearly_data_for_selected_pattern)
  
-
-# get_special_patterns_analysis (restored and improved for all requested data)
-def get_special_patterns_analysis(df_source):
-    """
-    Analyzes various 'special' white ball patterns across historical data and recent trends,
-    providing overall frequencies, yearly chart data (percentages and counts), and detailed
-    yearly pattern breakdowns.
-    """
-    if df_source.empty:
-        return {
-            'tens_apart_patterns_overall': [],
-            'same_last_digit_patterns_overall': [],
-            'repeating_digit_patterns_overall': [],
-            'recent_trends': [],
-            'yearly_chart_data': [],
-            'available_years': [],
-            'yearly_data': [] # Detailed yearly data for tables
-        }
-
-    df_copy = df_source.copy()
-    if 'Draw Date_dt' not in df_copy.columns:
-        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
-    df_copy = df_copy.dropna(subset=['Draw Date_dt'])
-
-    if df_copy.empty:
-        return {
-            'tens_apart_patterns_overall': [],
-            'same_last_digit_patterns_overall': [],
-            'repeating_digit_patterns_overall': [],
-            'recent_trends': [],
-            'yearly_chart_data': [],
-            'available_years': [],
-            'yearly_data': []
-        }
-
-    # --- Pre-define all possible patterns for efficient lookup ---
-    all_tens_apart_pairs = set()
-    for n1 in range(1, 60): # White balls up to 69
-        for diff in [10, 20, 30, 40, 50]:
-            n2 = n1 + diff
-            if n2 <= 69:
-                all_tens_apart_pairs.add(tuple(sorted((n1, n2))))
-
-    same_last_digit_groups_full = defaultdict(list)
-    for i in range(1, 70):
-        last_digit = i % 10
-        same_last_digit_groups_full[last_digit].append(i)
-    
-    repeating_digit_numbers = [11, 22, 33, 44, 55, 66] # White balls only go up to 69
-
-    # --- Overall Pattern Counts ---
-    tens_apart_counts_overall = defaultdict(int)
-    same_last_digit_counts_overall = defaultdict(int)
-    repeating_digit_counts_overall = defaultdict(int)
-
-    # --- Yearly Pattern Counts (for detailed tables and for chart aggregation) ---
-    yearly_tens_apart_counts_raw = defaultdict(lambda: defaultdict(int)) # {year: {pattern: count}}
-    yearly_same_last_digit_counts_raw = defaultdict(lambda: defaultdict(int))
-    yearly_repeating_digit_counts_raw = defaultdict(lambda: defaultdict(int))
-    yearly_total_draws = defaultdict(int) # Counts total draws per year
-    
-    # Track draws where a pattern *type* was present (for percentage calculation)
-    yearly_tens_apart_draws_present = defaultdict(int)
-    yearly_same_last_digit_draws_present = defaultdict(int)
-    yearly_repeating_digit_draws_present = defaultdict(int)
-
-
-    # --- Recent Trends (Last 12 Months) ---
-    recent_trends_data = []
-    one_year_ago = datetime.now() - pd.DateOffset(months=12)
-
-    # Define relevant years for analysis (2017 to current year, capped at 2025 as requested)
-    min_year_in_data = min(df_copy['Draw Date_dt'].dt.year) if not df_copy.empty else datetime.now().year
-    relevant_years = sorted(list(range(max(2017, min_year_in_data), min(datetime.now().year, 2025) + 1)))
-
-    # --- Main Loop: Process each draw ---
-    for _, row in df_copy.iterrows():
-        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
-        white_ball_set = set(white_balls) # For faster lookups
-        draw_year = row['Draw Date_dt'].year
-        draw_date_str = row['Draw Date_dt'].strftime('%Y-%m-%d')
-
-        if draw_year in relevant_years:
-            yearly_total_draws[draw_year] += 1
-
-        # Temp lists to track patterns in the *current draw* for recent trends
-        current_draw_tens_apart_list = []
-        current_draw_same_last_digit_list = []
-        current_draw_repeating_digit_list = []
-
-        # 1. Tens Apart Patterns
-        tens_apart_found_in_draw = False
-        for pair in combinations(white_balls, 2):
-            sorted_pair = tuple(sorted(pair))
-            if sorted_pair in all_tens_apart_pairs:
-                tens_apart_counts_overall[sorted_pair] += 1
-                if draw_year in relevant_years:
-                    yearly_tens_apart_counts_raw[draw_year][sorted_pair] += 1
-                current_draw_tens_apart_list.append(list(sorted_pair))
-                tens_apart_found_in_draw = True
-        if tens_apart_found_in_draw and draw_year in relevant_years:
-            yearly_tens_apart_draws_present[draw_year] += 1
-
-        # 2. Same Last Digit Patterns
-        same_last_digit_found_in_draw = False
-        for last_digit, full_group_numbers in same_last_digit_groups_full.items():
-            intersection_with_draw = white_ball_set.intersection(set(full_group_numbers))
-            if len(intersection_with_draw) >= 2:
-                # Find all combinations of size 2 or more from the intersection for counting
-                for r in range(2, len(intersection_with_draw) + 1):
-                    for pattern_combo in combinations(sorted(list(intersection_with_draw)), r):
-                        same_last_digit_counts_overall[pattern_combo] += 1
-                        if draw_year in relevant_years:
-                            yearly_same_last_digit_counts_raw[draw_year][pattern_combo] += 1
-                current_draw_same_last_digit_list.append(list(sorted(list(intersection_with_draw)))) # For recent trends, just list the numbers with same last digit
-                same_last_digit_found_in_draw = True
-        if same_last_digit_found_in_draw and draw_year in relevant_years:
-            yearly_same_last_digit_draws_present[draw_year] += 1
-
-        # 3. Repeating Digit Patterns
-        repeating_digit_found_in_draw = False
-        drawn_repeating_digits = [n for n in repeating_digit_numbers if n in white_ball_set]
-        if len(drawn_repeating_digits) > 0: # Check if *any* repeating digit is drawn
-            # If multiple repeating digits are drawn, consider combinations for counting, otherwise just the number itself
-            if len(drawn_repeating_digits) >= 2: # For combinations
-                for r in range(2, len(drawn_repeating_digits) + 1):
-                    for pattern_combo in combinations(sorted(drawn_repeating_digits), r):
-                        repeating_digit_counts_overall[pattern_combo] += 1
-                        if draw_year in relevant_years:
-                            yearly_repeating_digit_counts_raw[draw_year][pattern_combo] += 1
-            else: # If only one repeating digit is drawn
-                repeating_digit_counts_overall[tuple(drawn_repeating_digits)] += 1 # Store as tuple for consistency
-                if draw_year in relevant_years:
-                    yearly_repeating_digit_counts_raw[draw_year][tuple(drawn_repeating_digits)] += 1
-
-            current_draw_repeating_digit_list.extend(drawn_repeating_digits) # Add actual numbers for recent trends
-            repeating_digit_found_in_draw = True
-        if repeating_digit_found_in_draw and draw_year in relevant_years:
-            yearly_repeating_digit_draws_present[draw_year] += 1
-
-
-        # Add to recent trends data if within the last 12 months
-        if row['Draw Date_dt'] >= one_year_ago:
-            # For recent trends, show if *any* pattern of that type was present, and list the patterns
-            recent_trends_data.append({
-                'draw_date': draw_date_str,
-                'white_balls': white_balls,
-                'tens_apart': "Yes" if current_draw_tens_apart_list else "No",
-                'tens_apart_patterns': current_draw_tens_apart_list,
-                'same_last_digit': "Yes" if current_draw_same_last_digit_list else "No",
-                'same_last_digit_patterns': current_draw_same_last_digit_list,
-                'repeating_digit': "Yes" if current_draw_repeating_digit_list else "No",
-                'repeating_digit_patterns': current_draw_repeating_digit_list
-            })
-
-    # Sort recent trends by date descending
-    recent_trends_data.sort(key=lambda x: x['draw_date'], reverse=True)
-
-
-    # --- Format Overall Results ---
-    # Convert pattern tuples back to lists for JSON, sort by count, then pattern
-    tens_apart_patterns_overall = sorted([{'pattern': list(p), 'count': c} for p, c in tens_apart_counts_overall.items()], key=lambda x: (-x['count'], str(x['pattern'])))
-    same_last_digit_patterns_overall = sorted([{'pattern': list(p), 'count': c} for p, c in same_last_digit_counts_overall.items()], key=lambda x: (-x['count'], str(x['pattern'])))
-    repeating_digit_patterns_overall = sorted([{'pattern': list(p), 'count': c} if isinstance(p, tuple) else {'pattern': p, 'count': c} for p, c in repeating_digit_counts_overall.items()], key=lambda x: (-x['count'], str(x['pattern'])))
-
-    # --- Prepare Yearly Chart Data ---
-    yearly_chart_data = []
-    for year in relevant_years:
-        total_draws_for_year = yearly_total_draws.get(year, 0)
-        
-        tens_apart_percent = round((yearly_tens_apart_draws_present.get(year, 0) / total_draws_for_year) * 100, 2) if total_draws_for_year > 0 else 0.0
-        same_last_digit_percent = round((yearly_same_last_digit_draws_present.get(year, 0) / total_draws_for_year) * 100, 2) if total_draws_for_year > 0 else 0.0
-        repeating_digit_percent = round((yearly_repeating_digit_draws_present.get(year, 0) / total_draws_for_year) * 100, 2) if total_draws_for_year > 0 else 0.0
-
-        yearly_chart_data.append({
-            'year': int(year),
-            'total_draws': total_draws_for_year,
-            'tens_apart_count': sum(yearly_tens_apart_counts_raw[year].values()),
-            'same_last_digit_count': sum(yearly_same_last_digit_counts_raw[year].values()),
-            'repeating_digit_count': sum(yearly_repeating_digit_counts_raw[year].values()),
-            'tens_apart_draw_percentage': tens_apart_percent,
-            'same_last_digit_draw_percentage': same_last_digit_percent,
-            'repeating_digit_draw_percentage': repeating_digit_percent,
-        })
-    yearly_chart_data.sort(key=lambda x: x['year']) # Ensure ascending year order for chart
-
-    # --- Group detailed yearly data for frontend tables (sortable by count/pattern) ---
-    yearly_grouped_data_for_tables = []
-    for year in relevant_years:
-        # Convert pattern tuples back to lists for JSON and sort by count then pattern string
-        tens_apart_patterns_for_year = sorted([{'pattern': list(p), 'count': c} for p, c in yearly_tens_apart_counts_raw[year].items()], key=lambda x: (-x['count'], str(x['pattern'])))
-        same_last_digit_patterns_for_year = sorted([{'pattern': list(p), 'count': c} for p, c in yearly_same_last_digit_counts_raw[year].items()], key=lambda x: (-x['count'], str(x['pattern'])))
-        repeating_digit_patterns_for_year = sorted([{'pattern': list(p), 'count': c} if isinstance(p, tuple) else {'pattern': p, 'count': c} for p, c in yearly_repeating_digit_counts_raw[year].items()], key=lambda x: (-x['count'], str(x['pattern'])))
-
-        yearly_grouped_data_for_tables.append({
-            'year': int(year),
-            'total_draws': yearly_total_draws.get(year, 0),
-            'tens_apart_patterns': tens_apart_patterns_for_year,
-            'same_last_digit_patterns': same_last_digit_patterns_for_year,
-            'repeating_digit_patterns': repeating_digit_patterns_for_year
-        })
-    yearly_grouped_data_for_tables.sort(key=lambda x: x['year'], reverse=True) # Sort years descending for the details sections
-
-    return {
-        'tens_apart_patterns_overall': tens_apart_patterns_overall,
-        'same_last_digit_patterns_overall': same_last_digit_patterns_overall,
-        'repeating_digit_patterns_overall': repeating_digit_patterns_overall,
-        'recent_trends': recent_trends_data,
-        'yearly_chart_data': yearly_chart_data,
-        'available_years': relevant_years,
-        'yearly_data': yearly_grouped_data_for_tables
-    }
-
 @app.route('/special_patterns_analysis')
 def special_patterns_analysis_route():
     if df.empty:
@@ -4690,16 +4187,6 @@ def positional_analysis_route():
         return jsonify(positional_data)
     else:
         return render_template('positional_analysis.html', positional_data=positional_data)
-
-@app.route('/ai_assistant')
-def ai_assistant_route():
-    try:
-        return render_template('ai_assistant.html')
-    except Exception as e:
-        traceback.print_exc()
-        flash("An error occurred loading the AI Assistant page. Please try again.", 'error')
-        return redirect(url_for('index'))
-
 # --- CUSTOM COMBINATIONS ROUTE (Corrected to fix data passing) ---
 @app.route('/custom_combinations')
 def custom_combinations_route():
@@ -4945,71 +4432,12 @@ def api_white_ball_gaps():
         return jsonify({'success': False, 'error': f"No appearance data for number {target_number} in the selected year range."}), 404
 
     return jsonify({'success': True, 'gaps_data': gaps_data})
-
-    # ... (existing API endpoints, like /api/generate_custom_combinations) ...
-
-@app.route('/api/generate_ml_smart_picks', methods=['POST'])
-def generate_ml_smart_picks_api():
-    """
-    Generates Powerball picks using the trained K-Means clustering model.
-    Picks will conform to patterns learned from historical draws.
-    """
-    global kmeans_model, scaler_model, df
-
-    if df.empty or kmeans_model is None or scaler_model is None:
-        return jsonify({
-            'success': False,
-            'error': "Machine learning model not trained. Historical data might be empty or training failed."
-        }), 500
-
-    try:
-        data = request.json
-        num_sets_to_generate = int(data.get('num_sets', 1))
-        excluded_numbers_input = data.get('excluded_numbers', '')
-        excluded_numbers = [int(num.strip()) for num in excluded_numbers_input.split(',') if num.strip().isdigit()] if excluded_numbers_input else []
-        
-        # We'll use the current date for weekday feature calculation for generated picks
-        current_draw_date_for_features = datetime.now() 
-
-        generated_sets = []
-        last_draw_dates = {}
-
-        # Randomly select a cluster to target for generation
-        # We can make this smarter later (e.g., weighted by cluster size, or user choice)
-        target_cluster_id = random.randint(0, kmeans_model.n_clusters - 1)
-        target_cluster_centroid = kmeans_model.cluster_centers_[target_cluster_id]
-        print(f"Targeting cluster {target_cluster_id} for ML pick generation. Centroid: {target_cluster_centroid[:5]}...") # Print first 5 features
-
-        for i in range(num_sets_to_generate):
-            white_balls, powerball = _generate_pick_for_cluster(
-                target_cluster_centroid, current_draw_date_for_features, excluded_numbers
-            )
-
-            if white_balls is not None and powerball is not None:
-                generated_sets.append({'white_balls': white_balls, 'powerball': powerball})
-                # For the last generated set, find last drawn dates for its numbers
-                if i == num_sets_to_generate - 1:
-                    last_draw_dates = find_last_draw_dates_for_numbers(df, white_balls, powerball)
-            else:
-                print(f"Warning: Failed to generate a valid ML pick for set {i+1} after many attempts.")
-                # If a pick fails, we still try to generate the rest, but might return fewer than requested
-                # or add a placeholder indicating failure. For now, just skip.
-                
-        if not generated_sets:
-             raise ValueError("Could not generate any ML-based picks after multiple attempts. Try adjusting excluded numbers or increasing generation attempts.")
-
-        return jsonify({
-            'success': True,
-            'generated_sets': generated_sets,
-            'last_draw_dates': last_draw_dates,
-            'ml_cluster_info': f"Generated based on characteristics of Cluster {target_cluster_id}."
-        })
-
-    except ValueError as e:
-        return jsonify({'success': False, 'error': str(e)}), 400
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
-
-# Initialize core data on app startup
-initialize_core_data()
+    
+# --- Initialize on startup ---
+if __name__ == '__main__':
+    success = initialize_core_data()
+    if success:
+        print("Application initialized successfully")
+        app.run(debug=True)
+    else:
+        print("Failed to initialize application")
