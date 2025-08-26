@@ -874,7 +874,7 @@ def _generate_from_kmeans(cluster_id=None):
     return cluster_draws, centroid
 
     def find_last_draw_dates_for_numbers(df_source, white_balls, powerball):
-    """Finds the last draw date for each given number."""
+        """Finds the last draw date for each given number."""
     if df_source.empty: return {}
     last_draw_dates = {}
     
