@@ -2188,8 +2188,8 @@ def initialize_core_data():
         print(f"Error training ML models: {e}")
         return False
 
-        def get_cached_analysis(key, compute_function, *args, **kwargs):
-    """Retrieves cached analysis results or computes and caches them."""
+    def get_cached_analysis(key, compute_function, *args, **kwargs):
+        """Retrieves cached analysis results or computes and caches them."""
     global analysis_cache, last_analysis_cache_update
     
     serializable_args = [arg for arg in args if not isinstance(arg, pd.DataFrame)]
