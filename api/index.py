@@ -2881,7 +2881,7 @@ def calculate_consecutive_gaps(df_source):
    
 # --- Flask Routes ---
 @app.route('/')
-    def index():
+def index():
     last_draw_dict = last_draw.to_dict()
     return render_template('index.html', 
                            last_draw=last_draw_dict, 
@@ -2892,7 +2892,7 @@ def calculate_consecutive_gaps(df_source):
                           )
                           
 @app.route('/generate', methods=['POST'])
-    def generate():
+def generate():
     if df.empty:
         flash("Cannot generate numbers: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
         return render_template('index.html', last_draw=last_draw.to_dict(), sum_ranges=SUM_RANGES)
