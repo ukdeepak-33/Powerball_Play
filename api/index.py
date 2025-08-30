@@ -3919,6 +3919,33 @@ def save_manual_pick_route():
         traceback.print_exc()
         return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
 
+@app.route('/smart_pick_generator')
+def smart_pick_generator_route():
+    global df, last_draw
+
+    if df.empty or last_draw.empty:
+        success = initialize_core_data() 
+        if not success: 
+            if df.empty:
+                flash("Failed to load historical data. Please try again later.", 'error')
+                return redirect(url_for('index'))
+    
+    generated_sets = []
+    last_draw_dates = {}
+
+    return render_template('smart_pick_generator.html', 
+                           sum_ranges=SUM_RANGES,
+                           group_a=group_a,
+                           generated_sets=generated_sets, 
+                           last_draw_dates=last_draw_dates, 
+                           num_sets_to_generate=1, 
+                           excluded_numbers='',     
+                           num_from_group_a=2,      
+                           odd_even_choice="Any",   
+                           selected_sum_range="Any" 
+                          )
+
+
 @app.route('/sum_trends_and_gaps')
 def sum_trends_and_gaps_route():
     if df.empty:
