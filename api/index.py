@@ -511,7 +511,7 @@ def _extract_features_for_candidate(white_balls, powerball, draw_date_dt):
         elif 50 <= num <= 59: num_in_range['50s'] += 1
         elif 60 <= num <= 69: num_in_range['60s'] += 1
 
-    draw_weekday = draw_date_dt.day_name()
+    draw_weekday = draw_date_dt.strftime('%A')
     is_monday_draw = 1 if draw_weekday == 'Monday' else 0
     is_wednesday_draw = 1 if draw_weekday == 'Wednesday' else 0
     is_saturday_draw = 1 if draw_weekday == 'Saturday' else 0
