@@ -316,7 +316,8 @@ def generate_powerball_numbers(df_source, group_a_list, odd_even_choice, combo_c
     raise ValueError("Could not generate a unique combination meeting all criteria after many attempts. Try adjusting filters or increasing max_attempts.")
 
 
-def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerball_range, excluded_numbers, selected_sum_range_tuple=None):
+def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerball_range, excluded_numbers, selected_sum_range_tuple=None, one_unpicked_four_picked=False, two_unpicked_three_picked=False, two_same_frequency=False,
+                         picked_numbers=None, unpicked_numbers=None, frequency_groups=None):
     """Generates a Powerball combination ensuring a certain number of Group A numbers."""
     if df_source.empty:
         raise ValueError("Cannot generate numbers: Historical data is empty.")
@@ -335,6 +336,12 @@ def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerba
     num_from_remaining = 5 - num_from_group_a
     if len(remaining_pool) < num_from_remaining:
         raise ValueError(f"Not enough unique numbers in the remaining pool ({len(remaining_pool)}) to pick {num_from_remaining}.")
+    if picked_numbers is None:
+        picked_numbers = []
+    if unpicked_numbers is None:
+        unpicked_numbers = []
+    if frequency_groups is None:
+        frequency_groups = {}
 
     while attempts < max_attempts:
         try:
@@ -344,6 +351,64 @@ def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerba
             if len(available_for_remaining) < num_from_remaining:
                 attempts += 1
                 continue
+                      # Apply preferences for the remaining numbers
+            if one_unpicked_four_picked and unpicked_numbers:
+                # Ensure at least one unpicked number from current month
+                available_unpicked = [num for num in available_for_remaining if num in unpicked_numbers]
+                if not available_unpicked:
+                    attempts += 1
+                    continue
+                    
+                selected_unpicked = random.sample(available_unpicked, 1)
+                available_for_remaining = [num for num in available_for_remaining if num not in selected_unpicked]
+                if len(available_for_remaining) < (num_from_remaining - 1):
+                    attempts += 1
+                    continue
+                    
+                selected_from_remaining = selected_unpicked + random.sample(available_for_remaining, num_from_remaining - 1)
+                
+            elif two_unpicked_three_picked and unpicked_numbers:
+                # Ensure at least two unpicked numbers from current month
+                available_unpicked = [num for num in available_for_remaining if num in unpicked_numbers]
+                if len(available_unpicked) < 2:
+                    attempts += 1
+                    continue
+                    
+                selected_unpicked = random.sample(available_unpicked, 2)
+                available_for_remaining = [num for num in available_for_remaining if num not in selected_unpicked]
+                if len(available_for_remaining) < (num_from_remaining - 2):
+                    attempts += 1
+                    continue
+                    
+                selected_from_remaining = selected_unpicked + random.sample(available_for_remaining, num_from_remaining - 2)
+                
+            elif two_same_frequency and frequency_groups:
+                # Ensure two numbers with the same frequency in current year
+                # Find frequencies that have at least 2 numbers
+                valid_frequencies = {freq: nums for freq, nums in frequency_groups.items() if len(nums) >= 2}
+                if not valid_frequencies:
+                    attempts += 1
+                    continue
+                    
+                # Select a random frequency group
+                selected_freq = random.choice(list(valid_frequencies.keys()))
+                freq_numbers = valid_frequencies[selected_freq]
+                
+                # Select two numbers from this frequency group that are in our available pool
+                available_freq_numbers = [num for num in freq_numbers if num in available_for_remaining]
+                if len(available_freq_numbers) < 2:
+                    attempts += 1
+                    continue
+                    
+                selected_freq_pair = random.sample(available_freq_numbers, 2)
+                available_for_remaining = [num for num in available_for_remaining if num not in selected_freq_pair]
+                if len(available_for_remaining) < (num_from_remaining - 2):
+                    attempts += 1
+                    continue
+                    
+                selected_from_remaining = selected_freq_pair + random.sample(available_for_remaining, num_from_remaining - 2)   
+            else:
+
             selected_from_remaining = random.sample(available_for_remaining, num_from_remaining)
             white_balls = sorted(selected_from_group_a + selected_from_remaining)
             if selected_sum_range_tuple:
@@ -625,6 +690,53 @@ def _generate_smart_pick(num_sets_to_generate, excluded_numbers):
 
     return generated_sets, last_draw_dates, "Generated based on historically common statistical rules."
 
+# Add these helper functions at the top of your file, near other utility functions
+def _get_current_month_picked_unpicked():
+    """Get picked and unpicked numbers for the current month."""
+    global df
+    if df.empty:
+        return [], []
+    
+    current_date = datetime.now()
+    current_month_start = current_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # Filter draws for current month
+    current_month_draws = df[df['Draw Date_dt'] >= current_month_start]
+    
+    # Get all picked white balls
+    picked_numbers = set()
+    for _, row in current_month_draws.iterrows():
+        for i in range(1, 6):
+            picked_numbers.add(int(row[f'Number {i}']))
+    
+    # Get unpicked numbers (all possible numbers minus picked ones)
+    all_possible_numbers = set(range(1, 70))
+    unpicked_numbers = sorted(list(all_possible_numbers - picked_numbers))
+    picked_numbers = sorted(list(picked_numbers))
+    
+    return picked_numbers, unpicked_numbers
+
+def _get_current_year_frequency_groups():
+    """Group numbers by their frequency in the current year."""
+    global df
+    if df.empty:
+        return {}
+    
+    current_year = datetime.now().year
+    year_draws = df[df['Draw Date_dt'].dt.year == current_year]
+    
+    # Count frequencies
+    frequency_count = defaultdict(int)
+    for _, row in year_draws.iterrows():
+        for i in range(1, 6):
+            frequency_count[int(row[f'Number {i}'])] += 1
+    
+    # Group numbers by frequency
+    frequency_groups = defaultdict(list)
+    for number, count in frequency_count.items():
+        frequency_groups[count].append(number)
+    
+    return frequency_groups
 
 def initialize_core_data():
     """Initializes and loads all core data from Supabase and performs initial analyses."""
@@ -2387,7 +2499,11 @@ def _get_yearly_patterns_for_range(df_source, target_range_label):
 
     return yearly_data
 
-def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a, odd_even_choice, sum_range_tuple, prioritize_monthly_hot, prioritize_grouped_patterns, prioritize_special_patterns, prioritize_consecutive_patterns, force_specific_pattern):
+def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a, odd_even_choice, sum_range_tuple, 
+                        prioritize_monthly_hot, prioritize_grouped_patterns, prioritize_special_patterns, 
+                        prioritize_consecutive_patterns, force_specific_pattern,
+                        one_unpicked_four_picked=False, two_unpicked_three_picked=False, two_same_frequency=False,
+                        picked_numbers=None, unpicked_numbers=None, frequency_groups=None):
     """Generates Powerball picks based on a combination of hard and soft criteria."""
     if df_source.empty:
         raise ValueError("Historical data is empty. Cannot generate smart picks.")
@@ -2436,6 +2552,32 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
 
             remaining_to_pick = 5
             temp_excluded = set(excluded_numbers)
+
+            if one_unpicked_four_picked and unpicked_numbers:
+        # Check if we have exactly one unpicked number
+        unpicked_count = sum(1 for num in candidate_white_balls if num in unpicked_numbers)
+        if unpicked_count != 1:
+            continue
+            
+    if two_unpicked_three_picked and unpicked_numbers:
+        # Check if we have exactly two unpicked numbers
+        unpicked_count = sum(1 for num in candidate_white_balls if num in unpicked_numbers)
+        if unpicked_count != 2:
+            continue
+            
+    if two_same_frequency and frequency_groups:
+        # Check if we have at least two numbers with the same frequency
+        freq_count = defaultdict(int)
+        for num in candidate_white_balls:
+            for freq, numbers in frequency_groups.items():
+                if num in numbers:
+                    freq_count[freq] += 1
+                    break
+                    
+        # Check if any frequency has at least 2 numbers
+        has_same_frequency_pair = any(count >= 2 for count in freq_count.values())
+        if not has_same_frequency_pair:
+            continue
 
             if force_specific_pattern:
                 for num in force_specific_pattern:
@@ -3033,12 +3175,25 @@ def generate_group_a_strategy_route():
 
     selected_sum_range_label = request.form.get('sum_range_filter_group_a', 'Any')
     selected_sum_range_tuple = SUM_RANGES.get(selected_sum_range_label)
+    current_month_preferences = request.form.getlist('current_month_preference')
+    one_unpicked_four_picked = "one_unpicked_four_picked" in current_month_preferences
+    two_unpicked_three_picked = "two_unpicked_three_picked" in current_month_preferences
+    two_same_frequency = "two_same_frequency" in current_month_preferences
 
     white_balls = []
     powerball = None
     last_draw_dates = {}
 
     try:
+        picked_numbers = []
+        unpicked_numbers = []
+        frequency_groups = {}
+        
+        if one_unpicked_four_picked or two_unpicked_three_picked:
+            picked_numbers, unpicked_numbers = _get_current_month_picked_unpicked()
+            
+        if two_same_frequency:
+            frequency_groups = _get_current_year_frequency_groups()
         white_balls, powerball = generate_from_group_a(
             df, num_from_group_a, white_ball_range_local, powerball_range_local,
             excluded_numbers_local, selected_sum_range_tuple
@@ -4127,6 +4282,7 @@ def api_white_ball_trends_route():
         'period_labels': period_labels
     })
     
+# Modify the generate_smart_picks_route function
 @app.route('/generate_smart_picks_route', methods=['POST'])
 def generate_smart_picks_route():
     if df.empty:
@@ -4149,6 +4305,11 @@ def generate_smart_picks_route():
         prioritize_special_patterns = data.get('prioritize_special_patterns', False)
         prioritize_consecutive_patterns = data.get('prioritize_consecutive_patterns', False)
         
+        # Get the new preferences
+        one_unpicked_four_picked = data.get('preference_one_unpicked', False)
+        two_unpicked_three_picked = data.get('preference_two_unpicked', False)
+        two_same_frequency = data.get('preference_two_same_frequency', False)
+        
         force_specific_pattern_input = data.get('force_specific_pattern', '') 
         force_specific_pattern = []
         if force_specific_pattern_input:
@@ -4163,6 +4324,17 @@ def generate_smart_picks_route():
             if len(set(force_specific_pattern)) != len(force_specific_pattern):
                 raise ValueError("Forced specific pattern numbers must be unique.")
 
+        # Get current month/year data if needed
+        picked_numbers = []
+        unpicked_numbers = []
+        frequency_groups = {}
+        
+        if one_unpicked_four_picked or two_unpicked_three_picked:
+            picked_numbers, unpicked_numbers = _get_current_month_picked_unpicked()
+            
+        if two_same_frequency:
+            frequency_groups = _get_current_year_frequency_groups()
+
         generated_sets = generate_smart_picks(
             df_source=df,
             num_sets=num_sets_to_generate,
@@ -4174,7 +4346,13 @@ def generate_smart_picks_route():
             prioritize_grouped_patterns=prioritize_grouped_patterns,
             prioritize_special_patterns=prioritize_special_patterns,
             prioritize_consecutive_patterns=prioritize_consecutive_patterns,
-            force_specific_pattern=force_specific_pattern
+            force_specific_pattern=force_specific_pattern,
+            one_unpicked_four_picked=one_unpicked_four_picked,
+            two_unpicked_three_picked=two_unpicked_three_picked,
+            two_same_frequency=two_same_frequency,
+            picked_numbers=picked_numbers,
+            unpicked_numbers=unpicked_numbers,
+            frequency_groups=frequency_groups
         )
         
         last_draw_dates = {}
@@ -4192,7 +4370,6 @@ def generate_smart_picks_route():
     except Exception as e:
         traceback.print_exc()
         return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
-
 @app.route('/api/generate_smart_picks', methods=['POST'])
 def generate_smart_picks_api():
     """
