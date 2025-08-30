@@ -14,7 +14,7 @@
             width: 40px;
             height: 40px;
             border-radius: 50%;
-            background-color: #6366f1; /* Indigo - for white balls */
+            background-color: #6366f1; /* Indigo */
             color: white;
             font-weight: bold;
             font-size: 1.1rem;
@@ -38,44 +38,6 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-
-        /* Styles for generated pick items to match the image */
-        .generated-pick-item {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            background-color: #f7fafc; /* light gray background for the pick container */
-            border: 1px solid #e2e8f0; /* light border */
-            border-radius: 0.5rem;
-            padding: 0.75rem 1rem;
-            margin-bottom: 1rem; /* Space between picks */
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .generated-pick-item .ball {
-            background-color: #9258a4; /* A shade of purple, common in Powerball branding */
-        }
-        .generated-pick-item .powerball {
-            background-color: #ef4444; /* Red, as in the image */
-        }
-        .generated-pick-item .ball-display {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            margin-right: auto; /* Push buttons to the right */
-        }
-        .generated-pick-item .pick-actions {
-            margin-left: 1rem;
-            white-space: nowrap; /* Keep buttons on one line */
-        }
-
-        .animate-fade-in {
-            animation: fadeIn 0.5s ease-out forwards;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
     </style>
 {% endblock %}
 
@@ -272,7 +234,7 @@
             };
 
             if (selectedStrategy === 'rule_based') {
-                apiUrl = '/api/generate_smart_picks'; // Updated to use the API route
+                apiUrl = '/generate_smart_picks_route'; // Your existing Flask route for rule-based
                 payload.num_from_group_a = document.getElementById('num_from_group_a').value;
                 payload.odd_even_choice = document.getElementById('odd_even_choice').value;
                 payload.sum_range_filter = document.getElementById('sum_range_filter').value;
@@ -302,23 +264,18 @@
                     generatedPicksContainer.innerHTML = ''; // Clear existing
                     result.generated_sets.forEach(pick => {
                         const pickDiv = document.createElement('div');
-                        pickDiv.className = 'generated-pick-item'; // Apply the new styling class
+                        pickDiv.className = 'flex flex-wrap items-center justify-center sm:justify-start bg-gray-50 p-4 rounded-lg shadow-sm';
                         const whiteBallsHtml = pick.white_balls.map(ball => `<span class="ball">${ball}</span>`).join('');
                         
-                        // Structure to match the image: balls first, then optional actions
+                        // --- FIX FOR RED POWERBALL HERE ---
                         pickDiv.innerHTML = `
-                            <div class="ball-display">
+                            <div class="flex items-center mb-2 sm:mb-0 sm:mr-4">
                                 ${whiteBallsHtml}
                                 <span class="ball powerball">${pick.powerball}</span>
                             </div>
-                            <div class="pick-actions">
-                                <button type="button" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition ease-in-out duration-150 save-single-pick-btn"
-                                    data-white-balls="${pick.white_balls.join(',')}"
-                                    data-powerball="${pick.powerball}">
-                                    Save
-                                </button>
-                            </div>
                         `;
+                        // --- END FIX ---
+
                         generatedPicksContainer.appendChild(pickDiv);
                     });
                     generatedPicksSection.classList.remove('hidden');
@@ -359,38 +316,6 @@
             }
         });
 
-        // Event listener for saving individual picks
-        generatedPicksContainer.addEventListener('click', async function(e) {
-            if (e.target.classList.contains('save-single-pick-btn')) {
-                const button = e.target;
-                const whiteBalls = button.dataset.white_balls.split(',').map(Number);
-                const powerball = Number(button.dataset.powerball);
-
-                try {
-                    const response = await fetch("{{ url_for('save_generated_pick_route') }}", {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ white_balls: whiteBalls, powerball: powerball })
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                        alert(result.message);
-                        button.disabled = true; // Disable after saving
-                        button.textContent = 'Saved!';
-                        button.classList.remove('bg-green-500', 'hover:bg-green-600');
-                        button.classList.add('bg-gray-400'); // Use gray for saved button
-                    } else {
-                        alert('Error saving pick: ' + result.error);
-                    }
-                } catch (error) {
-                    console.error('Error saving pick:', error);
-                    alert('An unexpected error occurred while saving the pick.');
-                }
-            }
-        });
-
         // Event listener for saving all generated picks
         saveAllPicksBtn.addEventListener('click', async function() {
             if (currentGeneratedSets.length === 0) {
@@ -405,7 +330,7 @@
             }));
 
             try {
-                const response = await fetch("{{ url_for('save_multiple_generated_picks_route') }}", {
+                const response = await fetch('/save_multiple_generated_picks', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -417,19 +342,6 @@
 
                 if (response.ok && result.success) {
                     alert(result.message);
-                    // Optionally disable all save buttons and "Save All" button
-                    saveAllPicksBtn.disabled = true;
-                    saveAllPicksBtn.textContent = 'All Picks Saved!';
-                    saveAllPicksBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
-                    saveAllPicksBtn.classList.add('bg-gray-400'); // Use gray for saved state
-
-                    document.querySelectorAll('.save-single-pick-btn').forEach(button => {
-                        button.disabled = true;
-                        button.textContent = 'Saved!';
-                        button.classList.remove('bg-green-500', 'hover:bg-green-600');
-                        button.classList.add('bg-gray-400'); // Use gray for saved state
-                    });
-
                 } else {
                     alert(result.message || result.error || 'Failed to save picks.');
                 }
