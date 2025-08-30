@@ -4127,6 +4127,39 @@ def generate_smart_picks_api():
         traceback.print_exc()
         return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
 
+# --- CUSTOM COMBINATIONS ROUTE (Corrected to fix data passing) ---
+@app.route('/custom_combinations')
+def custom_combinations_route():
+    print("--- custom_combinations_route IS BEING CALLED! ---")
+    global df, last_draw
+
+    if df.empty:
+        initialize_core_data()
+        if df.empty: # if still empty after attempt
+            flash("Failed to load historical data for Custom Combinations. Please try again later.", 'error')
+            return redirect(url_for('index'))
+
+    current_year = datetime.now().year
+    current_month = datetime.now().month
+    
+    current_month_unpicked, current_month_most_picked_data = _compute_unpicked_and_most_picked(current_year, current_month)
+
+    first_day_of_current_month = datetime.now().replace(day=1)
+    previous_month_date = first_day_of_current_month - timedelta(days=1)
+    previous_year = previous_month_date.year
+    previous_month = previous_month_date.month
+
+    previous_month_unpicked, previous_month_most_picked_data_actual = _compute_unpicked_and_most_picked(previous_year, previous_month)
+
+    return render_template('custom_combinations.html',
+                           current_month_name=datetime.now().strftime('%B %Y'),
+                           previous_month_name=previous_month_date.strftime('%B %Y'),
+                           current_month_unpicked=current_month_unpicked,
+                           current_month_most_picked=current_month_most_picked_data, # Corrected: Pass current month's data
+                           previous_month_unpicked=previous_month_unpicked,
+                           previous_month_most_picked=previous_month_most_picked_data_actual,
+                          )
+
 
 # --- NEW FUNCTION FOR CUSTOM COMBINATIONS API ---
 @app.route('/api/generate_custom_combinations', methods=['POST'])
