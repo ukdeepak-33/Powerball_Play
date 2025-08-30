@@ -3200,6 +3200,23 @@ def frequency_analysis_route():
     return render_template('frequency_analysis.html',
                            white_ball_freq=white_ball_freq_list,
                            powerball_freq=powerball_freq_list)
+@app.route('/positional_analysis')
+def positional_analysis_route():
+    if df.empty:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({"error": "Historical data not loaded or is empty."}), 500
+        else:
+            flash("Cannot display Positional Analysis: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+            return redirect(url_for('index'))
+
+    positional_data = get_cached_analysis('positional_range_frequency', get_positional_range_frequency_analysis, df)
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify(positional_data)
+    else:
+        return render_template('positional_analysis.html', positional_data=positional_data)
+
+
 
 @app.route('/hot_cold_numbers')
 def hot_cold_numbers_route():
