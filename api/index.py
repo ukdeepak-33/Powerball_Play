@@ -405,11 +405,9 @@ def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerba
                 if len(available_for_remaining) < (num_from_remaining - 2):
                     attempts += 1
                     continue
-                    
-                selected_from_remaining = selected_freq_pair + random.sample(available_for_remaining, num_from_remaining - 2)   
+            selected_from_remaining = selected_freq_pair + random.sample(available_for_remaining, num_from_remaining - 2)   
             else:
-
-            selected_from_remaining = random.sample(available_for_remaining, num_from_remaining)
+                selected_from_remaining = random.sample(available_for_remaining, num_from_remaining)
             white_balls = sorted(selected_from_group_a + selected_from_remaining)
             if selected_sum_range_tuple:
                 current_sum = sum(white_balls)
