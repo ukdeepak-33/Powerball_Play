@@ -4126,6 +4126,72 @@ def api_white_ball_trends_route():
         'data': white_ball_data,
         'period_labels': period_labels
     })
+    
+@app.route('/generate_smart_picks_route', methods=['POST'])
+def generate_smart_picks_route():
+    if df.empty:
+        return jsonify({'success': False, 'error': "Historical data not loaded or is empty. Please check Supabase connection."}), 500
+
+    try:
+        data = request.json 
+        num_sets_to_generate = int(data.get('num_sets_to_generate', 1))
+        excluded_numbers_input = data.get('excluded_numbers', '')
+        excluded_numbers_local = [int(num.strip()) for num in excluded_numbers_input.split(',') if num.strip().isdigit()] if excluded_numbers_input else []
+        
+        num_from_group_a = int(data.get('num_from_group_a', 0))
+        odd_even_choice = data.get('odd_even_choice', 'Any')
+        
+        selected_sum_range_label = data.get('sum_range_filter', 'Any')
+        selected_sum_range_tuple = SUM_RANGES.get(selected_sum_range_label)
+
+        prioritize_monthly_hot = data.get('prioritize_monthly_hot', False) 
+        prioritize_grouped_patterns = data.get('prioritize_grouped_patterns', False)
+        prioritize_special_patterns = data.get('prioritize_special_patterns', False)
+        prioritize_consecutive_patterns = data.get('prioritize_consecutive_patterns', False)
+        
+        force_specific_pattern_input = data.get('force_specific_pattern', '') 
+        force_specific_pattern = []
+        if force_specific_pattern_input:
+            force_specific_pattern = sorted([int(num.strip()) for num in force_specific_pattern_input.split(',') if num.strip().isdigit()])
+            if not (2 <= len(force_specific_pattern) <= 3):
+                raise ValueError("Forced specific pattern must contain 2 or 3 numbers.")
+            for num in force_specific_pattern:
+                if not (GLOBAL_WHITE_BALL_RANGE[0] <= num <= GLOBAL_WHITE_BALL_RANGE[1]):
+                    raise ValueError(f"Forced number {num} is outside the valid white ball range (1-69).")
+                if num in excluded_numbers_local:
+                    raise ValueError(f"Forced number {num} is also in the excluded numbers list. Please remove it from excluded.")
+            if len(set(force_specific_pattern)) != len(force_specific_pattern):
+                raise ValueError("Forced specific pattern numbers must be unique.")
+
+        generated_sets = generate_smart_picks(
+            df_source=df,
+            num_sets=num_sets_to_generate,
+            excluded_numbers=excluded_numbers_local,
+            num_from_group_a=num_from_group_a,
+            odd_even_choice=odd_even_choice,
+            sum_range_tuple=selected_sum_range_tuple,
+            prioritize_monthly_hot=prioritize_monthly_hot,
+            prioritize_grouped_patterns=prioritize_grouped_patterns,
+            prioritize_special_patterns=prioritize_special_patterns,
+            prioritize_consecutive_patterns=prioritize_consecutive_patterns,
+            force_specific_pattern=force_specific_pattern
+        )
+        
+        last_draw_dates = {}
+        if generated_sets:
+            last_draw_dates = find_last_draw_dates_for_numbers(df, generated_sets[-1]['white_balls'], generated_sets[-1]['powerball'])
+
+        return jsonify({
+            'success': True,
+            'generated_sets': generated_sets,
+            'last_draw_dates': last_draw_dates
+        })
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
 
 @app.route('/api/generate_smart_picks', methods=['POST'])
 def generate_smart_picks_api():
