@@ -264,7 +264,24 @@
                     {% endfor %}
                 </select>
             </div>
-            
+            <div class="form-group">
+    <label class="block text-gray-700 text-sm font-bold mb-2">Current Month Number Preferences:</label>
+    <div class="flex flex-col space-y-2">
+        <label class="inline-flex items-center">
+            <input type="checkbox" name="current_month_preference" value="one_unpicked_four_picked" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+            <span class="ml-2 text-gray-700">One unpicked number + 4 picked numbers from current month</span>
+        </label>
+        <label class="inline-flex items-center">
+            <input type="checkbox" name="current_month_preference" value="two_unpicked_three_picked" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+            <span class="ml-2 text-gray-700">Two unpicked numbers + 3 picked numbers from current month</span>
+        </label>
+        <label class="inline-flex items-center">
+            <input type="checkbox" name="current_month_preference" value="two_same_frequency" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+            <span class="ml-2 text-gray-700">Two numbers from the same white ball frequency from current year</span>
+        </label>
+    </div>
+    <p class="text-xs text-gray-500 mt-1">Select preferences for including numbers based on current month/year patterns.</p>
+</div>
             <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition duration-300 ease-in-out w-full sm:w-auto">
                 Generate with Group A
             </button>
@@ -374,6 +391,26 @@
                 <p class="text-xs text-gray-500 mt-1">Numbers to explicitly exclude from generation.</p>
             </div>
 
+            <div class="form-group">
+                 <label class="block text-gray-700 text-sm font-bold mb-2">Current Month Number Preferences:</label>
+            <div class="flex flex-col space-y-2">
+                <label class="inline-flex items-center">
+                <input type="checkbox" id="preference_one_unpicked" name="current_month_preference_smart" value="one_unpicked_four_picked" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                <span class="ml-2 text-gray-700">One unpicked number + 4 picked numbers from current month</span>
+        </label>
+                <label class="inline-flex items-center">
+                <input type="checkbox" id="preference_two_unpicked" name="current_month_preference_smart" value="two_unpicked_three_picked" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                <span class="ml-2 text-gray-700">Two unpicked numbers + 3 picked numbers from current month</span>
+        </label>
+                <label class="inline-flex items-center">
+                <input type="checkbox" id="preference_two_same_frequency" name="current_month_preference_smart" value="two_same_frequency" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                <span class="ml-2 text-gray-700">Two numbers from the same white ball frequency from current year</span>
+        </label>
+        </div>
+        <p class="text-xs text-gray-500 mt-1">Select preferences for including numbers based on current month/year patterns.</p>
+            </div>
+
+
             <button type="button" id="generateSmartPicksBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition duration-300 ease-in-out w-full sm:w-auto">
                 Generate Smart Picks
             </button>
@@ -481,6 +518,9 @@
             const prioritizeGroupedPatterns = document.getElementById('prioritize_grouped_patterns').checked;
             const prioritizeSpecialPatterns = document.getElementById('prioritize_special_patterns').checked;
             const prioritizeConsecutivePatterns = document.getElementById('prioritize_consecutive_patterns').checked;
+            const preferenceOneUnpicked = document.getElementById('preference_one_unpicked').checked;
+            const preferenceTwoUnpicked = document.getElementById('preference_two_unpicked').checked;
+            const preferenceTwoSameFrequency = document.getElementById('preference_two_same_frequency').checked;
             const groupANumbersCount = document.getElementById('group_a_numbers_count').value;
             const oddEvenChoiceSmart = document.getElementById('odd_even_choice_smart').value;
             const sumRangeFilterSmart = document.getElementById('sum_range_filter_smart').value;
@@ -497,7 +537,10 @@
                 odd_even_choice: oddEvenChoiceSmart,
                 sum_range_filter: sumRangeFilterSmart,
                 excluded_numbers: excludedNumbersSmart,
-                force_specific_pattern: '' // Set to empty as the field is removed
+                preference_one_unpicked: preferenceOneUnpicked,
+                preference_two_unpicked: preferenceTwoUnpicked,
+                preference_two_same_frequency: preferenceTwoSameFrequency,
+                force_specific_pattern: '' // Set to empty as the field is removed   
             };
 
             try {
