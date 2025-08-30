@@ -4200,7 +4200,7 @@ def generate_smart_picks_api():
     This replaces the ML/DL smart pick generation.
     """
     try:
-        data = request.get_json(silent=True) or {}
+        data = request.get_json(silent=True) or request.form.to_dict()
         num_sets_to_generate = int(data.get('numSetsToGenerate', 1))
         excluded_numbers_str = data.get('excludedNumbers', '')
         excluded_numbers = [int(n.strip()) for n in excluded_numbers_str.split(',') if n.strip().isdigit()]
