@@ -2583,12 +2583,11 @@ def _get_yearly_patterns_for_range(df_source, target_range_label):
 
     return yearly_data
 
-# Update the generate_smart_picks function with proper indentation
 def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a, odd_even_choice, sum_range_tuple, 
                         prioritize_monthly_hot, prioritize_grouped_patterns, prioritize_special_patterns, 
                         prioritize_consecutive_patterns, force_specific_pattern,
                         one_unpicked_four_picked=False, two_unpicked_three_picked=False, two_same_frequency=False,
-                        five_unpicked_same_freq=False,  # Add this parameter
+                        five_unpicked_same_freq=False,
                         picked_numbers=None, unpicked_numbers=None, frequency_groups=None):
     """Generates Powerball picks based on a combination of hard and soft criteria with new preferences."""
     if df_source.empty:
@@ -2692,7 +2691,7 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
 
             candidate_white_balls = sorted(candidate_white_balls)
 
-            # NEW: Add the five_unpicked_same_freq check with proper indentation
+            # NEW: Add the five_unpicked_same_freq check
             if five_unpicked_same_freq and unpicked_numbers and frequency_groups:
                 # Check if all five numbers are unpicked
                 unpicked_count = sum(1 for num in candidate_white_balls if num in unpicked_numbers)
@@ -2752,9 +2751,12 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
 
             if expected_odd_even_split != "Any":
                 current_split_str = f"{odd_count} Odd / {even_count} Even"
-                if expected_odd_even_split == "All Even" and even_count != 5: continue
-                if expected_odd_even_split == "All Odd" and odd_count != 5: continue
-                if expected_odd_even_split not in ["All Even", "All Odd"] and current_split_str != expected_odd_even_split: continue
+                if expected_odd_even_split == "All Even" and even_count != 5: 
+                    continue
+                if expected_odd_even_split == "All Odd" and odd_count != 5: 
+                    continue
+                if expected_odd_even_split not in ["All Even", "All Odd"] and current_split_str != expected_odd_even_split: 
+                    continue
 
             current_sum = sum(candidate_white_balls)
             if sum_range_tuple and not (sum_range_tuple[0] <= current_sum <= sum_range_tuple[1]):
