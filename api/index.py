@@ -2496,12 +2496,13 @@ def _get_yearly_patterns_for_range(df_source, target_range_label):
 
     return yearly_data
 
+# Update the generate_smart_picks function with proper indentation
 def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a, odd_even_choice, sum_range_tuple, 
                         prioritize_monthly_hot, prioritize_grouped_patterns, prioritize_special_patterns, 
                         prioritize_consecutive_patterns, force_specific_pattern,
                         one_unpicked_four_picked=False, two_unpicked_three_picked=False, two_same_frequency=False,
                         picked_numbers=None, unpicked_numbers=None, frequency_groups=None):
-    """Generates Powerball picks based on a combination of hard and soft criteria."""
+    """Generates Powerball picks based on a combination of hard and soft criteria with new preferences."""
     if df_source.empty:
         raise ValueError("Historical data is empty. Cannot generate smart picks.")
 
@@ -2549,32 +2550,6 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
 
             remaining_to_pick = 5
             temp_excluded = set(excluded_numbers)
-
-            if one_unpicked_four_picked and unpicked_numbers:
-        # Check if we have exactly one unpicked number
-        unpicked_count = sum(1 for num in candidate_white_balls if num in unpicked_numbers)
-        if unpicked_count != 1:
-            continue
-            
-    if two_unpicked_three_picked and unpicked_numbers:
-        # Check if we have exactly two unpicked numbers
-        unpicked_count = sum(1 for num in candidate_white_balls if num in unpicked_numbers)
-        if unpicked_count != 2:
-            continue
-            
-    if two_same_frequency and frequency_groups:
-        # Check if we have at least two numbers with the same frequency
-        freq_count = defaultdict(int)
-        for num in candidate_white_balls:
-            for freq, numbers in frequency_groups.items():
-                if num in numbers:
-                    freq_count[freq] += 1
-                    break
-                    
-        # Check if any frequency has at least 2 numbers
-        has_same_frequency_pair = any(count >= 2 for count in freq_count.values())
-        if not has_same_frequency_pair:
-            continue
 
             if force_specific_pattern:
                 for num in force_specific_pattern:
@@ -2628,6 +2603,33 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
                 continue
 
             candidate_white_balls = sorted(candidate_white_balls)
+
+            # NEW: Add the preference checks here with proper indentation
+            if one_unpicked_four_picked and unpicked_numbers:
+                # Check if we have exactly one unpicked number
+                unpicked_count = sum(1 for num in candidate_white_balls if num in unpicked_numbers)
+                if unpicked_count != 1:
+                    continue
+                    
+            if two_unpicked_three_picked and unpicked_numbers:
+                # Check if we have exactly two unpicked numbers
+                unpicked_count = sum(1 for num in candidate_white_balls if num in unpicked_numbers)
+                if unpicked_count != 2:
+                    continue
+                    
+            if two_same_frequency and frequency_groups:
+                # Check if we have at least two numbers with the same frequency
+                freq_count = defaultdict(int)
+                for num in candidate_white_balls:
+                    for freq, numbers in frequency_groups.items():
+                        if num in numbers:
+                            freq_count[freq] += 1
+                            break
+                            
+                # Check if any frequency has at least 2 numbers
+                has_same_frequency_pair = any(count >= 2 for count in freq_count.values())
+                if not has_same_frequency_pair:
+                    continue
 
             even_count = sum(1 for num in candidate_white_balls if num % 2 == 0)
             odd_count = 5 - even_count
