@@ -2588,6 +2588,7 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
                         prioritize_monthly_hot, prioritize_grouped_patterns, prioritize_special_patterns, 
                         prioritize_consecutive_patterns, force_specific_pattern,
                         one_unpicked_four_picked=False, two_unpicked_three_picked=False, two_same_frequency=False,
+                        five_unpicked_same_freq=False,  # Add this parameter
                         picked_numbers=None, unpicked_numbers=None, frequency_groups=None):
     """Generates Powerball picks based on a combination of hard and soft criteria with new preferences."""
     if df_source.empty:
@@ -2691,33 +2692,33 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
 
             candidate_white_balls = sorted(candidate_white_balls)
 
-            # Add this check with the other preference checks
-if five_unpicked_same_freq and unpicked_numbers and frequency_groups:
-    # Check if all five numbers are unpicked
-    unpicked_count = sum(1 for num in candidate_white_balls if num in unpicked_numbers)
-    if unpicked_count != 5:
-        continue
-    
-    # Check age limit (≤ 25 draws missed)
-    white_ball_ages = _get_white_ball_ages()
-    young_numbers_count = sum(1 for num in candidate_white_balls if white_ball_ages.get(num, 1000) <= 25)
-    if young_numbers_count != 5:
-        continue
-    
-    # Check if we have at least two numbers with same frequency
-    freq_count = defaultdict(int)
-    for num in candidate_white_balls:
-        for freq, numbers in frequency_groups.items():
-            if num in numbers:
-                freq_count[freq] += 1
-                break
+            # NEW: Add the five_unpicked_same_freq check with proper indentation
+            if five_unpicked_same_freq and unpicked_numbers and frequency_groups:
+                # Check if all five numbers are unpicked
+                unpicked_count = sum(1 for num in candidate_white_balls if num in unpicked_numbers)
+                if unpicked_count != 5:
+                    continue
                 
-    # Check if any frequency has at least 2 numbers
-    has_same_frequency_pair = any(count >= 2 for count in freq_count.values())
-    if not has_same_frequency_pair:
-        continue
+                # Check age limit (≤ 25 draws missed)
+                white_ball_ages = _get_white_ball_ages()
+                young_numbers_count = sum(1 for num in candidate_white_balls if white_ball_ages.get(num, 1000) <= 25)
+                if young_numbers_count != 5:
+                    continue
+                
+                # Check if we have at least two numbers with same frequency
+                freq_count = defaultdict(int)
+                for num in candidate_white_balls:
+                    for freq, numbers in frequency_groups.items():
+                        if num in numbers:
+                            freq_count[freq] += 1
+                            break
+                            
+                # Check if any frequency has at least 2 numbers
+                has_same_frequency_pair = any(count >= 2 for count in freq_count.values())
+                if not has_same_frequency_pair:
+                    continue
 
-            # NEW: Add the preference checks here with proper indentation
+            # Other preference checks
             if one_unpicked_four_picked and unpicked_numbers:
                 # Check if we have exactly one unpicked number
                 unpicked_count = sum(1 for num in candidate_white_balls if num in unpicked_numbers)
