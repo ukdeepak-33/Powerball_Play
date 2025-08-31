@@ -268,6 +268,10 @@
     <label class="block text-gray-700 text-sm font-bold mb-2">Current Month Number Preferences:</label>
     <div class="flex flex-col space-y-2">
         <label class="inline-flex items-center">
+            <input type="checkbox" name="current_month_preference" value="five_unpicked_same_freq" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+            <span class="ml-2 text-gray-700">Five unpicked numbers (with two from same frequency, age ≤ 25 draws)</span>
+        </label>
+        <label class="inline-flex items-center">
             <input type="checkbox" name="current_month_preference" value="one_unpicked_four_picked" class="form-checkbox h-5 w-5 text-blue-600 rounded">
             <span class="ml-2 text-gray-700">One unpicked number + 4 picked numbers from current month</span>
         </label>
@@ -394,6 +398,10 @@
             <div class="form-group">
                  <label class="block text-gray-700 text-sm font-bold mb-2">Current Month Number Preferences:</label>
             <div class="flex flex-col space-y-2">
+                 <label class="inline-flex items-center">
+                 <input type="checkbox" name="current_month_preference" value="five_unpicked_same_freq" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                 <span class="ml-2 text-gray-700">Five unpicked numbers (with two from same frequency, age ≤ 25 draws)</span>
+        </label>
                 <label class="inline-flex items-center">
                 <input type="checkbox" id="preference_one_unpicked" name="current_month_preference_smart" value="one_unpicked_four_picked" class="form-checkbox h-5 w-5 text-blue-600 rounded">
                 <span class="ml-2 text-gray-700">One unpicked number + 4 picked numbers from current month</span>
