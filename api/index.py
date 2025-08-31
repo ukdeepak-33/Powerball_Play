@@ -242,6 +242,42 @@ def check_exact_match(white_balls):
     global historical_white_ball_sets
     return frozenset(white_balls) in historical_white_ball_sets
 
+def _get_white_ball_ages():
+    """Get the current age (miss streak) for all white balls."""
+    global df
+    if df.empty:
+        return {}
+    
+    # Get the most recent draw date
+    if not df.empty:
+        latest_draw_date = df['Draw Date_dt'].max()
+    else:
+        latest_draw_date = datetime.now()
+    
+    age_data = {}
+    for number in range(1, 70):
+        # Find the most recent occurrence of this number
+        recent_occurrence = df[
+            (df['Number 1'] == number) | 
+            (df['Number 2'] == number) | 
+            (df['Number 3'] == number) | 
+            (df['Number 4'] == number) | 
+            (df['Number 5'] == number)
+        ]
+        
+        if not recent_occurrence.empty:
+            last_drawn = recent_occurrence['Draw Date_dt'].max()
+            # Calculate days since last drawn (approximate)
+            days_since_drawn = (latest_draw_date - last_drawn).days
+            # Convert to "draws missed" (assuming 3 draws per week)
+            draws_missed = int(days_since_drawn / 2.33)  # Approximate conversion
+        else:
+            draws_missed = 1000  # Very high number if never drawn
+        
+        age_data[number] = draws_missed
+    
+    return age_data
+
 def generate_powerball_numbers(df_source, group_a_list, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, high_low_balance=None, selected_sum_range_tuple=None, is_simulation=False):
     """Generates a single Powerball combination based on various criteria."""
     if df_source.empty:
@@ -352,7 +388,49 @@ def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerba
             if len(available_for_remaining) < num_from_remaining:
                 attempts += 1
                 continue
-            
+    # In the generate_from_group_a function, add this condition:
+    elif five_unpicked_same_freq and unpicked_numbers and frequency_groups:
+         # Ensure we have at least 5 unpicked numbers
+    if len(unpicked_numbers) < 5:
+        attempts += 1
+        continue
+    
+    # Get white ball ages
+    white_ball_ages = _get_white_ball_ages()
+    
+    # Filter unpicked numbers by age (≤ 25 draws missed)
+    young_unpicked_numbers = [num for num in unpicked_numbers if white_ball_ages.get(num, 1000) <= 25]
+    
+    if len(young_unpicked_numbers) < 5:
+        attempts += 1
+        continue
+    
+    # Find frequencies that have at least 2 numbers in the young unpicked pool
+    valid_frequencies = {}
+    for freq, numbers in frequency_groups.items():
+        available_numbers = [num for num in numbers if num in young_unpicked_numbers]
+        if len(available_numbers) >= 2:
+            valid_frequencies[freq] = available_numbers
+    
+    if not valid_frequencies:
+        attempts += 1
+        continue
+    
+    # Select a random frequency group
+    selected_freq = random.choice(list(valid_frequencies.keys()))
+    freq_numbers = valid_frequencies[selected_freq]
+    
+    # Select two numbers from this frequency group
+    selected_freq_pair = random.sample(freq_numbers, 2)
+    
+    # Select three more numbers from remaining young unpicked numbers
+    remaining_numbers = [num for num in young_unpicked_numbers if num not in selected_freq_pair]
+    if len(remaining_numbers) < 3:
+        attempts += 1
+        continue
+    
+    selected_remaining = random.sample(remaining_numbers, 3)
+    selected_from_remaining = selected_freq_pair + selected_remaining        
             # Apply preferences for the remaining numbers
             if one_unpicked_four_picked and unpicked_numbers:
                 # Ensure at least one unpicked number from current month
@@ -2604,6 +2682,32 @@ def generate_smart_picks(df_source, num_sets, excluded_numbers, num_from_group_a
 
             candidate_white_balls = sorted(candidate_white_balls)
 
+            # Add this check with the other preference checks
+if five_unpicked_same_freq and unpicked_numbers and frequency_groups:
+    # Check if all five numbers are unpicked
+    unpicked_count = sum(1 for num in candidate_white_balls if num in unpicked_numbers)
+    if unpicked_count != 5:
+        continue
+    
+    # Check age limit (≤ 25 draws missed)
+    white_ball_ages = _get_white_ball_ages()
+    young_numbers_count = sum(1 for num in candidate_white_balls if white_ball_ages.get(num, 1000) <= 25)
+    if young_numbers_count != 5:
+        continue
+    
+    # Check if we have at least two numbers with same frequency
+    freq_count = defaultdict(int)
+    for num in candidate_white_balls:
+        for freq, numbers in frequency_groups.items():
+            if num in numbers:
+                freq_count[freq] += 1
+                break
+                
+    # Check if any frequency has at least 2 numbers
+    has_same_frequency_pair = any(count >= 2 for count in freq_count.values())
+    if not has_same_frequency_pair:
+        continue
+
             # NEW: Add the preference checks here with proper indentation
             if one_unpicked_four_picked and unpicked_numbers:
                 # Check if we have exactly one unpicked number
@@ -3175,6 +3279,7 @@ def generate_group_a_strategy_route():
     selected_sum_range_label = request.form.get('sum_range_filter_group_a', 'Any')
     selected_sum_range_tuple = SUM_RANGES.get(selected_sum_range_label)
     current_month_preferences = request.form.getlist('current_month_preference')
+    five_unpicked_same_freq = "five_unpicked_same_freq" in current_month_preferences
     one_unpicked_four_picked = "one_unpicked_four_picked" in current_month_preferences
     two_unpicked_three_picked = "two_unpicked_three_picked" in current_month_preferences
     two_same_frequency = "two_same_frequency" in current_month_preferences
@@ -4308,6 +4413,7 @@ def generate_smart_picks_route():
         one_unpicked_four_picked = data.get('preference_one_unpicked', False)
         two_unpicked_three_picked = data.get('preference_two_unpicked', False)
         two_same_frequency = data.get('preference_two_same_frequency', False)
+        five_unpicked_same_freq = data.get('preference_five_unpicked', False)
         
         force_specific_pattern_input = data.get('force_specific_pattern', '') 
         force_specific_pattern = []
