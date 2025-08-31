@@ -317,7 +317,7 @@ def generate_powerball_numbers(df_source, group_a_list, odd_even_choice, combo_c
 
 
 def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerball_range, excluded_numbers, selected_sum_range_tuple=None, one_unpicked_four_picked=False, two_unpicked_three_picked=False, two_same_frequency=False,
-                         picked_numbers=None, unpicked_numbers=None, frequency_groups=None):
+                             picked_numbers=None, unpicked_numbers=None, frequency_groups=None):
     """Generates a Powerball combination ensuring a certain number of Group A numbers."""
     if df_source.empty:
         raise ValueError("Cannot generate numbers: Historical data is empty.")
@@ -336,6 +336,7 @@ def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerba
     num_from_remaining = 5 - num_from_group_a
     if len(remaining_pool) < num_from_remaining:
         raise ValueError(f"Not enough unique numbers in the remaining pool ({len(remaining_pool)}) to pick {num_from_remaining}.")
+
     if picked_numbers is None:
         picked_numbers = []
     if unpicked_numbers is None:
@@ -346,42 +347,39 @@ def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerba
     while attempts < max_attempts:
         try:
             selected_from_group_a = random.sample(valid_group_a, num_from_group_a)
-
             available_for_remaining = [num for num in remaining_pool if num not in selected_from_group_a]
+
             if len(available_for_remaining) < num_from_remaining:
                 attempts += 1
                 continue
-                      # Apply preferences for the remaining numbers
+            
+            # Apply preferences for the remaining numbers
             if one_unpicked_four_picked and unpicked_numbers:
                 # Ensure at least one unpicked number from current month
                 available_unpicked = [num for num in available_for_remaining if num in unpicked_numbers]
                 if not available_unpicked:
                     attempts += 1
                     continue
-                    
                 selected_unpicked = random.sample(available_unpicked, 1)
                 available_for_remaining = [num for num in available_for_remaining if num not in selected_unpicked]
                 if len(available_for_remaining) < (num_from_remaining - 1):
                     attempts += 1
                     continue
-                    
                 selected_from_remaining = selected_unpicked + random.sample(available_for_remaining, num_from_remaining - 1)
-                
+            
             elif two_unpicked_three_picked and unpicked_numbers:
                 # Ensure at least two unpicked numbers from current month
                 available_unpicked = [num for num in available_for_remaining if num in unpicked_numbers]
                 if len(available_unpicked) < 2:
                     attempts += 1
                     continue
-                    
                 selected_unpicked = random.sample(available_unpicked, 2)
                 available_for_remaining = [num for num in available_for_remaining if num not in selected_unpicked]
                 if len(available_for_remaining) < (num_from_remaining - 2):
                     attempts += 1
                     continue
-                    
                 selected_from_remaining = selected_unpicked + random.sample(available_for_remaining, num_from_remaining - 2)
-                
+            
             elif two_same_frequency and frequency_groups:
                 # Ensure two numbers with the same frequency in current year
                 # Find frequencies that have at least 2 numbers
@@ -389,7 +387,6 @@ def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerba
                 if not valid_frequencies:
                     attempts += 1
                     continue
-                    
                 # Select a random frequency group
                 selected_freq = random.choice(list(valid_frequencies.keys()))
                 freq_numbers = valid_frequencies[selected_freq]
@@ -399,18 +396,18 @@ def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerba
                 if len(available_freq_numbers) < 2:
                     attempts += 1
                     continue
-                    
                 selected_freq_pair = random.sample(available_freq_numbers, 2)
                 available_for_remaining = [num for num in available_for_remaining if num not in selected_freq_pair]
                 if len(available_for_remaining) < (num_from_remaining - 2):
                     attempts += 1
                     continue
-                    
-                selected_from_remaining = selected_freq_pair + random.sample(available_for_remaining, num_from_remaining - 2) 
+                selected_from_remaining = selected_freq_pair + random.sample(available_for_remaining, num_from_remaining - 2)
             
-           else:
+            else:
                 selected_from_remaining = random.sample(available_for_remaining, num_from_remaining)
-                white_balls = sorted(selected_from_group_a + selected_from_remaining)
+
+            white_balls = sorted(selected_from_group_a + selected_from_remaining)
+            
             if selected_sum_range_tuple:
                 current_sum = sum(white_balls)
                 if not (selected_sum_range_tuple[0] <= current_sum <= selected_sum_range_tuple[1]):
