@@ -352,8 +352,9 @@ def generate_powerball_numbers(df_source, group_a_list, odd_even_choice, combo_c
     raise ValueError("Could not generate a unique combination meeting all criteria after many attempts. Try adjusting filters or increasing max_attempts.")
 
 
-def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerball_range, excluded_numbers, selected_sum_range_tuple=None, one_unpicked_four_picked=False, two_unpicked_three_picked=False, two_same_frequency=False,
-                             picked_numbers=None, unpicked_numbers=None, frequency_groups=None):
+def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerball_range, excluded_numbers, selected_sum_range_tuple=None, 
+                         one_unpicked_four_picked=False, two_unpicked_three_picked=False, two_same_frequency=False, five_unpicked_same_freq=False,
+                         picked_numbers=None, unpicked_numbers=None, frequency_groups=None):
     """Generates a Powerball combination ensuring a certain number of Group A numbers."""
     if df_source.empty:
         raise ValueError("Cannot generate numbers: Historical data is empty.")
@@ -388,103 +389,111 @@ def generate_from_group_a(df_source, num_from_group_a, white_ball_range, powerba
             if len(available_for_remaining) < num_from_remaining:
                 attempts += 1
                 continue
-    # In the generate_from_group_a function, add this condition:
-    elif five_unpicked_same_freq and unpicked_numbers and frequency_groups:
-         # Ensure we have at least 5 unpicked numbers
-    if len(unpicked_numbers) < 5:
-        attempts += 1
-        continue
-    
-    # Get white ball ages
-    white_ball_ages = _get_white_ball_ages()
-    
-    # Filter unpicked numbers by age (≤ 25 draws missed)
-    young_unpicked_numbers = [num for num in unpicked_numbers if white_ball_ages.get(num, 1000) <= 25]
-    
-    if len(young_unpicked_numbers) < 5:
-        attempts += 1
-        continue
-    
-    # Find frequencies that have at least 2 numbers in the young unpicked pool
-    valid_frequencies = {}
-    for freq, numbers in frequency_groups.items():
-        available_numbers = [num for num in numbers if num in young_unpicked_numbers]
-        if len(available_numbers) >= 2:
-            valid_frequencies[freq] = available_numbers
-    
-    if not valid_frequencies:
-        attempts += 1
-        continue
-    
-    # Select a random frequency group
-    selected_freq = random.choice(list(valid_frequencies.keys()))
-    freq_numbers = valid_frequencies[selected_freq]
-    
-    # Select two numbers from this frequency group
-    selected_freq_pair = random.sample(freq_numbers, 2)
-    
-    # Select three more numbers from remaining young unpicked numbers
-    remaining_numbers = [num for num in young_unpicked_numbers if num not in selected_freq_pair]
-    if len(remaining_numbers) < 3:
-        attempts += 1
-        continue
-    
-    selected_remaining = random.sample(remaining_numbers, 3)
-    selected_from_remaining = selected_freq_pair + selected_remaining        
-            # Apply preferences for the remaining numbers
-            if one_unpicked_four_picked and unpicked_numbers:
-                # Ensure at least one unpicked number from current month
-                available_unpicked = [num for num in available_for_remaining if num in unpicked_numbers]
-                if not available_unpicked:
+                
+            # Handle the five_unpicked_same_freq case first as it's a special case
+            if five_unpicked_same_freq and unpicked_numbers and frequency_groups:
+                # Ensure we have at least 5 unpicked numbers
+                if len(unpicked_numbers) < 5:
                     attempts += 1
                     continue
-                selected_unpicked = random.sample(available_unpicked, 1)
-                available_for_remaining = [num for num in available_for_remaining if num not in selected_unpicked]
-                if len(available_for_remaining) < (num_from_remaining - 1):
+                
+                # Get white ball ages
+                white_ball_ages = _get_white_ball_ages()
+                
+                # Filter unpicked numbers by age (≤ 25 draws missed)
+                young_unpicked_numbers = [num for num in unpicked_numbers if white_ball_ages.get(num, 1000) <= 25]
+                
+                if len(young_unpicked_numbers) < 5:
                     attempts += 1
                     continue
-                selected_from_remaining = selected_unpicked + random.sample(available_for_remaining, num_from_remaining - 1)
-            
-            elif two_unpicked_three_picked and unpicked_numbers:
-                # Ensure at least two unpicked numbers from current month
-                available_unpicked = [num for num in available_for_remaining if num in unpicked_numbers]
-                if len(available_unpicked) < 2:
-                    attempts += 1
-                    continue
-                selected_unpicked = random.sample(available_unpicked, 2)
-                available_for_remaining = [num for num in available_for_remaining if num not in selected_unpicked]
-                if len(available_for_remaining) < (num_from_remaining - 2):
-                    attempts += 1
-                    continue
-                selected_from_remaining = selected_unpicked + random.sample(available_for_remaining, num_from_remaining - 2)
-            
-            elif two_same_frequency and frequency_groups:
-                # Ensure two numbers with the same frequency in current year
-                # Find frequencies that have at least 2 numbers
-                valid_frequencies = {freq: nums for freq, nums in frequency_groups.items() if len(nums) >= 2}
+                
+                # Find frequencies that have at least 2 numbers in the young unpicked pool
+                valid_frequencies = {}
+                for freq, numbers in frequency_groups.items():
+                    available_numbers = [num for num in numbers if num in young_unpicked_numbers]
+                    if len(available_numbers) >= 2:
+                        valid_frequencies[freq] = available_numbers
+                
                 if not valid_frequencies:
                     attempts += 1
                     continue
+                
                 # Select a random frequency group
                 selected_freq = random.choice(list(valid_frequencies.keys()))
                 freq_numbers = valid_frequencies[selected_freq]
                 
-                # Select two numbers from this frequency group that are in our available pool
-                available_freq_numbers = [num for num in freq_numbers if num in available_for_remaining]
-                if len(available_freq_numbers) < 2:
+                # Select two numbers from this frequency group
+                selected_freq_pair = random.sample(freq_numbers, 2)
+                
+                # Select three more numbers from remaining young unpicked numbers
+                remaining_numbers = [num for num in young_unpicked_numbers if num not in selected_freq_pair]
+                if len(remaining_numbers) < 3:
                     attempts += 1
                     continue
-                selected_freq_pair = random.sample(available_freq_numbers, 2)
-                available_for_remaining = [num for num in available_for_remaining if num not in selected_freq_pair]
-                if len(available_for_remaining) < (num_from_remaining - 2):
-                    attempts += 1
-                    continue
-                selected_from_remaining = selected_freq_pair + random.sample(available_for_remaining, num_from_remaining - 2)
-            
+                
+                selected_remaining = random.sample(remaining_numbers, 3)
+                selected_from_remaining = selected_freq_pair + selected_remaining
+                
+                # For this special case, we need to override the selected_from_group_a
+                # since we're selecting all 5 from unpicked numbers
+                selected_from_group_a = []
+                white_balls = sorted(selected_from_remaining)
+                
             else:
-                selected_from_remaining = random.sample(available_for_remaining, num_from_remaining)
+                # Apply preferences for the remaining numbers (original logic)
+                if one_unpicked_four_picked and unpicked_numbers:
+                    # Ensure at least one unpicked number from current month
+                    available_unpicked = [num for num in available_for_remaining if num in unpicked_numbers]
+                    if not available_unpicked:
+                        attempts += 1
+                        continue
+                    selected_unpicked = random.sample(available_unpicked, 1)
+                    available_for_remaining = [num for num in available_for_remaining if num not in selected_unpicked]
+                    if len(available_for_remaining) < (num_from_remaining - 1):
+                        attempts += 1
+                        continue
+                    selected_from_remaining = selected_unpicked + random.sample(available_for_remaining, num_from_remaining - 1)
+                
+                elif two_unpicked_three_picked and unpicked_numbers:
+                    # Ensure at least two unpicked numbers from current month
+                    available_unpicked = [num for num in available_for_remaining if num in unpicked_numbers]
+                    if len(available_unpicked) < 2:
+                        attempts += 1
+                        continue
+                    selected_unpicked = random.sample(available_unpicked, 2)
+                    available_for_remaining = [num for num in available_for_remaining if num not in selected_unpicked]
+                    if len(available_for_remaining) < (num_from_remaining - 2):
+                        attempts += 1
+                        continue
+                    selected_from_remaining = selected_unpicked + random.sample(available_for_remaining, num_from_remaining - 2)
+                
+                elif two_same_frequency and frequency_groups:
+                    # Ensure two numbers with the same frequency in current year
+                    # Find frequencies that have at least 2 numbers
+                    valid_frequencies = {freq: nums for freq, nums in frequency_groups.items() if len(nums) >= 2}
+                    if not valid_frequencies:
+                        attempts += 1
+                        continue
+                    # Select a random frequency group
+                    selected_freq = random.choice(list(valid_frequencies.keys()))
+                    freq_numbers = valid_frequencies[selected_freq]
+                    
+                    # Select two numbers from this frequency group that are in our available pool
+                    available_freq_numbers = [num for num in freq_numbers if num in available_for_remaining]
+                    if len(available_freq_numbers) < 2:
+                        attempts += 1
+                        continue
+                    selected_freq_pair = random.sample(available_freq_numbers, 2)
+                    available_for_remaining = [num for num in available_for_remaining if num not in selected_freq_pair]
+                    if len(available_for_remaining) < (num_from_remaining - 2):
+                        attempts += 1
+                        continue
+                    selected_from_remaining = selected_freq_pair + random.sample(available_for_remaining, num_from_remaining - 2)
+                
+                else:
+                    selected_from_remaining = random.sample(available_for_remaining, num_from_remaining)
 
-            white_balls = sorted(selected_from_group_a + selected_from_remaining)
+                white_balls = sorted(selected_from_group_a + selected_from_remaining)
             
             if selected_sum_range_tuple:
                 current_sum = sum(white_balls)
