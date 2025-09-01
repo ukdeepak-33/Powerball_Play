@@ -4729,7 +4729,7 @@ def yearly_white_ball_trends_route():
                            years=years_for_display)
 
 @app.route('/ai_assistant')
-def powerball_assistant():
+def ai_assistant():
     """Dedicated page for the Powerball conversational assistant."""
     return render_template('ai_assistant.html')
 
