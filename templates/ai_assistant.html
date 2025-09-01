@@ -296,36 +296,46 @@
         }
         
         // Function to send message to AI backend
-        async function getAIResponse(message) {
-            try {
-                // Show typing indicator
-                typingIndicator.classList.remove('hidden');
-                
-                // Call the backend API
-                const response = await fetch('/api/ai-assistant/query', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ query: message })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    return data.response;
-                } else {
-                    return `Sorry, I encountered an error: ${data.error}`;
-                }
-            } catch (error) {
-                console.error('Error communicating with AI:', error);
-                return 'Oops! I encountered an error. Please try again later.';
-            } finally {
-                // Hide typing indicator
-                typingIndicator.classList.add('hidden');
-            }
-        }
+async function getAIResponse(message) {
+    try {
+        // Show typing indicator
+        typingIndicator.classList.remove('hidden');
         
+        // Call the backend API
+        const response = await fetch('/api/ai-assistant/query', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query: message })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Handle object responses by converting them to strings
+            if (typeof data.response === 'object') {
+                if (data.response.white_balls && data.response.powerball) {
+                    // Format Powerball numbers response
+                    return `Here are your generated Powerball numbers:<br><br>
+                            White Balls: ${data.response.white_balls.join(', ')}<br>
+                            Powerball: <span class="powerball-ball red-ball">${data.response.powerball}</span>`;
+                }
+                // Generic object handling
+                return JSON.stringify(data.response);
+            }
+            return data.response;
+        } else {
+            return `Sorry, I encountered an error: ${data.error}`;
+        }
+    } catch (error) {
+        console.error('Error communicating with AI:', error);
+        return 'Oops! I encountered an error. Please try again later.';
+    } finally {
+        // Hide typing indicator
+        typingIndicator.classList.add('hidden');
+    }
+}
         // Function to send message to AI
         async function sendMessage() {
             const message = userInput.value.trim();
