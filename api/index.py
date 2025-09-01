@@ -3609,7 +3609,19 @@ def handle_specific_number_analysis(intent):
             response += f"- With {num2}: {freq} times\n"
     
     return response
-
+    
+def format_dict_response(data_dict):
+    """Convert a dictionary response to a formatted string"""
+    if 'white_balls' in data_dict and 'powerball' in data_dict:
+        # Format Powerball numbers
+        response = "Generated numbers:<br><br>"
+        response += "White Balls: "
+        response += " ".join([f'<span class="powerball-ball white-ball">{num}</span>' for num in data_dict['white_balls']])
+        response += f"<br>Powerball: <span class='powerball-ball red-ball'>{data_dict['powerball']}</span>"
+        return response
+    
+    # Generic dictionary formatting
+    return "<br>".join([f"{key}: {value}" for key, value in data_dict.items()])
 
 # --- Flask Routes ---
 @app.route('/')
@@ -5143,10 +5155,23 @@ def ai_assistant_query():
         if not query:
             return jsonify({'success': False, 'error': 'No query provided'}), 400
         
-        # Parse the query to determine intent
+        # Handle number generation requests
+        if any(word in query for word in ['generate', 'number', 'pick', 'random']):
+            white_balls = sorted(random.sample(range(1, 70), 5))
+            powerball = random.randint(1, 26)
+            
+            # Format with HTML for nice display
+            response = "Here are your generated Powerball numbers:<br><br>"
+            response += "White Balls: "
+            response += " ".join([f'<span class="powerball-ball white-ball">{num}</span>' for num in white_balls])
+            response += f"<br>Powerball: <span class='powerball-ball red-ball'>{powerball}</span>"
+            response += "<br><br>Good luck!"
+            
+            return jsonify({'success': True, 'response': response})
+        
+        # Handle other types of queries
         intent = parse_query_intent(query)
         
-        # Process based on intent
         if intent['type'] == 'four_white_ball_matches':
             result = handle_four_white_ball_matches(intent)
         elif intent['type'] == 'three_white_ball_matches':
@@ -5158,12 +5183,17 @@ def ai_assistant_query():
         elif intent['type'] == 'specific_number_analysis':
             result = handle_specific_number_analysis(intent)
         else:
-            result = {'answer': "I'm not sure how to help with that query. Try asking about patterns, frequencies, or specific numbers."}
+            result = "I'm not sure how to help with that query. Try asking about patterns, frequencies, or specific numbers."
+        
+        # Ensure we're always returning a string, not an object
+        if isinstance(result, dict):
+            # Convert dictionary to formatted string
+            result = format_dict_response(result)
         
         return jsonify({'success': True, 'response': result})
         
     except Exception as e:
         return jsonify({'success': False, 'error': f'Error processing query: {str(e)}'}), 500
-
+        
 # Initialize core data on app startup
 initialize_core_data()
