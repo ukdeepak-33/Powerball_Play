@@ -3,7 +3,8 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 import random
 from itertools import combinations
 import math
-import os
+import 
+import re
 from collections import defaultdict
 from datetime import datetime, timedelta
 import requests
@@ -3273,6 +3274,342 @@ def _handle_general_question(question):
     except Exception as e:
         return {'answer': 'I encountered an error processing your question. Please try again.'}
 
+def parse_query_intent(query):
+    """Parse the user query to determine intent and extract parameters"""
+    # Check for four white ball matches
+    if re.search(r'(four|4)\s+(white\s+)?ball', query) and re.search(r'(match|appear|repeat|same)', query):
+        year_match = re.search(r'(20\d{2})', query)
+        year = int(year_match.group(1)) if year_match else None
+        return {'type': 'four_white_ball_matches', 'year': year}
+    
+    # Check for three white ball matches
+    if re.search(r'(three|3)\s+(white\s+)?ball', query) and re.search(r'(match|appear|repeat|same)', query):
+        year_match = re.search(r'(20\d{2})', query)
+        year = int(year_match.group(1)) if year_match else None
+        return {'type': 'three_white_ball_matches', 'year': year}
+    
+    # Check for frequency analysis
+    if re.search(r'frequenc(y|ies)', query) or (re.search(r'how\s+many\s+times', query) and re.search(r'number', query)):
+        # Try to extract a specific frequency value
+        freq_match = re.search(r'frequenc(y\s+)?(\d+)', query)
+        if freq_match:
+            frequency = int(freq_match.group(2))
+        else:
+            # Look for any number in the query
+            num_match = re.search(r'(\d+)(?!\s*(times|percent|%|draws))', query)
+            frequency = int(num_match.group(1)) if num_match else None
+        
+        year_match = re.search(r'(20\d{2})', query)
+        year = int(year_match.group(1)) if year_match else None
+        
+        return {'type': 'frequency_analysis', 'frequency': frequency, 'year': year}
+    
+    # Check for number pairs
+    if re.search(r'(pairs|combination|combo)', query) and re.search(r'(number|white\s+ball)', query):
+        year_match = re.search(r'(20\d{2})', query)
+        year = int(year_match.group(1)) if year_match else None
+        return {'type': 'number_pairs', 'year': year}
+    
+    # Check for specific number analysis
+    num_match = re.search(r'(analyze|analysis|number|#)\s+(\d+)', query)
+    if num_match:
+        number = int(num_match.group(2))
+        if 1 <= number <= 69:
+            year_match = re.search(r'(20\d{2})', query)
+            year = int(year_match.group(1)) if year_match else None
+            return {'type': 'specific_number_analysis', 'number': number, 'year': year}
+    
+    # Default to general response
+    return {'type': 'general'}
+
+def handle_four_white_ball_matches(intent):
+    """Find draws where the same four white balls appeared"""
+    year = intent.get('year')
+    
+    # Filter draws by year if specified
+    if year:
+        draws_df = df[df['Draw Date_dt'].dt.year == year].copy()
+    else:
+        draws_df = df.copy()
+    
+    if draws_df.empty:
+        return "I couldn't find any draw data for the specified timeframe."
+    
+    # Find four white ball matches
+    four_ball_matches = []
+    
+    # Convert to list of draws for easier processing
+    draws = []
+    for _, row in draws_df.iterrows():
+        draws.append({
+            'date': row['Draw Date'],
+            'white_balls': sorted([int(row['Number 1']), int(row['Number 2']), 
+                                 int(row['Number 3']), int(row['Number 4']), 
+                                 int(row['Number 5'])]),
+            'powerball': int(row['Powerball'])
+        })
+    
+    # Compare all pairs of draws
+    for i in range(len(draws)):
+        for j in range(i + 1, len(draws)):
+            common_balls = set(draws[i]['white_balls']).intersection(set(draws[j]['white_balls']))
+            if len(common_balls) >= 4:
+                four_ball_matches.append({
+                    'draw1': draws[i],
+                    'draw2': draws[j],
+                    'common_balls': sorted(common_balls)
+                })
+    
+    # Format response
+    if four_ball_matches:
+        response = f"I found {len(four_ball_matches)} instances where the same four white balls appeared"
+        if year:
+            response += f" in {year}"
+        response += ":\n\n"
+        
+        # Show top matches (limit to 5 for response length)
+        for i, match in enumerate(four_ball_matches[:5]):
+            response += f"- Draw on {match['draw1']['date']} ({', '.join(map(str, match['draw1']['white_balls']))}) and "
+            response += f"draw on {match['draw2']['date']} ({', '.join(map(str, match['draw2']['white_balls']))})\n"
+            response += f"  Common numbers: {', '.join(map(str, match['common_balls']))}\n\n"
+        
+        if len(four_ball_matches) > 5:
+            response += f"... and {len(four_ball_matches) - 5} more instances."
+        
+        return response
+    else:
+        response = "I didn't find any instances where the same four white balls appeared"
+        if year:
+            response += f" in {year}"
+        response += "."
+        return response
+
+def handle_three_white_ball_matches(intent):
+    """Find draws where the same three white balls appeared"""
+    year = intent.get('year')
+    
+    # Filter draws by year if specified
+    if year:
+        draws_df = df[df['Draw Date_dt'].dt.year == year].copy()
+    else:
+        draws_df = df.copy()
+    
+    if draws_df.empty:
+        return "I couldn't find any draw data for the specified timeframe."
+    
+    # Find three white ball matches
+    three_ball_matches = []
+    
+    # Convert to list of draws for easier processing
+    draws = []
+    for _, row in draws_df.iterrows():
+        draws.append({
+            'date': row['Draw Date'],
+            'white_balls': sorted([int(row['Number 1']), int(row['Number 2']), 
+                                 int(row['Number 3']), int(row['Number 4']), 
+                                 int(row['Number 5'])]),
+            'powerball': int(row['Powerball'])
+        })
+    
+    # Compare all pairs of draws
+    for i in range(len(draws)):
+        for j in range(i + 1, len(draws)):
+            common_balls = set(draws[i]['white_balls']).intersection(set(draws[j]['white_balls']))
+            if len(common_balls) >= 3:
+                three_ball_matches.append({
+                    'draw1': draws[i],
+                    'draw2': draws[j],
+                    'common_balls': sorted(common_balls)
+                })
+    
+    # Format response
+    if three_ball_matches:
+        response = f"I found {len(three_ball_matches)} instances where the same three white balls appeared"
+        if year:
+            response += f" in {year}"
+        response += ":\n\n"
+        
+        # Show top matches (limit to 5 for response length)
+        for i, match in enumerate(three_ball_matches[:5]):
+            response += f"- Draw on {match['draw1']['date']} ({', '.join(map(str, match['draw1']['white_balls']))}) and "
+            response += f"draw on {match['draw2']['date']} ({', '.join(map(str, match['draw2']['white_balls']))})\n"
+            response += f"  Common numbers: {', '.join(map(str, match['common_balls']))}\n\n"
+        
+        if len(three_ball_matches) > 5:
+            response += f"... and {len(three_ball_matches) - 5} more instances."
+        
+        return response
+    else:
+        response = "I didn't find any instances where the same three white balls appeared"
+        if year:
+            response += f" in {year}"
+        response += "."
+        return response
+
+def handle_frequency_analysis(intent):
+    """Analyze frequency of white balls"""
+    target_frequency = intent.get('frequency')
+    year = intent.get('year')
+    
+    # Filter draws by year if specified
+    if year:
+        draws_df = df[df['Draw Date_dt'].dt.year == year].copy()
+    else:
+        draws_df = df.copy()
+    
+    if draws_df.empty:
+        return "I couldn't find any draw data for the specified timeframe."
+    
+    # Calculate frequencies
+    frequency_count = defaultdict(int)
+    for _, row in draws_df.iterrows():
+        for i in range(1, 6):
+            ball_num = int(row[f'Number {i}'])
+            frequency_count[ball_num] += 1
+    
+    if target_frequency:
+        # Find numbers with the specific frequency
+        numbers_with_frequency = [num for num, count in frequency_count.items() if count == target_frequency]
+        
+        if numbers_with_frequency:
+            response = f"I found {len(numbers_with_frequency)} white ball numbers with frequency {target_frequency}"
+            if year:
+                response += f" in {year}"
+            response += ":\n\n"
+            response += ", ".join(map(str, sorted(numbers_with_frequency)))
+            return response
+        else:
+            response = f"I didn't find any white ball numbers with frequency {target_frequency}"
+            if year:
+                response += f" in {year}"
+            response += "."
+            return response
+    else:
+        # Show frequency table
+        sorted_frequencies = sorted([(num, count) for num, count in frequency_count.items()], 
+                                  key=lambda x: x[1], reverse=True)
+        
+        response = "Here are the frequencies of white ball numbers"
+        if year:
+            response += f" in {year}"
+        response += ":\n\n"
+        
+        # Create a simple table format
+        response += "Number | Frequency\n"
+        response += "------ | ---------\n"
+        for num, freq in sorted_frequencies[:15]:  # Show top 15
+            response += f"{num:6} | {freq:9}\n"
+        
+        if len(sorted_frequencies) > 15:
+            response += f"\n... and {len(sorted_frequencies) - 15} more numbers."
+        
+        return response
+
+def handle_number_pairs(intent):
+    """Find common number pairs"""
+    year = intent.get('year')
+    
+    # Filter draws by year if specified
+    if year:
+        draws_df = df[df['Draw Date_dt'].dt.year == year].copy()
+    else:
+        draws_df = df.copy()
+    
+    if draws_df.empty:
+        return "I couldn't find any draw data for the specified timeframe."
+    
+    # Calculate number pairs
+    pair_count = defaultdict(int)
+    for _, row in draws_df.iterrows():
+        white_balls = sorted([int(row['Number 1']), int(row['Number 2']), 
+                            int(row['Number 3']), int(row['Number 4']), 
+                            int(row['Number 5'])])
+        
+        # Count all pairs in this draw
+        for i in range(len(white_balls)):
+            for j in range(i + 1, len(white_balls)):
+                pair = tuple(sorted([white_balls[i], white_balls[j]]))
+                pair_count[pair] += 1
+    
+    # Sort pairs by frequency
+    sorted_pairs = sorted([(pair, count) for pair, count in pair_count.items()], 
+                         key=lambda x: x[1], reverse=True)
+    
+    response = "Here are the most common white ball number pairs"
+    if year:
+        response += f" in {year}"
+    response += ":\n\n"
+    
+    # Create a simple table format
+    response += "Number Pair | Frequency\n"
+    response += "----------- | ---------\n"
+    for (num1, num2), freq in sorted_pairs[:15]:  # Show top 15
+        response += f"{num1}-{num2:9} | {freq:9}\n"
+    
+    if len(sorted_pairs) > 15:
+        response += f"\n... and {len(sorted_pairs) - 15} more pairs."
+    
+    return response
+
+def handle_specific_number_analysis(intent):
+    """Analyze a specific white ball number"""
+    number = intent.get('number')
+    year = intent.get('year')
+    
+    # Filter draws by year if specified
+    if year:
+        draws_df = df[df['Draw Date_dt'].dt.year == year].copy()
+    else:
+        draws_df = df.copy()
+    
+    if draws_df.empty:
+        return "I couldn't find any draw data for the specified timeframe."
+    
+    # Calculate frequency of the specific number
+    frequency = 0
+    for _, row in draws_df.iterrows():
+        white_balls = [int(row['Number 1']), int(row['Number 2']), 
+                      int(row['Number 3']), int(row['Number 4']), 
+                      int(row['Number 5'])]
+        if number in white_balls:
+            frequency += 1
+    
+    # Calculate percentage of draws containing this number
+    total_draws = len(draws_df)
+    percentage = (frequency / total_draws * 100) if total_draws > 0 else 0
+    
+    # Find most common pairs with this number
+    pair_count = defaultdict(int)
+    for _, row in draws_df.iterrows():
+        white_balls = [int(row['Number 1']), int(row['Number 2']), 
+                      int(row['Number 3']), int(row['Number 4']), 
+                      int(row['Number 5'])]
+        
+        if number in white_balls:
+            # Count all pairs with this number in this draw
+            for ball in white_balls:
+                if ball != number:
+                    pair = tuple(sorted([number, ball]))
+                    pair_count[pair] += 1
+    
+    # Sort pairs by frequency
+    sorted_pairs = sorted([(pair, count) for pair, count in pair_count.items()], 
+                         key=lambda x: x[1], reverse=True)
+    
+    response = f"Analysis of white ball number {number}"
+    if year:
+        response += f" in {year}"
+    response += ":\n\n"
+    response += f"- Frequency: {frequency} times\n"
+    response += f"- Appears in {percentage:.1f}% of draws\n\n"
+    
+    if sorted_pairs:
+        response += "Most common pairs with this number:\n"
+        for (num1, num2), freq in sorted_pairs[:5]:  # Show top 5
+            response += f"- With {num2}: {freq} times\n"
+    
+    return response
+
 
 # --- Flask Routes ---
 @app.route('/')
@@ -4796,37 +5133,37 @@ def create_combinations_api():
         traceback.print_exc()
         return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
 
-@app.route('/api/ask', methods=['POST'])
-def ask_question():
-    """Handle natural language questions from users."""
-    if not GEMINI_API_KEY:
-        return jsonify({'error': 'Gemini API not configured'}), 500
-    
+@app.route('/api/ai-assistant/query', methods=['POST'])
+def ai_assistant_query():
+    """Handle AI assistant queries about Powerball data"""
     try:
         data = request.get_json()
-        user_question = data.get('question', '').strip()
+        query = data.get('query', '').strip().lower()
         
-        if not user_question:
-            return jsonify({'error': 'No question provided'}), 400
+        if not query:
+            return jsonify({'success': False, 'error': 'No query provided'}), 400
         
-        # Analyze the question and determine the intent
-        intent = _analyze_question_intent(user_question)
+        # Parse the query to determine intent
+        intent = parse_query_intent(query)
         
         # Process based on intent
-        if intent['type'] == 'frequency_query':
-            result = _handle_frequency_query(intent)
-        elif intent['type'] == 'pattern_query':
-            result = _handle_pattern_query(intent)
-        elif intent['type'] == 'general_question':
-            result = _handle_general_question(user_question)
+        if intent['type'] == 'four_white_ball_matches':
+            result = handle_four_white_ball_matches(intent)
+        elif intent['type'] == 'three_white_ball_matches':
+            result = handle_three_white_ball_matches(intent)
+        elif intent['type'] == 'frequency_analysis':
+            result = handle_frequency_analysis(intent)
+        elif intent['type'] == 'number_pairs':
+            result = handle_number_pairs(intent)
+        elif intent['type'] == 'specific_number_analysis':
+            result = handle_specific_number_analysis(intent)
         else:
-            result = {'answer': "I'm not sure how to help with that question. Try asking about number frequencies or patterns."}
+            result = {'answer': "I'm not sure how to help with that query. Try asking about patterns, frequencies, or specific numbers."}
         
-        return jsonify(result)
+        return jsonify({'success': True, 'response': result})
         
     except Exception as e:
-        return jsonify({'error': f'Error processing question: {str(e)}'}), 500
-
+        return jsonify({'success': False, 'error': f'Error processing query: {str(e)}'}), 500
 
 # Initialize core data on app startup
 initialize_core_data()
