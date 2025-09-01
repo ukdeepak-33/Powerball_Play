@@ -4728,10 +4728,10 @@ def yearly_white_ball_trends_route():
     return render_template('yearly_white_ball_trends.html',
                            years=years_for_display)
 
-@app.route('/powerball-assistant')
+@app.route('/ai_assistant')
 def powerball_assistant():
     """Dedicated page for the Powerball conversational assistant."""
-    return render_template('powerball_assistant.html')
+    return render_template('ai_assistant.html')
 
 
 # --- API Endpoints ---
