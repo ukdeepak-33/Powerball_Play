@@ -22,6 +22,9 @@ SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_ACTUAL_SUPAB
 SUPABASE_TABLE_NAME = 'powerball_draws'
 GENERATED_NUMBERS_TABLE_NAME = 'generated_powerball_numbers'
 
+# --- Gemini API Configuration ---
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
 # --- Flask App Initialization with Template Path ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_DIR = os.path.join(BASE_DIR, '..', 'templates')
@@ -3138,6 +3141,138 @@ def calculate_consecutive_gaps(df_source):
     """Placeholder for consecutive gaps calculation."""
     pass # This function was empty in the provided code, so it remains a placeholder.
 
+def _analyze_question_intent(question):
+    """Analyze the user's question to determine intent and extract parameters."""
+    question_lower = question.lower()
+    
+    # Check for frequency queries
+    frequency_match = re.search(r'frequency.*(\d+).*(\d{4})', question_lower)
+    if frequency_match:
+        return {
+            'type': 'frequency_query',
+            'number': int(frequency_match.group(1)),
+            'year': int(frequency_match.group(2))
+        }
+    
+    # Check for same numbers patterns
+    pattern_matches = [
+        'same.*white.*ball',
+        'four.*same.*number',
+        'repeated.*number',
+        'multiple.*times.*same'
+    ]
+    
+    if any(pattern in question_lower for pattern in pattern_matches):
+        return {
+            'type': 'pattern_query',
+            'pattern_type': 'repeated_white_balls'
+        }
+    
+    # General question
+    return {'type': 'general_question'}
+
+def _handle_frequency_query(intent):
+    """Handle frequency-based queries."""
+    number = intent.get('number')
+    year = intent.get('year')
+    
+    if not number or not year:
+        return {'answer': 'Please specify both a number and year for frequency queries.'}
+    
+    # Get frequency data for the specified year
+    yearly_data, years = get_white_ball_frequency_by_period(df, period_type='year', start_year=year, end_year=year)
+    
+    if year not in years:
+        return {'answer': f'I don\'t have data for the year {year}.'}
+    
+    # Find the frequency for the requested number
+    frequency = yearly_data.get(number, {}).get('frequency', 0) if yearly_data else 0
+    
+    return {
+        'answer': f'White ball {number} was drawn {frequency} times in {year}.',
+        'data': {
+            'number': number,
+            'year': year,
+            'frequency': frequency
+        }
+    }
+
+def _handle_pattern_query(intent):
+    """Handle pattern-based queries like repeated numbers."""
+    pattern_type = intent.get('pattern_type')
+    
+    if pattern_type == 'repeated_white_balls':
+        # Find draws where the same white balls appear multiple times
+        white_ball_combinations = {}
+        
+        for _, row in df.iterrows():
+            white_balls = tuple(sorted([
+                int(row['Number 1']), int(row['Number 2']), 
+                int(row['Number 3']), int(row['Number 4']), 
+                int(row['Number 5'])
+            ]))
+            
+            if white_balls in white_ball_combinations:
+                white_ball_combinations[white_balls]['count'] += 1
+                white_ball_combinations[white_balls]['dates'].append(row['Draw Date'])
+            else:
+                white_ball_combinations[white_balls] = {
+                    'count': 1,
+                    'dates': [row['Draw Date']],
+                    'numbers': white_balls
+                }
+        
+        # Filter for combinations that appear multiple times
+        repeated_combinations = [
+            combo for combo in white_ball_combinations.values() 
+            if combo['count'] > 1
+        ]
+        
+        # Sort by frequency
+        repeated_combinations.sort(key=lambda x: x['count'], reverse=True)
+        
+        if not repeated_combinations:
+            return {'answer': 'No white ball combinations have been repeated in the historical data.'}
+        
+        # Format response
+        top_combination = repeated_combinations[0]
+        return {
+            'answer': f'The most repeated white ball combination is {top_combination["numbers"]} which appeared {top_combination["count"]} times.',
+            'data': {
+                'combinations': repeated_combinations[:5]  # Top 5
+            }
+        }
+    
+    return {'answer': 'Pattern analysis completed.'}
+
+def _handle_general_question(question):
+    """Use Gemini AI for general questions."""
+    try:
+        # Simple implementation using requests
+        import requests
+        
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
+        
+        payload = {
+            "contents": [{
+                "parts": [{
+                    "text": f"You are a Powerball analysis assistant. Answer this question based on your knowledge: {question}"
+                }]
+            }]
+        }
+        
+        headers = {'Content-Type': 'application/json'}
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        
+        result = response.json()
+        answer = result['candidates'][0]['content']['parts'][0]['text']
+        
+        return {'answer': answer}
+        
+    except Exception as e:
+        return {'answer': 'I encountered an error processing your question. Please try again.'}
+
 
 # --- Flask Routes ---
 @app.route('/')
@@ -4256,6 +4391,11 @@ def yearly_white_ball_trends_route():
     return render_template('yearly_white_ball_trends.html',
                            years=years_for_display)
 
+@app.route('/powerball-assistant')
+def powerball_assistant():
+    """Dedicated page for the Powerball conversational assistant."""
+    return render_template('powerball_assistant.html')
+
 
 # --- API Endpoints ---
 @app.route('/api/generate_single_draw', methods=['GET'])
@@ -4655,6 +4795,37 @@ def create_combinations_api():
     except Exception as e:
         traceback.print_exc()
         return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
+
+@app.route('/api/ask', methods=['POST'])
+def ask_question():
+    """Handle natural language questions from users."""
+    if not GEMINI_API_KEY:
+        return jsonify({'error': 'Gemini API not configured'}), 500
+    
+    try:
+        data = request.get_json()
+        user_question = data.get('question', '').strip()
+        
+        if not user_question:
+            return jsonify({'error': 'No question provided'}), 400
+        
+        # Analyze the question and determine the intent
+        intent = _analyze_question_intent(user_question)
+        
+        # Process based on intent
+        if intent['type'] == 'frequency_query':
+            result = _handle_frequency_query(intent)
+        elif intent['type'] == 'pattern_query':
+            result = _handle_pattern_query(intent)
+        elif intent['type'] == 'general_question':
+            result = _handle_general_question(user_question)
+        else:
+            result = {'answer': "I'm not sure how to help with that question. Try asking about number frequencies or patterns."}
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': f'Error processing question: {str(e)}'}), 500
 
 
 # Initialize core data on app startup
