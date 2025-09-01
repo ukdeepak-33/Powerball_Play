@@ -5,118 +5,7 @@
 {% block page_heading %}Powerball AI Assistant{% endblock %}
 
 {% block content %}
-    <title>Advanced Powerball AI Assistant</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        body {
-            background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
-            min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .card {
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-        }
-        .btn-primary {
-            background: linear-gradient(to right, #2563eb, #1d4ed8);
-            transition: all 0.3s ease;
-        }
-        .btn-primary:hover {
-            background: linear-gradient(to right, #1d4ed8, #1e40af);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-        }
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #888;
-            border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #555;
-        }
-        .powerball-ball {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            font-weight: bold;
-            margin: 0 2px;
-        }
-        .white-ball {
-            background: linear-gradient(to bottom, #ffffff, #f0f0f0);
-            color: #1f2937;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-        .red-ball {
-            background: linear-gradient(to bottom, #e11d48, #be123c);
-            color: white;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-        }
-        .message-animation {
-            animation: fadeIn 0.3s ease-in-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .typing-dots {
-            display: inline-flex;
-            align-items: center;
-        }
-        .typing-dots span {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: #6b7280;
-            margin: 0 2px;
-            animation: typingAnimation 1.4s infinite both;
-        }
-        .typing-dots span:nth-child(2) {
-            animation-delay: 0.2s;
-        }
-        .typing-dots span:nth-child(3) {
-            animation-delay: 0.4s;
-        }
-        @keyframes typingAnimation {
-            0%, 80%, 100% { 
-                transform: scale(0.8);
-                opacity: 0.5;
-            }
-            40% { 
-                transform: scale(1);
-                opacity: 1;
-            }
-        }
-        .analysis-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 10px 0;
-            font-size: 0.9em;
-        }
-        .analysis-table th, .analysis-table td {
-            padding: 8px 12px;
-            text-align: left;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        .analysis-table th {
-            background-color: #f3f4f6;
-            font-weight: 600;
-        }
-        .analysis-table tr:hover {
-            background-color: #f9fafb;
-        }
-    </style>
-</head>
-<body class="flex items-center justify-center min-h-screen p-4">
+<div class="container mx-auto p-4">
     <div class="card p-6 bg-white rounded-lg shadow-lg max-w-4xl w-full flex flex-col h-[90vh]">
         <div class="flex justify-between items-center mb-4">
             <div>
@@ -187,554 +76,307 @@
             <span class="ml-2">AI is analyzing Powerball data...</span>
         </div>
     </div>
+</div>
 
-    <script>
-        // Simulated Powerball dataset for 2024 and 2025
-        const generatePowerballDataset = () => {
-            const draws = [];
-            const startDate2024 = new Date('2024-01-01');
-            const endDate2024 = new Date('2024-12-31');
-            const startDate2025 = new Date('2025-01-01');
-            const endDate2025 = new Date('2025-12-31');
-            
-            // Generate draws for 2024
-            let currentDate = new Date(startDate2024);
-            while (currentDate <= endDate2024) {
-                // Powerball draws happen on Wednesdays and Saturdays
-                if (currentDate.getDay() === 3 || currentDate.getDay() === 6) {
-                    const whiteBalls = generateUniqueNumbers(5, 1, 69);
-                    const powerball = Math.floor(Math.random() * 26) + 1;
-                    
-                    draws.push({
-                        date: new Date(currentDate),
-                        year: 2024,
-                        numbers: {
-                            whiteBalls: whiteBalls.sort((a, b) => a - b),
-                            powerball: powerball
-                        }
-                    });
-                }
-                currentDate.setDate(currentDate.getDate() + 1);
-            }
-            
-            // Generate draws for 2025
-            currentDate = new Date(startDate2025);
-            while (currentDate <= endDate2025) {
-                if (currentDate.getDay() === 3 || currentDate.getDay() === 6) {
-                    const whiteBalls = generateUniqueNumbers(5, 1, 69);
-                    const powerball = Math.floor(Math.random() * 26) + 1;
-                    
-                    draws.push({
-                        date: new Date(currentDate),
-                        year: 2025,
-                        numbers: {
-                            whiteBalls: whiteBalls.sort((a, b) => a - b),
-                            powerball: powerball
-                        }
-                    });
-                }
-                currentDate.setDate(currentDate.getDate() + 1);
-            }
-            
-            // Add some repeated patterns for more interesting analysis
-            // Add some four white ball matches
-            for (let i = 0; i < 5; i++) {
-                const baseDrawIndex = Math.floor(Math.random() * 50);
-                const baseDraw = draws[baseDrawIndex];
-                
-                const newDrawIndex = baseDrawIndex + 10 + Math.floor(Math.random() * 40);
-                if (newDrawIndex < draws.length) {
-                    const fourNumbers = [...baseDraw.numbers.whiteBalls].slice(0, 4);
-                    const fifthNumber = generateUniqueNumbers(1, 1, 69, fourNumbers)[0];
-                    
-                    draws[newDrawIndex].numbers.whiteBalls = [...fourNumbers, fifthNumber].sort((a, b) => a - b);
-                }
-            }
-            
-            return draws;
-        };
+<style>
+    .card {
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+    .btn-primary {
+        background: linear-gradient(to right, #2563eb, #1d4ed8);
+        transition: all 0.3s ease;
+    }
+    .btn-primary:hover {
+        background: linear-gradient(to right, #1d4ed8, #1e40af);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 10px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+    .powerball-ball {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        font-weight: bold;
+        margin: 0 2px;
+    }
+    .white-ball {
+        background: linear-gradient(to bottom, #ffffff, #f0f0f0);
+        color: #1f2937;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    .red-ball {
+        background: linear-gradient(to bottom, #e11d48, #be123c);
+        color: white;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+    .message-animation {
+        animation: fadeIn 0.3s ease-in-out;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .typing-dots {
+        display: inline-flex;
+        align-items: center;
+    }
+    .typing-dots span {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #6b7280;
+        margin: 0 2px;
+        animation: typingAnimation 1.4s infinite both;
+    }
+    .typing-dots span:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+    .typing-dots span:nth-child(3) {
+        animation-delay: 0.4s;
+    }
+    @keyframes typingAnimation {
+        0%, 80%, 100% { 
+            transform: scale(0.8);
+            opacity: 0.5;
+        }
+        40% { 
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+    .analysis-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0;
+        font-size: 0.9em;
+    }
+    .analysis-table th, .analysis-table td {
+        padding: 8px 12px;
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .analysis-table th {
+        background-color: #f3f4f6;
+        font-weight: 600;
+    }
+    .analysis-table tr:hover {
+        background-color: #f9fafb;
+    }
+    .quick-action-btn {
+        padding: 0.4rem 0.75rem;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+        white-space: nowrap;
+        border: none;
+        cursor: pointer;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const chatHistory = document.getElementById('chat-history');
+        const typingIndicator = document.getElementById('typing-indicator');
+        const clearChatBtn = document.getElementById('clear-chat');
+        const quickActionBtns = document.querySelectorAll('.quick-action-btn');
         
-        const generateUniqueNumbers = (count, min, max, exclude = []) => {
-            const numbers = [];
-            while (numbers.length < count) {
-                const num = Math.floor(Math.random() * (max - min + 1)) + min;
-                if (!numbers.includes(num) && !exclude.includes(num)) {
-                    numbers.push(num);
-                }
+        // Load chat history from localStorage if available
+        loadChatHistory();
+        
+        // Function to add a message to chat history
+        function addMessage(sender, message, timestamp = new Date()) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('flex', sender === 'user' ? 'justify-end' : 'justify-start', 'message-animation');
+            
+            const messageBubble = document.createElement('div');
+            messageBubble.classList.add('p-3', 'rounded-lg', 'max-w-[90%]', 'shadow-sm');
+            
+            if (sender === 'user') {
+                messageBubble.classList.add('bg-blue-600', 'text-white');
+                messageBubble.innerHTML = `
+                    <div class="font-medium">You</div>
+                    <div class="mt-1">${message}</div>
+                    <div class="text-xs text-blue-200 mt-2">${formatTime(timestamp)}</div>
+                `;
+            } else {
+                messageBubble.classList.add('bg-gray-200', 'text-gray-800');
+                messageBubble.innerHTML = `
+                    <div class="font-medium">Powerball AI</div>
+                    <div class="mt-1">${message}</div>
+                    <div class="text-xs text-gray-500 mt-2">${formatTime(timestamp)}</div>
+                `;
             }
-            return numbers;
-        };
-        
-        // Generate the dataset
-        const powerballDraws = generatePowerballDataset();
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            const userInput = document.getElementById('user-input');
-            const sendButton = document.getElementById('send-button');
-            const chatHistory = document.getElementById('chat-history');
-            const typingIndicator = document.getElementById('typing-indicator');
-            const clearChatBtn = document.getElementById('clear-chat');
-            const quickActionBtns = document.querySelectorAll('.quick-action-btn');
             
-            // Load chat history from localStorage if available
-            loadChatHistory();
+            messageDiv.appendChild(messageBubble);
+            chatHistory.appendChild(messageDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
             
-            // Function to add a message to chat history
-            function addMessage(sender, message, timestamp = new Date()) {
-                const messageDiv = document.createElement('div');
-                messageDiv.classList.add('flex', sender === 'user' ? 'justify-end' : 'justify-start', 'message-animation');
+            // Save to localStorage
+            saveChatHistory();
+        }
+        
+        // Format time for display
+        function formatTime(date) {
+            const now = new Date();
+            const messageTime = new Date(date);
+            const diffInMinutes = Math.floor((now - messageTime) / 60000);
+            
+            if (diffInMinutes < 1) return 'Just now';
+            if (diffInMinutes < 60) return `${diffInMinutes} min ago`;
+            
+            const diffInHours = Math.floor(diffInMinutes / 60);
+            if (diffInHours < 24) return `${diffInHours} hr ago`;
+            
+            return messageTime.toLocaleDateString() + ' ' + messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+        
+        // Save chat history to localStorage
+        function saveChatHistory() {
+            const messages = [];
+            const messageElements = chatHistory.querySelectorAll('.flex.justify-start, .flex.justify-end');
+            
+            messageElements.forEach(el => {
+                const isUser = el.classList.contains('justify-end');
+                const content = el.querySelector('.mt-1').textContent;
+                const timestamp = el.querySelector('.text-xs').textContent;
                 
-                const messageBubble = document.createElement('div');
-                messageBubble.classList.add('p-3', 'rounded-lg', 'max-w-[90%]', 'shadow-sm');
+                messages.push({
+                    sender: isUser ? 'user' : 'ai',
+                    content: content,
+                    timestamp: timestamp
+                });
+            });
+            
+            localStorage.setItem('powerballChatHistory', JSON.stringify(messages));
+        }
+        
+        // Load chat history from localStorage
+        function loadChatHistory() {
+            const savedHistory = localStorage.getItem('powerballChatHistory');
+            if (savedHistory) {
+                const messages = JSON.parse(savedHistory);
                 
-                if (sender === 'user') {
-                    messageBubble.classList.add('bg-blue-600', 'text-white');
-                    messageBubble.innerHTML = `
-                        <div class="font-medium">You</div>
-                        <div class="mt-1">${message}</div>
-                        <div class="text-xs text-blue-200 mt-2">${formatTime(timestamp)}</div>
-                    `;
+                // Clear the default messages
+                chatHistory.innerHTML = '';
+                
+                messages.forEach(msg => {
+                    addMessage(msg.sender, msg.content);
+                });
+            }
+        }
+        
+        // Clear chat history
+        function clearChatHistory() {
+            if (confirm('Are you sure you want to clear the chat history?')) {
+                chatHistory.innerHTML = '';
+                localStorage.removeItem('powerballChatHistory');
+                
+                // Add the initial AI message
+                addMessage('ai', 'Hello! I\'m your Advanced Powerball AI Assistant. I can help you analyze Powerball data with advanced queries.');
+            }
+        }
+        
+        // Function to send message to AI backend
+        async function getAIResponse(message) {
+            try {
+                // Show typing indicator
+                typingIndicator.classList.remove('hidden');
+                
+                // Call the backend API
+                const response = await fetch('/api/ai-assistant/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: message })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    return data.response;
                 } else {
-                    messageBubble.classList.add('bg-gray-200', 'text-gray-800');
-                    messageBubble.innerHTML = `
-                        <div class="font-medium">Powerball AI</div>
-                        <div class="mt-1">${message}</div>
-                        <div class="text-xs text-gray-500 mt-2">${formatTime(timestamp)}</div>
-                    `;
+                    return `Sorry, I encountered an error: ${data.error}`;
                 }
-                
-                messageDiv.appendChild(messageBubble);
-                chatHistory.appendChild(messageDiv);
-                chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
-                
-                // Save to localStorage
-                saveChatHistory();
+            } catch (error) {
+                console.error('Error communicating with AI:', error);
+                return 'Oops! I encountered an error. Please try again later.';
+            } finally {
+                // Hide typing indicator
+                typingIndicator.classList.add('hidden');
             }
-            
-            // Format time for display
-            function formatTime(date) {
-                const now = new Date();
-                const messageTime = new Date(date);
-                const diffInMinutes = Math.floor((now - messageTime) / 60000);
-                
-                if (diffInMinutes < 1) return 'Just now';
-                if (diffInMinutes < 60) return `${diffInMinutes} min ago`;
-                
-                const diffInHours = Math.floor(diffInMinutes / 60);
-                if (diffInHours < 24) return `${diffInHours} hr ago`;
-                
-                return messageTime.toLocaleDateString() + ' ' + messageTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            }
-            
-            // Save chat history to localStorage
-            function saveChatHistory() {
-                const messages = [];
-                const messageElements = chatHistory.querySelectorAll('.flex.justify-start, .flex.justify-end');
-                
-                messageElements.forEach(el => {
-                    const isUser = el.classList.contains('justify-end');
-                    const content = el.querySelector('.mt-1').textContent;
-                    const timestamp = el.querySelector('.text-xs').textContent;
-                    
-                    messages.push({
-                        sender: isUser ? 'user' : 'ai',
-                        content: content,
-                        timestamp: timestamp
-                    });
-                });
-                
-                localStorage.setItem('powerballChatHistory', JSON.stringify(messages));
-            }
-            
-            // Load chat history from localStorage
-            function loadChatHistory() {
-                const savedHistory = localStorage.getItem('powerballChatHistory');
-                if (savedHistory) {
-                    const messages = JSON.parse(savedHistory);
-                    
-                    // Clear the default messages
-                    chatHistory.innerHTML = '';
-                    
-                    messages.forEach(msg => {
-                        addMessage(msg.sender, msg.content);
-                    });
-                }
-            }
-            
-            // Clear chat history
-            function clearChatHistory() {
-                if (confirm('Are you sure you want to clear the chat history?')) {
-                    chatHistory.innerHTML = '';
-                    localStorage.removeItem('powerballChatHistory');
-                    
-                    // Add the initial AI message
-                    addMessage('ai', 'Hello! I\'m your Advanced Powerball AI Assistant. I can help you analyze Powerball data with advanced queries.');
-                }
-            }
-            
-            // Function to analyze the dataset based on user query
-            function analyzePowerballData(query, year) {
-                const results = {
-                    fourWhiteMatches: [],
-                    threeWhiteMatches: [],
-                    frequencies: {},
-                    numberPairs: {},
-                    specificNumber: null
-                };
-                
-                // Filter draws by year if specified
-                let draws = powerballDraws;
-                if (year) {
-                    draws = powerballDraws.filter(draw => draw.year === year);
-                }
-                
-                // Check for four white ball matches
-                for (let i = 0; i < draws.length; i++) {
-                    for (let j = i + 1; j < draws.length; j++) {
-                        const draw1 = draws[i];
-                        const draw2 = draws[j];
-                        
-                        const commonWhiteBalls = draw1.numbers.whiteBalls.filter(num => 
-                            draw2.numbers.whiteBalls.includes(num)
-                        );
-                        
-                        if (commonWhiteBalls.length >= 4) {
-                            results.fourWhiteMatches.push({
-                                draw1: draw1,
-                                draw2: draw2,
-                                commonNumbers: commonWhiteBalls,
-                                exactMatch: commonWhiteBalls.length === 4
-                            });
-                        } else if (commonWhiteBalls.length >= 3) {
-                            results.threeWhiteMatches.push({
-                                draw1: draw1,
-                                draw2: draw2,
-                                commonNumbers: commonWhiteBalls,
-                                exactMatch: commonWhiteBalls.length === 3
-                            });
-                        }
-                    }
-                }
-                
-                // Calculate frequencies
-                results.frequencies = calculateFrequencies(draws);
-                
-                // Calculate number pairs
-                results.numberPairs = calculateNumberPairs(draws);
-                
-                return results;
-            }
-            
-            // Calculate frequencies of white balls
-            function calculateFrequencies(draws) {
-                const frequencies = {};
-                
-                for (let i = 1; i <= 69; i++) {
-                    frequencies[i] = 0;
-                }
-                
-                draws.forEach(draw => {
-                    draw.numbers.whiteBalls.forEach(num => {
-                        frequencies[num]++;
-                    });
-                });
-                
-                return frequencies;
-            }
-            
-            // Calculate common number pairs
-            function calculateNumberPairs(draws) {
-                const pairs = {};
-                
-                for (let i = 1; i <= 69; i++) {
-                    for (let j = i + 1; j <= 69; j++) {
-                        pairs[`${i}-${j}`] = 0;
-                    }
-                }
-                
-                draws.forEach(draw => {
-                    const whiteBalls = draw.numbers.whiteBalls;
-                    for (let i = 0; i < whiteBalls.length; i++) {
-                        for (let j = i + 1; j < whiteBalls.length; j++) {
-                            const key = `${Math.min(whiteBalls[i], whiteBalls[j])}-${Math.max(whiteBalls[i], whiteBalls[j])}`;
-                            pairs[key]++;
-                        }
-                    }
-                });
-                
-                return pairs;
-            }
-            
-            // Function to simulate AI response with advanced analysis
-            async function getAIResponse(message) {
-                // Simulate API call delay
-                await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
-                
-                const lowerMessage = message.toLowerCase();
-                
-                // Extract year from message if specified
-                let year = null;
-                if (lowerMessage.includes('2024')) year = 2024;
-                if (lowerMessage.includes('2025')) year = 2025;
-                
-                // Analyze the data
-                const analysis = analyzePowerballData(message, year);
-                
-                // Check for four white ball matches query
-                if (lowerMessage.includes('four') && lowerMessage.includes('white')) {
-                    if (analysis.fourWhiteMatches.length > 0) {
-                        let response = `I found ${analysis.fourWhiteMatches.length} instances where the same four white balls appeared in different draws${year ? ' in ' + year : ''}:<br><br>`;
-                        
-                        // Show top 5 matches
-                        const topMatches = analysis.fourWhiteMatches.slice(0, 5);
-                        topMatches.forEach(match => {
-                            response += `- Draw on ${match.draw1.date.toLocaleDateString()} (${match.draw1.numbers.whiteBalls.join(', ')}) and `;
-                            response += `draw on ${match.draw2.date.toLocaleDateString()} (${match.draw2.numbers.whiteBalls.join(', ')})<br>`;
-                            response += `  Common numbers: ${match.commonNumbers.map(n => `<span class="powerball-ball white-ball">${n}</span>`).join(' ')}<br><br>`;
-                        });
-                        
-                        if (analysis.fourWhiteMatches.length > 5) {
-                            response += `... and ${analysis.fourWhiteMatches.length - 5} more instances.`;
-                        }
-                        
-                        return response;
-                    } else {
-                        return `I didn't find any instances where the same four white balls appeared in different draws${year ? ' in ' + year : ''}.`;
-                    }
-                }
-                
-                // Check for three white ball matches query
-                else if (lowerMessage.includes('three') && lowerMessage.includes('white')) {
-                    if (analysis.threeWhiteMatches.length > 0) {
-                        let response = `I found ${analysis.threeWhiteMatches.length} instances where the same three white balls appeared in different draws${year ? ' in ' + year : ''}:<br><br>`;
-                        
-                        // Show top 5 matches
-                        const topMatches = analysis.threeWhiteMatches.slice(0, 5);
-                        topMatches.forEach(match => {
-                            response += `- Draw on ${match.draw1.date.toLocaleDateString()} (${match.draw1.numbers.whiteBalls.join(', ')}) and `;
-                            response += `draw on ${match.draw2.date.toLocaleDateString()} (${match.draw2.numbers.whiteBalls.join(', ')})<br>`;
-                            response += `  Common numbers: ${match.commonNumbers.map(n => `<span class="powerball-ball white-ball">${n}</span>`).join(' ')}<br><br>`;
-                        });
-                        
-                        if (analysis.threeWhiteMatches.length > 5) {
-                            response += `... and ${analysis.threeWhiteMatches.length - 5} more instances.`;
-                        }
-                        
-                        return response;
-                    } else {
-                        return `I didn't find any instances where the same three white balls appeared in different draws${year ? ' in ' + year : ''}.`;
-                    }
-                }
-                
-                // Check for frequency query
-                else if (lowerMessage.includes('frequenc') && !lowerMessage.includes('pair')) {
-                    // Extract the specific frequency number if mentioned
-                    const frequencyMatch = lowerMessage.match(/frequenc[y\s]*(\d+)/);
-                    let targetFrequency = frequencyMatch ? parseInt(frequencyMatch[1]) : null;
-                    
-                    if (!targetFrequency) {
-                        // Try to find any number in the query
-                        const numberMatch = lowerMessage.match(/\d+/);
-                        targetFrequency = numberMatch ? parseInt(numberMatch[0]) : null;
-                    }
-                    
-                    if (targetFrequency) {
-                        const numbersWithFrequency = [];
-                        for (const num in analysis.frequencies) {
-                            if (analysis.frequencies[num] === targetFrequency) {
-                                numbersWithFrequency.push(parseInt(num));
-                            }
-                        }
-                        
-                        if (numbersWithFrequency.length > 0) {
-                            let response = `I found ${numbersWithFrequency.length} white ball numbers with frequency ${targetFrequency}${year ? ' in ' + year : ''}:<br><br>`;
-                            response += numbersWithFrequency.map(n => `<span class="powerball-ball white-ball">${n}</span>`).join(' ');
-                            response += `<br><br>These numbers have appeared ${targetFrequency} times in the draws analyzed.`;
-                            return response;
-                        } else {
-                            return `I didn't find any white ball numbers with frequency ${targetFrequency}${year ? ' in ' + year : ''}.`;
-                        }
-                    } else {
-                        // Show frequency table if no specific frequency requested
-                        let response = `Here are the frequencies of white ball numbers${year ? ' in ' + year : ''}:<br><br>`;
-                        
-                        // Create a sorted list of frequencies
-                        const sortedFrequencies = [];
-                        for (const num in analysis.frequencies) {
-                            sortedFrequencies.push({
-                                number: parseInt(num),
-                                frequency: analysis.frequencies[num]
-                            });
-                        }
-                        
-                        sortedFrequencies.sort((a, b) => b.frequency - a.frequency);
-                        
-                        response += `<table class="analysis-table"><tr><th>Number</th><th>Frequency</th></tr>`;
-                        
-                        // Show top 10 most frequent numbers
-                        for (let i = 0; i < Math.min(10, sortedFrequencies.length); i++) {
-                            response += `<tr><td><span class="powerball-ball white-ball">${sortedFrequencies[i].number}</span></td><td>${sortedFrequencies[i].frequency}</td></tr>`;
-                        }
-                        
-                        response += `</table>`;
-                        return response;
-                    }
-                }
-                
-                // Check for number pairs query
-                else if (lowerMessage.includes('pair')) {
-                    // Create a sorted list of pairs
-                    const sortedPairs = [];
-                    for (const pair in analysis.numberPairs) {
-                        sortedPairs.push({
-                            pair: pair,
-                            frequency: analysis.numberPairs[pair]
-                        });
-                    }
-                    
-                    sortedPairs.sort((a, b) => b.frequency - a.frequency);
-                    
-                    let response = `Here are the most common white ball number pairs${year ? ' in ' + year : ''}:<br><br>`;
-                    
-                    response += `<table class="analysis-table"><tr><th>Number Pair</th><th>Frequency</th></tr>`;
-                    
-                    // Show top 10 most frequent pairs
-                    for (let i = 0; i < Math.min(10, sortedPairs.length); i++) {
-                        const numbers = sortedPairs[i].pair.split('-');
-                        response += `<tr><td>${numbers.map(n => `<span class="powerball-ball white-ball">${n}</span>`).join(' + ')}</td><td>${sortedPairs[i].frequency}</td></tr>`;
-                    }
-                    
-                    response += `</table>`;
-                    return response;
-                }
-                
-                // Check for specific number analysis
-                else if (lowerMessage.match(/\b(analyze|analysis|number)\s+(\d+)/)) {
-                    const numberMatch = lowerMessage.match(/\b(analyze|analysis|number)\s+(\d+)/);
-                    if (numberMatch) {
-                        const number = parseInt(numberMatch[2]);
-                        if (number >= 1 && number <= 69) {
-                            const frequency = analysis.frequencies[number];
-                            let response = `Analysis of white ball number <span class="powerball-ball white-ball">${number}</span>${year ? ' in ' + year : ''}:<br><br>`;
-                            response += `- Frequency: ${frequency} times<br>`;
-                            response += `- Appears in approximately ${((frequency / (year ? 104 : 208)) * 100).toFixed(1)}% of draws<br><br>`;
-                            
-                            // Find most common pairs with this number
-                            const pairsWithThisNumber = [];
-                            for (const pair in analysis.numberPairs) {
-                                if (pair.includes(number.toString())) {
-                                    pairsWithThisNumber.push({
-                                        pair: pair,
-                                        frequency: analysis.numberPairs[pair]
-                                    });
-                                }
-                            }
-                            
-                            pairsWithThisNumber.sort((a, b) => b.frequency - a.frequency);
-                            
-                            if (pairsWithThisNumber.length > 0) {
-                                response += `Most common pairs with ${number}:<br>`;
-                                for (let i = 0; i < Math.min(3, pairsWithThisNumber.length); i++) {
-                                    const otherNumber = pairsWithThisNumber[i].pair.split('-')
-                                        .find(n => parseInt(n) !== number);
-                                    response += `- With <span class="powerball-ball white-ball">${otherNumber}</span>: ${pairsWithThisNumber[i].frequency} times<br>`;
-                                }
-                            }
-                            
-                            return response;
-                        }
-                    }
-                }
-                
-                // Default response for other queries
-                return `I've analyzed your query about "${message}". I found interesting patterns in the Powerball data${year ? ' for ' + year : ''}. ` +
-                       `You can ask me to find specific patterns like four white ball matches, frequency analysis, or common number pairs.`;
-            }
-            
-            // Generate random Powerball numbers (for demo purposes)
-            function generatePowerballNumbers() {
-                const whiteBalls = [];
-                while (whiteBalls.length < 5) {
-                    const num = Math.floor(Math.random() * 69) + 1;
-                    if (!whiteBalls.includes(num)) whiteBalls.push(num);
-                }
-                whiteBalls.sort((a, b) => a - b);
-                
-                const powerball = Math.floor(Math.random() * 26) + 1;
-                
-                return { whiteBalls, powerball };
-            }
-            
-            // Function to send message to AI
-            async function sendMessage() {
-                const message = userInput.value.trim();
-                if (message === '') return;
+        }
+        
+        // Function to send message to AI
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (message === '') return;
 
-                addMessage('user', message);
-                userInput.value = ''; // Clear input
+            addMessage('user', message);
+            userInput.value = ''; // Clear input
 
-                typingIndicator.classList.remove('hidden'); // Show typing indicator
-
-                try {
-                    const response = await getAIResponse(message);
-                    addMessage('ai', response);
-                } catch (error) {
-                    console.error('Error communicating with AI:', error);
-                    addMessage('ai', 'Oops! I encountered an error. Please try again later.');
-                } finally {
-                    typingIndicator.classList.add('hidden'); // Hide typing indicator
-                }
+            try {
+                const response = await getAIResponse(message);
+                addMessage('ai', response);
+            } catch (error) {
+                console.error('Error communicating with AI:', error);
+                addMessage('ai', 'Oops! I encountered an error. Please try again later.');
             }
-            
-            // Handle quick action buttons
-            quickActionBtns.forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const action = this.getAttribute('data-action');
-                    let message = '';
-                    
-                    switch(action) {
-                        case 'four-white':
-                            message = 'Find Powerball draws where the same four white balls appeared multiple times in 2024';
-                            break;
-                        case 'frequency':
-                            message = 'Show me white ball numbers with frequency 8 in 2024';
-                            break;
-                        case 'pairs':
-                            message = 'What are the most common number pairs in 2024?';
-                            break;
-                        case 'generate':
-                            message = 'Generate some Powerball numbers for me';
-                            break;
-                    }
-                    
-                    userInput.value = message;
-                    sendMessage();
-                });
+        }
+        
+        // Handle quick action buttons
+        quickActionBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const action = this.getAttribute('data-action');
+                let message = '';
+                
+                switch(action) {
+                    case 'four-white':
+                        message = 'Find Powerball draws where the same four white balls appeared multiple times in 2024';
+                        break;
+                    case 'frequency':
+                        message = 'Show me white ball numbers with frequency 8 in 2024';
+                        break;
+                    case 'pairs':
+                        message = 'What are the most common number pairs in 2024?';
+                        break;
+                    case 'generate':
+                        message = 'Generate some Powerball numbers for me';
+                        break;
+                }
+                
+                userInput.value = message;
+                sendMessage();
             });
-            
-            // Event listeners
-            sendButton.addEventListener('click', sendMessage);
-            userInput.addEventListener('keypress', function(event) {
-                if (event.key === 'Enter') {
-                    sendMessage();
-                }
-            });
-            clearChatBtn.addEventListener('click', clearChatHistory);
-            
-            // Style for quick action buttons
-            const style = document.createElement('style');
-            style.textContent = `
-                .quick-action-btn {
-                    padding: 0.4rem 0.75rem;
-                    border-radius: 0.375rem;
-                    font-size: 0.875rem;
-                    transition: all 0.2s;
-                    white-space: nowrap;
-                    border: none;
-                    cursor: pointer;
-                }
-            `;
-            document.head.appendChild(style);
         });
-    </script>
+        
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        clearChatBtn.addEventListener('click', clearChatHistory);
+    });
+</script>
 {% endblock %}
