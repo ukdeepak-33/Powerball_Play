@@ -3630,10 +3630,112 @@ def generate_smart_pick_with_preferences(df, num_from_group_a, odd_even_choice, 
                                        three_same_frequency=False, two_pairs_same_frequency=False,
                                        picked_numbers=None, unpicked_numbers=None, frequency_groups=None):
     """Generate a smart pick with the specified pattern preferences."""
-    # Implementation similar to generate_from_group_a but with all the new pattern checks
-    # This would be quite complex - you'd need to implement the logic for each pattern preference
-    # You might want to reuse parts of your existing generate_from_group_a function
-    pass
+    
+    max_attempts = 10000
+    attempts = 0
+    
+    base_available_white_balls = [num for num in range(1, 70) if num not in excluded_numbers]
+    
+    while attempts < max_attempts:
+        attempts += 1
+        
+        # Start with basic generation
+        if num_from_group_a > 0:
+            # Use Group A strategy
+            valid_group_a = [num for num in group_a if num not in excluded_numbers]
+            if len(valid_group_a) < num_from_group_a:
+                continue
+                
+            selected_from_group_a = random.sample(valid_group_a, num_from_group_a)
+            remaining_pool = [num for num in base_available_white_balls if num not in selected_from_group_a]
+            
+            if len(remaining_pool) < (5 - num_from_group_a):
+                continue
+                
+            selected_from_remaining = random.sample(remaining_pool, 5 - num_from_group_a)
+            white_balls = sorted(selected_from_group_a + selected_from_remaining)
+        else:
+            # Regular random selection
+            if len(base_available_white_balls) < 5:
+                continue
+            white_balls = sorted(random.sample(base_available_white_balls, 5))
+        
+        # Check pattern preferences
+        if one_unpicked_four_picked and unpicked_numbers and picked_numbers:
+            unpicked_count = sum(1 for num in white_balls if num in unpicked_numbers)
+            picked_count = sum(1 for num in white_balls if num in picked_numbers)
+            if unpicked_count != 1 or picked_count != 4:
+                continue
+        
+        if two_unpicked_three_picked and unpicked_numbers and picked_numbers:
+            unpicked_count = sum(1 for num in white_balls if num in unpicked_numbers)
+            picked_count = sum(1 for num in white_balls if num in picked_numbers)
+            if unpicked_count != 2 or picked_count != 3:
+                continue
+        
+        if five_unpicked_same_month and unpicked_numbers:
+            unpicked_count = sum(1 for num in white_balls if num in unpicked_numbers)
+            if unpicked_count != 5:
+                continue
+        
+        if four_unpicked_one_picked and unpicked_numbers and picked_numbers:
+            unpicked_count = sum(1 for num in white_balls if num in unpicked_numbers)
+            picked_count = sum(1 for num in white_balls if num in picked_numbers)
+            if unpicked_count != 4 or picked_count != 1:
+                continue
+        
+        # Frequency-based checks
+        if frequency_groups:
+            freq_count = defaultdict(int)
+            for num in white_balls:
+                for freq, numbers in frequency_groups.items():
+                    if num in numbers:
+                        freq_count[freq] += 1
+                        break
+            
+            if two_same_frequency and not any(count >= 2 for count in freq_count.values()):
+                continue
+            
+            if three_same_frequency and not any(count >= 3 for count in freq_count.values()):
+                continue
+            
+            if two_pairs_same_frequency:
+                pairs_count = sum(1 for count in freq_count.values() if count >= 2)
+                if pairs_count < 2:
+                    continue
+        
+        # Check odd/even preference
+        even_count = sum(1 for num in white_balls if num % 2 == 0)
+        odd_count = 5 - even_count
+        
+        if odd_even_choice == "All Even" and even_count != 5:
+            continue
+        elif odd_even_choice == "All Odd" and odd_count != 5:
+            continue
+        elif odd_even_choice == "3 Even / 2 Odd" and (even_count != 3 or odd_count != 2):
+            continue
+        elif odd_even_choice == "2 Even / 3 Odd" and (even_count != 2 or odd_count != 3):
+            continue
+        elif odd_even_choice == "1 Even / 4 Odd" and (even_count != 1 or odd_count != 4):
+            continue
+        elif odd_even_choice == "4 Even / 1 Odd" and (even_count != 4 or odd_count != 1):
+            continue
+        
+        # Check sum range
+        if sum_range_tuple:
+            current_sum = sum(white_balls)
+            if not (sum_range_tuple[0] <= current_sum <= sum_range_tuple[1]):
+                continue
+        
+        # Check for exact historical matches
+        if check_exact_match(white_balls):
+            continue
+        
+        # If all checks pass, generate powerball and return
+        powerball = random.randint(1, 26)
+        return white_balls, powerball
+    
+    raise ValueError("Could not generate a combination meeting all criteria after many attempts.")
 
 # --- Flask Routes ---
 @app.route('/')
@@ -4764,6 +4866,90 @@ def generate_smart_picks_route():
     except Exception as e:
         flash(f"Error generating smart picks: {str(e)}", 'error')
         return redirect(url_for('index'))
+
+@app.route('/generate_smart_picks_custom', methods=['POST'])
+def generate_smart_picks_custom():
+    if df.empty:
+        flash("Cannot generate smart picks: Historical data not loaded.", 'error')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get form data
+        num_sets = int(request.form.get('num_smart_sets', 1))
+        pattern_preferences = request.form.getlist('pattern_preference')
+        group_a_count = int(request.form.get('group_a_numbers_count', 0))
+        odd_even_choice = request.form.get('odd_even_choice_smart', 'Any')
+        sum_range_filter = request.form.get('sum_range_filter_smart', 'Any')
+        excluded_numbers = request.form.get('excluded_numbers_smart', '')
+        
+        # Parse excluded numbers
+        excluded_numbers_list = []
+        if excluded_numbers:
+            excluded_numbers_list = [int(num.strip()) for num in excluded_numbers.split(',') if num.strip().isdigit()]
+        
+        # Get sum range tuple
+        selected_sum_range_tuple = SUM_RANGES.get(sum_range_filter)
+        
+        # Get current month data if pattern preferences require it
+        picked_numbers = []
+        unpicked_numbers = []
+        frequency_groups = {}
+        
+        if any(pref in pattern_preferences for pref in [
+            'one_unpicked_four_picked', 'two_unpicked_three_picked', 
+            'five_unpicked_same_month', 'four_unpicked_one_picked'
+        ]):
+            picked_numbers, unpicked_numbers = _get_current_month_picked_unpicked()
+        
+        if any(pref in pattern_preferences for pref in [
+            'two_same_frequency', 'three_same_frequency', 'two_pairs_same_frequency'
+        ]):
+            frequency_groups = _get_current_year_frequency_groups()
+        
+        generated_sets = []
+        for _ in range(num_sets):
+            white_balls, powerball = generate_smart_pick_with_preferences(
+                df=df,
+                num_from_group_a=group_a_count,
+                odd_even_choice=odd_even_choice,
+                sum_range_tuple=selected_sum_range_tuple,
+                excluded_numbers=excluded_numbers_list,
+                one_unpicked_four_picked='one_unpicked_four_picked' in pattern_preferences,
+                two_unpicked_three_picked='two_unpicked_three_picked' in pattern_preferences,
+                five_unpicked_same_month='five_unpicked_same_month' in pattern_preferences,
+                four_unpicked_one_picked='four_unpicked_one_picked' in pattern_preferences,
+                two_same_frequency='two_same_frequency' in pattern_preferences,
+                three_same_frequency='three_same_frequency' in pattern_preferences,
+                two_pairs_same_frequency='two_pairs_same_frequency' in pattern_preferences,
+                picked_numbers=picked_numbers,
+                unpicked_numbers=unpicked_numbers,
+                frequency_groups=frequency_groups
+            )
+            generated_sets.append({'white_balls': white_balls, 'powerball': powerball})
+        
+        # Get last draw dates for the numbers
+        last_draw_dates = {}
+        if generated_sets:
+            last_draw_dates = find_last_draw_dates_for_numbers(df, generated_sets[0]['white_balls'], generated_sets[0]['powerball'])
+        
+        return render_template('index.html',
+            generated_sets=generated_sets,
+            generation_type='smart_pick',
+            last_draw_dates=last_draw_dates,
+            last_draw=last_draw,
+            sum_ranges=SUM_RANGES,
+            group_a=group_a,
+            selected_sum_range=sum_range_filter,
+            selected_odd_even_choice=odd_even_choice
+        )
+        
+    except ValueError as e:
+        flash(f"Invalid input: {str(e)}", 'error')
+    except Exception as e:
+        flash(f"Error generating smart picks: {str(e)}", 'error')
+    
+    return redirect(url_for('index'))
+
 @app.route('/sum_trends_and_gaps')
 def sum_trends_and_gaps_route():
     if df.empty:
