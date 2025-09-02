@@ -3623,6 +3623,18 @@ def format_dict_response(data_dict):
     # Generic dictionary formatting
     return "<br>".join([f"{key}: {value}" for key, value in data_dict.items()])
 
+def generate_smart_pick_with_preferences(df, num_from_group_a, odd_even_choice, sum_range_tuple, 
+                                       excluded_numbers, one_unpicked_four_picked=False,
+                                       two_unpicked_three_picked=False, five_unpicked_same_month=False,
+                                       four_unpicked_one_picked=False, two_same_frequency=False,
+                                       three_same_frequency=False, two_pairs_same_frequency=False,
+                                       picked_numbers=None, unpicked_numbers=None, frequency_groups=None):
+    """Generate a smart pick with the specified pattern preferences."""
+    # Implementation similar to generate_from_group_a but with all the new pattern checks
+    # This would be quite complex - you'd need to implement the logic for each pattern preference
+    # You might want to reuse parts of your existing generate_from_group_a function
+    pass
+
 # --- Flask Routes ---
 @app.route('/')
 def index():
@@ -4674,33 +4686,84 @@ def save_manual_pick_route():
         traceback.print_exc()
         return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
 
-@app.route('/smart_pick_generator')
-def smart_pick_generator_route():
-    global df, last_draw
-
-    if df.empty or last_draw.empty:
-        success = initialize_core_data() 
-        if not success: 
-            if df.empty:
-                flash("Failed to load historical data. Please try again later.", 'error')
-                return redirect(url_for('index'))
+@app.route('/generate_smart_picks', methods=['POST'])
+def generate_smart_picks_route():
+    if df.empty:
+        flash("Cannot generate smart picks: Historical data not loaded.", 'error')
+        return redirect(url_for('index'))
     
-    generated_sets = []
-    last_draw_dates = {}
-
-    return render_template('smart_pick_generator.html', 
-                           sum_ranges=SUM_RANGES,
-                           group_a=group_a,
-                           generated_sets=generated_sets, 
-                           last_draw_dates=last_draw_dates, 
-                           num_sets_to_generate=1, 
-                           excluded_numbers='',     
-                           num_from_group_a=2,      
-                           odd_even_choice="Any",   
-                           selected_sum_range="Any" 
-                          )
-
-
+    try:
+        # Get form data
+        num_sets = int(request.form.get('num_smart_sets', 1))
+        pattern_preferences = request.form.getlist('pattern_preference')
+        group_a_count = int(request.form.get('group_a_numbers_count', 0))
+        odd_even_choice = request.form.get('odd_even_choice_smart', 'Any')
+        sum_range_filter = request.form.get('sum_range_filter_smart', 'Any')
+        excluded_numbers = request.form.get('excluded_numbers_smart', '')
+        
+        # Parse excluded numbers
+        excluded_numbers_list = []
+        if excluded_numbers:
+            excluded_numbers_list = [int(num.strip()) for num in excluded_numbers.split(',') if num.strip().isdigit()]
+        
+        # Get sum range tuple
+        selected_sum_range_tuple = SUM_RANGES.get(sum_range_filter)
+        
+        # Get current month data if pattern preferences require it
+        picked_numbers = []
+        unpicked_numbers = []
+        frequency_groups = {}
+        
+        if any(pref in pattern_preferences for pref in [
+            'one_unpicked_four_picked', 'two_unpicked_three_picked', 
+            'five_unpicked_same_month', 'four_unpicked_one_picked'
+        ]):
+            picked_numbers, unpicked_numbers = _get_current_month_picked_unpicked()
+        
+        if any(pref in pattern_preferences for pref in [
+            'two_same_frequency', 'three_same_frequency', 'two_pairs_same_frequency'
+        ]):
+            frequency_groups = _get_current_year_frequency_groups()
+        
+        generated_sets = []
+        for _ in range(num_sets):
+            white_balls, powerball = generate_smart_pick_with_preferences(
+                df=df,
+                num_from_group_a=group_a_count,
+                odd_even_choice=odd_even_choice,
+                sum_range_tuple=selected_sum_range_tuple,
+                excluded_numbers=excluded_numbers_list,
+                one_unpicked_four_picked='one_unpicked_four_picked' in pattern_preferences,
+                two_unpicked_three_picked='two_unpicked_three_picked' in pattern_preferences,
+                five_unpicked_same_month='five_unpicked_same_month' in pattern_preferences,
+                four_unpicked_one_picked='four_unpicked_one_picked' in pattern_preferences,
+                two_same_frequency='two_same_frequency' in pattern_preferences,
+                three_same_frequency='three_same_frequency' in pattern_preferences,
+                two_pairs_same_frequency='two_pairs_same_frequency' in pattern_preferences,
+                picked_numbers=picked_numbers,
+                unpicked_numbers=unpicked_numbers,
+                frequency_groups=frequency_groups
+            )
+            generated_sets.append({'white_balls': white_balls, 'powerball': powerball})
+        
+        # Get last draw dates for the numbers
+        last_draw_dates = {}
+        if generated_sets:
+            last_draw_dates = find_last_draw_dates_for_numbers(df, generated_sets[0]['white_balls'], generated_sets[0]['powerball'])
+        
+        return render_template('index.html',
+            generated_sets=generated_sets,
+            generation_type='smart_pick',
+            last_draw_dates=last_draw_dates,
+            # Pass other necessary template variables
+            last_draw=last_draw,
+            sum_ranges=SUM_RANGES,
+            group_a=group_a
+        )
+        
+    except Exception as e:
+        flash(f"Error generating smart picks: {str(e)}", 'error')
+        return redirect(url_for('index'))
 @app.route('/sum_trends_and_gaps')
 def sum_trends_and_gaps_route():
     if df.empty:
