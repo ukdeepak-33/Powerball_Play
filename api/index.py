@@ -3994,27 +3994,29 @@ def save_generated_pick_route():
         flash(f"An error occurred while saving generated numbers: {e}", 'error')
     return redirect(url_for('index'))
 
-@app.route('/save_multiple_generated_picks', methods=['POST'])
-def save_multiple_generated_picks_route():
+@app.route('/save_multiple_generated_picks_api', methods=['POST'])  # Changed URL
+def save_multiple_generated_picks_api():  # Changed function name
+    """Save multiple generated picks from the smart pick generator."""
     try:
-        picks_to_save = request.json.get('picks', [])
-
+        data = request.get_json()
+        picks_to_save = data.get('picks', [])
+        
         if not picks_to_save:
             return jsonify({"success": False, "message": "No picks provided to save."}), 400
-
+        
         saved_count = 0
         failed_count = 0
         messages = []
-
+        
         for pick in picks_to_save:
             white_balls = pick.get('white_balls')
             powerball = pick.get('powerball')
-
+            
             if not white_balls or len(white_balls) != 5 or powerball is None:
                 messages.append(f"Skipping invalid pick: {pick}")
                 failed_count += 1
                 continue
-
+            
             try:
                 white_balls = sorted([int(n) for n in white_balls])
                 powerball = int(powerball)
@@ -4022,7 +4024,7 @@ def save_multiple_generated_picks_route():
                 messages.append(f"Skipping pick due to invalid number format: {pick}")
                 failed_count += 1
                 continue
-
+            
             success, message = save_generated_numbers_to_db(white_balls, powerball)
             if success:
                 saved_count += 1
@@ -4030,14 +4032,13 @@ def save_multiple_generated_picks_route():
             else:
                 failed_count += 1
                 messages.append(f"Failed to save {', '.join(map(str, white_balls))} + {powerball}: {message}")
-
+        
         status_message = f"Successfully saved {saved_count} pick(s). Failed to save {failed_count} pick(s)."
         return jsonify({"success": True, "message": status_message, "details": messages}), 200
-
+        
     except Exception as e:
-        print(f"Error in save_multiple_generated_picks_route: {e}")
-        traceback.print_exc()
         return jsonify({"success": False, "message": f"An unexpected error occurred: {str(e)}"}), 500
+
 
 # NEW: Route for White Ball Gap Analysis
 @app.route('/white_ball_gap_analysis')
