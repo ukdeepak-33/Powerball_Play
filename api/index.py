@@ -3961,8 +3961,9 @@ def save_official_draw_route():
         flash(f"An error occurred: {e}", 'error')
     return redirect(url_for('index'))
 
-@app.route('/save_generated_pick', methods=['POST'])
-def save_generated_pick_route():
+@app.route('/save_multiple_generated_picks', methods=['POST'], endpoint='save_multiple_index')
+def save_multiple_generated_picks_route():
+    # ... existing implementation ...
     try:
         white_balls_str = request.form.get('generated_white_balls')
         powerball_str = request.form.get('generated_powerball')
@@ -3994,9 +3995,9 @@ def save_generated_pick_route():
         flash(f"An error occurred while saving generated numbers: {e}", 'error')
     return redirect(url_for('index'))
 
-@app.route('/save_multiple_generated_picks_api', methods=['POST'])  # Changed URL
-def save_multiple_generated_picks_api():  # Changed function name
-    """Save multiple generated picks from the smart pick generator."""
+@app.route('/api/save_multiple_smart_picks', methods=['POST'], endpoint='save_multiple_smart')
+def save_multiple_smart_picks_route():
+    """Save multiple generated picks from the dedicated smart pick generator page."""
     try:
         data = request.get_json()
         picks_to_save = data.get('picks', [])
@@ -4038,7 +4039,6 @@ def save_multiple_generated_picks_api():  # Changed function name
         
     except Exception as e:
         return jsonify({"success": False, "message": f"An unexpected error occurred: {str(e)}"}), 500
-
 
 # NEW: Route for White Ball Gap Analysis
 @app.route('/white_ball_gap_analysis')
