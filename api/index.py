@@ -4789,8 +4789,9 @@ def save_manual_pick_route():
         traceback.print_exc()
         return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
 
-@app.route('/generate_smart_picks', methods=['POST'])
-def generate_smart_picks_route():
+# Route for the smart pick generator on the main index page
+@app.route('/api/generate_smart_picks', methods=['POST'], endpoint='generate_smart_picks_index')
+def generate_smart_picks_for_index():
     if df.empty:
         flash("Cannot generate smart picks: Historical data not loaded.", 'error')
         return redirect(url_for('index'))
@@ -4858,18 +4859,20 @@ def generate_smart_picks_route():
             generated_sets=generated_sets,
             generation_type='smart_pick',
             last_draw_dates=last_draw_dates,
-            # Pass other necessary template variables
             last_draw=last_draw,
             sum_ranges=SUM_RANGES,
-            group_a=group_a
+            group_a=group_a,
+            selected_sum_range=sum_range_filter,
+            selected_odd_even_choice=odd_even_choice
         )
         
     except Exception as e:
         flash(f"Error generating smart picks: {str(e)}", 'error')
         return redirect(url_for('index'))
 
-@app.route('/generate_smart_picks_api', methods=['POST'])  # Changed URL
-def generate_smart_picks_api():  # Changed function name
+# Route for the dedicated smart pick generator page
+@app.route('/api/generate_advanced_picks', methods=['POST'], endpoint='generate_smart_picks_dedicated')
+def generate_smart_picks_for_dedicated_page():
     """Handle smart pick generation for the dedicated page."""
     if df.empty:
         return jsonify({'success': False, 'error': "Historical data not loaded."})
@@ -4972,88 +4975,6 @@ def save_multiple_generated_picks_route():
     except Exception as e:
         return jsonify({"success": False, "message": f"An unexpected error occurred: {str(e)}"}), 500
 
-@app.route('/generate_smart_picks_custom', methods=['POST'])
-def generate_smart_picks_custom():
-    if df.empty:
-        flash("Cannot generate smart picks: Historical data not loaded.", 'error')
-        return redirect(url_for('index'))
-    
-    try:
-        # Get form data (not JSON)
-        num_sets = int(request.form.get('num_smart_sets', 1))
-        pattern_preferences = request.form.getlist('pattern_preference')
-        group_a_count = int(request.form.get('group_a_numbers_count', 0))
-        odd_even_choice = request.form.get('odd_even_choice_smart', 'Any')
-        sum_range_filter = request.form.get('sum_range_filter_smart', 'Any')
-        excluded_numbers = request.form.get('excluded_numbers_smart', '')
-        
-        # Parse excluded numbers
-        excluded_numbers_list = []
-        if excluded_numbers:
-            excluded_numbers_list = [int(num.strip()) for num in excluded_numbers.split(',') if num.strip().isdigit()]
-        
-        # Get sum range tuple
-        selected_sum_range_tuple = SUM_RANGES.get(sum_range_filter)
-        
-        # Get current month data if pattern preferences require it
-        picked_numbers = []
-        unpicked_numbers = []
-        frequency_groups = {}
-        
-        if any(pref in pattern_preferences for pref in [
-            'one_unpicked_four_picked', 'two_unpicked_three_picked', 
-            'five_unpicked_same_month', 'four_unpicked_one_picked'
-        ]):
-            picked_numbers, unpicked_numbers = _get_current_month_picked_unpicked()
-        
-        if any(pref in pattern_preferences for pref in [
-            'two_same_frequency', 'three_same_frequency', 'two_pairs_same_frequency'
-        ]):
-            frequency_groups = _get_current_year_frequency_groups()
-        
-        generated_sets = []
-        for _ in range(num_sets):
-            white_balls, powerball = generate_smart_pick_with_preferences(
-                df=df,
-                num_from_group_a=group_a_count,
-                odd_even_choice=odd_even_choice,
-                sum_range_tuple=selected_sum_range_tuple,
-                excluded_numbers=excluded_numbers_list,
-                one_unpicked_four_picked='one_unpicked_four_picked' in pattern_preferences,
-                two_unpicked_three_picked='two_unpicked_three_picked' in pattern_preferences,
-                five_unpicked_same_month='five_unpicked_same_month' in pattern_preferences,
-                four_unpicked_one_picked='four_unpicked_one_picked' in pattern_preferences,
-                two_same_frequency='two_same_frequency' in pattern_preferences,
-                three_same_frequency='three_same_frequency' in pattern_preferences,
-                two_pairs_same_frequency='two_pairs_same_frequency' in pattern_preferences,
-                picked_numbers=picked_numbers,
-                unpicked_numbers=unpicked_numbers,
-                frequency_groups=frequency_groups
-            )
-            generated_sets.append({'white_balls': white_balls, 'powerball': powerball})
-        
-        # Get last draw dates for the numbers
-        last_draw_dates = {}
-        if generated_sets:
-            last_draw_dates = find_last_draw_dates_for_numbers(df, generated_sets[0]['white_balls'], generated_sets[0]['powerball'])
-        
-        return render_template('index.html',
-            generated_sets=generated_sets,
-            generation_type='smart_pick',
-            last_draw_dates=last_draw_dates,
-            last_draw=last_draw,
-            sum_ranges=SUM_RANGES,
-            group_a=group_a,
-            selected_sum_range=sum_range_filter,
-            selected_odd_even_choice=odd_even_choice
-        )
-        
-    except ValueError as e:
-        flash(f"Invalid input: {str(e)}", 'error')
-    except Exception as e:
-        flash(f"Error generating smart picks: {str(e)}", 'error')
-    
-    return redirect(url_for('index'))
 
 @app.route('/sum_trends_and_gaps')
 def sum_trends_and_gaps_route():
