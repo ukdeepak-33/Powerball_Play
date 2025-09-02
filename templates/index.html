@@ -685,7 +685,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ picks: picks })
+                    body: JSON.stringify({picks: picksToSave})
                 });
 
                 const data = await response.json();
