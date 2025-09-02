@@ -567,7 +567,7 @@
             };
 
             try {
-                const response = await fetch('/generate_smart_picks_route', {
+                const response = await fetch('/api/generate_smart_picks', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json' // Crucial: tell the server we're sending JSON
