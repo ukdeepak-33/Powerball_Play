@@ -4867,6 +4867,109 @@ def generate_smart_picks_route():
         flash(f"Error generating smart picks: {str(e)}", 'error')
         return redirect(url_for('index'))
 
+@app.route('/generate_smart_picks_route', methods=['POST'])
+def generate_smart_picks_route():
+    """Handle smart pick generation for the dedicated page."""
+    if df.empty:
+        return jsonify({'success': False, 'error': "Historical data not loaded."})
+    
+    try:
+        data = request.get_json()
+        num_sets = int(data.get('num_sets_to_generate', 1))
+        excluded_numbers = data.get('excluded_numbers', '')
+        strategy = data.get('generation_strategy', 'rule_based')
+        
+        # Parse excluded numbers
+        excluded_numbers_list = []
+        if excluded_numbers:
+            excluded_numbers_list = [int(num.strip()) for num in excluded_numbers.split(',') if num.strip().isdigit()]
+        
+        generated_sets = []
+        last_draw_dates = {}
+        
+        if strategy == 'rule_based':
+            # Get rule-based parameters
+            num_from_group_a = int(data.get('num_from_group_a', 2))
+            odd_even_choice = data.get('odd_even_choice', 'Any')
+            sum_range_label = data.get('sum_range_filter', 'Any')
+            sum_range_tuple = SUM_RANGES.get(sum_range_label)
+            
+            # Generate using rule-based approach
+            for _ in range(num_sets):
+                white_balls, powerball = generate_powerball_numbers(
+                    df, group_a, odd_even_choice, "No Combo",
+                    GLOBAL_WHITE_BALL_RANGE, GLOBAL_POWERBALL_RANGE,
+                    excluded_numbers_list, None, sum_range_tuple, False
+                )
+                generated_sets.append({'white_balls': white_balls, 'powerball': powerball})
+        
+        else:  # vae_based or other strategies
+            # Fallback to basic generation if ML not implemented
+            for _ in range(num_sets):
+                white_balls = sorted(random.sample(
+                    [num for num in range(1, 70) if num not in excluded_numbers_list], 5
+                ))
+                powerball = random.randint(1, 26)
+                generated_sets.append({'white_balls': white_balls, 'powerball': powerball})
+        
+        # Get last draw dates
+        if generated_sets:
+            last_draw_dates = find_last_draw_dates_for_numbers(df, generated_sets[0]['white_balls'], generated_sets[0]['powerball'])
+        
+        return jsonify({
+            'success': True,
+            'generated_sets': generated_sets,
+            'last_draw_dates': last_draw_dates
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/save_multiple_generated_picks', methods=['POST'])
+def save_multiple_generated_picks_route():
+    """Save multiple generated picks from the smart pick generator."""
+    try:
+        data = request.get_json()
+        picks_to_save = data.get('picks', [])
+        
+        if not picks_to_save:
+            return jsonify({"success": False, "message": "No picks provided to save."}), 400
+        
+        saved_count = 0
+        failed_count = 0
+        messages = []
+        
+        for pick in picks_to_save:
+            white_balls = pick.get('white_balls')
+            powerball = pick.get('powerball')
+            
+            if not white_balls or len(white_balls) != 5 or powerball is None:
+                messages.append(f"Skipping invalid pick: {pick}")
+                failed_count += 1
+                continue
+            
+            try:
+                white_balls = sorted([int(n) for n in white_balls])
+                powerball = int(powerball)
+            except ValueError:
+                messages.append(f"Skipping pick due to invalid number format: {pick}")
+                failed_count += 1
+                continue
+            
+            success, message = save_generated_numbers_to_db(white_balls, powerball)
+            if success:
+                saved_count += 1
+                messages.append(f"Saved: {', '.join(map(str, white_balls))} + {powerball}")
+            else:
+                failed_count += 1
+                messages.append(f"Failed to save {', '.join(map(str, white_balls))} + {powerball}: {message}")
+        
+        status_message = f"Successfully saved {saved_count} pick(s). Failed to save {failed_count} pick(s)."
+        return jsonify({"success": True, "message": status_message, "details": messages}), 200
+        
+    except Exception as e:
+        return jsonify({"success": False, "message": f"An unexpected error occurred: {str(e)}"}), 500
+
 @app.route('/generate_smart_picks_custom', methods=['POST'])
 def generate_smart_picks_custom():
     if df.empty:
@@ -4993,7 +5096,21 @@ def yearly_white_ball_trends_route():
 def ai_assistant():
     """Dedicated page for the Powerball conversational assistant."""
     return render_template('ai_assistant.html')
-
+    
+@app.route('/smart_pick_generator')
+def smart_pick_generator_route():
+    """Route for the dedicated smart pick generator page."""
+    # Make sure data is loaded
+    if df.empty:
+        initialize_core_data()
+    
+    return render_template('smart_pick_generator.html',
+                           last_draw=last_draw.to_dict(),
+                           sum_ranges=SUM_RANGES,
+                           group_a=group_a,
+                           selected_odd_even_choice="Any",
+                           selected_sum_range="Any",
+                           num_sets_to_generate=1)
 
 # --- API Endpoints ---
 @app.route('/api/generate_single_draw', methods=['GET'])
