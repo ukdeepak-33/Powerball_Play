@@ -4867,8 +4867,8 @@ def generate_smart_picks_route():
         flash(f"Error generating smart picks: {str(e)}", 'error')
         return redirect(url_for('index'))
 
-@app.route('/generate_smart_picks_route', methods=['POST'])
-def generate_smart_picks_route():
+@app.route('/generate_smart_picks_api', methods=['POST'])  # Changed URL
+def generate_smart_picks_api():  # Changed function name
     """Handle smart pick generation for the dedicated page."""
     if df.empty:
         return jsonify({'success': False, 'error': "Historical data not loaded."})
@@ -4924,6 +4924,7 @@ def generate_smart_picks_route():
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
 
 @app.route('/save_multiple_generated_picks', methods=['POST'])
 def save_multiple_generated_picks_route():
