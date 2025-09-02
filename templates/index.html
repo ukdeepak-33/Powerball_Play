@@ -316,131 +316,146 @@
         {% endif %}
     </div>
 
-    {# Smart Pick Generator (AI-Powered) Card - MOVED TO LAST #}
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Smart Pick Generator (AI-Powered)</h2>
-        <p class="text-gray-700 mb-6">
-            Generate Powerball picks tailored to your preferences. 
-            Choose criteria below to influence the generation of intelligent number sets.
-        </p>
+    {# Smart Pick Generator (AI-Powered) Card #}
+<div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">Smart Pick Generator</h2>
+    <p class="text-gray-700 mb-6">
+        Generate Powerball picks with advanced pattern preferences and constraints.
+    </p>
 
-        <div class="space-y-6">
-            <div class="form-group">
-                <label for="num_smart_sets" class="block text-gray-700 text-sm font-bold mb-2">Number of Picks to Generate (1-5):</label>
-                <input type="number" id="num_smart_sets" name="num_smart_sets" min="1" max="5" value="1" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-            </div>
+    <form method="POST" action="{{ url_for('generate_smart_picks_route') }}" class="space-y-4">
+        <div class="form-group">
+            <label for="num_smart_sets" class="block text-gray-700 text-sm font-bold mb-2">Number of Picks to Generate (1-5):</label>
+            <input type="number" id="num_smart_sets" name="num_smart_sets" min="1" max="5" value="1" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
 
-            <div class="form-group">
-                <label class="block text-gray-700 text-sm font-bold mb-2">Prioritize Patterns (Soft Constraints):</label>
-                <div class="flex flex-wrap gap-4">
-                    {# Removed Monthly Hot Numbers #}
+        <div class="form-group">
+            <label class="block text-gray-700 text-sm font-bold mb-2">Number Pattern Preferences:</label>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-2">
                     <label class="inline-flex items-center">
-                        <input type="checkbox" id="prioritize_grouped_patterns" name="prioritize_grouped_patterns" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-                        <span class="ml-2 text-gray-700">Grouped Patterns</span>
+                        <input type="checkbox" name="pattern_preference" value="one_unpicked_four_picked" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                        <span class="ml-2 text-gray-700">1 unpicked + 4 picked (same month)</span>
                     </label>
                     <label class="inline-flex items-center">
-                        <input type="checkbox" id="prioritize_special_patterns" name="prioritize_special_patterns" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-                        <span class="ml-2 text-gray-700">Special Patterns</span>
+                        <input type="checkbox" name="pattern_preference" value="two_unpicked_three_picked" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                        <span class="ml-2 text-gray-700">2 unpicked + 3 picked (same month)</span>
                     </label>
                     <label class="inline-flex items-center">
-                        <input type="checkbox" id="prioritize_consecutive_patterns" name="prioritize_consecutive_patterns" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-                        <span class="ml-2 text-gray-700">Consecutive Patterns</span>
+                        <input type="checkbox" name="pattern_preference" value="five_unpicked_same_month" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                        <span class="ml-2 text-gray-700">5 unpicked numbers (same month)</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" name="pattern_preference" value="four_unpicked_one_picked" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                        <span class="ml-2 text-gray-700">4 unpicked + 1 picked (same month)</span>
+                    </label>
+                </div>
+                <div class="space-y-2">
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" name="pattern_preference" value="two_same_frequency" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                        <span class="ml-2 text-gray-700">2 numbers with same frequency</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" name="pattern_preference" value="three_same_frequency" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                        <span class="ml-2 text-gray-700">3 numbers with same frequency</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="checkbox" name="pattern_preference" value="two_pairs_same_frequency" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                        <span class="ml-2 text-gray-700">2 pairs from different frequencies</span>
                     </label>
                 </div>
             </div>
-
-            <div class="form-group">
-                <label for="group_a_numbers_count" class="block text-gray-700 text-sm font-bold mb-2">Numbers from Group A (Hard Constraint):</label>
-                <select id="group_a_numbers_count" name="group_a_numbers_count" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    <option value="0">Any (0 from Group A)</option>
-                    <option value="1">1 from Group A</option>
-                    <option value="2">2 from Group A</option>
-                    <option value="3">3 from Group A</option>
-                    <option value="4">4 from Group A</option>
-                    <option value="5">5 from Group A</option>
-                </select>
-                <p class="text-xs text-gray-500 mt-1">Select the exact number of balls you want from the predefined 'Group A' numbers.</p>
-            </div>
-
-            <div class="form-group">
-                <label for="odd_even_choice_smart" class="block text-gray-700 text-sm font-bold mb-2">Odd/Even Split Preference:</label>
-                <select id="odd_even_choice_smart" name="odd_even_choice_smart" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    <option value="Any">Any Split (Random)</option>
-                    <option value="All Even">All Even (5 Even / 0 Odd)</option>
-                    <option value="All Odd">All Odd (5 Odd / 0 Even)</option>
-                    <option value="3 Even / 2 Odd">3 Even / 2 Odd</option>
-                    <option value="2 Even / 3 Odd">2 Even / 3 Odd</option>
-                    <option value="1 Even / 4 Odd">1 Even / 4 Odd</option>
-                    <option value="4 Even / 1 Odd">4 Even / 1 Odd</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="sum_range_filter_smart" class="block text-gray-700 text-sm font-bold mb-2">Sum Range Filter:</label>
-                <select id="sum_range_filter_smart" name="sum_range_filter_smart" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    <option value="Any">Any Sum</option>
-                    <option value="Zone A (60-99)">Zone A (60-99)</option>
-                    <option value="Zone B (100-129)">Zone B (100-129)</option>
-                    <option value="Zone C (130-159)">Zone C (130-159)</option>
-                    <option value="Zone D (160-189)">Zone D (160-189)</option>
-                    <option value="Zone E (190-220)">Zone E (190-220)</option>
-                    <option value="Zone F (221-249)">Zone F (221-249)</option>
-                    <option value="Zone G (250-300)">Zone G (250-300)</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="excluded_numbers_smart" class="block text-gray-700 text-sm font-bold mb-2">Excluded Numbers (comma-separated):</label>
-                <input type="text" id="excluded_numbers_smart" name="excluded_numbers_smart" placeholder="e.g., 4, 18, 55" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                <p class="text-xs text-gray-500 mt-1">Numbers to explicitly exclude from generation.</p>
-            </div>
-
-            <div class="form-group">
-                 <label class="block text-gray-700 text-sm font-bold mb-2">Current Month Number Preferences:</label>
-            <div class="flex flex-col space-y-2">
-                 <label class="inline-flex items-center">
-                 <input type="checkbox" name="current_month_preference" value="five_unpicked_same_freq" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-                 <span class="ml-2 text-gray-700">Five unpicked numbers (with two from same frequency, age ≤ 25 draws)</span>
-        </label>
-                <label class="inline-flex items-center">
-                <input type="checkbox" id="preference_one_unpicked" name="current_month_preference_smart" value="one_unpicked_four_picked" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-                <span class="ml-2 text-gray-700">One unpicked number + 4 picked numbers from current month</span>
-        </label>
-                <label class="inline-flex items-center">
-                <input type="checkbox" id="preference_two_unpicked" name="current_month_preference_smart" value="two_unpicked_three_picked" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-                <span class="ml-2 text-gray-700">Two unpicked numbers + 3 picked numbers from current month</span>
-        </label>
-                <label class="inline-flex items-center">
-                <input type="checkbox" id="preference_two_same_frequency" name="current_month_preference_smart" value="two_same_frequency" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-                <span class="ml-2 text-gray-700">Two numbers from the same white ball frequency from current year</span>
-        </label>
-        </div>
-        <p class="text-xs text-gray-500 mt-1">Select preferences for including numbers based on current month/year patterns.</p>
-            </div>
-
-
-            <button type="button" id="generateSmartPicksBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition duration-300 ease-in-out w-full sm:w-auto">
-                Generate Smart Picks
-            </button>
+            <p class="text-xs text-gray-500 mt-1">Select pattern preferences for number generation.</p>
         </div>
 
-        <div id="loadingIndicator" class="hidden text-center mt-6 text-blue-500 font-semibold">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-            Generating intelligent picks... Please wait.
+        <div class="form-group">
+            <label for="group_a_numbers_count" class="block text-gray-700 text-sm font-bold mb-2">Numbers from Group A (0-5):</label>
+            <select id="group_a_numbers_count" name="group_a_numbers_count" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                {% for i in range(6) %}
+                    <option value="{{ i }}">{{ i }} from Group A</option>
+                {% endfor %}
+            </select>
+            <p class="text-xs text-gray-500 mt-1">Select how many balls from Group A: {{ group_a | join(', ') }}</p>
         </div>
 
-        <div id="smartPicksResults" class="mt-8 space-y-4 hidden bg-gradient-to-br from-blue-500 to-indigo-600 p-8 rounded-2xl shadow-xl">
-            <h3 class="text-3xl font-bold text-white text-center mb-6">Your Smart Picks!</h3>
-            {# Picks will be injected here by JavaScript #}
+        <div class="form-group">
+            <label for="odd_even_choice_smart" class="block text-gray-700 text-sm font-bold mb-2">Odd/Even Split Preference:</label>
+            <select id="odd_even_choice_smart" name="odd_even_choice_smart" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <option value="Any">Any Split (Random)</option>
+                <option value="All Even">All Even (5 Even / 0 Odd)</option>
+                <option value="All Odd">All Odd (5 Odd / 0 Even)</option>
+                <option value="3 Even / 2 Odd">3 Even / 2 Odd</option>
+                <option value="2 Even / 3 Odd">2 Even / 3 Odd</option>
+                <option value="1 Even / 4 Odd">1 Even / 4 Odd</option>
+                <option value="4 Even / 1 Odd">4 Even / 1 Odd</option>
+            </select>
         </div>
 
-        <div id="saveAllSmartPicksActions" class="hidden mt-6 text-center">
-            <button type="button" id="saveAllSmartPicksBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
-                Save All Generated Picks
-            </button>
+        <div class="form-group">
+            <label for="sum_range_filter_smart" class="block text-gray-700 text-sm font-bold mb-2">Sum Range Filter:</label>
+            <select id="sum_range_filter_smart" name="sum_range_filter_smart" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <option value="Any">Any Sum</option>
+                {% for label, _ in sum_ranges.items() %}
+                    {% if label != "Any" %}
+                        <option value="{{ label }}">{{ label }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
         </div>
-    </div>
 
+        <div class="form-group">
+            <label for="excluded_numbers_smart" class="block text-gray-700 text-sm font-bold mb-2">Excluded Numbers (comma-separated):</label>
+            <input type="text" id="excluded_numbers_smart" name="excluded_numbers_smart" placeholder="e.g., 4, 18, 55" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            <p class="text-xs text-gray-500 mt-1">Numbers to explicitly exclude from generation.</p>
+        </div>
+
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition duration-300 ease-in-out w-full">
+            Generate Smart Picks
+        </button>
+    </form>
+
+    {% if generated_sets and generation_type == 'smart_pick' %}
+        <h3 class="text-2xl font-bold mt-8 mb-4 text-gray-800">Your Smart Picks</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for pick in generated_sets %}
+            <div class="bg-white p-4 rounded-lg shadow flex items-center justify-between flex-wrap">
+                <div class="flex items-center space-x-2 mb-2 md:mb-0">
+                    {% for num in pick.white_balls %}
+                        <span class="ball-sm bg-blue-500 text-white">{{ num }}</span>
+                    {% endfor %}
+                    <span class="ball-sm powerball-ball bg-red-500 text-white ml-2">{{ pick.powerball }}</span>
+                </div>
+                <form action="{{ url_for('save_generated_pick_route') }}" method="post" class="ml-auto">
+                    <input type="hidden" name="generated_white_balls" value="{{ pick.white_balls | join(',') }}">
+                    <input type="hidden" name="generated_powerball" value="{{ pick.powerball }}">
+                    <button type="submit" class="bg-green-500 hover:bg-green-600 text-white text-sm font-bold py-1 px-3 rounded-lg">Save Pick</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        
+        {% if last_draw_dates %}
+        <div class="mt-4 p-4 bg-gray-100 rounded-lg text-gray-700 text-sm">
+            <h4 class="font-semibold mb-2">Last Drawn Dates for Your Numbers:</h4>
+            <ul class="list-disc list-inside">
+                {% for number, date in last_draw_dates.items() %}
+                    <li>{{ number }}: {{ date }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        
+        <div class="mt-6 text-center">
+            <form action="{{ url_for('save_multiple_generated_picks_route') }}" method="post">
+                {% for pick in generated_sets %}
+                    <input type="hidden" name="picks" value="{{ {'white_balls': pick.white_balls, 'powerball': pick.powerball} | tojson }}">
+                {% endfor %}
+                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
+                    Save All Generated Picks
+                </button>
+            </form>
+        </div>
+    {% endif %}
 </div>
 
 <style>
