@@ -299,7 +299,7 @@
                     {% endfor %}
                     <span class="ball-sm powerball-ball bg-red-500 text-white ml-2">{{ generated_sets[0].powerball }}</span>
                 </div>
-                <form action="{{ url_for('save_generated_pick_route') }}" method="post" class="ml-auto">
+                <form action="{{ url_for('save_multiple_generated_picks_route') }}" method="post" class="ml-auto">
                     <input type="hidden" name="generated_white_balls" value="{{ generated_sets[0].white_balls | join(',') }}">
                     <input type="hidden" name="generated_powerball" value="{{ generated_sets[0].powerball }}">
                     <button type="submit" class="bg-green-500 hover:bg-green-600 text-white text-sm font-bold py-1 px-3 rounded-lg">Save Pick</button>
