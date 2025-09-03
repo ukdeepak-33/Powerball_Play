@@ -409,8 +409,8 @@
             <p class="text-xs text-gray-500 mt-1">Numbers to explicitly exclude from generation.</p>
         </div>
 
-        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition duration-300 ease-in-out w-full">
-            Generate Smart Picks
+        <button id="generatePicksBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition duration-300 ease-in-out">
+           Generate Smart Picks
         </button>
     </form>
 
@@ -450,9 +450,9 @@
                 {% for pick in generated_sets %}
                     <input type="hidden" name="picks" value="{{ {'white_balls': pick.white_balls, 'powerball': pick.powerball} | tojson }}">
                 {% endfor %}
-                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
-                    Save All Generated Picks
-                </button>
+                <button id="saveAllPicksBtn" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition duration-300 ease-in-out">
+                  Save All Generated Picks
+                </button>    
             </form>
         </div>
     {% endif %}
@@ -498,6 +498,29 @@
         // NEW: Elements for General Generator "Save All"
         const generalGeneratedPicksList = document.getElementById('generalGeneratedPicksList');
         const saveAllGeneralPicksBtn = document.getElementById('saveAllGeneralPicksBtn');
+        const saveAllPicksBtn = document.getElementById('saveAllPicksBtn');
+    if (saveAllPicksBtn) {
+        saveAllPicksBtn.addEventListener('click', async function() {
+            const generatedSetsContainer = document.getElementById('generated-picks-container');
+            const pickElements = generatedSetsContainer.querySelectorAll('.generated-pick-item');
+            
+            if (pickElements.length === 0) {
+                showFlashMessage('No numbers generated to save.', 'error');
+                return;
+            }
+
+            const picksToSave = [];
+            pickElements.forEach(item => {
+                const whiteBallsStr = item.dataset.whiteBalls;
+                const powerballStr = item.dataset.powerball;
+                const whiteBalls = whiteBallsStr.split(',').map(Number);
+                const powerball = Number(powerballStr);
+                picksToSave.push({ white_balls: whiteBalls, powerball: powerball });
+            });
+
+            await saveMultiplePicks(picksToSave);
+        });
+    }
 
 
         // Function to display flash messages directly in JS
