@@ -5076,6 +5076,34 @@ def smart_pick_generator_route():
                            selected_sum_range="Any",
                            num_sets_to_generate=1)
 
+@app.route('/historical-data', methods=['GET'], endpoint='historical_data_route')
+def historical_data_route():
+    """Renders the historical data page with draw results and frequencies."""
+    try:
+        # Ensure the DataFrame is populated
+        if df.empty:
+            initialize_core_data()
+        
+        # Get the requested year from the URL, defaulting to the current year
+        year_to_display = request.args.get('year', type=int, default=datetime.now().year)
+        
+        # Filter for draws from the specified year
+        current_year_draws_df = df[df['Draw Date_dt'].dt.year == year_to_display].sort_values(by='Draw Date_dt', ascending=False)
+        
+        # Get a list of all available years for the dropdown menu
+        available_years = sorted(df['Draw Date_dt'].dt.year.unique(), reverse=True)
+        
+        return render_template(
+            'historical_data.html',
+            historical_draws=[],  # Empty for now, will be populated by JavaScript
+            available_years=available_years,
+            selected_year=year_to_display
+        )
+
+    except Exception as e:
+        flash(f'An error occurred: {str(e)}', 'error')
+        return redirect(url_for('index'))
+
 @app.route('/api/historical-frequencies', methods=['GET'])
 def api_historical_frequencies():
     """API endpoint to get white ball frequencies for a specific year."""
