@@ -5058,27 +5058,30 @@ def historical_data_route():
         # Get the requested year from the URL, defaulting to the current year
         year_to_display = request.args.get('year', type=int, default=datetime.now().year)
         
-        # Filter for draws from the specified year
-        current_year_draws_df = df[df['draw_date'].dt.year == year_to_display].sort_values(by='draw_date', ascending=False)
+        # Filter for draws from the specified year - use correct column name 'Draw Date'
+        current_year_draws_df = df[df['Draw Date_dt'].dt.year == year_to_display].sort_values(by='Draw Date_dt', ascending=False)
         
         # Calculate overall frequencies for the entire dataset
-        all_white_balls = [item for sublist in df['white_balls'] for item in sublist]
+        # Extract white balls from all Number columns
+        white_ball_columns = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']
+        all_white_balls = df[white_ball_columns].values.flatten()
         overall_frequencies = calculate_white_ball_frequencies(all_white_balls)
         
         # Prepare the list of draws with their frequencies for the template
         historical_draws = []
         for _, row in current_year_draws_df.iterrows():
-            white_balls = row['white_balls']
+            white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), 
+                          int(row['Number 4']), int(row['Number 5'])]
             frequencies = get_frequency_numbers(white_balls, overall_frequencies)
             historical_draws.append({
-                'draw_date': row['draw_date'].strftime('%Y-%m-%d'),
+                'draw_date': row['Draw Date'],
                 'white_balls': white_balls,
-                'powerball': row['powerball'],
+                'powerball': int(row['Powerball']),
                 'frequencies': frequencies
             })
             
         # Get a list of all available years for the dropdown menu
-        available_years = sorted(df['draw_date'].dt.year.unique(), reverse=True)
+        available_years = sorted(df['Draw Date_dt'].dt.year.unique(), reverse=True)
         
         return render_template(
             'historical_data.html',
@@ -5090,16 +5093,7 @@ def historical_data_route():
     except Exception as e:
         flash(f'An error occurred: {str(e)}', 'error')
         return redirect(url_for('index'))
-        
-        return render_template(
-            'historical_data.html',
-            historical_draws=historical_draws,
-            available_years=available_years,
-            selected_year=year_to_display
-        )
-    except Exception as e:
-        flash(f'An error occurred: {str(e)}', 'error')
-        return redirect(url_for('index'))
+
 
 # --- API Endpoints ---
 @app.route('/api/generate_single_draw', methods=['GET'])
