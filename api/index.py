@@ -828,7 +828,7 @@ def _get_current_year_frequency_groups():
 
 def initialize_core_data():
     """Initializes and loads all core data from Supabase and performs initial analyses."""
-    global df, last_draw, historical_white_ball_sets, white_ball_co_occurrence_lookup, last_analysis_cache_update, 
+    global df, last_draw, historical_white_ball_sets, white_ball_co_occurrence_lookup, last_analysis_cache_update
     print("Initializing core data...")
     df = load_historical_data_from_supabase()
 
@@ -844,26 +844,6 @@ def initialize_core_data():
     last_analysis_cache_update = datetime.now()
     print("Core data initialization complete.")
 
-def calculate_frequencies(year, all_draws_df):
-    """
-    Calculates the frequency of each number for a given year.
-    Returns a list of dictionaries with number and its count, sorted by number.
-    """
-    year_df = all_draws_df[all_draws_df['draw_date'].dt.year == int(year)]
-    white_ball_counts = defaultdict(int)
-    for balls in year_df['white_balls']:
-        for ball in balls:
-            white_ball_counts[ball] += 1
-    
-    powerball_counts = defaultdict(int)
-    for powerball in year_df['powerball']:
-        powerball_counts[powerball] += 1
-
-    return {
-        'white_balls': [{'number': i, 'count': white_ball_counts[i]} for i in range(1, 70)],
-        'powerball': [{'number': i, 'count': powerball_counts[i]} for i in range(1, 27)],
-        'draw_count': len(year_df)
-    }
 
 def get_cached_analysis(cache_key, analysis_func, *args, **kwargs):
     """
@@ -894,7 +874,6 @@ def frequency_analysis(df_source):
     powerball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in powerball_freq.items()]
 
     return white_ball_freq_list, powerball_freq_list
-    
 def hot_cold_numbers(df_source, last_draw_date_str):
     """Identifies hot and cold numbers based on recent draws."""
     if df_source.empty or last_draw_date_str == 'N/A':
@@ -5068,82 +5047,59 @@ def smart_pick_generator_route():
                            selected_sum_range="Any",
                            num_sets_to_generate=1)
 
-@app.route('/historical-data', methods=['GET'])
+@app.route('/historical-data', methods=['GET'], endpoint='historical_data_route')
 def historical_data_route():
-    """
-    Renders the historical data page with an initial year's data.
-    """
+    """Renders the historical data page with draw results and frequencies."""
     try:
+        # Ensure the DataFrame is populated
         if df.empty:
             initialize_core_data()
         
+        # Get the requested year from the URL, defaulting to the current year
+        year_to_display = request.args.get('year', type=int, default=datetime.now().year)
+        
+        # Filter for draws from the specified year
+        current_year_draws_df = df[df['draw_date'].dt.year == year_to_display].sort_values(by='draw_date', ascending=False)
+        
+        # Calculate overall frequencies for the entire dataset
+        all_white_balls = [item for sublist in df['white_balls'] for item in sublist]
+        overall_frequencies = calculate_white_ball_frequencies(all_white_balls)
+        
+        # Prepare the list of draws with their frequencies for the template
+        historical_draws = []
+        for _, row in current_year_draws_df.iterrows():
+            white_balls = row['white_balls']
+            frequencies = get_frequency_numbers(white_balls, overall_frequencies)
+            historical_draws.append({
+                'draw_date': row['draw_date'].strftime('%Y-%m-%d'),
+                'white_balls': white_balls,
+                'powerball': row['powerball'],
+                'frequencies': frequencies
+            })
+            
+        # Get a list of all available years for the dropdown menu
         available_years = sorted(df['draw_date'].dt.year.unique(), reverse=True)
-        return render_template('historical_data.html', available_years=available_years)
+        
+        return render_template(
+            'historical_data.html',
+            historical_draws=historical_draws,
+            available_years=available_years,
+            selected_year=year_to_display
+        )
+
     except Exception as e:
         flash(f'An error occurred: {str(e)}', 'error')
         return redirect(url_for('index'))
-
-@app.route('/api/historical-frequencies', methods=['GET'])
-def historical_frequencies_api():
-    """
-    API endpoint to get frequency data for a specific year.
-    """
-    try:
-        if df.empty:
-            initialize_core_data()
         
-        year_to_display = request.args.get('year', type=int, default=datetime.now().year)
-        frequencies = calculate_frequencies(year_to_display, df)
-        return jsonify(frequencies)
+        return render_template(
+            'historical_data.html',
+            historical_draws=historical_draws,
+            available_years=available_years,
+            selected_year=year_to_display
+        )
     except Exception as e:
-        print(f"Error in historical_frequencies_api: {e}")
-        return jsonify({'error': 'Failed to retrieve frequencies.'}), 500
-
-@app.route('/api/compare-frequencies', methods=['GET'])
-def compare_frequencies_api():
-    """
-    API endpoint to compare frequencies between two years.
-    """
-    try:
-        if df.empty:
-            initialize_core_data()
-            
-        year1 = request.args.get('year1', type=int)
-        year2 = request.args.get('year2', type=int)
-
-        if not year1 or not year2:
-            return jsonify({'error': 'Two years are required for comparison.'}), 400
-
-        freq1 = calculate_frequencies(year1, df)
-        freq2 = calculate_frequencies(year2, df)
-        
-        matching_white_ball_frequencies = []
-        freq1_map = {item['number']: item['count'] for item in freq1['white_balls']}
-        freq2_map = {item['number']: item['count'] for item in freq2['white_balls']}
-
-        for number, count1 in freq1_map.items():
-            if freq2_map.get(number) == count1:
-                matching_white_ball_frequencies.append(number)
-        
-        matching_powerball_frequencies = []
-        freq1_pb_map = {item['number']: item['count'] for item in freq1['powerball']}
-        freq2_pb_map = {item['number']: item['count'] for item in freq2['powerball']}
-
-        for number, count1 in freq1_pb_map.items():
-            if freq2_pb_map.get(number) == count1:
-                matching_powerball_frequencies.append(number)
-
-        return jsonify({
-            'year1': year1,
-            'year2': year2,
-            'freq1': freq1,
-            'freq2': freq2,
-            'matching_white_balls': matching_white_ball_frequencies,
-            'matching_powerballs': matching_powerball_frequencies
-        })
-    except Exception as e:
-        print(f"Error in compare_frequencies_api: {e}")
-        return jsonify({'error': 'Failed to compare frequencies.'}), 500
+        flash(f'An error occurred: {str(e)}', 'error')
+        return redirect(url_for('index'))
 
 # --- API Endpoints ---
 @app.route('/api/generate_single_draw', methods=['GET'])
