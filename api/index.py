@@ -1697,7 +1697,6 @@ def delete_generated_numbers_from_db(ids):
         traceback.print_exc()
         return False, f"An unexpected error occurred: {e}"
 
-
 def get_generated_numbers_history():
     """Fetches the history of generated numbers from Supabase."""
     all_data = []
@@ -2403,7 +2402,6 @@ def _get_detailed_triplets_analysis(df_source, filter_number=None):
         })
 
     return formatted_triplets
-
 
 # --- New Helper Functions for Custom Combinations Page ---
 
