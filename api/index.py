@@ -5048,7 +5048,7 @@ def smart_pick_generator_route():
                            num_sets_to_generate=1)
 
 app.route('/historical_data', methods=['GET'])
-def historical_data():
+def historical_data_route():
     """Renders the historical data page with draw results and frequencies."""
     try:
         if df.empty:
