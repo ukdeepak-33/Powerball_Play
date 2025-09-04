@@ -2,7 +2,7 @@
 
 {% block title %}Historical Powerball Data{% endblock %}
 
-{% block page_heading %}Historical Draw Results with Frequency Analysis{% endblock %}
+{% block page_heading %}Historical Draw Results with Year-Specific Frequency Analysis{% endblock %}
 
 {% block content %}
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -28,9 +28,9 @@
         </div>
     </div>
 
-    <!-- Historical Draws Table with Frequency -->
+    <!-- Historical Draws Table with Year-Specific Frequency -->
     <div class="bg-white rounded-xl shadow-lg p-6">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">Historical Draws for {{ selected_year }} with Frequency Analysis</h2>
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Historical Draws for {{ selected_year }} with Year-Specific Frequency Analysis</h2>
         
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
@@ -38,7 +38,7 @@
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">White Balls</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">White Ball Frequencies</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">White Ball Frequencies ({{ selected_year }})</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Powerball</th>
                     </tr>
                 </thead>
@@ -83,17 +83,32 @@
         {% endif %}
     </div>
 
+    <!-- Year Frequency Summary -->
+    <div id="year-frequency-summary" class="bg-white rounded-xl shadow-lg p-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Year {{ selected_year }} - White Ball Frequency Summary</h2>
+        <div id="year-frequencies" class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 text-center">
+            <!-- Will be populated by JavaScript -->
+        </div>
+    </div>
+
     <!-- Comparison Section -->
     <div id="comparison-section" class="hidden bg-white rounded-xl shadow-lg p-6">
         <h2 class="text-2xl font-bold text-gray-800 mb-6">Year Comparison: <span id="year1-display"></span> vs <span id="year2-display"></span></h2>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-                <h3 class="text-lg font-semibold text-gray-700 mb-4"><span id="compare-year1-display"></span> Draws</h3>
+                <h3 class="text-lg font-semibold text-gray-700 mb-4"><span id="compare-year1-display"></span> Frequency Summary</h3>
+                <div id="comparison-year1-frequencies" class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 text-center mb-6"></div>
+                
+                <h3 class="text-lg font-semibold text-gray-700 mb-4"><span id="compare-year1-display"></span> Sample Draws</h3>
                 <div id="comparison-year1-draws" class="space-y-4"></div>
             </div>
+            
             <div>
-                <h3 class="text-lg font-semibold text-gray-700 mb-4"><span id="compare-year2-display"></span> Draws</h3>
+                <h3 class="text-lg font-semibold text-gray-700 mb-4"><span id="compare-year2-display"></span> Frequency Summary</h3>
+                <div id="comparison-year2-frequencies" class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 text-center mb-6"></div>
+                
+                <h3 class="text-lg font-semibold text-gray-700 mb-4"><span id="compare-year2-display"></span> Sample Draws</h3>
                 <div id="comparison-year2-draws" class="space-y-4"></div>
             </div>
         </div>
@@ -149,47 +164,51 @@
         border-color: #3b82f6;
         background: #eff6ff;
     }
+    
+    .high-frequency { background-color: #d1fae5; color: #065f46; }
+    .medium-frequency { background-color: #fef3c7; color: #92400e; }
+    .low-frequency { background-color: #fee2e2; color: #b91c1c; }
 </style>
 
 <script>
-    // Global variable to store frequency data
-    let globalFrequencies = {};
-
     document.addEventListener('DOMContentLoaded', function() {
         const primaryYearSelect = document.getElementById('primary-year-select');
         const compareYearSelect = document.getElementById('compare-year-select');
         const comparisonSection = document.getElementById('comparison-section');
+        const yearFrequenciesContainer = document.getElementById('year-frequencies');
         const year1Display = document.getElementById('year1-display');
         const year2Display = document.getElementById('year2-display');
         const compareYear1Display = document.getElementById('compare-year1-display');
         const compareYear2Display = document.getElementById('compare-year2-display');
 
-        // First, load global frequencies for all years
-        loadGlobalFrequencies().then(() => {
-            // Then populate the frequency displays for the current year
+        const currentYear = {{ selected_year }};
+        let currentYearFrequencies = {};
+
+        // Load year-specific frequencies and populate the table
+        loadYearFrequencies(currentYear).then(() => {
             populateFrequencyDisplays();
+            renderYearFrequencySummary();
             
             // Set up event listeners
             primaryYearSelect.addEventListener('change', function() {
-                // Reload the page with the new year
                 window.location.href = `/historical-data?year=${this.value}`;
             });
 
             compareYearSelect.addEventListener('change', handleYearComparison);
         });
 
-        async function loadGlobalFrequencies() {
+        async function loadYearFrequencies(year) {
             try {
-                const response = await fetch('/api/global-frequencies');
+                const response = await fetch(`/api/year-frequencies?year=${year}`);
                 const data = await response.json();
                 
                 if (response.ok) {
-                    globalFrequencies = data.frequencies;
+                    currentYearFrequencies = data.frequencies;
                 } else {
-                    console.error('Error loading global frequencies:', data.error);
+                    console.error('Error loading year frequencies:', data.error);
                 }
             } catch (error) {
-                console.error('Error loading global frequencies:', error);
+                console.error('Error loading year frequencies:', error);
             }
         }
 
@@ -198,22 +217,46 @@
             
             frequencyDisplays.forEach(display => {
                 const ballNumber = parseInt(display.dataset.ball);
-                const frequency = globalFrequencies[ballNumber] || 0;
+                const frequency = currentYearFrequencies[ballNumber] || 0;
                 
                 display.textContent = frequency;
-                display.dataset.frequency = `${frequency} times total`;
+                display.dataset.frequency = `${frequency} times in ${currentYear}`;
                 
-                // Color coding based on frequency
-                if (frequency >= 30) {
-                    display.classList.add('bg-green-100', 'text-green-700');
-                } else if (frequency >= 20) {
-                    display.classList.add('bg-yellow-100', 'text-yellow-700');
-                } else if (frequency >= 10) {
-                    display.classList.add('bg-orange-100', 'text-orange-700');
-                } else {
-                    display.classList.add('bg-red-100', 'text-red-700');
-                }
+                // Color coding based on frequency within this year
+                applyFrequencyColor(display, frequency);
             });
+        }
+
+        function renderYearFrequencySummary() {
+            yearFrequenciesContainer.innerHTML = '';
+            
+            for (let number = 1; number <= 69; number++) {
+                const frequency = currentYearFrequencies[number] || 0;
+                
+                const div = document.createElement('div');
+                div.className = 'frequency-ball flex-col items-center justify-center';
+                div.innerHTML = `
+                    <span class="text-lg font-bold">${number}</span>
+                    <span class="text-sm">${frequency}</span>
+                `;
+                
+                applyFrequencyColor(div, frequency);
+                yearFrequenciesContainer.appendChild(div);
+            }
+        }
+
+        function applyFrequencyColor(element, frequency) {
+            // Remove existing color classes
+            element.classList.remove('high-frequency', 'medium-frequency', 'low-frequency');
+            
+            // Add appropriate color class
+            if (frequency >= 5) {
+                element.classList.add('high-frequency');
+            } else if (frequency >= 2) {
+                element.classList.add('medium-frequency');
+            } else if (frequency >= 1) {
+                element.classList.add('low-frequency');
+            }
         }
 
         async function handleYearComparison() {
@@ -232,22 +275,21 @@
                 return;
             }
 
-            // Show loading state
             comparisonSection.classList.remove('hidden');
             year1Display.textContent = primaryYear;
             year2Display.textContent = compareYear;
             compareYear1Display.textContent = primaryYear;
             compareYear2Display.textContent = compareYear;
 
-            // Load comparison data
+            // Load comparison data for both years
             try {
                 const [year1Data, year2Data] = await Promise.all([
-                    fetch(`/api/historical-draws?year=${primaryYear}`).then(r => r.json()),
-                    fetch(`/api/historical-draws?year=${compareYear}`).then(r => r.json())
+                    fetch(`/api/year-frequencies?year=${primaryYear}`).then(r => r.json()),
+                    fetch(`/api/year-frequencies?year=${compareYear}`).then(r => r.json())
                 ]);
 
                 if (year1Data.success && year2Data.success) {
-                    renderComparison(year1Data.draws, year2Data.draws, primaryYear, compareYear);
+                    renderComparison(year1Data, year2Data, primaryYear, compareYear);
                 } else {
                     alert('Error loading comparison data');
                 }
@@ -257,53 +299,28 @@
             }
         }
 
-        function renderComparison(year1Draws, year2Draws, year1, year2) {
-            const year1Container = document.getElementById('comparison-year1-draws');
-            const year2Container = document.getElementById('comparison-year2-draws');
-            
-            year1Container.innerHTML = '';
-            year2Container.innerHTML = '';
-
-            // Display up to 5 draws from each year for comparison
-            const maxDraws = 5;
-            
-            year1Draws.slice(0, maxDraws).forEach(draw => {
-                year1Container.appendChild(createComparisonDrawCard(draw, year1));
-            });
-            
-            year2Draws.slice(0, maxDraws).forEach(draw => {
-                year2Container.appendChild(createComparisonDrawCard(draw, year2));
-            });
+        function renderComparison(year1Data, year2Data, year1, year2) {
+            renderFrequencyComparison('comparison-year1-frequencies', year1Data.frequencies, year1);
+            renderFrequencyComparison('comparison-year2-frequencies', year2Data.frequencies, year2);
         }
 
-        function createComparisonDrawCard(draw, year) {
-            const card = document.createElement('div');
-            card.className = 'comparison-draw';
+        function renderFrequencyComparison(containerId, frequencies, year) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
             
-            card.innerHTML = `
-                <div class="text-sm text-gray-600 mb-2">${draw.date}</div>
-                <div class="flex space-x-1 mb-2">
-                    ${draw.white_balls.map(ball => `
-                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 text-sm font-bold text-gray-700">
-                            ${ball}
-                        </span>
-                    `).join('')}
-                </div>
-                <div class="flex space-x-1">
-                    ${draw.white_balls.map(ball => `
-                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-sm font-bold text-blue-700">
-                            ${globalFrequencies[ball] || 0}
-                        </span>
-                    `).join('')}
-                </div>
-                <div class="mt-2">
-                    <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-500 text-sm font-bold text-white">
-                        ${draw.powerball}
-                    </span>
-                </div>
-            `;
-            
-            return card;
+            for (let number = 1; number <= 69; number++) {
+                const frequency = frequencies[number] || 0;
+                
+                const div = document.createElement('div');
+                div.className = 'frequency-ball flex-col items-center justify-center';
+                div.innerHTML = `
+                    <span class="text-lg font-bold">${number}</span>
+                    <span class="text-sm">${frequency}</span>
+                `;
+                
+                applyFrequencyColor(div, frequency);
+                container.appendChild(div);
+            }
         }
     });
 </script>
