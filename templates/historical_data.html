@@ -7,79 +7,157 @@
 {% block content %}
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     
-    <div class="flex items-center justify-between mb-6">
-        <h2 class="text-2xl font-bold text-gray-800">Draws for {{ selected_year }}</h2>
-        <div class="flex items-center space-x-2">
-            <label for="year-select" class="text-gray-700">Select Year:</label>
-            <select id="year-select" name="year" class="form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+    <div class="flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-4 bg-white p-6 rounded-xl shadow-lg">
+        <div class="flex items-center space-x-2 w-full">
+            <label for="primary-year-select" class="text-gray-700 font-medium">Select Year:</label>
+            <select id="primary-year-select" name="year" class="form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
                 {% for year in available_years %}
-                    <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
+                    <option value="{{ year }}">{{ year }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="flex items-center space-x-2 w-full">
+            <label for="compare-year-select" class="text-gray-700 font-medium">Compare with:</label>
+            <select id="compare-year-select" name="compare_year" class="form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                <option value="">(None)</option>
+                {% for year in available_years %}
+                    <option value="{{ year }}">{{ year }}</option>
                 {% endfor %}
             </select>
         </div>
     </div>
     
-    <div class="overflow-x-auto bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Draw Date</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">White Balls</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Powerball</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequencies</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-                {% for draw in historical_draws %}
-                    <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ draw.draw_date }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <div class="flex items-center space-x-1">
-                                {% for ball in draw.white_balls %}
-                                    <span class="ball-visual bg-indigo-600 text-white rounded-full h-8 w-8 flex items-center justify-center">{{ ball }}</span>
-                                {% endfor %}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
-                            <span class="ball-visual bg-red-600 text-white rounded-full h-8 w-8 flex items-center justify-center">{{ draw.powerball }}</span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            <div class="flex items-center space-x-2">
-                                {% for freq in draw.frequencies %}
-                                    <span class="text-gray-500 font-medium">{{ freq }}</span>
-                                {% endfor %}
-                            </div>
-                        </td>
-                    </tr>
-                {% else %}
-                    <tr>
-                        <td colspan="4" class="px-6 py-4 text-center text-gray-500">No draws found for this year.</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div id="primary-frequency-container" class="bg-white rounded-xl shadow-lg p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-bold text-gray-800">Frequency for <span id="primary-year-display"></span></h2>
+            <p id="primary-draw-count" class="text-gray-500 text-sm"></p>
+        </div>
+        <div id="primary-frequencies" class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 text-center">
+            </div>
     </div>
+
+    <div id="comparison-section" class="hidden">
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-800">Frequency for <span id="compare-year-display"></span></h2>
+                <p id="compare-draw-count" class="text-gray-500 text-sm"></p>
+            </div>
+            <div id="comparison-frequencies" class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 text-center">
+                </div>
+        </div>
+    </div>
+
 </div>
 
 <style>
-    .ball-visual {
+    .frequency-ball {
         display: inline-flex;
+        flex-direction: column;
         justify-content: center;
         align-items: center;
-        flex-shrink: 0;
+        width: 50px;
+        height: 65px;
+        border-radius: 12px;
+        background-color: #f3f4f6;
+        color: #374151;
         font-weight: bold;
         font-size: 1rem;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        transition: all 0.2s ease-in-out;
+    }
+    .frequency-ball.highlight-match {
+        background-color: #d1fae5; /* Green */
+        box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.1), 0 2px 4px -1px rgba(16, 185, 129, 0.06);
+        border: 2px solid #10b981;
+    }
+    .frequency-count {
+        font-size: 0.75rem;
+        color: #6b7280;
+        font-weight: 500;
     }
 </style>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const yearSelect = document.getElementById('year-select');
-        yearSelect.addEventListener('change', function() {
-            const selectedYear = this.value;
-            window.location.href = `{{ url_for('historical_data') }}?year=${selectedYear}`;
-        });
+        const primaryYearSelect = document.getElementById('primary-year-select');
+        const compareYearSelect = document.getElementById('compare-year-select');
+        const primaryYearDisplay = document.getElementById('primary-year-display');
+        const primaryDrawCount = document.getElementById('primary-draw-count');
+        const compareYearDisplay = document.getElementById('compare-year-display');
+        const compareDrawCount = document.getElementById('compare-draw-count');
+        const primaryFrequenciesContainer = document.getElementById('primary-frequencies');
+        const comparisonFrequenciesContainer = document.getElementById('comparison-frequencies');
+        const comparisonSection = document.getElementById('comparison-section');
+
+        const fetchAndRenderFrequencies = async () => {
+            const primaryYear = primaryYearSelect.value;
+            const compareYear = compareYearSelect.value;
+
+            if (compareYear && primaryYear === compareYear) {
+                // Prevent comparing a year with itself
+                compareYearSelect.value = "";
+                comparisonSection.classList.add('hidden');
+                return;
+            }
+
+            // Always render the primary year's data
+            const primaryResponse = await fetch(`/api/historical-frequencies?year=${primaryYear}`);
+            const primaryData = await primaryResponse.json();
+            renderFrequencyTable(primaryData, primaryFrequenciesContainer);
+            primaryYearDisplay.textContent = primaryYear;
+            primaryDrawCount.textContent = `${primaryData.draw_count} draws analyzed`;
+
+            // Handle the comparison year
+            if (compareYear) {
+                comparisonSection.classList.remove('hidden');
+                
+                const compareResponse = await fetch(`/api/compare-frequencies?year1=${primaryYear}&year2=${compareYear}`);
+                const compareData = await compareResponse.json();
+                
+                renderFrequencyTable(compareData.freq2, comparisonFrequenciesContainer);
+                compareYearDisplay.textContent = compareYear;
+                compareDrawCount.textContent = `${compareData.freq2.draw_count} draws analyzed`;
+
+                highlightMatchingFrequencies(compareData.matching_white_balls, primaryFrequenciesContainer, comparisonFrequenciesContainer);
+
+            } else {
+                comparisonSection.classList.add('hidden');
+                // Remove any highlights if comparison is turned off
+                document.querySelectorAll('.highlight-match').forEach(el => el.classList.remove('highlight-match'));
+            }
+        };
+
+        const renderFrequencyTable = (data, container) => {
+            container.innerHTML = ''; // Clear previous content
+            data.white_balls.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'frequency-ball flex-col items-center justify-center transition duration-200 ease-in-out hover:scale-105 cursor-pointer';
+                div.dataset.number = item.number;
+                div.innerHTML = `<span class="text-lg font-bold">${item.number}</span>
+                                 <span class="text-sm text-gray-600">(${item.count})</span>`;
+                container.appendChild(div);
+            });
+        };
+
+        const highlightMatchingFrequencies = (matchingNumbers, primaryContainer, compareContainer) => {
+            // Remove previous highlights
+            document.querySelectorAll('.highlight-match').forEach(el => el.classList.remove('highlight-match'));
+            
+            // Apply new highlights
+            matchingNumbers.forEach(number => {
+                const primaryEl = primaryContainer.querySelector(`[data-number="${number}"]`);
+                const compareEl = compareContainer.querySelector(`[data-number="${number}"]`);
+                if (primaryEl) primaryEl.classList.add('highlight-match');
+                if (compareEl) compareEl.classList.add('highlight-match');
+            });
+        };
+
+        primaryYearSelect.addEventListener('change', fetchAndRenderFrequencies);
+        compareYearSelect.addEventListener('change', fetchAndRenderFrequencies);
+        
+        // Initial load
+        fetchAndRenderFrequencies();
     });
 </script>
 {% endblock %}
