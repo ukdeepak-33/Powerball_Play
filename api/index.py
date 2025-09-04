@@ -3737,6 +3737,18 @@ def generate_smart_pick_with_preferences(df, num_from_group_a, odd_even_choice, 
     
     raise ValueError("Could not generate a combination meeting all criteria after many attempts.")
 
+def calculate_white_ball_frequencies(draws):
+    """Calculates the frequency of each white ball number."""
+    frequency = defaultdict(int)
+    for draw in draws:
+        for number in draw:
+            frequency[number] += 1
+    return dict(frequency)
+
+def get_frequency_numbers(balls, frequencies):
+    """Maps a list of balls to their corresponding frequencies."""
+    return [frequencies.get(ball, 0) for ball in balls]
+
 # --- Flask Routes ---
 @app.route('/')
 def index():
@@ -5034,6 +5046,52 @@ def smart_pick_generator_route():
                            selected_odd_even_choice="Any",
                            selected_sum_range="Any",
                            num_sets_to_generate=1)
+
+app.route('/historical-data', methods=['GET'])
+def historical_data():
+    """Renders the historical data page with draw results and frequencies."""
+    try:
+        if df.empty:
+            initialize_core_data()
+        
+        # Get the requested year from the query parameters, default to the current year
+        year_to_display = request.args.get('year', type=int, default=datetime.now().year)
+        
+        # Filter for draws from the specified year
+        # First, ensure 'draw_date' is in datetime format
+        if not pd.api.types.is_datetime64_any_dtype(df['draw_date']):
+            df['draw_date'] = pd.to_datetime(df['draw_date'])
+        
+        current_year_draws_df = df[df['draw_date'].dt.year == year_to_display].sort_values(by='draw_date', ascending=False)
+        
+        # Calculate overall frequencies for the entire dataset
+        all_white_balls = [row['white_balls'] for _, row in df.iterrows()]
+        overall_frequencies = calculate_white_ball_frequencies(all_white_balls)
+        
+        # Prepare the list of draws with their frequencies for the template
+        historical_draws = []
+        for _, row in current_year_draws_df.iterrows():
+            white_balls = row['white_balls']
+            frequencies = get_frequency_numbers(white_balls, overall_frequencies)
+            historical_draws.append({
+                'draw_date': row['draw_date'].strftime('%Y-%m-%d'),
+                'white_balls': white_balls,
+                'powerball': row['powerball'],
+                'frequencies': frequencies
+            })
+            
+        # Get a list of available years for the dropdown
+        available_years = sorted(df['draw_date'].dt.year.unique(), reverse=True)
+        
+        return render_template(
+            'historical_data.html',
+            historical_draws=historical_draws,
+            available_years=available_years,
+            selected_year=year_to_display
+        )
+    except Exception as e:
+        flash(f'An error occurred: {str(e)}', 'error')
+        return redirect(url_for('index'))
 
 # --- API Endpoints ---
 @app.route('/api/generate_single_draw', methods=['GET'])
