@@ -3776,8 +3776,6 @@ def api_historical_frequencies_internal(year):
         "draw_count": len(yearly_df)
     }
 
-
-
 # --- Flask Routes ---
 @app.route('/')
 def index():
@@ -4434,6 +4432,7 @@ def grouped_patterns_yearly_comparison_route():
                            yearly_patterns_data=yearly_patterns_data,
                            number_ranges=NUMBER_RANGES,
                            selected_range=selected_range_label)
+    
 # Main route for boundary crossing pairs (restored)
 @app.route('/boundary_crossing_pairs_trends', methods=['GET', 'POST'])
 def boundary_crossing_pairs_trends_route():
@@ -5090,12 +5089,23 @@ def historical_data_route():
         # Filter for draws from the specified year
         current_year_draws_df = df[df['Draw Date_dt'].dt.year == year_to_display].sort_values(by='Draw Date_dt', ascending=False)
         
+        # --- ADD THE HISTORICAL DRAWS CODE RIGHT HERE ---
+        historical_draws = []
+        for _, row in current_year_draws_df.iterrows():
+            historical_draws.append({
+                'date': row['Draw Date'],
+                'white_balls': [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), 
+                               int(row['Number 4']), int(row['Number 5'])],
+                'powerball': int(row['Powerball'])
+            })
+        # --- END OF ADDED CODE ---
+        
         # Get a list of all available years for the dropdown menu
         available_years = sorted(df['Draw Date_dt'].dt.year.unique(), reverse=True)
         
         return render_template(
             'historical_data.html',
-            historical_draws=[],  # Empty for now, will be populated by JavaScript
+            historical_draws=historical_draws,  # Changed from empty list to actual data
             available_years=available_years,
             selected_year=year_to_display
         )
@@ -5103,6 +5113,96 @@ def historical_data_route():
     except Exception as e:
         flash(f'An error occurred: {str(e)}', 'error')
         return redirect(url_for('index'))
+
+@app.route('/api/draw-frequency-analysis', methods=['GET'])
+def api_draw_frequency_analysis():
+    """Analyze how common each number in a specific draw was historically."""
+    try:
+        draw_date = request.args.get('date')
+        if not draw_date:
+            return jsonify({"error": "Date parameter required"}), 400
+        
+        # Find the specific draw
+        specific_draw = df[df['Draw Date'] == draw_date]
+        if specific_draw.empty:
+            return jsonify({"error": f"No draw found for date {draw_date}"}), 404
+        
+        # Get the white balls from this specific draw
+        white_balls = [
+            int(specific_draw['Number 1'].iloc[0]),
+            int(specific_draw['Number 2'].iloc[0]),
+            int(specific_draw['Number 3'].iloc[0]),
+            int(specific_draw['Number 4'].iloc[0]),
+            int(specific_draw['Number 5'].iloc[0])
+        ]
+        
+        # Calculate overall frequencies for comparison
+        white_ball_columns = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']
+        all_white_balls = df[white_ball_columns].values.flatten()
+        
+        frequency_count = {}
+        for ball in all_white_balls:
+            ball_int = int(ball)
+            frequency_count[ball_int] = frequency_count.get(ball_int, 0) + 1
+        
+        # Prepare response with frequency context for each ball in the draw
+        analysis = []
+        for ball in white_balls:
+            analysis.append({
+                'number': ball,
+                'frequency': frequency_count.get(ball, 0),
+                'percentage': round((frequency_count.get(ball, 0) / len(df) * 100), 2) if len(df) > 0 else 0
+            })
+        
+        return jsonify({
+            "draw_date": draw_date,
+            "white_balls": white_balls,
+            "powerball": int(specific_draw['Powerball'].iloc[0]),
+            "frequency_analysis": analysis,
+            "total_draws": len(df)
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
+@app.route('/api/advanced-comparison', methods=['GET'])
+def api_advanced_comparison():
+    """Compare frequency patterns between two years."""
+    try:
+        year1 = request.args.get('year1')
+        year2 = request.args.get('year2')
+        
+        # Get frequencies for both years
+        freq1 = api_historical_frequencies_internal(int(year1))
+        freq2 = api_historical_frequencies_internal(int(year2))
+        
+        if 'error' in freq1 or 'error' in freq2:
+            return jsonify({"error": "Invalid year(s) provided"}), 400
+        
+        # Find common frequency patterns
+        common_patterns = []
+        for ball1 in freq1['white_balls']:
+            for ball2 in freq2['white_balls']:
+                if ball1['number'] == ball2['number']:
+                    common_patterns.append({
+                        'number': ball1['number'],
+                        'year1_frequency': ball1['count'],
+                        'year2_frequency': ball2['count'],
+                        'frequency_difference': abs(ball1['count'] - ball2['count'])
+                    })
+                    break
+        
+        common_patterns.sort(key=lambda x: x['frequency_difference'])
+        
+        return jsonify({
+            "year1": year1,
+            "year2": year2,
+            "common_patterns": common_patterns,
+            "total_common_numbers": len(common_patterns)
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 @app.route('/api/historical-frequencies', methods=['GET'], endpoint='api_historical_frequencies_v1')
 def api_historical_frequencies_v1():
