@@ -5317,6 +5317,71 @@ def api_compare_frequencies():
     except Exception as e:
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
+@app.route('/api/global-frequencies', methods=['GET'])
+def api_global_frequencies():
+    """Get frequencies for all white balls across all years."""
+    try:
+        if df.empty:
+            return jsonify({"error": "Historical data not loaded."}), 500
+        
+        # Calculate frequencies for all white balls
+        white_ball_columns = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']
+        all_white_balls = df[white_ball_columns].values.flatten()
+        
+        frequency_count = {}
+        for ball in all_white_balls:
+            ball_int = int(ball)
+            frequency_count[ball_int] = frequency_count.get(ball_int, 0) + 1
+        
+        # Fill in missing numbers (1-69) with frequency 0
+        for number in range(1, 70):
+            if number not in frequency_count:
+                frequency_count[number] = 0
+        
+        return jsonify({
+            "success": True,
+            "total_draws": len(df),
+            "frequencies": frequency_count
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
+@app.route('/api/historical-draws', methods=['GET'])
+def api_historical_draws():
+    """Get historical draws for a specific year."""
+    try:
+        year = request.args.get('year', type=int)
+        if not year:
+            return jsonify({"error": "Year parameter required"}), 400
+        
+        # Filter for draws from the specified year
+        yearly_df = df[df['Draw Date_dt'].dt.year == year].sort_values(by='Draw Date_dt', ascending=False)
+        
+        if yearly_df.empty:
+            return jsonify({"error": f"No data available for year {year}"}), 404
+        
+        # Format the draws
+        draws = []
+        for _, row in yearly_df.iterrows():
+            draws.append({
+                'date': row['Draw Date'],
+                'white_balls': [
+                    int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                    int(row['Number 4']), int(row['Number 5'])
+                ],
+                'powerball': int(row['Powerball'])
+            })
+        
+        return jsonify({
+            "success": True,
+            "year": year,
+            "draws": draws,
+            "total_draws": len(yearly_df)
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 
 # --- API Endpoints ---
