@@ -5047,62 +5047,45 @@ def smart_pick_generator_route():
                            selected_sum_range="Any",
                            num_sets_to_generate=1)
 
-@app.route('/historical-data', methods=['GET'], endpoint='historical_data_route')
-def historical_data_route():
-    """Renders the historical data page with draw results and frequencies."""
+@app.route('/api/historical-frequencies', methods=['GET'])
+def api_historical_frequencies():
+    """API endpoint to get white ball frequencies for a specific year."""
     try:
-        # Ensure the DataFrame is populated
         if df.empty:
-            initialize_core_data()
+            return jsonify({"error": "Historical data not loaded."}), 500
         
-        # Get the requested year from the URL, defaulting to the current year
-        year_to_display = request.args.get('year', type=int, default=datetime.now().year)
+        year = request.args.get('year', type=int, default=datetime.now().year)
         
-        # Filter for draws from the specified year - use correct column name 'Draw Date'
-        current_year_draws_df = df[df['Draw Date_dt'].dt.year == year_to_display].sort_values(by='Draw Date_dt', ascending=False)
+        # Filter data for the requested year
+        yearly_df = df[df['Draw Date_dt'].dt.year == year].copy()
         
-        # Calculate overall frequencies for the entire dataset
-        # Extract white balls from all Number columns across all draws
+        if yearly_df.empty:
+            return jsonify({"error": f"No data available for year {year}."}), 404
+        
+        # Calculate frequencies for the year
         white_ball_columns = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']
-        all_white_balls = df[white_ball_columns].values.flatten()
+        yearly_white_balls = yearly_df[white_ball_columns].values.flatten()
         
-        # Convert numpy array to regular Python list and ensure they're integers
-        all_white_balls = [int(ball) for ball in all_white_balls]
+        # Count frequencies
+        frequency_count = {}
+        for ball in yearly_white_balls:
+            ball_int = int(ball)
+            frequency_count[ball_int] = frequency_count.get(ball_int, 0) + 1
         
-        # Calculate frequencies
-        overall_frequencies = {}
-        for ball in all_white_balls:
-            overall_frequencies[ball] = overall_frequencies.get(ball, 0) + 1
+        # Convert to list format for easier consumption
+        frequencies = [{"number": num, "frequency": freq} for num, freq in frequency_count.items()]
+        frequencies.sort(key=lambda x: x["number"])  # Sort by number
         
-        # Prepare the list of draws with their frequencies for the template
-        historical_draws = []
-        for _, row in current_year_draws_df.iterrows():
-            white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), 
-                          int(row['Number 4']), int(row['Number 5'])]
-            
-            # Get frequencies for each ball in this specific draw
-            frequencies = [overall_frequencies.get(ball, 0) for ball in white_balls]
-            
-            historical_draws.append({
-                'draw_date': row['Draw Date'],
-                'white_balls': white_balls,
-                'powerball': int(row['Powerball']),
-                'frequencies': frequencies
-            })
-            
-        # Get a list of all available years for the dropdown menu
-        available_years = sorted(df['Draw Date_dt'].dt.year.unique(), reverse=True)
+        return jsonify({
+            "success": True,
+            "year": year,
+            "total_draws": len(yearly_df),
+            "frequencies": frequencies
+        })
         
-        return render_template(
-            'historical_data.html',
-            historical_draws=historical_draws,
-            available_years=available_years,
-            selected_year=year_to_display
-        )
-
     except Exception as e:
-        flash(f'An error occurred: {str(e)}', 'error')
-        return redirect(url_for('index'))
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
 
 # --- API Endpoints ---
 @app.route('/api/generate_single_draw', methods=['GET'])
