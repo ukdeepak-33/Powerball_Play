@@ -5204,8 +5204,9 @@ def api_advanced_comparison():
     except Exception as e:
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
-@app.route('/api/historical-frequencies', methods=['GET'], endpoint='api_historical_frequencies_v1')
-def api_historical_frequencies_v1():
+# KEEP THIS VERSION (or modify it to match the format you need)
+@app.route('/api/historical-frequencies', methods=['GET'])
+def api_historical_frequencies():
     """API endpoint to get white ball frequencies for a specific year."""
     try:
         if df.empty:
@@ -5229,57 +5230,16 @@ def api_historical_frequencies_v1():
             ball_int = int(ball)
             frequency_count[ball_int] = frequency_count.get(ball_int, 0) + 1
         
-        # Convert to list format for easier consumption
-        frequencies = [{"number": num, "frequency": freq} for num, freq in frequency_count.items()]
-        frequencies.sort(key=lambda x: x["number"])  # Sort by number
-        
+        # Return as dictionary format (not array) for easier frontend use
         return jsonify({
             "success": True,
             "year": year,
             "total_draws": len(yearly_df),
-            "frequencies": frequencies
+            "frequencies": frequency_count  # This is the format your new HTML expects
         })
         
     except Exception as e:
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
-
-@app.route('/api/historical-frequencies', methods=['GET'], endpoint='api_historical_frequencies_v2')  
-def api_historical_frequencies_v2():
-    """API endpoint to get white ball frequencies for a specific year."""
-    try:
-        if df.empty:
-            return jsonify({"error": "Historical data not loaded."}), 500
-        
-        year = request.args.get('year', type=int, default=datetime.now().year)
-        
-        # Filter data for the requested year
-        yearly_df = df[df['Draw Date_dt'].dt.year == year].copy()
-        
-        if yearly_df.empty:
-            return jsonify({"error": f"No data available for year {year}."}), 404
-        
-        # Calculate frequencies for the year
-        white_ball_columns = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']
-        yearly_white_balls = yearly_df[white_ball_columns].values.flatten()
-        
-        # Count frequencies
-        frequency_count = {}
-        for ball in yearly_white_balls:
-            ball_int = int(ball)
-            frequency_count[ball_int] = frequency_count.get(ball_int, 0) + 1
-        
-        # Convert to the format your frontend expects
-        white_balls = [{"number": num, "count": freq} for num, freq in frequency_count.items()]
-        white_balls.sort(key=lambda x: x["number"])  # Sort by number
-        
-        return jsonify({
-            "white_balls": white_balls,
-            "draw_count": len(yearly_df)  # Changed from total_draws to draw_count
-        })
-        
-    except Exception as e:
-        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
-
 
 @app.route('/api/compare-frequencies', methods=['GET'])
 def api_compare_frequencies():
@@ -5378,6 +5338,44 @@ def api_historical_draws():
             "year": year,
             "draws": draws,
             "total_draws": len(yearly_df)
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
+@app.route('/api/year-frequencies', methods=['GET'])
+def api_year_frequencies():
+    """Get frequencies for white balls in a specific year."""
+    try:
+        year = request.args.get('year', type=int)
+        if not year:
+            return jsonify({"error": "Year parameter required"}), 400
+        
+        # Filter for draws from the specified year
+        yearly_df = df[df['Draw Date_dt'].dt.year == year].copy()
+        
+        if yearly_df.empty:
+            return jsonify({"error": f"No data available for year {year}"}), 404
+        
+        # Calculate frequencies for this specific year
+        white_ball_columns = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']
+        yearly_white_balls = yearly_df[white_ball_columns].values.flatten()
+        
+        frequency_count = {}
+        for ball in yearly_white_balls:
+            ball_int = int(ball)
+            frequency_count[ball_int] = frequency_count.get(ball_int, 0) + 1
+        
+        # Fill in missing numbers (1-69) with frequency 0
+        for number in range(1, 70):
+            if number not in frequency_count:
+                frequency_count[number] = 0
+        
+        return jsonify({
+            "success": True,
+            "year": year,
+            "total_draws": len(yearly_df),
+            "frequencies": frequency_count
         })
         
     except Exception as e:
