@@ -5104,8 +5104,8 @@ def historical_data_route():
         flash(f'An error occurred: {str(e)}', 'error')
         return redirect(url_for('index'))
 
-@app.route('/api/historical-frequencies', methods=['GET'])
-def api_historical_frequencies():
+@app.route('/api/historical-frequencies', methods=['GET'], endpoint='api_historical_frequencies_v1')
+def api_historical_frequencies_v1():
     """API endpoint to get white ball frequencies for a specific year."""
     try:
         if df.empty:
@@ -5143,8 +5143,8 @@ def api_historical_frequencies():
     except Exception as e:
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
-@app.route('/api/historical-frequencies', methods=['GET'])
-def api_historical_frequencies():
+@app.route('/api/historical-frequencies', methods=['GET'], endpoint='api_historical_frequencies_v2')  
+def api_historical_frequencies_v2():
     """API endpoint to get white ball frequencies for a specific year."""
     try:
         if df.empty:
@@ -5299,8 +5299,6 @@ def api_delete_generated_picks():
     except Exception as e:
         traceback.print_exc()
         return jsonify({'success': False, 'error': f"An unexpected error occurred: {str(e)}"}), 500
-
-
 
 @app.route('/api/white_ball_gaps', methods=['GET'])
 def api_white_ball_gaps():
