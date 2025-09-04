@@ -828,7 +828,7 @@ def _get_current_year_frequency_groups():
 
 def initialize_core_data():
     """Initializes and loads all core data from Supabase and performs initial analyses."""
-    global df, last_draw, historical_white_ball_sets, white_ball_co_occurrence_lookup, last_analysis_cache_update
+    global df, last_draw, historical_white_ball_sets, white_ball_co_occurrence_lookup, last_analysis_cache_update, 
     print("Initializing core data...")
     df = load_historical_data_from_supabase()
 
@@ -843,30 +843,6 @@ def initialize_core_data():
 
     last_analysis_cache_update = datetime.now()
     print("Core data initialization complete.")
-
-# --- Helper Functions for Data Processing ---
-def initialize_core_data():
-    """
-    Simulates loading historical Powerball draw data into a pandas DataFrame.
-    """
-    global df
-    data = {
-        'draw_date': pd.to_datetime(['2025-08-25', '2025-08-22', '2024-12-25', '2024-12-22', '2024-01-01',
-                                     '2023-10-15', '2023-09-01', '2022-07-20', '2022-06-10']),
-        'white_balls': [
-            [3, 18, 22, 27, 33],
-            [10, 15, 20, 25, 30],
-            [12, 17, 21, 28, 32],
-            [1, 5, 10, 15, 20],
-            [4, 8, 12, 16, 20],
-            [3, 5, 8, 12, 15],
-            [10, 18, 22, 33, 40],
-            [5, 15, 20, 30, 32],
-            [8, 10, 20, 25, 33]
-        ],
-        'powerball': [10, 5, 2, 7, 1, 10, 5, 2, 7]
-    }
-    df = pd.DataFrame(data)
 
 def calculate_frequencies(year, all_draws_df):
     """
