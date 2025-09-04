@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Historical Powerball Data{% endblock %}
+
+{% block page_heading %}Historical Draw Results & Frequencies{% endblock %}
+
+{% block content %}
+<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">Draws for {{ selected_year }}</h2>
+        <div class="flex items-center space-x-2">
+            <label for="year-select" class="text-gray-700">Select Year:</label>
+            <select id="year-select" name="year" class="form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                {% for year in available_years %}
+                    <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    
+    <div class="overflow-x-auto bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Draw Date</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">White Balls</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Powerball</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequencies</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for draw in historical_draws %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ draw.draw_date }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <div class="flex items-center space-x-1">
+                                {% for ball in draw.white_balls %}
+                                    <span class="ball-visual bg-indigo-600 text-white rounded-full h-8 w-8 flex items-center justify-center">{{ ball }}</span>
+                                {% endfor %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
+                            <span class="ball-visual bg-red-600 text-white rounded-full h-8 w-8 flex items-center justify-center">{{ draw.powerball }}</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <div class="flex items-center space-x-2">
+                                {% for freq in draw.frequencies %}
+                                    <span class="text-gray-500 font-medium">{{ freq }}</span>
+                                {% endfor %}
+                            </div>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="4" class="px-6 py-4 text-center text-gray-500">No draws found for this year.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+    .ball-visual {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        flex-shrink: 0;
+        font-weight: bold;
+        font-size: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const yearSelect = document.getElementById('year-select');
+        yearSelect.addEventListener('change', function() {
+            const selectedYear = this.value;
+            window.location.href = `{{ url_for('historical_data') }}?year=${selectedYear}`;
+        });
+    });
+</script>
+{% endblock %}
