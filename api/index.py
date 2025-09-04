@@ -5047,7 +5047,7 @@ def smart_pick_generator_route():
                            selected_sum_range="Any",
                            num_sets_to_generate=1)
 
-@app.route('/historical-data', methods=['GET'], endpoint='historical_data')
+@app.route('/historical-data', methods=['GET'], endpoint='historical_data_route')
 def historical_data_route():
     """Renders the historical data page with draw results and frequencies."""
     try:
