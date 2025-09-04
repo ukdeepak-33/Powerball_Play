@@ -5062,17 +5062,27 @@ def historical_data_route():
         current_year_draws_df = df[df['Draw Date_dt'].dt.year == year_to_display].sort_values(by='Draw Date_dt', ascending=False)
         
         # Calculate overall frequencies for the entire dataset
-        # Extract white balls from all Number columns
+        # Extract white balls from all Number columns across all draws
         white_ball_columns = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']
         all_white_balls = df[white_ball_columns].values.flatten()
-        overall_frequencies = calculate_white_ball_frequencies(all_white_balls)
+        
+        # Convert numpy array to regular Python list and ensure they're integers
+        all_white_balls = [int(ball) for ball in all_white_balls]
+        
+        # Calculate frequencies
+        overall_frequencies = {}
+        for ball in all_white_balls:
+            overall_frequencies[ball] = overall_frequencies.get(ball, 0) + 1
         
         # Prepare the list of draws with their frequencies for the template
         historical_draws = []
         for _, row in current_year_draws_df.iterrows():
             white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), 
                           int(row['Number 4']), int(row['Number 5'])]
-            frequencies = get_frequency_numbers(white_balls, overall_frequencies)
+            
+            # Get frequencies for each ball in this specific draw
+            frequencies = [overall_frequencies.get(ball, 0) for ball in white_balls]
+            
             historical_draws.append({
                 'draw_date': row['Draw Date'],
                 'white_balls': white_balls,
@@ -5093,7 +5103,6 @@ def historical_data_route():
     except Exception as e:
         flash(f'An error occurred: {str(e)}', 'error')
         return redirect(url_for('index'))
-
 
 # --- API Endpoints ---
 @app.route('/api/generate_single_draw', methods=['GET'])
