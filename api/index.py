@@ -5047,25 +5047,22 @@ def smart_pick_generator_route():
                            selected_sum_range="Any",
                            num_sets_to_generate=1)
 
-@app.route('/historical-data', methods=['GET'], endpoint='historical_data_route')
+@app.route('/historical-data', methods=['GET'], endpoint='historical_data')
 def historical_data_route():
     """Renders the historical data page with draw results and frequencies."""
     try:
+        # Ensure the DataFrame is populated
         if df.empty:
             initialize_core_data()
         
-        # Get the requested year from the query parameters, default to the current year
+        # Get the requested year from the URL, defaulting to the current year
         year_to_display = request.args.get('year', type=int, default=datetime.now().year)
         
         # Filter for draws from the specified year
-        # First, ensure 'draw_date' is in datetime format
-        if not pd.api.types.is_datetime64_any_dtype(df['draw_date']):
-            df['draw_date'] = pd.to_datetime(df['draw_date'])
-        
         current_year_draws_df = df[df['draw_date'].dt.year == year_to_display].sort_values(by='draw_date', ascending=False)
         
         # Calculate overall frequencies for the entire dataset
-        all_white_balls = [row['white_balls'] for _, row in df.iterrows()]
+        all_white_balls = [item for sublist in df['white_balls'] for item in sublist]
         overall_frequencies = calculate_white_ball_frequencies(all_white_balls)
         
         # Prepare the list of draws with their frequencies for the template
@@ -5080,8 +5077,19 @@ def historical_data_route():
                 'frequencies': frequencies
             })
             
-        # Get a list of available years for the dropdown
+        # Get a list of all available years for the dropdown menu
         available_years = sorted(df['draw_date'].dt.year.unique(), reverse=True)
+        
+        return render_template(
+            'historical_data.html',
+            historical_draws=historical_draws,
+            available_years=available_years,
+            selected_year=year_to_display
+        )
+
+    except Exception as e:
+        flash(f'An error occurred: {str(e)}', 'error')
+        return redirect(url_for('index'))
         
         return render_template(
             'historical_data.html',
