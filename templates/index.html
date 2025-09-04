@@ -700,44 +700,54 @@
             });
         }
 
-        // --- Function to Save Multiple Picks (for both single and all saves) ---
-        async function saveMultiplePicks(picks) {
-            try {
-                const response = await fetch('/save_multiple_generated_picks', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({picks: picksToSave})
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showFlashMessage(data.message, 'info');
-                } else {
-                    showFlashMessage(data.message || 'Error saving picks.', 'error');
-                }
-            } catch (error) {
-                console.error('Error saving picks:', error);
-                showFlashMessage(`An unexpected error occurred while saving: ${error.message}`, 'error');
-            }
-        }
-
-        // --- Existing save for individual general picks (updated to use saveMultiplePicks) ---
-        document.body.addEventListener('click', async function(event) {
-            if (event.target.classList.contains('save-general-pick-btn')) { // Changed class
-                const pickItem = event.target.closest('.generated-pick-item');
-                if (pickItem) {
-                    const whiteBallsStr = pickItem.dataset.whiteBalls;
-                    const powerballStr = pickItem.dataset.powerball;
-                    const whiteBalls = whiteBallsStr.split(',').map(Number);
-                    const powerball = Number(powerballStr);
-                    saveMultiplePicks([{ white_balls: whiteBalls, powerball: powerball }]);
-                }
-            }
+       // --- Function to Save Multiple Picks (for both single and all saves) ---
+async function saveMultiplePicks(picks) {
+    try {
+        const response = await fetch('/save_multiple_generated_picks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({picks: picks})
         });
-    });
-</script>
 
+        const data = await response.json();
+
+        if (response.ok) {
+            showFlashMessage(data.message, 'info');
+        } else {
+            showFlashMessage(data.message || 'Error saving picks.', 'error');
+        }
+    } catch (error) {
+        console.error('Error saving picks:', error);
+        showFlashMessage(`An unexpected error occurred while saving: ${error.message}`, 'error');
+    }
+}
+
+// --- Fix for draw_date element ---
+const drawDateElement = document.getElementById('draw_date');
+if (drawDateElement) {
+    drawDateElement.addEventListener('click', function() {
+        // Add your draw_date click handling logic here
+        console.log('draw_date clicked!');
+    });
+} else {
+    console.warn('Element with ID "draw_date" not found - check your HTML');
+}
+
+// --- Existing save for individual general picks (updated to use saveMultiplePicks) ---
+document.body.addEventListener('click', async function(event) {
+    if (event.target.classList.contains('save-general-pick-btn')) { // Changed class
+        const pickItem = event.target.closest('.generated-pick-item');
+        if (pickItem) {
+            const whiteBallsStr = pickItem.dataset.whiteBalls;
+            const powerballStr = pickItem.dataset.powerball;
+            const whiteBalls = whiteBallsStr.split(',').map(Number);
+            const powerball = Number(powerballStr);
+            saveMultiplePicks([{ white_balls: whiteBalls, powerball: powerball }]);
+        }
+    }
+});
+}); // <-- This is the closing of the DOMContentLoaded event listener
+</script>
 {% endblock %}
