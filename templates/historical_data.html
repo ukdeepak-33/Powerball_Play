@@ -12,7 +12,7 @@
             <label for="primary-year-select" class="text-gray-700 font-medium">Select Year:</label>
             <select id="primary-year-select" name="year" class="form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
                 {% for year in available_years %}
-                    <option value="{{ year }}">{{ year }}</option>
+                    <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -26,6 +26,56 @@
                 {% endfor %}
             </select>
         </div>
+    </div>
+
+    <!-- Historical Draws Table -->
+    <div class="bg-white rounded-xl shadow-lg p-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Historical Draws for {{ selected_year }}</h2>
+        
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">White Balls</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Powerball</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for draw in historical_draws %}
+                    <tr class="hover:bg-gray-50 transition-colors duration-200">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ draw.date }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex space-x-1">
+                                {% for ball in draw.white_balls %}
+                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 text-sm font-bold text-gray-700">
+                                    {{ ball }}
+                                </span>
+                                {% endfor %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-500 text-sm font-bold text-white">
+                                {{ draw.powerball }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <button onclick="analyzeDraw('{{ draw.date }}')" class="text-indigo-600 hover:text-indigo-900 font-medium">
+                                Analyze Frequency
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% if not historical_draws %}
+        <div class="text-center py-8 text-gray-500">
+            <p>No draw data available for {{ selected_year }}</p>
+        </div>
+        {% endif %}
     </div>
     
     <div id="primary-frequency-container" class="bg-white rounded-xl shadow-lg p-6">
@@ -89,6 +139,9 @@
         const primaryFrequenciesContainer = document.getElementById('primary-frequencies');
         const comparisonFrequenciesContainer = document.getElementById('comparison-frequencies');
         const comparisonSection = document.getElementById('comparison-section');
+
+        // Set initial year display
+        primaryYearDisplay.textContent = primaryYearSelect.value;
 
         const fetchAndRenderFrequencies = async () => {
             const primaryYear = primaryYearSelect.value;
@@ -159,5 +212,25 @@
         // Initial load
         fetchAndRenderFrequencies();
     });
+
+    async function analyzeDraw(drawDate) {
+        try {
+            const response = await fetch(`/api/draw-frequency-analysis?date=${drawDate}`);
+            const data = await response.json();
+            
+            if (response.ok) {
+                // Show analysis in a modal or alert
+                alert(`Frequency Analysis for ${drawDate}:\n\n` +
+                      data.frequency_analysis.map(item => 
+                          `Number ${item.number}: ${item.frequency} times (${item.percentage}%)`
+                      ).join('\n'));
+            } else {
+                alert('Error analyzing draw: ' + data.error);
+            }
+        } catch (error) {
+            console.error('Error analyzing draw:', error);
+            alert('An error occurred while analyzing the draw.');
+        }
+    }
 </script>
 {% endblock %}
