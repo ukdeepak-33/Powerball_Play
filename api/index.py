@@ -3749,6 +3749,37 @@ def get_frequency_numbers(balls, frequencies):
     """Maps a list of balls to their corresponding frequencies."""
     return [frequencies.get(ball, 0) for ball in balls]
 
+def api_historical_frequencies_internal(year):
+    """Internal helper function to get frequencies for a year."""
+    if df.empty:
+        return {"error": "Historical data not loaded."}
+    
+    yearly_df = df[df['Draw Date_dt'].dt.year == year].copy()
+    
+    if yearly_df.empty:
+        return {"error": f"No data available for year {year}."}
+    
+    # Calculate frequencies for the year
+    white_ball_columns = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']
+    yearly_white_balls = yearly_df[white_ball_columns].values.flatten()
+    
+    # Count frequencies
+    frequency_count = {}
+    for ball in yearly_white_balls:
+        ball_int = int(ball)
+        frequency_count[ball_int] = frequency_count.get(ball_int, 0) + 1
+    
+    # Convert to the format your frontend expects
+    white_balls = [{"number": num, "count": freq} for num, freq in frequency_count.items()]
+    white_balls.sort(key=lambda x: x["number"])  # Sort by number
+    
+    return {
+        "white_balls": white_balls,
+        "draw_count": len(yearly_df)
+    }
+
+
+
 # --- Flask Routes ---
 @app.route('/')
 def index():
@@ -5085,6 +5116,81 @@ def api_historical_frequencies():
         
     except Exception as e:
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
+@app.route('/api/historical-frequencies', methods=['GET'])
+def api_historical_frequencies():
+    """API endpoint to get white ball frequencies for a specific year."""
+    try:
+        if df.empty:
+            return jsonify({"error": "Historical data not loaded."}), 500
+        
+        year = request.args.get('year', type=int, default=datetime.now().year)
+        
+        # Filter data for the requested year
+        yearly_df = df[df['Draw Date_dt'].dt.year == year].copy()
+        
+        if yearly_df.empty:
+            return jsonify({"error": f"No data available for year {year}."}), 404
+        
+        # Calculate frequencies for the year
+        white_ball_columns = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']
+        yearly_white_balls = yearly_df[white_ball_columns].values.flatten()
+        
+        # Count frequencies
+        frequency_count = {}
+        for ball in yearly_white_balls:
+            ball_int = int(ball)
+            frequency_count[ball_int] = frequency_count.get(ball_int, 0) + 1
+        
+        # Convert to the format your frontend expects
+        white_balls = [{"number": num, "count": freq} for num, freq in frequency_count.items()]
+        white_balls.sort(key=lambda x: x["number"])  # Sort by number
+        
+        return jsonify({
+            "white_balls": white_balls,
+            "draw_count": len(yearly_df)  # Changed from total_draws to draw_count
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
+
+@app.route('/api/compare-frequencies', methods=['GET'])
+def api_compare_frequencies():
+    """API endpoint to compare frequencies between two years."""
+    try:
+        if df.empty:
+            return jsonify({"error": "Historical data not loaded."}), 500
+        
+        year1 = request.args.get('year1', type=int)
+        year2 = request.args.get('year2', type=int)
+        
+        if not year1 or not year2:
+            return jsonify({"error": "Both year1 and year2 parameters are required."}), 400
+        
+        # Get frequencies for both years
+        freq1_response = api_historical_frequencies_internal(year1)
+        freq2_response = api_historical_frequencies_internal(year2)
+        
+        if 'error' in freq1_response:
+            return jsonify({"error": freq1_response["error"]}), 404
+        if 'error' in freq2_response:
+            return jsonify({"error": freq2_response["error"]}), 404
+        
+        # Find matching white balls (numbers that appear in both years)
+        numbers_year1 = {item["number"] for item in freq1_response["white_balls"]}
+        numbers_year2 = {item["number"] for item in freq2_response["white_balls"]}
+        matching_white_balls = sorted(list(numbers_year1.intersection(numbers_year2)))
+        
+        return jsonify({
+            "freq1": freq1_response,
+            "freq2": freq2_response,
+            "matching_white_balls": matching_white_balls
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
 
 
 # --- API Endpoints ---
