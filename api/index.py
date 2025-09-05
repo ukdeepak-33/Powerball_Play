@@ -5124,9 +5124,11 @@ def api_draw_frequency_at_time():
         
         # Convert to datetime for comparison
         target_date = pd.to_datetime(draw_date)
+        print(f"Target date: {target_date}")
         
         # Get all draws that happened BEFORE the target date (not including the target date itself)
         historical_draws_up_to_date = df[df['Draw Date_dt'] < target_date].copy()
+        print(f"Draws before {target_date}: {len(historical_draws_up_to_date)}")
         
         # Calculate frequencies up to this date (excluding the current draw)
         white_ball_columns = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']
@@ -5136,7 +5138,8 @@ def api_draw_frequency_at_time():
         for ball in all_white_balls_up_to_date:
             ball_int = int(ball)
             frequency_count_up_to_date[ball_int] = frequency_count_up_to_date.get(ball_int, 0) + 1
-        
+        print(f"Sample frequencies: {dict(list(frequency_count_up_to_date.items())[:5])}")
+
         # Get the specific draw to analyze
         specific_draw = df[df['Draw Date'] == draw_date]
         if specific_draw.empty:
@@ -5800,6 +5803,3 @@ def ai_assistant_query():
         
 # Initialize core data on app startup
 initialize_core_data()
-print(f"Target date: {target_date}")
-print(f"Draws before {target_date}: {len(historical_draws_up_to_date)}")
-print(f"Sample frequencies: {dict(list(frequency_count_up_to_date.items())[:5])}")
