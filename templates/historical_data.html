@@ -177,30 +177,31 @@
 
     // Function to load frequencies for each individual draw
     async function loadDrawFrequencies() {
-        const draws = {{ historical_draws | tojson }};
-        const frequencyPromises = [];
-        
-        // Create promises for all draw frequency API calls
-        for (const draw of draws) {
-            frequencyPromises.push(
-                fetch(`/api/draw-frequency-at-time?date=${draw.date}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            drawFrequencies[draw.date] = data.frequency_at_time;
-                        }
-                    })
-                    .catch(error => {
-                        console.error(`Error loading frequencies for ${draw.date}:`, error);
-                    })
-            );
-        }
-        
-        // Wait for all API calls to complete
-        await Promise.all(frequencyPromises);
-        populateFrequencyDisplays();
+    const draws = {{ historical_draws | tojson }};
+    console.log('Loading frequencies for', draws.length, 'draws');
+    
+    const frequencyPromises = [];
+    
+    for (const draw of draws) {
+        frequencyPromises.push(
+            fetch(`/api/draw-frequency-at-time?date=${draw.date}`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Frequency data for', draw.date, ':', data);
+                    if (data.success) {
+                        drawFrequencies[draw.date] = data.frequency_at_time;
+                    }
+                })
+                .catch(error => {
+                    console.error(`Error loading frequencies for ${draw.date}:`, error);
+                })
+        );
     }
-
+    
+    await Promise.all(frequencyPromises);
+    console.log('All frequencies loaded:', drawFrequencies);
+    populateFrequencyDisplays();
+}
     // Function to populate frequency displays with actual data
     function populateFrequencyDisplays() {
         const frequencyDisplays = document.querySelectorAll('.frequency-display');
