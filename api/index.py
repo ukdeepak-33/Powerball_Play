@@ -5800,3 +5800,6 @@ def ai_assistant_query():
         
 # Initialize core data on app startup
 initialize_core_data()
+print(f"Target date: {target_date}")
+print(f"Draws before {target_date}: {len(historical_draws_up_to_date)}")
+print(f"Sample frequencies: {dict(list(frequency_count_up_to_date.items())[:5])}")
