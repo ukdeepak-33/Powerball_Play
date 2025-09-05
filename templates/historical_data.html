@@ -171,219 +171,87 @@
 </style>
 
 <script>
-    // Global variables
-    let drawFrequencies = {};
-    let currentYearFrequencies = {};
-
-    // Function to load frequencies for each individual draw
-    async function loadDrawFrequencies() {
-    const draws = {{ historical_draws | tojson }};  // FIXED: Added quotes around tojson
-    console.log('Loading frequencies for', draws.length, 'draws');
-    
-    const frequencyPromises = [];
-    
-    for (const draw of draws) {
-        frequencyPromises.push(
-            fetch(`/api/draw-frequency-at-time?date=${draw.date}`)
-                .then(response => response.json())
-                .then(data => {
-                    console.log('Frequency data for', draw.date, ':', data);
-                    if (data.success) {
-                        drawFrequencies[draw.date] = data.frequency_at_time;
-                    }
-                })
-                .catch(error => {
-                    console.error(`Error loading frequencies for ${draw.date}:`, error);
-                })
-        );
-    }
-    
-    await Promise.all(frequencyPromises);
-    console.log('All frequencies loaded:', drawFrequencies);
-    populateFrequencyDisplays();
-}
-    // Function to populate frequency displays with actual data
-    function populateFrequencyDisplays() {
-        const frequencyDisplays = document.querySelectorAll('.frequency-display');
-        
-        frequencyDisplays.forEach(display => {
-            const ballNumber = parseInt(display.dataset.ball);
-            const drawDate = display.dataset.date;
-            const frequencies = drawFrequencies[drawDate];
-            
-            if (frequencies) {
-                const ballData = frequencies.find(item => item.number === ballNumber);
-                const frequency = ballData ? ballData.frequency : 0;
-                const totalDraws = ballData ? ballData.total_draws_up_to_date : 0;
-                
-                display.textContent = frequency;
-                display.dataset.frequency = `${frequency} times (out of ${totalDraws} total draws up to ${drawDate})`;
-                
-                // Color coding based on frequency
-                applyFrequencyColor(display, frequency);
-            }
-        });
-    }
-
-    // Function to apply color coding based on frequency
-    function applyFrequencyColor(element, frequency) {
-        // Remove existing color classes
-        element.classList.remove('high-frequency', 'medium-frequency', 'low-frequency');
-        
-        // Add appropriate color class
-        if (frequency >= 10) {
-            element.classList.add('high-frequency');
-        } else if (frequency >= 5) {
-            element.classList.add('medium-frequency');
-        } else if (frequency >= 1) {
-            element.classList.add('low-frequency');
-        }
-    }
-
-    // Function to analyze a specific draw
-    async function analyzeDraw(drawDate) {
-        try {
-            const response = await fetch(`/api/draw-frequency-at-time?date=${drawDate}`);
-            const data = await response.json();
-            
-            if (response.ok) {
-                // Show analysis in a modal or alert
-                alert(`Frequency Analysis for ${drawDate} (up to that date):\n\n` +
-                      data.frequency_at_time.map(item => 
-                          `Number ${item.number}: ${item.frequency} times (out of ${item.total_draws_up_to_date} total draws)`
-                      ).join('\n'));
-            } else {
-                alert('Error analyzing draw: ' + data.error);
-            }
-        } catch (error) {
-            console.error('Error analyzing draw:', error);
-            alert('An error occurred while analyzing the draw.');
-        }
-    }
-
-    // Main DOMContentLoaded event listener
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         const primaryYearSelect = document.getElementById('primary-year-select');
-        const compareYearSelect = document.getElementById('compare-year-select');
-        const comparisonSection = document.getElementById('comparison-section');
-        const yearFrequenciesContainer = document.getElementById('year-frequencies');
-        const year1Display = document.getElementById('year1-display');
-        const year2Display = document.getElementById('year2-display');
-        const compareYear1Display = document.getElementById('compare-year1-display');
-        const compareYear2Display = document.getElementById('compare-year2-display');
+        const drawResultsContainer = document.getElementById('draw-results-container');
+        let historical_draws = [];
 
-        const currentYear = {{ selected_year }};
+        async function fetchAndRenderData(year) {
+            try {
+                const response = await fetch(`/api/draws/${year}`);
+                const data = await response.json();
+                historical_draws = data.draws;
+                renderDrawsWithFrequencies(historical_draws);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                drawResultsContainer.innerHTML = '<p class="text-red-500">Error loading draw data. Please try again later.</p>';
+            }
+        }
 
-        // Load year-specific frequencies and draw-specific frequencies
-        Promise.all([
-            loadYearFrequencies(currentYear),
-            loadDrawFrequencies()
-        ]).then(() => {
-            renderYearFrequencySummary();
-            
-            // Set up event listeners
-            primaryYearSelect.addEventListener('change', function() {
-                window.location.href = `/historical-data?year=${this.value}`;
+        function renderDrawsWithFrequencies(draws) {
+            drawResultsContainer.innerHTML = '';
+            const ballFrequencies = {};
+
+            // Initialize frequency counts for all possible white balls (1-69)
+            for (let i = 1; i <= 69; i++) {
+                ballFrequencies[i] = 0;
+            }
+
+            draws.forEach(draw => {
+                const drawDate = draw.draw_date;
+                const whiteBalls = draw.white_balls.split(',').map(Number);
+                const powerball = draw.powerball;
+                const powerplay = draw.powerplay;
+
+                // Update frequencies for the current draw's white balls
+                whiteBalls.forEach(ball => {
+                    if (ballFrequencies.hasOwnProperty(ball)) {
+                        ballFrequencies[ball]++;
+                    }
+                });
+
+                // Create a copy of the current frequencies to render for this specific draw
+                const frequenciesAtDraw = { ...ballFrequencies };
+
+                // Create the table row for the current draw
+                const row = document.createElement('tr');
+                row.className = 'bg-white border-b hover:bg-gray-50';
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${drawDate}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex space-x-2 justify-center">
+                            ${whiteBalls.map(ball => `<span class="white-ball">${ball}</span>`).join('')}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="powerball">${powerball}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${powerplay || 'N/A'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="frequency-row flex space-x-2 justify-center">
+                            ${Object.keys(frequenciesAtDraw).map(number => {
+                                const frequency = frequenciesAtDraw[number];
+                                return `<div class="frequency-ball flex-col items-center justify-center data-ball="${number}">
+                                    <span class="text-lg font-bold">${number}</span>
+                                    <span class="text-sm">${frequency}</span>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </td>
+                `;
+                drawResultsContainer.appendChild(row);
             });
+        }
 
-            compareYearSelect.addEventListener('change', handleYearComparison);
+        primaryYearSelect.addEventListener('change', function () {
+            const selectedYear = this.value;
+            fetchAndRenderData(selectedYear);
         });
 
-        async function loadYearFrequencies(year) {
-            try {
-                const response = await fetch(`/api/year-frequencies?year=${year}`);
-                const data = await response.json();
-                
-                if (response.ok) {
-                    currentYearFrequencies = data.frequencies;
-                } else {
-                    console.error('Error loading year frequencies:', data.error);
-                }
-            } catch (error) {
-                console.error('Error loading year frequencies:', error);
-            }
-        }
-
-        function renderYearFrequencySummary() {
-            yearFrequenciesContainer.innerHTML = '';
-            
-            for (let number = 1; number <= 69; number++) {
-                const frequency = currentYearFrequencies[number] || 0;
-                
-                const div = document.createElement('div');
-                div.className = 'frequency-ball flex-col items-center justify-center';
-                div.innerHTML = `
-                    <span class="text-lg font-bold">${number}</span>
-                    <span class="text-sm">${frequency}</span>
-                `;
-                
-                applyFrequencyColor(div, frequency);
-                yearFrequenciesContainer.appendChild(div);
-            }
-        }
-
-        async function handleYearComparison() {
-            const compareYear = compareYearSelect.value;
-            
-            if (!compareYear) {
-                comparisonSection.classList.add('hidden');
-                return;
-            }
-
-            const primaryYear = primaryYearSelect.value;
-            
-            if (primaryYear === compareYear) {
-                alert("Cannot compare the same year with itself.");
-                compareYearSelect.value = "";
-                return;
-            }
-
-            comparisonSection.classList.remove('hidden');
-            year1Display.textContent = primaryYear;
-            year2Display.textContent = compareYear;
-            compareYear1Display.textContent = primaryYear;
-            compareYear2Display.textContent = compareYear;
-
-            // Load comparison data for both years
-            try {
-                const [year1Data, year2Data] = await Promise.all([
-                    fetch(`/api/year-frequencies?year=${primaryYear}`).then(r => r.json()),
-                    fetch(`/api/year-frequencies?year=${compareYear}`).then(r => r.json())
-                ]);
-
-                if (year1Data.success && year2Data.success) {
-                    renderComparison(year1Data, year2Data, primaryYear, compareYear);
-                } else {
-                    alert('Error loading comparison data');
-                }
-            } catch (error) {
-                console.error('Error in comparison:', error);
-                alert('Error loading comparison data');
-            }
-        }
-
-        function renderComparison(year1Data, year2Data, year1, year2) {
-            renderFrequencyComparison('comparison-year1-frequencies', year1Data.frequencies, year1);
-            renderFrequencyComparison('comparison-year2-frequencies', year2Data.frequencies, year2);
-        }
-
-        function renderFrequencyComparison(containerId, frequencies, year) {
-            const container = document.getElementById(containerId);
-            container.innerHTML = '';
-            
-            for (let number = 1; number <= 69; number++) {
-                const frequency = frequencies[number] || 0;
-                
-                const div = document.createElement('div');
-                div.className = 'frequency-ball flex-col items-center justify-center';
-                div.innerHTML = `
-                    <span class="text-lg font-bold">${number}</span>
-                    <span class="text-sm">${frequency}</span>
-                `;
-                
-                applyFrequencyColor(div, frequency);
-                container.appendChild(div);
-            }
+        // Initial load for the currently selected year
+        const initialYear = primaryYearSelect.value;
+        if (initialYear) {
+            fetchAndRenderData(initialYear);
         }
     });
 </script>
