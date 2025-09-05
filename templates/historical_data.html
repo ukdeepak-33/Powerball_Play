@@ -30,7 +30,7 @@
 
     <!-- Historical Draws Table with Year-Specific Frequency -->
     <div class="bg-white rounded-xl shadow-lg p-6">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">Historical Draws for {{ selected_year }} with Year-Specific Frequency Analysis</h2>
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Historical Draws for {{ selected_year }} with Frequency Analysis</h2>
         
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
@@ -38,7 +38,7 @@
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">White Balls</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">White Ball Frequencies ({{ selected_year }})</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">White Ball Frequencies (at time of draw)</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Powerball</th>
                     </tr>
                 </thead>
@@ -59,7 +59,7 @@
                             <div class="flex space-x-1">
                                 {% for ball in draw.white_balls %}
                                 <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-sm font-bold text-blue-700 frequency-display" 
-                                      data-ball="{{ ball }}">
+                                      data-ball="{{ ball }}" data-date="{{ draw.date }}">
                                     ?
                                 </span>
                                 {% endfor %}
@@ -171,6 +171,96 @@
 </style>
 
 <script>
+    // Global variables
+    let drawFrequencies = {};
+    let currentYearFrequencies = {};
+
+    // Function to load frequencies for each individual draw
+    async function loadDrawFrequencies() {
+        const draws = {{ historical_draws | tojson }};
+        const frequencyPromises = [];
+        
+        // Create promises for all draw frequency API calls
+        for (const draw of draws) {
+            frequencyPromises.push(
+                fetch(`/api/draw-frequency-at-time?date=${draw.date}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            drawFrequencies[draw.date] = data.frequency_at_time;
+                        }
+                    })
+                    .catch(error => {
+                        console.error(`Error loading frequencies for ${draw.date}:`, error);
+                    })
+            );
+        }
+        
+        // Wait for all API calls to complete
+        await Promise.all(frequencyPromises);
+        populateFrequencyDisplays();
+    }
+
+    // Function to populate frequency displays with actual data
+    function populateFrequencyDisplays() {
+        const frequencyDisplays = document.querySelectorAll('.frequency-display');
+        
+        frequencyDisplays.forEach(display => {
+            const ballNumber = parseInt(display.dataset.ball);
+            const drawDate = display.dataset.date;
+            const frequencies = drawFrequencies[drawDate];
+            
+            if (frequencies) {
+                const ballData = frequencies.find(item => item.number === ballNumber);
+                const frequency = ballData ? ballData.frequency : 0;
+                const totalDraws = ballData ? ballData.total_draws_up_to_date : 0;
+                
+                display.textContent = frequency;
+                display.dataset.frequency = `${frequency} times (out of ${totalDraws} total draws up to ${drawDate})`;
+                
+                // Color coding based on frequency
+                applyFrequencyColor(display, frequency);
+            }
+        });
+    }
+
+    // Function to apply color coding based on frequency
+    function applyFrequencyColor(element, frequency) {
+        // Remove existing color classes
+        element.classList.remove('high-frequency', 'medium-frequency', 'low-frequency');
+        
+        // Add appropriate color class
+        if (frequency >= 10) {
+            element.classList.add('high-frequency');
+        } else if (frequency >= 5) {
+            element.classList.add('medium-frequency');
+        } else if (frequency >= 1) {
+            element.classList.add('low-frequency');
+        }
+    }
+
+    // Function to analyze a specific draw
+    async function analyzeDraw(drawDate) {
+        try {
+            const response = await fetch(`/api/draw-frequency-at-time?date=${drawDate}`);
+            const data = await response.json();
+            
+            if (response.ok) {
+                // Show analysis in a modal or alert
+                alert(`Frequency Analysis for ${drawDate} (up to that date):\n\n` +
+                      data.frequency_at_time.map(item => 
+                          `Number ${item.number}: ${item.frequency} times (out of ${item.total_draws_up_to_date} total draws)`
+                      ).join('\n'));
+            } else {
+                alert('Error analyzing draw: ' + data.error);
+            }
+        } catch (error) {
+            console.error('Error analyzing draw:', error);
+            alert('An error occurred while analyzing the draw.');
+        }
+    }
+
+    // Main DOMContentLoaded event listener
     document.addEventListener('DOMContentLoaded', function() {
         const primaryYearSelect = document.getElementById('primary-year-select');
         const compareYearSelect = document.getElementById('compare-year-select');
@@ -182,11 +272,12 @@
         const compareYear2Display = document.getElementById('compare-year2-display');
 
         const currentYear = {{ selected_year }};
-        let currentYearFrequencies = {};
 
-        // Load year-specific frequencies and populate the table
-        loadYearFrequencies(currentYear).then(() => {
-            populateFrequencyDisplays();
+        // Load year-specific frequencies and draw-specific frequencies
+        Promise.all([
+            loadYearFrequencies(currentYear),
+            loadDrawFrequencies()
+        ]).then(() => {
             renderYearFrequencySummary();
             
             // Set up event listeners
@@ -212,21 +303,6 @@
             }
         }
 
-        function populateFrequencyDisplays() {
-            const frequencyDisplays = document.querySelectorAll('.frequency-display');
-            
-            frequencyDisplays.forEach(display => {
-                const ballNumber = parseInt(display.dataset.ball);
-                const frequency = currentYearFrequencies[ballNumber] || 0;
-                
-                display.textContent = frequency;
-                display.dataset.frequency = `${frequency} times in ${currentYear}`;
-                
-                // Color coding based on frequency within this year
-                applyFrequencyColor(display, frequency);
-            });
-        }
-
         function renderYearFrequencySummary() {
             yearFrequenciesContainer.innerHTML = '';
             
@@ -242,20 +318,6 @@
                 
                 applyFrequencyColor(div, frequency);
                 yearFrequenciesContainer.appendChild(div);
-            }
-        }
-
-        function applyFrequencyColor(element, frequency) {
-            // Remove existing color classes
-            element.classList.remove('high-frequency', 'medium-frequency', 'low-frequency');
-            
-            // Add appropriate color class
-            if (frequency >= 5) {
-                element.classList.add('high-frequency');
-            } else if (frequency >= 2) {
-                element.classList.add('medium-frequency');
-            } else if (frequency >= 1) {
-                element.classList.add('low-frequency');
             }
         }
 
