@@ -38,8 +38,8 @@
                     <tr>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Draw Date</th>
                         <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">White Balls</th>
-                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency At Time of Draw</th>
-                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Powerball</th>        
+                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Powerball</th>
+                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency At Time of Draw</th> 
                     </tr>
                 </thead>
                <tbody id="draw-results-container" class="bg-white divide-y divide-gray-200">
@@ -188,60 +188,58 @@
             }
         }
 
-        function renderDrawsWithFrequencies(draws) {
-            drawResultsContainer.innerHTML = '';
-            const ballFrequencies = {};
+ function renderDrawsWithFrequencies(draws) {
+    drawResultsContainer.innerHTML = '';
+    const ballFrequencies = {};
 
-            // Initialize frequency counts for all possible white balls (1-69)
-            for (let i = 1; i <= 69; i++) {
-                ballFrequencies[i] = 0;
+    // Initialize frequency counts for all possible white balls (1-69)
+    for (let i = 1; i <= 69; i++) {
+        ballFrequencies[i] = 0;
+    }
+
+    draws.forEach(draw => {
+        const drawDate = draw.draw_date;
+        const whiteBalls = draw.white_balls.split(',').map(Number);
+        const powerball = draw.powerball;
+
+        // Update frequencies for the current draw's white balls
+        whiteBalls.forEach(ball => {
+            if (ballFrequencies.hasOwnProperty(ball)) {
+                ballFrequencies[ball]++;
             }
+        });
 
-            draws.forEach(draw => {
-                const drawDate = draw.draw_date;
-                const whiteBalls = draw.white_balls.split(',').map(Number);
-                const powerball = draw.powerball;
-                const powerplay = draw.powerplay;
+        // Create a copy of the current frequencies to render for this specific draw
+        const frequenciesAtDraw = { ...ballFrequencies };
 
-                // Update frequencies for the current draw's white balls
-                whiteBalls.forEach(ball => {
-                    if (ballFrequencies.hasOwnProperty(ball)) {
-                        ballFrequencies[ball]++;
-                    }
-                });
-
-                // Create a copy of the current frequencies to render for this specific draw
-                const frequenciesAtDraw = { ...ballFrequencies };
-
-                // Create the table row for the current draw
-                const row = document.createElement('tr');
-                row.className = 'bg-white border-b hover:bg-gray-50';
-                row.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${drawDate}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex space-x-2 justify-center">
-                            ${whiteBalls.map(ball => `<span class="white-ball">${ball}</span>`).join('')}
-                        </div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="powerball">${powerball}</span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${powerplay || 'N/A'}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="frequency-row flex space-x-2 justify-center">
-                            ${Object.keys(frequenciesAtDraw).map(number => {
-                                const frequency = frequenciesAtDraw[number];
-                                return `<div class="frequency-ball flex-col items-center justify-center data-ball="${number}">
-                                    <span class="text-lg font-bold">${number}</span>
-                                    <span class="text-sm">${frequency}</span>
-                                </div>`;
-                            }).join('')}
-                        </div>
-                    </td>
-                `;
-                drawResultsContainer.appendChild(row);
-            });
-        }
+        // Create the table row for the current draw
+        const row = document.createElement('tr');
+        row.className = 'bg-white border-b hover:bg-gray-50';
+        row.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${drawDate}</td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="flex space-x-2 justify-center">
+                    ${whiteBalls.map(ball => `<span class="white-ball">${ball}</span>`).join('')}
+                </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="powerball">${powerball}</span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="frequency-row flex space-x-2 justify-center">
+                    ${Object.keys(frequenciesAtDraw).map(number => {
+                        const frequency = frequenciesAtDraw[number];
+                        return `<div class="frequency-ball flex-col items-center justify-center data-ball="${number}">
+                            <span class="text-lg font-bold">${number}</span>
+                            <span class="text-sm">${frequency}</span>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </td>
+        `;
+        drawResultsContainer.appendChild(row);
+    });
+}
 
         primaryYearSelect.addEventListener('change', function () {
             const selectedYear = this.value;
