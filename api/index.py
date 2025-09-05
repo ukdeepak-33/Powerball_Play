@@ -5113,6 +5113,64 @@ def historical_data_route():
     except Exception as e:
         flash(f'An error occurred: {str(e)}', 'error')
         return redirect(url_for('index'))
+        
+@app.route('/api/draw-frequency-at-time', methods=['GET'])
+def api_draw_frequency_at_time():
+    """Get frequency of each white ball number UP TO a specific draw date."""
+    try:
+        draw_date = request.args.get('date')
+        if not draw_date:
+            return jsonify({"error": "Date parameter required"}), 400
+        
+        # Convert to datetime for comparison
+        target_date = pd.to_datetime(draw_date)
+        
+        # Get all draws that happened BEFORE the target date (not including the target date itself)
+        historical_draws_up_to_date = df[df['Draw Date_dt'] < target_date].copy()
+        
+        # Calculate frequencies up to this date (excluding the current draw)
+        white_ball_columns = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']
+        all_white_balls_up_to_date = historical_draws_up_to_date[white_ball_columns].values.flatten()
+        
+        frequency_count_up_to_date = {}
+        for ball in all_white_balls_up_to_date:
+            ball_int = int(ball)
+            frequency_count_up_to_date[ball_int] = frequency_count_up_to_date.get(ball_int, 0) + 1
+        
+        # Get the specific draw to analyze
+        specific_draw = df[df['Draw Date'] == draw_date]
+        if specific_draw.empty:
+            return jsonify({"error": f"No draw found for date {draw_date}"}), 404
+        
+        # Get the white balls from this specific draw
+        white_balls = [
+            int(specific_draw['Number 1'].iloc[0]),
+            int(specific_draw['Number 2'].iloc[0]),
+            int(specific_draw['Number 3'].iloc[0]),
+            int(specific_draw['Number 4'].iloc[0]),
+            int(specific_draw['Number 5'].iloc[0])
+        ]
+        
+        # Get the frequency AT THE TIME for each ball in this draw
+        frequency_at_time = []
+        for ball in white_balls:
+            frequency_at_time.append({
+                'number': ball,
+                'frequency': frequency_count_up_to_date.get(ball, 0),
+                'total_draws_up_to_date': len(historical_draws_up_to_date)
+            })
+        
+        return jsonify({
+            "success": True,
+            "draw_date": draw_date,
+            "white_balls": white_balls,
+            "powerball": int(specific_draw['Powerball'].iloc[0]),
+            "frequency_at_time": frequency_at_time,
+            "total_draws_up_to_date": len(historical_draws_up_to_date)
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 @app.route('/api/draw-frequency-analysis', methods=['GET'])
 def api_draw_frequency_analysis():
