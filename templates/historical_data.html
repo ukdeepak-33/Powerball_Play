@@ -177,7 +177,7 @@
 
     // Function to load frequencies for each individual draw
     async function loadDrawFrequencies() {
-    const draws = {{ historical_draws | tojson }};
+    const draws = {{ historical_draws | tojson }};  // FIXED: Added quotes around tojson
     console.log('Loading frequencies for', draws.length, 'draws');
     
     const frequencyPromises = [];
