@@ -5800,6 +5800,44 @@ def ai_assistant_query():
         
     except Exception as e:
         return jsonify({'success': False, 'error': f'Error processing query: {str(e)}'}), 500
+
+@app.route('/api/draws/<int:year>')
+def get_draws_by_year(year):
+    """
+    Returns historical draw data for a specific year in JSON format.
+    """
+    global df
+    if df.empty:
+        return jsonify({"error": "Historical data not loaded."}), 503
+
+    try:
+        yearly_df = df[df['Draw Date_dt'].dt.year == year].copy()
+        
+        if yearly_df.empty:
+            return jsonify({"draws": []}), 200
+
+        # Prepare the list of draw dictionaries
+        draws_list = []
+        for _, row in yearly_df.iterrows():
+            white_balls = [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']), int(row['Number 4']), int(row['Number 5'])]
+            
+            # The 'Power Play' column might not exist, so handle it gracefully
+            powerplay = None
+            if 'Power Play' in row and not pd.isna(row['Power Play']):
+                powerplay = int(row['Power Play'])
+
+            draws_list.append({
+                "draw_date": row['Draw Date'],
+                "white_balls": ",".join(map(str, sorted(white_balls))),
+                "powerball": int(row['Powerball']),
+                "powerplay": powerplay
+            })
+        
+        return jsonify({"draws": draws_list}), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
         
 # Initialize core data on app startup
 initialize_core_data()
