@@ -209,9 +209,6 @@
             }
         });
 
-        // Create a copy of the current frequencies to render for this specific draw
-        const frequenciesAtDraw = { ...ballFrequencies };
-
         // Create the table row for the current draw
         const row = document.createElement('tr');
         row.className = 'bg-white border-b hover:bg-gray-50';
@@ -227,8 +224,8 @@
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
                 <div class="frequency-row flex space-x-2 justify-center">
-                    ${Object.keys(frequenciesAtDraw).map(number => {
-                        const frequency = frequenciesAtDraw[number];
+                    ${whiteBalls.map(number => {
+                        const frequency = ballFrequencies[number];
                         return `<div class="frequency-ball flex-col items-center justify-center data-ball="${number}">
                             <span class="text-lg font-bold">${number}</span>
                             <span class="text-sm">${frequency}</span>
