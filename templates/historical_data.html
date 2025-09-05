@@ -36,7 +36,10 @@
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Draw Date</th>
+                        <th id="draw-date-header" scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">
+                            Draw Date
+                            <span id="sort-indicator" class="ml-2">▼</span>
+                           </th>
                         <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">White Balls</th>
                         <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Powerball</th>
                         <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency At Time of Draw</th> 
@@ -174,13 +177,19 @@
     document.addEventListener('DOMContentLoaded', function () {
         const primaryYearSelect = document.getElementById('primary-year-select');
         const drawResultsContainer = document.getElementById('draw-results-container');
+        const drawDateHeader = document.getElementById('draw-date-header');
+        const sortIndicator = document.getElementById('sort-indicator');
+
         let historical_draws = [];
+        let sortOrder = 'desc'; // Initial sort order is descending
 
         async function fetchAndRenderData(year) {
             try {
                 const response = await fetch(`/api/draws/${year}`);
                 const data = await response.json();
                 historical_draws = data.draws;
+                
+                sortDraws(historical_draws); // Sort data before rendering
                 renderDrawsWithFrequencies(historical_draws);
             } catch (error) {
                 console.error('Error fetching data:', error);
@@ -188,59 +197,80 @@
             }
         }
 
- function renderDrawsWithFrequencies(draws) {
-    drawResultsContainer.innerHTML = '';
-    const ballFrequencies = {};
+        function sortDraws(draws) {
+            draws.sort((a, b) => {
+                const dateA = new Date(a.draw_date);
+                const dateB = new Date(b.draw_date);
+                
+                if (sortOrder === 'asc') {
+                    return dateA - dateB;
+                } else {
+                    return dateB - dateA;
+                }
+            });
+            // Update the sort indicator
+            sortIndicator.textContent = sortOrder === 'asc' ? '▲' : '▼';
+        }
 
-    // Initialize frequency counts for all possible white balls (1-69)
-    for (let i = 1; i <= 69; i++) {
-        ballFrequencies[i] = 0;
-    }
+        function renderDrawsWithFrequencies(draws) {
+            drawResultsContainer.innerHTML = '';
+            const ballFrequencies = {};
 
-    draws.forEach(draw => {
-        const drawDate = draw.draw_date;
-        const whiteBalls = draw.white_balls.split(',').map(Number);
-        const powerball = draw.powerball;
-
-        // Update frequencies for the current draw's white balls
-        whiteBalls.forEach(ball => {
-            if (ballFrequencies.hasOwnProperty(ball)) {
-                ballFrequencies[ball]++;
+            for (let i = 1; i <= 69; i++) {
+                ballFrequencies[i] = 0;
             }
-        });
 
-        // Create the table row for the current draw
-        const row = document.createElement('tr');
-        row.className = 'bg-white border-b hover:bg-gray-50';
-        row.innerHTML = `
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${drawDate}</td>
-            <td class="px-6 py-4 whitespace-nowrap">
-                <div class="flex space-x-2 justify-center">
-                    ${whiteBalls.map(ball => `<span class="white-ball">${ball}</span>`).join('')}
-                </div>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-                <span class="powerball">${powerball}</span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-                <div class="frequency-row flex space-x-2 justify-center">
-                    ${whiteBalls.map(number => {
-                        const frequency = ballFrequencies[number];
-                        return `<div class="frequency-ball flex-col items-center justify-center data-ball="${number}">
-                            <span class="text-lg font-bold">${number}</span>
-                            <span class="text-sm">${frequency}</span>
-                        </div>`;
-                    }).join('')}
-                </div>
-            </td>
-        `;
-        drawResultsContainer.appendChild(row);
-    });
-}
+            draws.forEach(draw => {
+                const drawDate = draw.draw_date;
+                const whiteBalls = draw.white_balls.split(',').map(Number);
+                const powerball = draw.powerball;
 
+                whiteBalls.forEach(ball => {
+                    if (ballFrequencies.hasOwnProperty(ball)) {
+                        ballFrequencies[ball]++;
+                    }
+                });
+                
+                const row = document.createElement('tr');
+                row.className = 'bg-white border-b hover:bg-gray-50';
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${drawDate}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex space-x-2 justify-center">
+                            ${whiteBalls.map(ball => `<span class="white-ball">${ball}</span>`).join('')}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="powerball">${powerball}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="frequency-row flex space-x-2 justify-center">
+                            ${whiteBalls.map(number => {
+                                const frequency = ballFrequencies[number];
+                                return `<div class="frequency-ball flex-col items-center justify-center data-ball="${number}">
+                                    <span class="text-lg font-bold">${number}</span>
+                                    <span class="text-sm">${frequency}</span>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                    </td>
+                `;
+                drawResultsContainer.appendChild(row);
+            });
+        }
+
+        // Event listener for changing the year
         primaryYearSelect.addEventListener('change', function () {
             const selectedYear = this.value;
+            sortOrder = 'desc'; // Reset sort order when changing year
             fetchAndRenderData(selectedYear);
+        });
+
+        // Event listener for clicking the Draw Date header
+        drawDateHeader.addEventListener('click', function () {
+            sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+            sortDraws(historical_draws);
+            renderDrawsWithFrequencies(historical_draws);
         });
 
         // Initial load for the currently selected year
