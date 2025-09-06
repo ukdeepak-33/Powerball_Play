@@ -1202,55 +1202,64 @@ def calculate_yearly_decade_pair_hits():
     Calculates the number of times each decade-based pair has appeared, grouped by year.
     For example, all pairs in the 10s (10-19), 20s (20-29), etc.
     """
-    global df
+global df
     if df.empty:
         return {}
+
     df['Draw Date'] = pd.to_datetime(df['Draw Date'])
     available_years = sorted(df['Draw Date'].dt.year.unique(), reverse=True)
+    
     yearly_pairs_data = {}
     decade_groups = {
         '1s': (1, 9), '10s': (10, 19), '20s': (20, 29), '30s': (30, 39),
         '40s': (40, 49), '50s': (50, 59), '60s': (60, 69)
     }
+
     for year in available_years:
         year_key = str(year)
         year_df = df[df['Draw Date'].dt.year == year].copy()
+        
         static_pairs_data = []
         for name, (start, end) in decade_groups.items():
             numbers_in_range = list(range(start, end + 1))
             if len(numbers_in_range) < 2:
                 continue
             all_possible_pairs_in_decade = list(combinations(numbers_in_range, 2))
+            
             static_pairs_data.append({
                 "group_name": f"Pairs in the {name}",
                 "number_of_pairs": len(all_possible_pairs_in_decade),
                 "pairs": all_possible_pairs_in_decade
             })
+
         pair_hit_counts = defaultdict(int)
         for _, row in year_df.iterrows():
             white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
             for drawn_pair in combinations(white_balls, 2):
-                if get_decade(drawn_pair[0]) == get_decade(drawn_pair[1]):
-                    pair_hit_counts[tuple(sorted(drawn_pair))] += 1
+                pair_hit_counts[tuple(sorted(drawn_pair))] += 1
+        
         year_decade_pairs = []
         for group in static_pairs_data:
             updated_pairs = []
             for pair in group['pairs']:
                 pair_tuple = tuple(sorted(pair))
                 hit_count = pair_hit_counts.get(pair_tuple, 0)
-                if hit_count > 0:
-                    updated_pairs.append({
-                        "pair": pair,
-                        "hit_count": hit_count
-                    })
-            updated_pairs.sort(key=lambda x: x['hit_count'], reverse=True)
-            if updated_pairs:
-                year_decade_pairs.append({
-                    "group_name": group["group_name"],
-                    "pairs": updated_pairs
+                updated_pairs.append({
+                    "pair": pair,
+                    "hit_count": hit_count
                 })
+            
+            # Sort the pairs by hit count (descending), so hits are at the top
+            updated_pairs.sort(key=lambda x: x['hit_count'], reverse=True)
+            
+            year_decade_pairs.append({
+                "group_name": group["group_name"],
+                "pairs": updated_pairs
+            })
+        
         yearly_pairs_data[year_key] = year_decade_pairs
-        return yearly_pairs_data
+
+    return yearly_pairs_data
 
 def calculate_combinations_py(elements, k):
     """Calculates all unique combinations of k elements from a list of elements."""
