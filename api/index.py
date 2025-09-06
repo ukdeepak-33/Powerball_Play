@@ -1120,6 +1120,30 @@ def calculate_last_digit_pair_hits():
 
     return static_pairs_data
 
+def get_pairs_by_last_digit():
+    """
+    Generates all possible white ball pairs grouped by their common last digit.
+    """
+    groups = defaultdict(list)
+    for number in range(1, 70):
+        last_digit = number % 10
+        groups[last_digit].append(number)
+        
+    pairs_data = []
+    for last_digit, numbers in sorted(groups.items()):
+        if len(numbers) < 2:
+            continue
+            
+        all_pairs = list(combinations(numbers, 2))
+        pairs_data.append({
+            "group_name": f"Numbers Ending in {last_digit}",
+            "numbers": numbers,
+            "number_of_pairs": len(all_pairs),
+            "pairs": all_pairs
+        })
+        
+    return pairs_data
+
 def calculate_combinations_py(elements, k):
     """Calculates all unique combinations of k elements from a list of elements."""
     if k < 0:
