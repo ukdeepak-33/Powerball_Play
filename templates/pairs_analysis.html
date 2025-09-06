@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Last-Digit Pairs Analysis{% endblock %}
+
+{% block page_heading %}White Ball Pairs by Last Digit{% endblock %}
+
+{% block content %}
+<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="bg-white rounded-xl shadow-lg p-6">
+        <p class="text-gray-700 text-lg mb-6">
+            This page lists all possible white ball pairs grouped by their common last digit. The pairs that have been drawn in a past Powerball drawing are marked with a strike-through. The number of strike-throughs indicates how many times the pair has been drawn.
+        </p>
+
+        <div id="pairs-container" class="space-y-8">
+            </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const pairsContainer = document.getElementById('pairs-container');
+
+        async function fetchAndRenderPairs() {
+            try {
+                const response = await fetch('/api/pairs-with-draw-counts');
+                const groups = await response.json();
+
+                if (!groups || groups.length === 0) {
+                    pairsContainer.innerHTML = '<p class="text-red-500 text-center">No pair data available.</p>';
+                    return;
+                }
+
+                groups.forEach(group => {
+                    const groupDiv = document.createElement('div');
+                    groupDiv.className = 'mb-8';
+
+                    const groupTitle = document.createElement('h2');
+                    groupTitle.className = 'text-2xl font-bold text-gray-800 mb-2';
+                    groupTitle.textContent = group.group_name;
+                    groupDiv.appendChild(groupTitle);
+
+                    const groupStats = document.createElement('div');
+                    groupStats.className = 'text-gray-600 mb-2';
+                    groupStats.innerHTML = `
+                        <p><strong>Numbers:</strong> [${group.numbers.join(', ')}]</p>
+                        <p><strong>Number of Pairs:</strong> ${group.number_of_pairs}</p>
+                    `;
+                    groupDiv.appendChild(groupStats);
+
+                    const pairsGrid = document.createElement('div');
+                    pairsGrid.className = 'bg-gray-50 p-4 rounded-lg';
+
+                    const pairsHeader = document.createElement('h3');
+                    pairsHeader.className = 'text-lg font-semibold text-gray-800 mb-2';
+                    pairsHeader.textContent = 'Pairs:';
+                    pairsGrid.appendChild(pairsHeader);
+
+                    const gridContent = document.createElement('div');
+                    gridContent.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2';
+                    
+                    group.pairs.forEach(pairData => {
+                        const pairSpan = document.createElement('span');
+                        pairSpan.className = 'pair-item text-sm text-gray-700';
+                        pairSpan.textContent = `(${pairData.pair[0]}, ${pairData.pair[1]})`;
+                        
+                        if (pairData.hit_count > 0) {
+                            // Apply strike-through based on hit_count
+                            let strikeThroughClass = 'strike-one';
+                            if (pairData.hit_count === 2) {
+                                strikeThroughClass = 'strike-two';
+                            } else if (pairData.hit_count >= 3) {
+                                strikeThroughClass = 'strike-three';
+                            }
+                            pairSpan.classList.add(strikeThroughClass);
+                        }
+                        
+                        gridContent.appendChild(pairSpan);
+                    });
+
+                    pairsGrid.appendChild(gridContent);
+                    groupDiv.appendChild(pairsGrid);
+                    pairsContainer.appendChild(groupDiv);
+                });
+
+            } catch (error) {
+                console.error('Error fetching pair data:', error);
+                pairsContainer.innerHTML = '<p class="text-red-500 text-center">Failed to load pair analysis data. Please try again later.</p>';
+            }
+        }
+
+        fetchAndRenderPairs();
+    });
+</script>
+
+<style>
+    .pair-item {
+        white-space: nowrap;
+    }
+
+    /* Base for all strike-throughs */
+    .strike-one {
+        text-decoration: line-through;
+        text-decoration-thickness: 1px;
+    }
+    
+    /* Double strike-through */
+    .strike-two {
+        text-decoration: line-through;
+        text-decoration-thickness: 2px;
+    }
+    
+    /* Triple strike-through */
+    .strike-three {
+        text-decoration: line-through;
+        text-decoration-thickness: 3px;
+        color: #ef4444; /* Optional: Make it red for extra visibility */
+    }
+</style>
+{% endblock %}
