@@ -28,9 +28,8 @@
         </div>
     </div>
 
-    <!-- Historical Draws Table with Year-Specific Frequency -->
     <div class="bg-white rounded-xl shadow-lg p-6">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">Historical Draws for {{ selected_year }} with Frequency Analysis</h2>
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Historical Draws for <span id="current-year-display">{{ selected_year }}</span> with Frequency Analysis</h2>
         
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
@@ -39,62 +38,28 @@
                         <th id="draw-date-header" scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">
                             Draw Date
                             <span id="sort-indicator" class="ml-2">▼</span>
-                           </th>
+                        </th>
                         <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">White Balls</th>
                         <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Powerball</th>
                         <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency At Time of Draw</th> 
                     </tr>
                 </thead>
                <tbody id="draw-results-container" class="bg-white divide-y divide-gray-200">
-                   {% for draw in historical_draws %}
-                    <tr class="hover:bg-gray-50 transition-colors duration-200">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ draw.date }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex space-x-1">
-                                {% for ball in draw.white_balls %}
-                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 text-sm font-bold text-gray-700">
-                                    {{ ball }}
-                                </span>
-                                {% endfor %}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex space-x-1">
-                                {% for ball in draw.white_balls %}
-                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-sm font-bold text-blue-700 frequency-display" 
-                                      data-ball="{{ ball }}" data-date="{{ draw.date }}">
-                                    ?
-                                </span>
-                                {% endfor %}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-500 text-sm font-bold text-white">
-                                {{ draw.powerball }}
-                            </span>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
+                    </tbody>
             </table>
         </div>
         
-        {% if not historical_draws %}
-        <div class="text-center py-8 text-gray-500">
-            <p>No draw data available for {{ selected_year }}</p>
+        <div id="no-data-message" class="text-center py-8 text-gray-500 hidden">
+            <p>No draw data available for <span id="no-data-year"></span></p>
         </div>
-        {% endif %}
     </div>
 
-    <!-- Year Frequency Summary -->
     <div id="year-frequency-summary" class="bg-white rounded-xl shadow-lg p-6">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">Year {{ selected_year }} - White Ball Frequency Summary</h2>
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Year <span id="summary-year-display">{{ selected_year }}</span> - White Ball Frequency Summary</h2>
         <div id="year-frequencies" class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 text-center">
-            <!-- Will be populated by JavaScript -->
-        </div>
+            </div>
     </div>
 
-    <!-- Comparison Section -->
     <div id="comparison-section" class="hidden bg-white rounded-xl shadow-lg p-6">
         <h2 class="text-2xl font-bold text-gray-800 mb-6">Year Comparison: <span id="year1-display"></span> vs <span id="year2-display"></span></h2>
         
@@ -102,183 +67,231 @@
             <div>
                 <h3 class="text-lg font-semibold text-gray-700 mb-4"><span id="compare-year1-display"></span> Frequency Summary</h3>
                 <div id="comparison-year1-frequencies" class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 text-center mb-6"></div>
-                
-                <h3 class="text-lg font-semibold text-gray-700 mb-4"><span id="compare-year1-display"></span> Sample Draws</h3>
-                <div id="comparison-year1-draws" class="space-y-4"></div>
             </div>
             
             <div>
                 <h3 class="text-lg font-semibold text-gray-700 mb-4"><span id="compare-year2-display"></span> Frequency Summary</h3>
                 <div id="comparison-year2-frequencies" class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 text-center mb-6"></div>
-                
-                <h3 class="text-lg font-semibold text-gray-700 mb-4"><span id="compare-year2-display"></span> Sample Draws</h3>
-                <div id="comparison-year2-draws" class="space-y-4"></div>
             </div>
         </div>
     </div>
-
 </div>
 
-<style>
-    .frequency-ball {
-        display: inline-flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        width: 50px;
-        height: 65px;
-        border-radius: 12px;
-        background-color: #f3f4f6;
-        color: #374151;
-        font-weight: bold;
-        font-size: 1rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        transition: all 0.2s ease-in-out;
-    }
-    
-    .frequency-display {
-        position: relative;
-        cursor: help;
-    }
-    
-    .frequency-display:hover::after {
-        content: attr(data-frequency);
-        position: absolute;
-        bottom: -25px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #000;
-        color: white;
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-size: 10px;
-        white-space: nowrap;
-        z-index: 10;
-    }
-    
-    .comparison-draw {
-        border: 2px solid #e5e7eb;
-        border-radius: 8px;
-        padding: 12px;
-        background: #f9fafb;
-    }
-    
-    .comparison-draw:hover {
-        border-color: #3b82f6;
-        background: #eff6ff;
-    }
-    
-    .high-frequency { background-color: #d1fae5; color: #065f46; }
-    .medium-frequency { background-color: #fef3c7; color: #92400e; }
-    .low-frequency { background-color: #fee2e2; color: #b91c1c; }
-  
-</style>
-
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const primaryYearSelect = document.getElementById('primary-year-select');
+    // Global variables for caching data and managing state
+    let historical_draws = [];
+    let sortOrder = 'desc'; // Initial sort order for the main table
+    let allYearFrequencies = {}; // Cache for all years' frequencies
+
+    // Function to fetch and render the main historical data table
+    async function fetchAndRenderData(year) {
         const drawResultsContainer = document.getElementById('draw-results-container');
-        const drawDateHeader = document.getElementById('draw-date-header');
-        const sortIndicator = document.getElementById('sort-indicator');
-
-        let historical_draws = [];
-        let sortOrder = 'desc'; // Initial sort order is descending
-
-        async function fetchAndRenderData(year) {
-            try {
-                const response = await fetch(`/api/draws/${year}`);
-                const data = await response.json();
-                historical_draws = data.draws;
-                
-                sortDraws(historical_draws); // Sort data before rendering
+        const noDataMessage = document.getElementById('no-data-message');
+        const noDataYear = document.getElementById('no-data-year');
+        
+        try {
+            const response = await fetch(`/api/draws/${year}`);
+            const data = await response.json();
+            historical_draws = data.draws;
+            
+            if (historical_draws.length === 0) {
+                drawResultsContainer.innerHTML = '';
+                noDataMessage.classList.remove('hidden');
+                noDataYear.textContent = year;
+            } else {
+                noDataMessage.classList.add('hidden');
+                sortDraws(historical_draws);
                 renderDrawsWithFrequencies(historical_draws);
-            } catch (error) {
-                console.error('Error fetching data:', error);
-                drawResultsContainer.innerHTML = '<p class="text-red-500">Error loading draw data. Please try again later.</p>';
             }
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            drawResultsContainer.innerHTML = '<p class="text-red-500">Error loading draw data. Please try again later.</p>';
+            noDataMessage.classList.add('hidden');
+        }
+    }
+
+    // Function to sort the draws by date
+    function sortDraws(draws) {
+        const sortIndicator = document.getElementById('sort-indicator');
+        draws.sort((a, b) => {
+            const dateA = new Date(a.draw_date);
+            const dateB = new Date(b.draw_date);
+            if (sortOrder === 'asc') {
+                return dateA - dateB;
+            } else {
+                return dateB - dateA;
+            }
+        });
+        sortIndicator.textContent = sortOrder === 'asc' ? '▲' : '▼';
+    }
+
+    // Function to render the main historical draws table
+    function renderDrawsWithFrequencies(draws) {
+        const drawResultsContainer = document.getElementById('draw-results-container');
+        drawResultsContainer.innerHTML = '';
+        const ballFrequencies = {};
+        for (let i = 1; i <= 69; i++) {
+            ballFrequencies[i] = 0;
         }
 
-        function sortDraws(draws) {
-            draws.sort((a, b) => {
-                const dateA = new Date(a.draw_date);
-                const dateB = new Date(b.draw_date);
-                
-                if (sortOrder === 'asc') {
-                    return dateA - dateB;
-                } else {
-                    return dateB - dateA;
+        draws.forEach(draw => {
+            const drawDate = draw.draw_date;
+            const whiteBalls = draw.white_balls.split(',').map(Number);
+            const powerball = draw.powerball;
+            whiteBalls.forEach(ball => {
+                if (ballFrequencies.hasOwnProperty(ball)) {
+                    ballFrequencies[ball]++;
                 }
             });
-            // Update the sort indicator
-            sortIndicator.textContent = sortOrder === 'asc' ? '▲' : '▼';
+
+            const row = document.createElement('tr');
+            row.className = 'bg-white border-b hover:bg-gray-50';
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${drawDate}</td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex space-x-2 justify-center">
+                        ${whiteBalls.map(ball => `<span class="white-ball">${ball}</span>`).join('')}
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="powerball">${powerball}</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="frequency-row flex space-x-2 justify-center">
+                        ${whiteBalls.map(number => {
+                            const frequency = ballFrequencies[number];
+                            return `<div class="frequency-ball flex-col items-center justify-center data-ball="${number}">
+                                <span class="text-lg font-bold">${number}</span>
+                                <span class="text-sm">${frequency}</span>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </td>
+            `;
+            drawResultsContainer.appendChild(row);
+        });
+    }
+
+    // Function to fetch and render the year frequency summary section
+    async function loadYearFrequencies(year) {
+        if (allYearFrequencies[year]) {
+            return allYearFrequencies[year];
+        }
+        try {
+            const response = await fetch(`/api/year-frequencies?year=${year}`);
+            const data = await response.json();
+            if (response.ok && data.success) {
+                allYearFrequencies[year] = data.frequencies;
+                return allYearFrequencies[year];
+            } else {
+                console.error('Error loading year frequencies:', data.error);
+                return {};
+            }
+        } catch (error) {
+            console.error('Error loading year frequencies:', error);
+            return {};
+        }
+    }
+
+    // Function to render the summary of all balls for a given year
+    function renderYearFrequencySummary(containerId = 'year-frequencies', frequencies) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        for (let number = 1; number <= 69; number++) {
+            const frequency = frequencies[number] || 0;
+            const div = document.createElement('div');
+            div.className = 'frequency-ball flex-col items-center justify-center';
+            div.innerHTML = `
+                <span class="text-lg font-bold">${number}</span>
+                <span class="text-sm">${frequency}</span>
+            `;
+            container.appendChild(div);
+        }
+    }
+
+    // Function to handle the year comparison section
+    async function handleYearComparison() {
+        const compareYearSelect = document.getElementById('compare-year-select');
+        const comparisonSection = document.getElementById('comparison-section');
+        const year1Display = document.getElementById('year1-display');
+        const year2Display = document.getElementById('year2-display');
+        const compareYear1Display = document.getElementById('compare-year1-display');
+        const compareYear2Display = document.getElementById('compare-year2-display');
+        const compareYear = compareYearSelect.value;
+        const primaryYear = document.getElementById('primary-year-select').value;
+        
+        if (!compareYear) {
+            comparisonSection.classList.add('hidden');
+            return;
+        }
+        if (primaryYear === compareYear) {
+            alert("Cannot compare the same year with itself.");
+            compareYearSelect.value = "";
+            return;
         }
 
-        function renderDrawsWithFrequencies(draws) {
-            drawResultsContainer.innerHTML = '';
-            const ballFrequencies = {};
+        comparisonSection.classList.remove('hidden');
+        year1Display.textContent = primaryYear;
+        year2Display.textContent = compareYear;
+        compareYear1Display.textContent = primaryYear;
+        compareYear2Display.textContent = compareYear;
 
-            for (let i = 1; i <= 69; i++) {
-                ballFrequencies[i] = 0;
+        try {
+            const year1Frequencies = await loadYearFrequencies(primaryYear);
+            const year2Frequencies = await loadYearFrequencies(compareYear);
+
+            if (Object.keys(year1Frequencies).length > 0 && Object.keys(year2Frequencies).length > 0) {
+                renderYearFrequencySummary('comparison-year1-frequencies', year1Frequencies);
+                renderYearFrequencySummary('comparison-year2-frequencies', year2Frequencies);
+            } else {
+                alert('Error loading comparison data.');
             }
+        } catch (error) {
+            console.error('Error in comparison:', error);
+            alert('Error loading comparison data.');
+        }
+    }
 
-            draws.forEach(draw => {
-                const drawDate = draw.draw_date;
-                const whiteBalls = draw.white_balls.split(',').map(Number);
-                const powerball = draw.powerball;
+    // Main DOMContentLoaded event listener
+    document.addEventListener('DOMContentLoaded', function() {
+        const primaryYearSelect = document.getElementById('primary-year-select');
+        const compareYearSelect = document.getElementById('compare-year-select');
+        const drawDateHeader = document.getElementById('draw-date-header');
+        const currentYearDisplay = document.getElementById('current-year-display');
+        const summaryYearDisplay = document.getElementById('summary-year-display');
+        
+        const initialYear = primaryYearSelect.value;
 
-                whiteBalls.forEach(ball => {
-                    if (ballFrequencies.hasOwnProperty(ball)) {
-                        ballFrequencies[ball]++;
-                    }
-                });
-                
-                const row = document.createElement('tr');
-                row.className = 'bg-white border-b hover:bg-gray-50';
-                row.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${drawDate}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex space-x-2 justify-center">
-                            ${whiteBalls.map(ball => `<span class="white-ball">${ball}</span>`).join('')}
-                        </div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="powerball">${powerball}</span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="frequency-row flex space-x-2 justify-center">
-                            ${whiteBalls.map(number => {
-                                const frequency = ballFrequencies[number];
-                                return `<div class="frequency-ball flex-col items-center justify-center data-ball="${number}">
-                                    <span class="text-lg font-bold">${number}</span>
-                                    <span class="text-sm">${frequency}</span>
-                                </div>`;
-                            }).join('')}
-                        </div>
-                    </td>
-                `;
-                drawResultsContainer.appendChild(row);
+        if (initialYear) {
+            fetchAndRenderData(initialYear);
+            loadYearFrequencies(initialYear).then(frequencies => {
+                if (Object.keys(frequencies).length > 0) {
+                    renderYearFrequencySummary('year-frequencies', frequencies);
+                }
             });
         }
-
-        // Event listener for changing the year
+        
         primaryYearSelect.addEventListener('change', function () {
             const selectedYear = this.value;
-            sortOrder = 'desc'; // Reset sort order when changing year
+            sortOrder = 'desc';
+            currentYearDisplay.textContent = selectedYear;
+            summaryYearDisplay.textContent = selectedYear;
             fetchAndRenderData(selectedYear);
+            loadYearFrequencies(selectedYear).then(frequencies => {
+                if (Object.keys(frequencies).length > 0) {
+                    renderYearFrequencySummary('year-frequencies', frequencies);
+                }
+            });
+            compareYearSelect.value = "";
         });
 
-        // Event listener for clicking the Draw Date header
         drawDateHeader.addEventListener('click', function () {
             sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
             sortDraws(historical_draws);
             renderDrawsWithFrequencies(historical_draws);
         });
 
-        // Initial load for the currently selected year
-        const initialYear = primaryYearSelect.value;
-        if (initialYear) {
-            fetchAndRenderData(initialYear);
-        }
+        compareYearSelect.addEventListener('change', handleYearComparison);
     });
 </script>
 {% endblock %}
