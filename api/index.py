@@ -1202,7 +1202,7 @@ def calculate_yearly_decade_pair_hits():
     Calculates the number of times each decade-based pair has appeared, grouped by year.
     For example, all pairs in the 10s (10-19), 20s (20-29), etc.
     """
-global df
+    global df
     if df.empty:
         return {}
 
