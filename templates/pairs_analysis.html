@@ -104,20 +104,27 @@
                     group.pairs.forEach(pairData => {
                         const pairSpan = document.createElement('span');
                         pairSpan.className = 'pair-item text-sm text-gray-700';
-                        // Check if pairData.pair is an array and if it has elements
+                        
                         if (Array.isArray(pairData.pair) && pairData.pair.length >= 2) {
                             pairSpan.textContent = `(${pairData.pair[0]}, ${pairData.pair[1]})`;
                         } else {
-                            // Fallback for unexpected data format
                             pairSpan.textContent = `(${pairData.pair})`;
                         }
                         
                         if (pairData.hit_count > 0) {
-                            let strikeThroughClass = 'strike-one';
-                            if (pairData.hit_count === 2) {
+                            let strikeThroughClass = '';
+                            if (pairData.hit_count === 1) {
+                                strikeThroughClass = 'strike-one';
+                            } else if (pairData.hit_count === 2) {
                                 strikeThroughClass = 'strike-two';
-                            } else if (pairData.hit_count >= 3) {
+                            } else if (pairData.hit_count === 3) {
                                 strikeThroughClass = 'strike-three';
+                            } else if (pairData.hit_count === 4) {
+                                strikeThroughClass = 'strike-four';
+                            } else if (pairData.hit_count === 5) {
+                                strikeThroughClass = 'strike-five';
+                            } else if (pairData.hit_count >= 6) {
+                                strikeThroughClass = 'strike-six';
                             }
                             pairSpan.classList.add(strikeThroughClass);
                         }
@@ -234,7 +241,25 @@
     .strike-three {
         text-decoration: line-through;
         text-decoration-thickness: 3px;
-        color: #ef4444;
+        color: #ef4444; /* Red for three strikes */
+    }
+
+    .strike-four {
+        text-decoration: line-through;
+        text-decoration-thickness: 4px;
+        color: #eab308; /* Yellow for four strikes */
+    }
+
+    .strike-five {
+        text-decoration: line-through;
+        text-decoration-thickness: 5px;
+        color: #a855f7; /* Purple for five strikes */
+    }
+
+    .strike-six {
+        text-decoration: line-through;
+        text-decoration-thickness: 6px;
+        color: #0d9488; /* Teal for six or more strikes */
     }
 </style>
 {% endblock %}
