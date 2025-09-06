@@ -5111,13 +5111,11 @@ def ai_assistant():
     """Dedicated page for the Powerball conversational assistant."""
     return render_template('ai_assistant.html')
 
-@app.route('/api/pairs-with-draw-counts')
-def get_pairs_with_counts():
-    try:
-        data = calculate_last_digit_pair_hits()
-        return jsonify(data)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+@app.route('/pairs-analysis')
+def pairs_analysis():
+    pairs_by_digit = get_pairs_by_last_digit()
+    
+    return render_template('pairs_analysis.html', pairs_by_digit=pairs_by_digit)
     
 @app.route('/smart_pick_generator')
 def smart_pick_generator_route():
@@ -5884,6 +5882,14 @@ def get_draws_by_year(year):
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+@app.route('/api/pairs-with-draw-counts')
+def get_pairs_with_counts():
+    try:
+        data = calculate_last_digit_pair_hits()
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
         
 # Initialize core data on app startup
 initialize_core_data()
