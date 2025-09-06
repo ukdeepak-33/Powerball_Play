@@ -104,7 +104,13 @@
                     group.pairs.forEach(pairData => {
                         const pairSpan = document.createElement('span');
                         pairSpan.className = 'pair-item text-sm text-gray-700';
-                        pairSpan.textContent = `(${pairData.pair[0]}, ${pairData.pair[1]})`;
+                        // Check if pairData.pair is an array and if it has elements
+                        if (Array.isArray(pairData.pair) && pairData.pair.length >= 2) {
+                            pairSpan.textContent = `(${pairData.pair[0]}, ${pairData.pair[1]})`;
+                        } else {
+                            // Fallback for unexpected data format
+                            pairSpan.textContent = `(${pairData.pair})`;
+                        }
                         
                         if (pairData.hit_count > 0) {
                             let strikeThroughClass = 'strike-one';
@@ -174,18 +180,17 @@
         }
 
         function setActiveTab(tabBtn, tabContent) {
-            // Deactivate all
             lastDigitTabBtn.classList.remove('border-indigo-600', 'text-indigo-600');
             lastDigitTabBtn.classList.add('border-transparent', 'text-gray-600');
             differenceTabBtn.classList.remove('border-indigo-600', 'text-indigo-600');
             differenceTabBtn.classList.add('border-transparent', 'text-gray-600');
             decadeTabBtn.classList.remove('border-indigo-600', 'text-indigo-600');
             decadeTabBtn.classList.add('border-transparent', 'text-gray-600');
+            
             lastDigitTab.classList.add('hidden');
             differenceTab.classList.add('hidden');
             decadeTab.classList.add('hidden');
 
-            // Activate the selected tab
             tabBtn.classList.add('border-indigo-600', 'text-indigo-600');
             tabBtn.classList.remove('border-transparent', 'text-gray-600');
             tabContent.classList.remove('hidden');
@@ -206,7 +211,6 @@
             fetchDecadeData();
         });
         
-        // Initial load
         setActiveTab(lastDigitTabBtn, lastDigitTab);
         fetchLastDigitData();
     });
