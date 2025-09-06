@@ -874,6 +874,7 @@ def frequency_analysis(df_source):
     powerball_freq_list = [{'Number': int(k), 'Frequency': int(v)} for k, v in powerball_freq.items()]
 
     return white_ball_freq_list, powerball_freq_list
+    
 def hot_cold_numbers(df_source, last_draw_date_str):
     """Identifies hot and cold numbers based on recent draws."""
     if df_source.empty or last_draw_date_str == 'N/A':
@@ -1068,6 +1069,56 @@ def simulate_multiple_draws(df_source, group_a_list, odd_even_choice, white_ball
 
     return {'white_ball_freq': simulated_white_ball_freq_list, 'powerball_freq': simulated_powerball_freq_list}
 
+def calculate_last_digit_pair_hits():
+    """
+    Calculates the number of times each last-digit pair has appeared in historical draws.
+    """
+    global df
+    if df.empty:
+        return {}
+
+    all_pairs_by_digit = defaultdict(list)
+    for number in range(1, 70):
+        last_digit = number % 10
+        all_pairs_by_digit[last_digit].append(number)
+
+    static_pairs_data = []
+    for last_digit, numbers in sorted(all_pairs_by_digit.items()):
+        if len(numbers) < 2:
+            continue
+        all_possible_pairs = list(combinations(numbers, 2))
+        
+        static_pairs_data.append({
+            "group_name": f"Numbers Ending in {last_digit}",
+            "numbers": numbers,
+            "number_of_pairs": len(all_possible_pairs),
+            "pairs": all_possible_pairs,
+            "group_id": last_digit
+        })
+
+    # Count occurrences in historical data
+    pair_hit_counts = defaultdict(int)
+    for _, row in df.iterrows():
+        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+        
+        for drawn_pair in combinations(white_balls, 2):
+            if drawn_pair[0] % 10 == drawn_pair[1] % 10:
+                # This is a last-digit pair
+                pair_hit_counts[tuple(sorted(drawn_pair))] += 1
+    
+    # Merge static data with hit counts
+    for group in static_pairs_data:
+        updated_pairs = []
+        for pair in group['pairs']:
+            pair_tuple = tuple(sorted(pair))
+            hit_count = pair_hit_counts[pair_tuple]
+            updated_pairs.append({
+                "pair": pair,
+                "hit_count": hit_count
+            })
+        group['pairs'] = updated_pairs
+
+    return static_pairs_data
 
 def calculate_combinations_py(elements, k):
     """Calculates all unique combinations of k elements from a list of elements."""
@@ -5059,6 +5110,14 @@ def yearly_white_ball_trends_route():
 def ai_assistant():
     """Dedicated page for the Powerball conversational assistant."""
     return render_template('ai_assistant.html')
+
+@app.route('/api/pairs-with-draw-counts')
+def get_pairs_with_counts():
+    try:
+        data = calculate_last_digit_pair_hits()
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
     
 @app.route('/smart_pick_generator')
 def smart_pick_generator_route():
