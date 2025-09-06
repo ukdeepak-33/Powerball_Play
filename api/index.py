@@ -282,6 +282,17 @@ def _get_white_ball_ages():
     
     return age_data
 
+# Helper function to get the decade for a number
+def get_decade(number):
+    if number <= 9: return '1s'
+    if number <= 19: return '10s'
+    if number <= 29: return '20s'
+    if number <= 39: return '30s'
+    if number <= 49: return '40s'
+    if number <= 59: return '50s'
+    if number <= 69: return '60s'
+    return None
+
 def generate_powerball_numbers(df_source, group_a_list, odd_even_choice, combo_choice, white_ball_range, powerball_range, excluded_numbers, high_low_balance=None, selected_sum_range_tuple=None, is_simulation=False):
     """Generates a single Powerball combination based on various criteria."""
     if df_source.empty:
@@ -1076,23 +1087,17 @@ def calculate_yearly_difference_pair_hits():
     global df
     if df.empty:
         return {}
-
     df['Draw Date'] = pd.to_datetime(df['Draw Date'])
     available_years = sorted(df['Draw Date'].dt.year.unique(), reverse=True)
-    
     yearly_pairs_data = {}
-
     for year in available_years:
         year_key = str(year)
         year_df = df[df['Draw Date'].dt.year == year].copy()
-        
         all_possible_pairs = list(combinations(range(1, 70), 2))
-        
         pairs_by_difference = defaultdict(list)
         for p1, p2 in all_possible_pairs:
             difference = abs(p1 - p2)
             pairs_by_difference[difference].append(tuple(sorted((p1, p2))))
-
         static_pairs_data = []
         for difference, pairs in sorted(pairs_by_difference.items()):
             static_pairs_data.append({
@@ -1100,16 +1105,11 @@ def calculate_yearly_difference_pair_hits():
                 "number_of_pairs": len(pairs),
                 "pairs": pairs
             })
-
-        # Count occurrences in the current year's data
         pair_hit_counts = defaultdict(int)
         for _, row in year_df.iterrows():
             white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
-            
             for drawn_pair in combinations(white_balls, 2):
                 pair_hit_counts[tuple(sorted(drawn_pair))] += 1
-        
-        # Merge static data with hit counts for the year
         for group in static_pairs_data:
             updated_pairs = []
             for pair in group['pairs']:
@@ -1120,11 +1120,59 @@ def calculate_yearly_difference_pair_hits():
                     "hit_count": hit_count
                 })
             group['pairs'] = updated_pairs
-
         yearly_pairs_data[year_key] = static_pairs_data
+        return yearly_pairs_data
 
+def calculate_yearly_last_digit_pair_hits():
+    global df
+    if df.empty:
+        return {}
+
+    df['Draw Date'] = pd.to_datetime(df['Draw Date'])
+    available_years = sorted(df['Draw Date'].dt.year.unique(), reverse=True)
+    yearly_pairs_data = {}
+
+    for year in available_years:
+        year_key = str(year)
+        year_df = df[df['Draw Date'].dt.year == year].copy()
+        
+        groups = defaultdict(list)
+        for number in range(1, 70):
+            last_digit = number % 10
+            groups[last_digit].append(number)
+            
+        static_pairs_data = []
+        for last_digit, numbers in sorted(groups.items()):
+            if len(numbers) < 2:
+                continue
+            all_pairs = list(combinations(numbers, 2))
+            static_pairs_data.append({
+                "group_name": f"Numbers Ending in {last_digit}",
+                "number_of_pairs": len(all_pairs),
+                "pairs": all_pairs,
+                "group_id": last_digit
+            })
+
+        pair_hit_counts = defaultdict(int)
+        for _, row in year_df.iterrows():
+            white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+            for drawn_pair in combinations(white_balls, 2):
+                if drawn_pair[0] % 10 == drawn_pair[1] % 10:
+                    pair_hit_counts[tuple(sorted(drawn_pair))] += 1
+        
+        for group in static_pairs_data:
+            updated_pairs = []
+            for pair in group['pairs']:
+                pair_tuple = tuple(sorted(pair))
+                hit_count = pair_hit_counts.get(pair_tuple, 0)
+                updated_pairs.append({
+                    "pair": pair,
+                    "hit_count": hit_count
+                })
+            group['pairs'] = updated_pairs
+        yearly_pairs_data[year_key] = static_pairs_data
     return yearly_pairs_data
-    
+
 def get_pairs_by_last_digit():
     """
     Generates all possible white ball pairs grouped by their common last digit.
@@ -1148,6 +1196,61 @@ def get_pairs_by_last_digit():
         })
         
     return pairs_data
+
+def calculate_yearly_decade_pair_hits():
+    """
+    Calculates the number of times each decade-based pair has appeared, grouped by year.
+    For example, all pairs in the 10s (10-19), 20s (20-29), etc.
+    """
+    global df
+    if df.empty:
+        return {}
+    df['Draw Date'] = pd.to_datetime(df['Draw Date'])
+    available_years = sorted(df['Draw Date'].dt.year.unique(), reverse=True)
+    yearly_pairs_data = {}
+    decade_groups = {
+        '1s': (1, 9), '10s': (10, 19), '20s': (20, 29), '30s': (30, 39),
+        '40s': (40, 49), '50s': (50, 59), '60s': (60, 69)
+    }
+    for year in available_years:
+        year_key = str(year)
+        year_df = df[df['Draw Date'].dt.year == year].copy()
+        static_pairs_data = []
+        for name, (start, end) in decade_groups.items():
+            numbers_in_range = list(range(start, end + 1))
+            if len(numbers_in_range) < 2:
+                continue
+            all_possible_pairs_in_decade = list(combinations(numbers_in_range, 2))
+            static_pairs_data.append({
+                "group_name": f"Pairs in the {name}",
+                "number_of_pairs": len(all_possible_pairs_in_decade),
+                "pairs": all_possible_pairs_in_decade
+            })
+        pair_hit_counts = defaultdict(int)
+        for _, row in year_df.iterrows():
+            white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+            for drawn_pair in combinations(white_balls, 2):
+                if get_decade(drawn_pair[0]) == get_decade(drawn_pair[1]):
+                    pair_hit_counts[tuple(sorted(drawn_pair))] += 1
+        year_decade_pairs = []
+        for group in static_pairs_data:
+            updated_pairs = []
+            for pair in group['pairs']:
+                pair_tuple = tuple(sorted(pair))
+                hit_count = pair_hit_counts.get(pair_tuple, 0)
+                if hit_count > 0:
+                    updated_pairs.append({
+                        "pair": pair,
+                        "hit_count": hit_count
+                    })
+            updated_pairs.sort(key=lambda x: x['hit_count'], reverse=True)
+            if updated_pairs:
+                year_decade_pairs.append({
+                    "group_name": group["group_name"],
+                    "pairs": updated_pairs
+                })
+        yearly_pairs_data[year_key] = year_decade_pairs
+        return yearly_pairs_data
 
 def calculate_combinations_py(elements, k):
     """Calculates all unique combinations of k elements from a list of elements."""
@@ -5142,10 +5245,8 @@ def ai_assistant():
 
 @app.route('/pairs-analysis')
 def pairs_analysis():
-    pairs_by_digit = get_pairs_by_last_digit()
-    
-    return render_template('pairs_analysis.html', pairs_by_digit=pairs_by_digit)
-    
+    return render_template('pairs_analysis.html')
+
 @app.route('/smart_pick_generator')
 def smart_pick_generator_route():
     """Route for the dedicated smart pick generator page."""
@@ -5919,7 +6020,25 @@ def get_yearly_pairs_with_counts():
         return jsonify(data)
     except Exception as e:
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Internal Server Error"}), 500
+
+@app.route('/api/yearly-difference-pairs-with-draw-counts')
+def get_yearly_difference_pairs_with_counts():
+    try:
+        data = calculate_yearly_difference_pair_hits()
+        return jsonify(data)
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": "Internal Server Error"}), 500
+
+@app.route('/api/yearly-decade-pairs-with-draw-counts')
+def get_yearly_decade_pairs_with_counts():
+    try:
+        data = calculate_yearly_decade_pair_hits()
+        return jsonify(data)
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": "Internal Server Error"}), 500
         
 # Initialize core data on app startup
 initialize_core_data()
