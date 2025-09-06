@@ -1069,9 +1069,9 @@ def simulate_multiple_draws(df_source, group_a_list, odd_even_choice, white_ball
 
     return {'white_ball_freq': simulated_white_ball_freq_list, 'powerball_freq': simulated_powerball_freq_list}
 
-def calculate_yearly_last_digit_pair_hits():
+def calculate_yearly_difference_pair_hits():
     """
-    Calculates the number of times each last-digit pair has appeared, grouped by year.
+    Calculates the number of times each pair with a common numerical difference has appeared, grouped by year.
     """
     global df
     if df.empty:
@@ -1083,28 +1083,22 @@ def calculate_yearly_last_digit_pair_hits():
     yearly_pairs_data = {}
 
     for year in available_years:
-        # Corrected: Convert numpy.int64 to string before using as a key
         year_key = str(year)
-        
         year_df = df[df['Draw Date'].dt.year == year].copy()
         
-        all_pairs_by_digit = defaultdict(list)
-        for number in range(1, 70):
-            last_digit = number % 10
-            all_pairs_by_digit[last_digit].append(number)
+        all_possible_pairs = list(combinations(range(1, 70), 2))
         
+        pairs_by_difference = defaultdict(list)
+        for p1, p2 in all_possible_pairs:
+            difference = abs(p1 - p2)
+            pairs_by_difference[difference].append(tuple(sorted((p1, p2))))
+
         static_pairs_data = []
-        for last_digit, numbers in sorted(all_pairs_by_digit.items()):
-            if len(numbers) < 2:
-                continue
-            all_possible_pairs = list(combinations(numbers, 2))
-            
+        for difference, pairs in sorted(pairs_by_difference.items()):
             static_pairs_data.append({
-                "group_name": f"Numbers Ending in {last_digit}",
-                "numbers": numbers,
-                "number_of_pairs": len(all_possible_pairs),
-                "pairs": all_possible_pairs,
-                "group_id": last_digit
+                "group_name": f"Pairs with a Difference of {difference}",
+                "number_of_pairs": len(pairs),
+                "pairs": pairs
             })
 
         # Count occurrences in the current year's data
@@ -1113,8 +1107,7 @@ def calculate_yearly_last_digit_pair_hits():
             white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
             
             for drawn_pair in combinations(white_balls, 2):
-                if drawn_pair[0] % 10 == drawn_pair[1] % 10:
-                    pair_hit_counts[tuple(sorted(drawn_pair))] += 1
+                pair_hit_counts[tuple(sorted(drawn_pair))] += 1
         
         # Merge static data with hit counts for the year
         for group in static_pairs_data:
@@ -1128,7 +1121,6 @@ def calculate_yearly_last_digit_pair_hits():
                 })
             group['pairs'] = updated_pairs
 
-        # Use the string key here
         yearly_pairs_data[year_key] = static_pairs_data
 
     return yearly_pairs_data
