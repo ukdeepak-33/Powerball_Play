@@ -1077,13 +1077,15 @@ def calculate_yearly_last_digit_pair_hits():
     if df.empty:
         return {}
 
-    # Get a list of all available years, sorted in descending order
     df['Draw Date'] = pd.to_datetime(df['Draw Date'])
     available_years = sorted(df['Draw Date'].dt.year.unique(), reverse=True)
     
     yearly_pairs_data = {}
 
     for year in available_years:
+        # Corrected: Convert numpy.int64 to string before using as a key
+        year_key = str(year)
+        
         year_df = df[df['Draw Date'].dt.year == year].copy()
         
         all_pairs_by_digit = defaultdict(list)
@@ -1126,8 +1128,10 @@ def calculate_yearly_last_digit_pair_hits():
                 })
             group['pairs'] = updated_pairs
 
-        yearly_pairs_data[year] = static_pairs_data
-        return yearly_pairs_data
+        # Use the string key here
+        yearly_pairs_data[year_key] = static_pairs_data
+
+    return yearly_pairs_data
     
 def get_pairs_by_last_digit():
     """
