@@ -96,7 +96,7 @@ RANGE_PATTERN_TYPES = [
     "Two-Number Pick (2-1-1-1)",
     "Three-Number Pick (3-1-1)",
     "Two-Two-Number Pick (2-2-1)",
-    "One-Two-Three Number Pick (1-2-3)"
+    "Two-Three Number Pick (2-3)"
 ]
 
 # NEW Global Variable for recent odd/even ratios
@@ -137,7 +137,7 @@ def _classify_range_pattern(white_balls):
     if active_range_ball_counts == [2, 2, 1]:
         return "Two-Two-Number Pick (2-2-1)"
     if active_range_ball_counts == [3, 2, 1]:
-        return "One-Two-Three Number Pick (1-2-3)"
+        return "Two-Three Number Pick (2-3)"
 
     return "Other"
 
@@ -687,7 +687,7 @@ def _extract_features_for_candidate(white_balls, powerball, draw_date_dt):
     is_two_number_pick_pattern = 1 if current_range_pattern_type == "Two-Number Pick (2-1-1-1)" else 0
     is_three_number_pick_pattern = 1 if current_range_pattern_type == "Three-Number Pick (3-1-1)" else 0
     is_two_two_pick_pattern = 1 if current_range_pattern_type == "Two-Two-Number Pick (2-2-1)" else 0
-    is_one_two_three_pick_pattern = 1 if current_range_pattern_type == "One-Two-Three Number Pick (1-2-3)" else 0
+    is_two_three_pick_pattern = 1 if current_range_pattern_type == "Two-Three Number Pick (2-3)" else 0
 
     features = {
         'odd_count': odd_count,
@@ -713,7 +713,7 @@ def _extract_features_for_candidate(white_balls, powerball, draw_date_dt):
         'is_two_number_pick_pattern': is_two_number_pick_pattern,
         'is_three_number_pick_pattern': is_three_number_pick_pattern,
         'is_two_two_pick_pattern': is_two_two_pick_pattern,
-        'is_one_two_three_pick_pattern': is_one_two_three_pick_pattern
+        'is_two_three_pick_pattern': is_two_three_pick_pattern
     }
     return features
 
