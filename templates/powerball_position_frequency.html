@@ -8,7 +8,8 @@
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 20px;
+            margin: 0;
+            padding: 20px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: #333;
             min-height: 100vh;
@@ -266,6 +267,30 @@
             font-weight: bold;
             color: #28a745;
         }
+        @media (max-width: 768px) {
+            .year-tabs {
+                justify-content: center;
+            }
+            .tab {
+                padding: 10px 15px;
+                font-size: 14px;
+            }
+            .download-btn {
+                margin-top: 10px;
+                margin-left: 0;
+                width: 100%;
+            }
+            .month-header {
+                flex-direction: column;
+                gap: 10px;
+            }
+            table {
+                font-size: 14px;
+            }
+            th, td {
+                padding: 8px 5px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -304,6 +329,7 @@
     </div>
 
     <script>
+        // Sample data for demonstration
         const rawData = `Draw Date	Number 1	Number 2	Number 3	Number 4	Number 5	Powerball
 2019-01-02	8	12	42	46	56	12
 2019-01-05	3	7	15	27	69	19
@@ -1550,4 +1576,18 @@
             summaryData.push(['- This analysis finds Powerball draws where 2+ main numbers', '', '', '', '', '', '']);
             summaryData.push(['  share the same last digit (e.g., 15, 25, 35)', '', '', '', '', '', '']);
             summaryData.push(['- Only main numbers (1-5) are analyzed, Powerball excluded', '', '', '', '', '', '']);
-            summaryData
+            summaryData.push(['- Data covers Powerball draws from 2019-2025', '', '', '', '', '', '']);
+            
+            const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
+            XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
+            
+            // Download the Excel file
+            XLSX.writeFile(wb, 'Powerball_Same_Last_Digit_Analysis_2019-2025.xlsx');
+        }
+
+        // Initialize the application
+        parseData();
+        displayData(currentYear);
+    </script>
+</body>
+</html>
