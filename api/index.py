@@ -4544,7 +4544,7 @@ def powerball_position_frequency_route():
 @app.route('/powerball_position_frequency')
 def powerball_position_frequency_route():
     powerball_position_data = get_cached_analysis('powerball_position_frequency', get_powerball_position_frequency, df)
-    return render_template('powerball_position_frequency.html',
+    return render_template('powerball_advance_analysis.html',
                            powerball_position_data=powerball_position_data)
     
 
