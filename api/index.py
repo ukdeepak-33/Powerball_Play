@@ -4541,6 +4541,13 @@ def powerball_position_frequency_route():
     return render_template('powerball_position_frequency.html',
                            powerball_position_data=powerball_position_data)
 
+@app.route('/powerball_position_frequency')
+def powerball_position_frequency_route():
+    powerball_position_data = get_cached_analysis('powerball_position_frequency', get_powerball_position_frequency, df)
+    return render_template('powerball_position_frequency.html',
+                           powerball_position_data=powerball_position_data)
+    
+
 @app.route('/powerball_frequency_by_year')
 def powerball_frequency_by_year_route():
     yearly_pb_freq_data, years = get_cached_analysis('yearly_pb_freq', get_powerball_frequency_by_year, df)
