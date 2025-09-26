@@ -2535,6 +2535,8 @@ def get_powerball_position_frequency(df_source):
             'Total Draws': int(total_draws)
         })
     return formatted_data
+
+
 def invalidate_analysis_cache():
     """Invalidates the analysis cache."""
     global analysis_cache, last_analysis_cache_update
@@ -4540,13 +4542,6 @@ def powerball_position_frequency_route():
     powerball_position_data = get_cached_analysis('powerball_position_frequency', get_powerball_position_frequency, df)
     return render_template('powerball_position_frequency.html',
                            powerball_position_data=powerball_position_data)
-
-@app.route('/powerball_position_frequency')
-def powerball_position_frequency_route():
-    powerball_position_data = get_cached_analysis('powerball_position_frequency', get_powerball_position_frequency, df)
-    return render_template('powerball_advance_analysis.html',
-                           powerball_position_data=powerball_position_data)
-    
 
 @app.route('/powerball_frequency_by_year')
 def powerball_frequency_by_year_route():
