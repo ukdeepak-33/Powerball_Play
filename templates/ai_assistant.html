@@ -7,6 +7,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* Your existing CSS styles remain the same */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 20px;
@@ -403,6 +404,7 @@
             <div>
                 <button class="download-btn" onclick="downloadExcel()">📊 Download Complete Analysis</button>
                 <button class="download-btn refresh-btn" onclick="loadData()">🔄 Refresh Data</button>
+                <button class="download-btn" onclick="testConnection()">🔧 Test Database Connection</button>
             </div>
         </div>
         
@@ -440,6 +442,11 @@
             <div id="data-container">
                 <!-- Data will be populated by JavaScript -->
             </div>
+            
+            <div id="debug-info" style="display: none; background: #f8f9fa; padding: 15px; border-radius: 10px; margin-top: 20px;">
+                <h3>🔧 Debug Information</h3>
+                <pre id="debug-content"></pre>
+            </div>
         </div>
     </div>
 
@@ -458,22 +465,71 @@
         let dataSource = 'manual';
 
         // Initialize Supabase client
-        const supabase = SUPABASE_CONFIG.url && SUPABASE_CONFIG.key 
-            ? supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.key)
-            : null;
+        const supabase = window.supabase ? window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.key) : null;
 
-        // Manual data as fallback (truncated for brevity)
+        // Enhanced manual data with more entries for testing
         const manualData = `Draw Date	Number 1	Number 2	Number 3	Number 4	Number 5	Powerball
 2019-01-02	8	12	42	46	56	12
 2019-01-05	3	7	15	27	69	19
 2019-01-09	6	19	37	49	59	22
 2019-01-12	7	36	48	57	58	24
+2019-01-16	14	29	31	56	61	1
+2019-01-19	5	8	41	65	66	20
+2019-01-23	23	25	47	48	50	24
+2019-01-26	8	12	20	21	32	10
+2019-01-30	2	12	16	29	54	6
+2020-01-01	49	53	57	59	62	26
+2021-01-02	3	4	11	41	67	5
+2022-01-01	6	12	39	48	50	7
+2023-01-02	7	9	12	31	62	22
+2024-01-01	12	21	42	44	49	1
+2025-01-01	6	12	28	35	66	26
 2025-09-24	15	31	45	49	53	19`;
+
+        // Debug function to test connection
+        async function testConnection() {
+            showStatus('🔧 Testing database connection...', 'info');
+            
+            if (!supabase) {
+                showStatus('❌ Supabase client not initialized', 'error');
+                return;
+            }
+
+            try {
+                const { data, error, count } = await supabase
+                    .from(SUPABASE_TABLE_NAME)
+                    .select('*', { count: 'exact', head: true });
+
+                if (error) {
+                    showStatus(`❌ Connection failed: ${error.message}`, 'error');
+                    showDebugInfo({ error: error.message, config: SUPABASE_CONFIG });
+                } else {
+                    showStatus(`✅ Connection successful! Table exists.`, 'success');
+                    showDebugInfo({ 
+                        status: 'connected', 
+                        table: SUPABASE_TABLE_NAME,
+                        config: SUPABASE_CONFIG 
+                    });
+                }
+            } catch (error) {
+                showStatus(`❌ Connection test failed: ${error.message}`, 'error');
+                showDebugInfo({ error: error.message, config: SUPABASE_CONFIG });
+            }
+        }
+
+        function showDebugInfo(info) {
+            const debugEl = document.getElementById('debug-info');
+            const contentEl = document.getElementById('debug-content');
+            if (debugEl && contentEl) {
+                debugEl.style.display = 'block';
+                contentEl.textContent = JSON.stringify(info, null, 2);
+            }
+        }
 
         // Data management functions
         async function fetchDataFromSupabase() {
             if (!supabase) {
-                console.log('Supabase not configured');
+                console.log('Supabase client not available');
                 return null;
             }
 
@@ -486,12 +542,14 @@
                     .order('draw_date', { ascending: true });
 
                 if (error) {
-                    throw new Error(`Supabase error: ${error.message}`);
+                    throw new Error(`Database error: ${error.message}`);
                 }
 
                 if (data && data.length > 0) {
                     console.log(`Fetched ${data.length} records from Supabase`);
-                    return data.map(draw => ({
+                    
+                    // Transform data to match our format
+                    const transformedData = data.map(draw => ({
                         date: draw.draw_date,
                         numbers: [
                             parseInt(draw.number1),
@@ -502,12 +560,15 @@
                         ],
                         powerball: parseInt(draw.powerball)
                     }));
+                    
+                    return transformedData;
+                } else {
+                    showStatus('📭 Database table is empty', 'info');
+                    return null;
                 }
-                
-                return null;
             } catch (error) {
                 console.error('Error fetching from Supabase:', error);
-                showStatus('❌ Database error: ' + error.message, 'error');
+                showStatus(`❌ Database error: ${error.message}`, 'error');
                 return null;
             }
         }
@@ -545,19 +606,16 @@
                 switch (type) {
                     case 'success':
                         statusEl.classList.add('status-success');
+                        // Auto-hide success messages after 3 seconds
+                        setTimeout(() => {
+                            statusEl.style.display = 'none';
+                        }, 3000);
                         break;
                     case 'error':
                         statusEl.classList.add('status-error');
                         break;
                     default:
                         statusEl.classList.add('status-info');
-                }
-                
-                // Auto-hide success messages after 3 seconds
-                if (type === 'success') {
-                    setTimeout(() => {
-                        statusEl.style.display = 'none';
-                    }, 3000);
                 }
             }
         }
@@ -571,14 +629,12 @@
             if (supabaseData && supabaseData.length > 0) {
                 allData = supabaseData;
                 dataSource = 'supabase';
-                showStatus('✅ Live data loaded from Supabase!', 'success');
-                console.log(`Loaded ${allData.length} draws from Supabase`);
+                showStatus(`✅ Loaded ${allData.length} draws from Supabase!`, 'success');
             } else {
                 // Fallback to manual data
                 allData = parseManualData();
                 dataSource = 'manual';
-                showStatus('⚠️ Using manual data (database unavailable)', 'error');
-                console.log(`Loaded ${allData.length} draws from manual data`);
+                showStatus(`⚠️ Using ${allData.length} manual draws (database empty/unavailable)`, 'error');
             }
             
             // Update the header to show data source
@@ -591,7 +647,7 @@
         function updateDataSourceIndicator() {
             const header = document.querySelector('.header p');
             if (header) {
-                const originalText = 'Multi-Pattern Analysis: Same Digits • Decade Groups • Consecutive Numbers • Repeated Patterns (2019-2025)';
+                const originalText = 'Multi-Pattern Analysis: Same Digits • Decade Groups • Consecutive Numbers • Repeated Patterns';
                 const sourceIndicator = dataSource === 'supabase' 
                     ? ' 🟢 Live Database' 
                     : ' ⚠️ Manual Data';
@@ -600,7 +656,7 @@
             }
         }
 
-        // Pattern analysis functions
+        // ... (rest of your pattern analysis functions remain the same)
         function findSameLastDigitMatches(numbers) {
             const digitGroups = {};
             const matches = [];
@@ -784,6 +840,13 @@
             const statsContainer = document.getElementById('stats');
             const summaryContainer = document.getElementById('yearly-summary');
             
+            if (allData.length === 0) {
+                container.innerHTML = '<div class="no-data">No data available. Please check your database connection.</div>';
+                statsContainer.innerHTML = '';
+                summaryContainer.innerHTML = '';
+                return;
+            }
+            
             // Calculate stats
             let totalMatches = 0;
             let patternCounts = {
@@ -803,7 +866,7 @@
             });
             
             const allYearDraws = allData.filter(draw => draw.date.startsWith(year.toString())).length;
-            const percentage = ((totalMatches / allYearDraws) * 100).toFixed(1);
+            const percentage = allYearDraws > 0 ? ((totalMatches / allYearDraws) * 100).toFixed(1) : '0';
             
             let bestMonth = 0, bestCount = 0;
             Object.entries(yearData).forEach(([month, data]) => {
@@ -832,7 +895,7 @@
                         <div class="stat-label">Pattern Frequency Rate</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number">${monthNames[bestMonth]} (${bestCount})</div>
+                        <div class="stat-number">${monthNames[bestMonth] || 'N/A'} (${bestCount})</div>
                         <div class="stat-label">Best Month for Patterns</div>
                     </div>
                 `;
@@ -851,11 +914,11 @@
                         <div class="stat-label">Total Draws in ${year}</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number">${((patternCounts[patternType] / allYearDraws) * 100).toFixed(1)}%</div>
+                        <div class="stat-number">${allYearDraws > 0 ? ((patternCounts[patternType] / allYearDraws) * 100).toFixed(1) : '0'}%</div>
                         <div class="stat-label">${patternName} Frequency</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number">${monthNames[bestMonth]} (${bestCount})</div>
+                        <div class="stat-number">${monthNames[bestMonth] || 'N/A'} (${bestCount})</div>
                         <div class="stat-label">Best Month for ${patternName}</div>
                     </div>
                 `;
@@ -957,8 +1020,6 @@
         }
 
         function downloadExcel() {
-            // Your existing downloadExcel function implementation
-            // (I've omitted it for brevity, but you can add it back)
             alert('Excel download functionality would be implemented here');
         }
 
