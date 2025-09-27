@@ -408,7 +408,7 @@
     </div>
 
     <script>
-        // Sample data for demonstration (truncated for brevity)
+        // Complete Powerball data from 2019-2025
         const rawData = `Draw Date	Number 1	Number 2	Number 3	Number 4	Number 5	Powerball
 2019-01-02	8	12	42	46	56	12
 2019-01-05	3	7	15	27	69	19
@@ -1563,27 +1563,28 @@
             Object.values(yearData).forEach(monthData => {
                 totalMatches += monthData.length;
                 
-                // Count patterns by type
+                // Count patterns by type - only count draws that have the pattern, not individual pattern instances
                 monthData.forEach(draw => {
+                    const patternTypes = new Set();
                     draw.patterns.forEach(pattern => {
-                        patternCounts[pattern.type]++;
+                        patternTypes.add(pattern.type);
+                    });
+                    // Only count each pattern type once per draw
+                    patternTypes.forEach(type => {
+                        patternCounts[type]++;
                     });
                 });
             });
             
             const allYearDraws = allData.filter(draw => draw.date.startsWith(year.toString())).length;
-            const percentage = ((totalMatches / allYearDraws) * 100).toFixed(1);
+            const percentage = allYearDraws > 0 ? ((totalMatches / allYearDraws) * 100).toFixed(1) : '0.0';
             
             // Calculate best and worst months
-            let bestMonth = 0, bestCount = 0, worstMonth = 12, worstCount = 999;
+            let bestMonth = 1, bestCount = 0;
             Object.entries(yearData).forEach(([month, data]) => {
                 if (data.length > bestCount) {
                     bestCount = data.length;
                     bestMonth = month;
-                }
-                if (data.length < worstCount) {
-                    worstCount = data.length;
-                    worstMonth = month;
                 }
             });
             
@@ -1616,6 +1617,8 @@
                                   patternType === 'decade' ? 'Decade Groups' :
                                   patternType === 'consecutive' ? 'Consecutive Numbers' : 'Repeated Patterns';
                 
+                const patternPercentage = allYearDraws > 0 ? ((patternCounts[patternType] / allYearDraws) * 100).toFixed(1) : '0.0';
+                
                 statsHtml = `
                     <div class="stat-card">
                         <div class="stat-number">${patternCounts[patternType]}</div>
@@ -1626,7 +1629,7 @@
                         <div class="stat-label">Total Draws in ${year}</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-number">${((patternCounts[patternType] / allYearDraws) * 100).toFixed(1)}%</div>
+                        <div class="stat-number">${patternPercentage}%</div>
                         <div class="stat-label">${patternName} Frequency</div>
                     </div>
                     <div class="stat-card">
@@ -1831,7 +1834,7 @@
                 grandTotalMatches += yearMatches;
                 grandTotalDraws += yearDraws;
                 
-                const yearPercentage = ((yearMatches / yearDraws) * 100).toFixed(1);
+                const yearPercentage = yearDraws > 0 ? ((yearMatches / yearDraws) * 100).toFixed(1) : '0.0';
                 
                 summaryData.push([`${year} Statistics:`, '', '', '', '', '', '']);
                 summaryData.push(['Total Draws:', yearDraws, '', 'Pattern Matches Found:', yearMatches, 'Percentage:', `${yearPercentage}%`]);
@@ -1859,7 +1862,7 @@
             });
             
             // Grand totals
-            const grandPercentage = ((grandTotalMatches / grandTotalDraws) * 100).toFixed(1);
+            const grandPercentage = grandTotalDraws > 0 ? ((grandTotalMatches / grandTotalDraws) * 100).toFixed(1) : '0.0';
             summaryData.push(['GRAND TOTALS (2019-2025):', '', '', '', '', '', '']);
             summaryData.push(['Total Draws Analyzed:', grandTotalDraws, '', '', '', '', '']);
             summaryData.push(['Total Pattern Matches Found:', grandTotalMatches, '', '', '', '', '']);
