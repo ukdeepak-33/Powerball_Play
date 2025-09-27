@@ -368,6 +368,65 @@
             </div>
             
             <button class="download-btn" onclick="downloadExcel()">📊 Download Complete Multi-Pattern Analysis</button>
+            <button class="download-btn" onclick="showAddDrawForm()" style="margin-left: 10px; background: linear-gradient(135deg, #6f42c1 0%, #5a2d91 100%);">➕ Add New Draw Result</button>
+        </div>
+        
+        <!-- Add Draw Form (initially hidden) -->
+        <div id="add-draw-form" style="display: none; padding: 25px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-top: 2px solid #dee2e6;">
+            <h3 style="color: #495057; margin-bottom: 20px;">Add New Powerball Draw Result</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                <div>
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Draw Date (YYYY-MM-DD):</label>
+                    <input type="date" id="draw-date" style="width: 100%; padding: 10px; border: 2px solid #dee2e6; border-radius: 5px;">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Number 1:</label>
+                    <input type="number" id="num1" min="1" max="69" style="width: 100%; padding: 10px; border: 2px solid #dee2e6; border-radius: 5px;">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Number 2:</label>
+                    <input type="number" id="num2" min="1" max="69" style="width: 100%; padding: 10px; border: 2px solid #dee2e6; border-radius: 5px;">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Number 3:</label>
+                    <input type="number" id="num3" min="1" max="69" style="width: 100%; padding: 10px; border: 2px solid #dee2e6; border-radius: 5px;">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Number 4:</label>
+                    <input type="number" id="num4" min="1" max="69" style="width: 100%; padding: 10px; border: 2px solid #dee2e6; border-radius: 5px;">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Number 5:</label>
+                    <input type="number" id="num5" min="1" max="69" style="width: 100%; padding: 10px; border: 2px solid #dee2e6; border-radius: 5px;">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Powerball (1-26):</label>
+                    <input type="number" id="powerball" min="1" max="26" style="width: 100%; padding: 10px; border: 2px solid #dee2e6; border-radius: 5px;">
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="addNewDraw()" style="background: linear-gradient(135deg, #28a745 0%, #218838 100%); color: white; padding: 12px 24px; border: none; border-radius: 25px; cursor: pointer; font-weight: 600;">Add Draw</button>
+                <button onclick="hideAddDrawForm()" style="background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%); color: white; padding: 12px 24px; border: none; border-radius: 25px; cursor: pointer; font-weight: 600;">Cancel</button>
+                <button onclick="showBulkImport()" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: white; padding: 12px 24px; border: none; border-radius: 25px; cursor: pointer; font-weight: 600;">Bulk Import</button>
+            </div>
+            <div id="add-draw-message" style="margin-top: 15px; padding: 10px; border-radius: 5px; display: none;"></div>
+        </div>
+        
+        <!-- Bulk Import Form (initially hidden) -->
+        <div id="bulk-import-form" style="display: none; padding: 25px; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-top: 2px solid #2196f3;">
+            <h3 style="color: #1976d2; margin-bottom: 20px;">Bulk Import Draw Results</h3>
+            <p style="margin-bottom: 15px; color: #495057;">
+                Paste draw results in the format: Date&lt;tab&gt;Num1&lt;tab&gt;Num2&lt;tab&gt;Num3&lt;tab&gt;Num4&lt;tab&gt;Num5&lt;tab&gt;Powerball<br>
+                Example: 2025-10-01&lt;tab&gt;5&lt;tab&gt;15&lt;tab&gt;25&lt;tab&gt;35&lt;tab&gt;45&lt;tab&gt;12
+            </p>
+            <textarea id="bulk-data" rows="8" style="width: 100%; padding: 15px; border: 2px solid #dee2e6; border-radius: 5px; font-family: monospace;" placeholder="2025-10-01	5	15	25	35	45	12
+2025-10-04	7	17	27	37	47	8"></textarea>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button onclick="importBulkData()" style="background: linear-gradient(135deg, #28a745 0%, #218838 100%); color: white; padding: 12px 24px; border: none; border-radius: 25px; cursor: pointer; font-weight: 600;">Import Data</button>
+                <button onclick="hideBulkImport()" style="background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%); color: white; padding: 12px 24px; border: none; border-radius: 25px; cursor: pointer; font-weight: 600;">Cancel</button>
+                <button onclick="exportCurrentData()" style="background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%); color: #212529; padding: 12px 24px; border: none; border-radius: 25px; cursor: pointer; font-weight: 600;">Export Current Data</button>
+            </div>
+            <div id="bulk-import-message" style="margin-top: 15px; padding: 10px; border-radius: 5px; display: none;"></div>
         </div>
         
         <div class="content">
@@ -1886,6 +1945,236 @@
         // Initialize the application
         parseData();
         displayData(currentYear, currentPattern);
+
+        // Functions for adding new draw data
+        function showAddDrawForm() {
+            document.getElementById('add-draw-form').style.display = 'block';
+            document.getElementById('bulk-import-form').style.display = 'none';
+        }
+
+        function hideAddDrawForm() {
+            document.getElementById('add-draw-form').style.display = 'none';
+            clearAddDrawForm();
+        }
+
+        function showBulkImport() {
+            document.getElementById('bulk-import-form').style.display = 'block';
+            document.getElementById('add-draw-form').style.display = 'none';
+        }
+
+        function hideBulkImport() {
+            document.getElementById('bulk-import-form').style.display = 'none';
+        }
+
+        function clearAddDrawForm() {
+            document.getElementById('draw-date').value = '';
+            document.getElementById('num1').value = '';
+            document.getElementById('num2').value = '';
+            document.getElementById('num3').value = '';
+            document.getElementById('num4').value = '';
+            document.getElementById('num5').value = '';
+            document.getElementById('powerball').value = '';
+            document.getElementById('add-draw-message').style.display = 'none';
+        }
+
+        function showMessage(elementId, message, isError = false) {
+            const messageEl = document.getElementById(elementId);
+            messageEl.textContent = message;
+            messageEl.style.display = 'block';
+            messageEl.style.backgroundColor = isError ? '#f8d7da' : '#d4edda';
+            messageEl.style.color = isError ? '#721c24' : '#155724';
+            messageEl.style.border = isError ? '1px solid #f5c6cb' : '1px solid #c3e6cb';
+            
+            setTimeout(() => {
+                messageEl.style.display = 'none';
+            }, 5000);
+        }
+
+        function validateDrawData(date, numbers, powerball) {
+            if (!date) {
+                return 'Please enter a draw date';
+            }
+
+            // Check if numbers are valid
+            if (numbers.length !== 5) {
+                return 'Please enter all 5 main numbers';
+            }
+
+            for (let i = 0; i < numbers.length; i++) {
+                const num = numbers[i];
+                if (isNaN(num) || num < 1 || num > 69) {
+                    return `Number ${i + 1} must be between 1 and 69`;
+                }
+            }
+
+            // Check for duplicate numbers
+            const uniqueNumbers = new Set(numbers);
+            if (uniqueNumbers.size !== numbers.length) {
+                return 'Numbers cannot be duplicated';
+            }
+
+            // Check powerball
+            if (isNaN(powerball) || powerball < 1 || powerball > 26) {
+                return 'Powerball must be between 1 and 26';
+            }
+
+            // Check if draw already exists
+            const existingDraw = allData.find(draw => draw.date === date);
+            if (existingDraw) {
+                return `Draw for ${date} already exists`;
+            }
+
+            return null; // No errors
+        }
+
+        function addNewDraw() {
+            const date = document.getElementById('draw-date').value;
+            const numbers = [
+                parseInt(document.getElementById('num1').value),
+                parseInt(document.getElementById('num2').value),
+                parseInt(document.getElementById('num3').value),
+                parseInt(document.getElementById('num4').value),
+                parseInt(document.getElementById('num5').value)
+            ];
+            const powerball = parseInt(document.getElementById('powerball').value);
+
+            // Validate input
+            const validationError = validateDrawData(date, numbers, powerball);
+            if (validationError) {
+                showMessage('add-draw-message', validationError, true);
+                return;
+            }
+
+            // Sort numbers for consistency (though not required for Powerball)
+            const sortedNumbers = [...numbers].sort((a, b) => a - b);
+
+            // Add to data array
+            const newDraw = {
+                date: date,
+                numbers: sortedNumbers,
+                powerball: powerball
+            };
+
+            allData.push(newDraw);
+            
+            // Sort allData by date to maintain chronological order
+            allData.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            // Update raw data string (for export purposes)
+            const newLine = `${date}\t${sortedNumbers[0]}\t${sortedNumbers[1]}\t${sortedNumbers[2]}\t${sortedNumbers[3]}\t${sortedNumbers[4]}\t${powerball}`;
+            rawData += '\n' + newLine;
+
+            showMessage('add-draw-message', `Successfully added draw for ${date}`, false);
+            clearAddDrawForm();
+            
+            // Refresh display if viewing the year of the added draw
+            const drawYear = parseInt(date.split('-')[0]);
+            if (drawYear === currentYear) {
+                displayData(currentYear, currentPattern);
+            }
+        }
+
+        function importBulkData() {
+            const bulkData = document.getElementById('bulk-data').value.trim();
+            if (!bulkData) {
+                showMessage('bulk-import-message', 'Please enter draw data to import', true);
+                return;
+            }
+
+            const lines = bulkData.split('\n');
+            let successCount = 0;
+            let errorCount = 0;
+            const errors = [];
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+
+                const parts = line.split('\t');
+                if (parts.length !== 7) {
+                    errors.push(`Line ${i + 1}: Invalid format (expected 7 tab-separated values)`);
+                    errorCount++;
+                    continue;
+                }
+
+                const date = parts[0];
+                const numbers = [
+                    parseInt(parts[1]),
+                    parseInt(parts[2]),
+                    parseInt(parts[3]),
+                    parseInt(parts[4]),
+                    parseInt(parts[5])
+                ];
+                const powerball = parseInt(parts[6]);
+
+                const validationError = validateDrawData(date, numbers, powerball);
+                if (validationError) {
+                    errors.push(`Line ${i + 1}: ${validationError}`);
+                    errorCount++;
+                    continue;
+                }
+
+                // Add successful draw
+                const sortedNumbers = [...numbers].sort((a, b) => a - b);
+                const newDraw = {
+                    date: date,
+                    numbers: sortedNumbers,
+                    powerball: powerball
+                };
+
+                allData.push(newDraw);
+                successCount++;
+            }
+
+            // Sort data after bulk import
+            allData.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            // Update raw data string
+            const newLines = allData.map(draw => 
+                `${draw.date}\t${draw.numbers[0]}\t${draw.numbers[1]}\t${draw.numbers[2]}\t${draw.numbers[3]}\t${draw.numbers[4]}\t${draw.powerball}`
+            );
+            rawData = 'Draw Date\tNumber 1\tNumber 2\tNumber 3\tNumber 4\tNumber 5\tPowerball\n' + newLines.join('\n');
+
+            let message = `Import complete: ${successCount} draws added successfully`;
+            if (errorCount > 0) {
+                message += `, ${errorCount} errors encountered`;
+                if (errors.length > 0) {
+                    message += `\n\nErrors:\n${errors.slice(0, 5).join('\n')}`;
+                    if (errors.length > 5) {
+                        message += `\n... and ${errors.length - 5} more errors`;
+                    }
+                }
+            }
+
+            showMessage('bulk-import-message', message, errorCount > 0);
+            
+            if (successCount > 0) {
+                document.getElementById('bulk-data').value = '';
+                displayData(currentYear, currentPattern);
+            }
+        }
+
+        function exportCurrentData() {
+            const dataToExport = allData.map(draw => 
+                `${draw.date}\t${draw.numbers[0]}\t${draw.numbers[1]}\t${draw.numbers[2]}\t${draw.numbers[3]}\t${draw.numbers[4]}\t${draw.powerball}`
+            ).join('\n');
+
+            const header = 'Draw Date\tNumber 1\tNumber 2\tNumber 3\tNumber 4\tNumber 5\tPowerball';
+            const fullData = header + '\n' + dataToExport;
+
+            // Create and download file
+            const blob = new Blob([fullData], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `powerball_data_${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            showMessage('bulk-import-message', 'Data exported successfully', false);
+        }
     </script>
 </body>
 </html>
