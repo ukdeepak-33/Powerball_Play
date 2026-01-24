@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Powerball Same Last Digit Analysis 2019-2025</title>
+    <title>Powerball Same Last Digit Analysis 2019-2026</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body {
@@ -297,11 +297,19 @@
     <div class="container">
         <div class="header">
             <h1>🎯 Powerball Same Last Digit Analysis</h1>
-            <p>Comprehensive analysis from 2019-2025 • Find patterns where multiple numbers share the same last digit</p>
+            <p>Comprehensive analysis from 2019-2026 • Find patterns where multiple numbers share the same last digit</p>
         </div>
         
         <div class="controls">
-            <div class="year-tabs" id="year-tabs-container">
+            <div class="year-tabs">
+                <button class="tab active" onclick="showYear(2025)">2026</button>
+                <button class="tab" onclick="showYear(2025)">2025</button>
+                <button class="tab" onclick="showYear(2024)">2024</button>
+                <button class="tab" onclick="showYear(2023)">2023</button>
+                <button class="tab" onclick="showYear(2022)">2022</button>
+                <button class="tab" onclick="showYear(2021)">2021</button>
+                <button class="tab" onclick="showYear(2020)">2020</button>
+                <button class="tab" onclick="showYear(2019)">2019</button>
                 
             </div>
             <button class="download-btn" onclick="downloadExcel()">📊 Download Complete Excel Report (2019-2026)</button>
