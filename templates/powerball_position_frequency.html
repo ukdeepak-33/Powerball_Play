@@ -301,16 +301,10 @@
         </div>
         
         <div class="controls">
-            <div class="year-tabs">
-                <button class="tab active" onclick="showYear(2025)">2025</button>
-                <button class="tab" onclick="showYear(2024)">2024</button>
-                <button class="tab" onclick="showYear(2023)">2023</button>
-                <button class="tab" onclick="showYear(2022)">2022</button>
-                <button class="tab" onclick="showYear(2021)">2021</button>
-                <button class="tab" onclick="showYear(2020)">2020</button>
-                <button class="tab" onclick="showYear(2019)">2019</button>
+            <div class="year-tabs" id="year-tabs-container">
+                
             </div>
-            <button class="download-btn" onclick="downloadExcel()">📊 Download Complete Excel Report (2019-2025)</button>
+            <button class="download-btn" onclick="downloadExcel()">📊 Download Complete Excel Report (2019-2026)</button>
         </div>
         
         <div class="content">
@@ -1300,7 +1294,7 @@
 2026-01-21	11	27	55	53	26	12`;
 
         let allData = [];
-        let currentYear = 2025;
+        let currentYear = 2026;
 
         function parseData() {
             const lines = rawData.trim().split('\n');
@@ -1318,6 +1312,20 @@
             }
         }
 
+        function generateYearTabs() {
+            const container = document.getElementById('year-tabs-container');
+            if (!container) return;
+            container.innerHTML = '';
+            const years = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
+            years.forEach(year => {
+                const button = document.createElement('button');
+                button.className = `tab${year === currentYear ? ' active' : ''}`;
+                button.textContent = year;
+                button.onclick = () => showYear(year);
+                container.appendChild(button);
+            });
+        }
+        
         function findSameLastDigitMatches(numbers) {
             const digitGroups = {};
             const matches = [];
@@ -1502,8 +1510,8 @@
         function downloadExcel() {
             const wb = XLSX.utils.book_new();
             
-            // Create data for all years (2019-2025)
-            const years = [2019, 2020, 2021, 2022, 2023, 2024, 2025];
+            // Create data for all years (2019-2026)
+            const years = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
             
             years.forEach(year => {
                 const yearData = analyzeYear(year);
@@ -1569,7 +1577,7 @@
             
             // Add comprehensive summary sheet
             const summaryData = [];
-            summaryData.push(['Powerball Same Last Digit Analysis Summary (2019-2025)', '', '', '', '', '', '']);
+            summaryData.push(['Powerball Same Last Digit Analysis Summary (2019-2026)', '', '', '', '', '', '']);
             summaryData.push(['Generated on:', new Date().toLocaleDateString(), '', '', '', '', '']);
             summaryData.push(['', '', '', '', '', '', '']);
             
@@ -1627,7 +1635,7 @@
             summaryData.push(['- This analysis finds Powerball draws where 2+ main numbers', '', '', '', '', '', '']);
             summaryData.push(['  share the same last digit (e.g., 15, 25, 35)', '', '', '', '', '', '']);
             summaryData.push(['- Only main numbers (1-5) are analyzed, Powerball excluded', '', '', '', '', '', '']);
-            summaryData.push(['- Data covers Powerball draws from 2019-2025', '', '', '', '', '', '']);
+            summaryData.push(['- Data covers Powerball draws from 2019-2026', '', '', '', '', '', '']);
             
             const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
             XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
