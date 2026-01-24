@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Powerball Pattern Analysis 2019-2025</title>
+    <title>Advanced Powerball Pattern Analysis 2019-2026</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body {
@@ -339,14 +339,15 @@
     <div class="container">
         <div class="header">
             <h1>🎯 Advanced Powerball Pattern Analysis</h1>
-            <p>Multi-Pattern Analysis: Same Digits • Decade Groups • Consecutive Numbers • Repeated Patterns (2019-2025)</p>
+            <p>Multi-Pattern Analysis: Same Digits • Decade Groups • Consecutive Numbers • Repeated Patterns (2019-2026)</p>
         </div>
         
         <div class="controls">
             <div class="control-section">
                 <div class="control-label">📅 Select Year:</div>
                 <div class="year-tabs">
-                    <button class="tab active" onclick="showYear(2025)">2025</button>
+                    <button class="tab active" onclick="showYear(2026)">2026</button>
+                    <button class="tab" onclick="showYear(2025)">2025</button>
                     <button class="tab" onclick="showYear(2024)">2024</button>
                     <button class="tab" onclick="showYear(2023)">2023</button>
                     <button class="tab" onclick="showYear(2022)">2022</button>
@@ -467,7 +468,7 @@
     </div>
 
     <script>
-        // Complete Powerball data from 2019-2025
+        // Complete Powerball data from 2019-2026
         const rawData = `Draw Date	Number 1	Number 2	Number 3	Number 4	Number 5	Powerball
 2019-01-02	8	12	42	46	56	12
 2019-01-05	3	7	15	27	69	19
@@ -1439,7 +1440,7 @@
 
         
         let allData = [];
-        let currentYear = 2025;
+        let currentYear = 2026;
         let currentPattern = 'all';
 
         function parseData() {
@@ -1848,8 +1849,8 @@
         function downloadExcel() {
             const wb = XLSX.utils.book_new();
             
-            // Create data for all years (2019-2025)
-            const years = [2019, 2020, 2021, 2022, 2023, 2024, 2025];
+            // Create data for all years (2019-2026)
+            const years = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
             
             years.forEach(year => {
                 const yearData = analyzeYear(year, 'all');
@@ -1926,7 +1927,7 @@
             
             // Add comprehensive summary sheet
             const summaryData = [];
-            summaryData.push(['Advanced Powerball Pattern Analysis Summary (2019-2025)', '', '', '', '', '', '']);
+            summaryData.push(['Advanced Powerball Pattern Analysis Summary (2019-2026)', '', '', '', '', '', '']);
             summaryData.push(['Generated on:', new Date().toLocaleDateString(), '', '', '', '', '']);
             summaryData.push(['', '', '', '', '', '', '']);
             
@@ -1974,7 +1975,7 @@
             
             // Grand totals
             const grandPercentage = grandTotalDraws > 0 ? ((grandTotalMatches / grandTotalDraws) * 100).toFixed(1) : '0.0';
-            summaryData.push(['GRAND TOTALS (2019-2025):', '', '', '', '', '', '']);
+            summaryData.push(['GRAND TOTALS (2019-2026):', '', '', '', '', '', '']);
             summaryData.push(['Total Draws Analyzed:', grandTotalDraws, '', '', '', '', '']);
             summaryData.push(['Total Pattern Matches Found:', grandTotalMatches, '', '', '', '', '']);
             summaryData.push(['Overall Pattern Match Rate:', `${grandPercentage}%`, '', '', '', '', '']);
@@ -1985,13 +1986,13 @@
             summaryData.push(['- Decade Groups: Numbers in same decade (20-29, 30-39)', '', '', '', '', '', '']);
             summaryData.push(['- Consecutive Numbers: Sequential numbers (12, 13, 14)', '', '', '', '', '', '']);
             summaryData.push(['- Repeated Patterns: Double digits (11, 22, 33, 44)', '', '', '', '', '', '']);
-            summaryData.push(['- Data covers Powerball draws from 2019-2025', '', '', '', '', '', '']);
+            summaryData.push(['- Data covers Powerball draws from 2019-2026', '', '', '', '', '', '']);
             
             const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
             XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
             
             // Download the Excel file
-            XLSX.writeFile(wb, 'Advanced_Powerball_Pattern_Analysis_2019-2025.xlsx');
+            XLSX.writeFile(wb, 'Advanced_Powerball_Pattern_Analysis_2019-2026.xlsx');
         }
 
         // Initialize the application
