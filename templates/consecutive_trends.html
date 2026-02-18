@@ -97,6 +97,18 @@
             </div>
         </div>
 
+        <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+    <div class="flex justify-between items-center mb-2">
+        <h3 class="font-bold text-blue-800">✨ AI Trend Insights</h3>
+        <button id="ai-analyze-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-all shadow-sm">
+            Run AI Analysis
+        </button>
+    </div>
+    <div id="ai-summary-text" class="text-gray-700 italic text-sm">
+        Click the button to generate a transformer-powered analysis of this year's trends.
+    </div>
+</div>
+        
         <div class="relative h-96 mb-8">
             <canvas id="yearlyConsecutiveChart"></canvas>
         </div>
@@ -303,6 +315,32 @@
             });
         }
 
+        document.getElementById('ai-analyze-btn').addEventListener('click', async function() {
+    const btn = this;
+    const summaryBox = document.getElementById('ai-summary-text');
+    
+    btn.disabled = true;
+    btn.innerText = "Analyzing...";
+    summaryBox.innerText = "Processing trends with Gemini...";
+
+    try {
+        const response = await fetch('/api/analyze-consecutive-trends', { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.summary) {
+            summaryBox.innerText = data.summary;
+            summaryBox.classList.remove('italic');
+        } else {
+            summaryBox.innerText = "Error: " + (data.error || "Could not generate analysis.");
+        }
+    } catch (err) {
+        summaryBox.innerText = "Failed to connect to the AI service.";
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Run AI Analysis";
+    }
+});
+    
         function fetchTrendsForYear(year) {
             // Update the heading to reflect the selected year
             document.querySelector('details > summary').innerHTML = `Consecutive Trends for ${year} <svg class="w-6 h-6 transform transition-transform duration-200 details-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>`;
@@ -377,7 +415,7 @@
         sortOrderSelect.addEventListener('change', () => {
             renderConsecutivePairs();
         });
-
+    
         // Add event listener to the details element to update the arrow
         const detailsElement = document.querySelector('details');
         detailsElement.addEventListener('toggle', () => {
