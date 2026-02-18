@@ -3139,6 +3139,50 @@ def calculate_consecutive_gaps(df_source):
     pass # This function was empty in the provided code, so it remains a placeholder.
 
 
+# --- HELPER FUNCTION (Add this above your routes) ---
+def get_consecutive_stats_logic():
+    global df
+    if df.empty:
+        df = load_data_from_supabase()
+    
+    # This matches the logic currently inside your calculate_consecutive_trends or similar block
+    # It returns the data structure needed for the chart and the AI
+    # (Simplified version based on your uploaded index.py logic)
+    grouped_by_year = []
+    consecutive_pairs_by_year = {}
+    
+    # Grouping logic...
+    years = sorted(df['Draw Date'].dt.year.unique(), reverse=True)
+    for year in years:
+        year_df = df[df['Draw Date'].dt.year == year]
+        total_draws = len(year_df)
+        consec_count = 0
+        pairs_freq = defaultdict(int)
+        
+        for _, row in year_df.iterrows():
+            nums = sorted([int(x) for x in str(row['white_balls']).split(',')])
+            has_consec = False
+            for i in range(len(nums)-1):
+                if nums[i+1] - nums[i] == 1:
+                    has_consec = True
+                    pairs_freq[f"{nums[i]}-{nums[i+1]}"] += 1
+            if has_consec:
+                consec_count += 1
+        
+        grouped_by_year.append({
+            "year": year,
+            "total_draws": total_draws,
+            "consecutive_draws": consec_count,
+            "percentage": round((consec_count / total_draws) * 100, 2) if total_draws > 0 else 0
+        })
+        consecutive_pairs_by_year[str(year)] = dict(sorted(pairs_freq.items(), key=lambda x: x[1], reverse=True))
+
+    return {
+        "grouped_by_year": grouped_by_year,
+        "consecutive_pairs_by_year": consecutive_pairs_by_year
+    }
+
+
 # --- Flask Routes ---
 @app.route('/')
 def index():
@@ -3647,6 +3691,7 @@ def simulate_multiple_draws_route():
                            simulated_powerball_freq=[],
                            num_simulations=100,
                            selected_odd_even_choice="Any")
+    
 @app.route('/number_age_distribution')
 def number_age_distribution_route():
     if df.empty:
@@ -3794,6 +3839,7 @@ def grouped_patterns_yearly_comparison_route():
                            yearly_patterns_data=yearly_patterns_data,
                            number_ranges=NUMBER_RANGES,
                            selected_range=selected_range_label)
+    
 # Main route for boundary crossing pairs (restored)
 @app.route('/boundary_crossing_pairs_trends', methods=['GET', 'POST'])
 def boundary_crossing_pairs_trends_route():
@@ -4130,44 +4176,38 @@ def my_jackpot_pick_route():
         flash("An error occurred loading the Jackpot Pick page. Please try again.", 'error')
         return redirect(url_for('index'))
 
+# --- UPDATED AI ROUTE ---
 @app.route('/api/analyze-consecutive-trends', methods=['POST'])
 def analyze_consecutive_trends_ai():
-    """Sends current trend data to Gemini for a statistical analysis summary."""
     try:
         if not GEMINI_API_KEY:
             return jsonify({"error": "Gemini API key is not configured."}), 500
 
-        # 1. Gather the data to analyze (Current Year Trends)
-        trends_data = calculate_consecutive_trends()
-        current_year_stats = next((item for item in trends_data['grouped_by_year'] 
-                                 if item['year'] == datetime.now().year), None)
+        # Use the helper function we just created
+        stats = get_consecutive_stats_logic()
         
-        if not current_year_stats:
-            return jsonify({"error": "No trend data found for the current year."}), 404
+        # Get the most recent year's data
+        current_year = datetime.now().year
+        current_stats = next((item for item in stats['grouped_by_year'] if item['year'] == current_year), stats['grouped_by_year'][0])
 
-        # 2. Construct the AI Prompt
         prompt = f"""
-        Analyze the following Powerball consecutive number trends for {datetime.now().year}:
-        - Total Draws: {current_year_stats['total_draws']}
-        - Draws with Consecutive Pairs: {current_year_stats['consecutive_draws']}
-        - Frequency Percentage: {current_year_stats['percentage']}%
-        - Most common pairs: {json.dumps(trends_data['consecutive_pairs_by_year'].get(str(datetime.now().year), {}))}
-
-        Provide a brief (3-4 sentence) statistical insight. Mention if this year is 
-        'hot' or 'cold' compared to the historical average of ~25-30%.
+        Analyze these Powerball stats for {current_stats['year']}:
+        - {current_stats['percentage']}% of draws had consecutive numbers.
+        - Total draws analyzed: {current_stats['total_draws']}.
+        Historically, consecutive pairs appear in about 25-30% of draws. 
+        Is this year showing a high or low frequency? Provide 3 sentences of insight.
         """
 
-        # 3. Call Gemini API
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
         response = requests.post(url, json=payload)
-        ai_response = response.json()
         
-        summary = ai_response['candidates'][0]['content']['parts'][0]['text']
+        result = response.json()
+        summary = result['candidates'][0]['content']['parts'][0]['text']
         return jsonify({"summary": summary})
 
     except Exception as e:
-        return jsonify({"error": f"AI Analysis failed: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/analyze_manual_pick', methods=['POST'])
 def analyze_manual_pick_route():
