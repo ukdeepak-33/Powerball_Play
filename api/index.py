@@ -4130,6 +4130,45 @@ def my_jackpot_pick_route():
         flash("An error occurred loading the Jackpot Pick page. Please try again.", 'error')
         return redirect(url_for('index'))
 
+@app.route('/api/analyze-consecutive-trends', methods=['POST'])
+def analyze_consecutive_trends_ai():
+    """Sends current trend data to Gemini for a statistical analysis summary."""
+    try:
+        if not GEMINI_API_KEY:
+            return jsonify({"error": "Gemini API key is not configured."}), 500
+
+        # 1. Gather the data to analyze (Current Year Trends)
+        trends_data = calculate_consecutive_trends()
+        current_year_stats = next((item for item in trends_data['grouped_by_year'] 
+                                 if item['year'] == datetime.now().year), None)
+        
+        if not current_year_stats:
+            return jsonify({"error": "No trend data found for the current year."}), 404
+
+        # 2. Construct the AI Prompt
+        prompt = f"""
+        Analyze the following Powerball consecutive number trends for {datetime.now().year}:
+        - Total Draws: {current_year_stats['total_draws']}
+        - Draws with Consecutive Pairs: {current_year_stats['consecutive_draws']}
+        - Frequency Percentage: {current_year_stats['percentage']}%
+        - Most common pairs: {json.dumps(trends_data['consecutive_pairs_by_year'].get(str(datetime.now().year), {}))}
+
+        Provide a brief (3-4 sentence) statistical insight. Mention if this year is 
+        'hot' or 'cold' compared to the historical average of ~25-30%.
+        """
+
+        # 3. Call Gemini API
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        response = requests.post(url, json=payload)
+        ai_response = response.json()
+        
+        summary = ai_response['candidates'][0]['content']['parts'][0]['text']
+        return jsonify({"summary": summary})
+
+    except Exception as e:
+        return jsonify({"error": f"AI Analysis failed: {str(e)}"}), 500
+
 @app.route('/analyze_manual_pick', methods=['POST'])
 def analyze_manual_pick_route():
     if df.empty:
@@ -4487,6 +4526,7 @@ def generate_smart_picks_route():
     except Exception as e:
         traceback.print_exc()
         return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
+        
 @app.route('/api/generate_smart_picks', methods=['POST'])
 def generate_smart_picks_api():
     """
