@@ -3182,6 +3182,32 @@ def get_consecutive_stats_logic():
         "consecutive_pairs_by_year": consecutive_pairs_by_year
     }
 
+    # --- Helper to get all draws with consecutive status ---
+def get_all_consecutive_draws_data(df_source):
+    if df_source.empty:
+        return []
+    
+    df_copy = df_source.copy()
+    if 'Draw Date_dt' not in df_copy.columns:
+        df_copy['Draw Date_dt'] = pd.to_datetime(df_copy['Draw Date'], errors='coerce')
+    
+    # Filter out invalid dates and sort
+    df_copy = df_copy.dropna(subset=['Draw Date_dt']).sort_values('Draw Date_dt', ascending=False)
+    
+    results = []
+    for _, row in df_copy.iterrows():
+        # Get numbers from columns Number 1 to Number 5
+        white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+        sequences = _find_consecutive_sequences(white_balls)
+        
+        results.append({
+            'date': row['Draw Date_dt'].strftime('%Y-%m-%d'),
+            'year': int(row['Draw Date_dt'].year),
+            'has_consec': "Yes" if sequences else "No",
+            # Format sequence like [8, 9] -> "8-9"
+            'sequences': ", ".join(["-".join(map(str, s)) for s in sequences]) if sequences else "N/A"
+        })
+    return results
 
 # --- Flask Routes ---
 @app.route('/')
@@ -3772,24 +3798,29 @@ def odd_even_trends_route():
 
 @app.route('/consecutive_trends')
 def consecutive_trends_route():
+    global df
     if df.empty:
-        flash("Cannot display Consecutive Trends: Historical data not loaded or is empty. Please check Supabase connection.", 'error')
+        df = load_data_from_supabase()
+
+    if df.empty:
+        flash("Cannot display trends: Data not loaded.", 'error')
         return redirect(url_for('index'))
 
-    last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
-    consecutive_trends = get_cached_analysis('consecutive_trends', get_consecutive_numbers_trends, df, last_draw_date_str_for_cache)
-
-    yearly_consecutive_data_full = get_cached_analysis('consecutive_yearly_trends', get_consecutive_numbers_yearly_trends, df)
-
-    yearly_consecutive_percentage_data = yearly_consecutive_data_full['yearly_data']
-    years_for_dropdown = yearly_consecutive_data_full['years']
-    all_consecutive_pairs_flat = yearly_consecutive_data_full['all_consecutive_pairs_flat']
+    # Get detailed data for the dynamic table
+    all_draws_data = get_all_consecutive_draws_data(df)
+    
+    # Get yearly summary for the chart
+    yearly_consecutive_data_full = get_cached_analysis(
+        'consecutive_yearly_trends', 
+        get_consecutive_numbers_yearly_trends, 
+        df
+    )
 
     return render_template('consecutive_trends.html',
-                           consecutive_trends=consecutive_trends,
-                           yearly_consecutive_percentage_data=yearly_consecutive_percentage_data,
-                           years_for_dropdown=years_for_dropdown,
-                           all_consecutive_pairs_flat=all_consecutive_pairs_flat)
+                           all_draws_json=json.dumps(all_draws_data),
+                           yearly_consecutive_percentage_data=yearly_consecutive_data_full['yearly_data'],
+                           years_for_dropdown=yearly_consecutive_data_full['years'],
+                           all_consecutive_pairs_flat=yearly_consecutive_data_full['all_consecutive_pairs_flat'])
 
 @app.route('/consecutive_trends_by_year/<int:year>')
 def consecutive_trends_by_year(year):
@@ -4180,34 +4211,35 @@ def my_jackpot_pick_route():
 @app.route('/api/analyze-consecutive-trends', methods=['POST'])
 def analyze_consecutive_trends_ai():
     try:
-        if not GEMINI_API_KEY:
-            return jsonify({"error": "Gemini API key is not configured."}), 500
-
-        # Use the helper function we just created
-        stats = get_consecutive_stats_logic()
+        data = request.get_json()
+        year = data.get('year')
         
-        # Get the most recent year's data
-        current_year = datetime.now().year
-        current_stats = next((item for item in stats['grouped_by_year'] if item['year'] == current_year), stats['grouped_by_year'][0])
+        # Get stats for prompt
+        stats = get_consecutive_numbers_yearly_trends(df)
+        year_stat = next((item for item in stats['yearly_data'] if str(item['year']) == str(year)), None)
+        
+        if not year_stat:
+            return jsonify({"error": f"No data found for {year}"}), 404
 
         prompt = f"""
-        Analyze these Powerball stats for {current_stats['year']}:
-        - {current_stats['percentage']}% of draws had consecutive numbers.
-        - Total draws analyzed: {current_stats['total_draws']}.
-        Historically, consecutive pairs appear in about 25-30% of draws. 
-        Is this year showing a high or low frequency? Provide 3 sentences of insight.
+        Analyze Powerball consecutive number trends for the year {year}:
+        - Percentage of draws with consecutives: {year_stat['percentage']}%
+        - Total draws: {year_stat['total_draws']}
+        - Consecutive draws: {year_stat['consecutive_draws']}
+        
+        Compare this to the mathematical expectation (approx 25-30%). 
+        Provide a 3-sentence professional statistical insight.
         """
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
         response = requests.post(url, json=payload)
+        ai_text = response.json()['candidates'][0]['content']['parts'][0]['text']
         
-        result = response.json()
-        summary = result['candidates'][0]['content']['parts'][0]['text']
-        return jsonify({"summary": summary})
-
+        return jsonify({"summary": ai_text})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route('/analyze_manual_pick', methods=['POST'])
 def analyze_manual_pick_route():
