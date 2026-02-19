@@ -4211,35 +4211,39 @@ def my_jackpot_pick_route():
 @app.route('/api/analyze-consecutive-trends', methods=['POST'])
 def analyze_consecutive_trends_ai():
     try:
+        if not GEMINI_API_KEY:
+            return jsonify({"error": "Gemini API Key is missing in Render environment variables."}), 500
+
         data = request.get_json()
         year = data.get('year')
         
-        # Get stats for prompt
+        # Get stats
         stats = get_consecutive_numbers_yearly_trends(df)
         year_stat = next((item for item in stats['yearly_data'] if str(item['year']) == str(year)), None)
         
         if not year_stat:
             return jsonify({"error": f"No data found for {year}"}), 404
 
-        prompt = f"""
-        Analyze Powerball consecutive number trends for the year {year}:
-        - Percentage of draws with consecutives: {year_stat['percentage']}%
-        - Total draws: {year_stat['total_draws']}
-        - Consecutive draws: {year_stat['consecutive_draws']}
-        
-        Compare this to the mathematical expectation (approx 25-30%). 
-        Provide a 3-sentence professional statistical insight.
-        """
+        prompt = f"Analyze Powerball consecutive trends for {year}: {year_stat['percentage']}% frequency."
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        response = requests.post(url, json=payload)
-        ai_text = response.json()['candidates'][0]['content']['parts'][0]['text']
         
-        return jsonify({"summary": ai_text})
+        response = requests.post(url, json=payload)
+        result = response.json()
+
+        # --- FIX: CHECK IF 'candidates' EXISTS BEFORE ACCESSING ---
+        if 'candidates' in result and len(result['candidates']) > 0:
+            ai_text = result['candidates'][0]['content']['parts'][0]['text']
+            return jsonify({"summary": ai_text})
+        else:
+            # Log the full error to your Render logs for debugging
+            print(f"Gemini API Error: {result}")
+            error_msg = result.get('error', {}).get('message', 'AI service currently unavailable.')
+            return jsonify({"error": error_msg}), 500
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 @app.route('/analyze_manual_pick', methods=['POST'])
 def analyze_manual_pick_route():
