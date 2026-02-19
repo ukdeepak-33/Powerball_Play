@@ -4227,6 +4227,14 @@ def analyze_consecutive_trends_ai():
         prompt = f"Analyze Powerball consecutive trends for {year}: {year_stat['percentage']}% frequency."
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+
+        payload = {
+          "contents": [{
+            "parts": [{
+               "text": prompt
+             }]
+         }]
+      }
         
         response = requests.post(url, json=payload)
         result = response.json()
