@@ -4207,53 +4207,85 @@ def my_jackpot_pick_route():
         flash("An error occurred loading the Jackpot Pick page. Please try again.", 'error')
         return redirect(url_for('index'))
 
-# --- UPDATED AI ROUTE ---
 @app.route('/api/analyze-consecutive-trends', methods=['POST'])
 def analyze_consecutive_trends_ai():
     try:
-        # 1. Check if Dataframe exists and is not empty
+        # 1. Check dataframe
         if df is None or df.empty:
-            return jsonify({"error": "Lottery data is still loading. Please refresh in a moment."}), 503
+            return jsonify({
+                "error": "Lottery data is still loading. Please refresh in a moment."
+            }), 503
 
         if not GEMINI_API_KEY:
-            return jsonify({"error": "Gemini API Key is missing in Render environment variables."}), 500
-            
-        data = request.get_json()
+            return jsonify({
+                "error": "Gemini API Key is missing in environment variables."
+            }), 500
+
+        data = request.get_json(force=True)
         year = data.get('year')
-        
-        # Get stats
+
+        if not year:
+            return jsonify({"error": "Year is required"}), 400
+
+        # 2. Get stats
         stats = get_consecutive_numbers_yearly_trends(df)
-        year_stat = next((item for item in stats['yearly_data'] if str(item['year']) == str(year)), None)
-        
+        year_stat = next(
+            (item for item in stats['yearly_data']
+             if str(item['year']) == str(year)),
+            None
+        )
+
         if not year_stat:
             return jsonify({"error": f"No data found for {year}"}), 404
 
-        prompt = f"Analyze Powerball consecutive trends for {year}: {year_stat['percentage']}% frequency."
+        prompt = (
+            f"Analyze Powerball consecutive number trends for {year}. "
+            f"The frequency of consecutive numbers was {year_stat['percentage']}%. "
+            f"Explain what this means for players in simple terms."
+        )
 
-        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        # ✅ FIXED: v1beta endpoint
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/"
+            f"models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        )
+
         payload = {
-          "contents": [{
-            "parts": [{
-               "text": prompt
-             }]
-         }]
-      }
-        
-        response = requests.post(url, json=payload)
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt}
+                    ]
+                }
+            ]
+        }
+
+        response = requests.post(url, json=payload, timeout=15)
         result = response.json()
 
-        # --- FIX: CHECK IF 'candidates' EXISTS BEFORE ACCESSING ---
-        if 'candidates' in result and len(result['candidates']) > 0:
-            ai_text = result['candidates'][0]['content']['parts'][0]['text']
-            return jsonify({"summary": ai_text})
-        else:
-            # Log the full error to your Render logs for debugging
-            print(f"Gemini API Error: {result}")
-            error_msg = result.get('error', {}).get('message', 'AI service currently unavailable.')
+        # 3. Safe response handling
+        if response.status_code != 200:
+            print("Gemini API error:", result)
+            error_msg = result.get("error", {}).get("message", "Gemini API error")
             return jsonify({"error": error_msg}), 500
 
+        candidates = result.get("candidates", [])
+        if not candidates:
+            print("Empty Gemini response:", result)
+            return jsonify({"error": "AI returned no response"}), 500
+
+        ai_text = (
+            candidates[0]
+            .get("content", {})
+            .get("parts", [{}])[0]
+            .get("text", "")
+        )
+
+        return jsonify({"summary": ai_text})
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print("Server exception:", str(e))
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/analyze_manual_pick', methods=['POST'])
 def analyze_manual_pick_route():
