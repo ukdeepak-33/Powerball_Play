@@ -4211,9 +4211,13 @@ def my_jackpot_pick_route():
 @app.route('/api/analyze-consecutive-trends', methods=['POST'])
 def analyze_consecutive_trends_ai():
     try:
+        # 1. Check if Dataframe exists and is not empty
+        if df is None or df.empty:
+            return jsonify({"error": "Lottery data is still loading. Please refresh in a moment."}), 503
+
         if not GEMINI_API_KEY:
             return jsonify({"error": "Gemini API Key is missing in Render environment variables."}), 500
-
+            
         data = request.get_json()
         year = data.get('year')
         
