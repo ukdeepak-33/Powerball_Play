@@ -8,7 +8,7 @@
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {# Flash messages display #}
     {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages % shark %}
+        {% if messages %}
             <div class="flash-messages space-y-3">
                 {% for category, message in messages %}
                     <div class="p-4 rounded-lg shadow-md text-sm {% if category == 'error' %}bg-red-100 text-red-700 border border-red-200{% else %}bg-blue-100 text-blue-700 border border-blue-200{% endif %} animate-fade-in">
