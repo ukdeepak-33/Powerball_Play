@@ -4218,7 +4218,7 @@ def analyze_consecutive_trends_ai():
 
         if not GEMINI_API_KEY:
             return jsonify({
-                "error": "Gemini API Key is missing in environment variables."
+                error": "Gemini API Key is missing in Render environment variables."
             }), 500
 
         data = request.get_json(force=True)
@@ -4247,7 +4247,7 @@ def analyze_consecutive_trends_ai():
         # ✅ FIXED: v1beta endpoint
         url = (
             "https://generativelanguage.googleapis.com/v1beta/"
-            f"models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+            f"models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
         )
 
         payload = {
