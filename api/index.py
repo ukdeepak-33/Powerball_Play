@@ -4212,14 +4212,10 @@ def analyze_consecutive_trends_ai():
     try:
         # 1. Check dataframe
         if df is None or df.empty:
-            return jsonify({
-                "error": "Lottery data is still loading. Please refresh in a moment."
-            }), 503
+            return jsonify({ "error": "Lottery data is still loading. Please refresh in a moment."}), 503
 
         if not GEMINI_API_KEY:
-            return jsonify({
-                error": "Gemini API Key is missing in Render environment variables."
-            }), 500
+            return jsonify({"error": "Gemini API Key is missing in Render environment variables."}), 500
 
         data = request.get_json(force=True)
         year = data.get('year')
