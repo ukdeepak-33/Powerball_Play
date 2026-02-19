@@ -211,6 +211,34 @@ def load_historical_data_from_supabase():
         print(f"An unexpected error occurred in load_historical_data_from_supabase: {e}")
         return pd.DataFrame()
 
+def call_groq(prompt):
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        return None, "Groq API Key is missing in environment variables."
+
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "llama-3.1-8b-instant",  # Best for Free Tier
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 512,
+        "temperature": 0.7
+    }
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=15)
+        result = response.json()
+        
+        if response.status_code != 200:
+            return None, result.get("error", {}).get("message", "Groq error")
+            
+        return result["choices"][0]["message"]["content"], None
+    except Exception as e:
+        return None, str(e)
+
 def get_last_draw(df_source):
     """Retrieves the most recent draw from the DataFrame."""
     if df_source.empty:
@@ -4210,78 +4238,28 @@ def my_jackpot_pick_route():
 @app.route('/api/analyze-consecutive-trends', methods=['POST'])
 def analyze_consecutive_trends_ai():
     try:
-        # 1. Check dataframe
-        if df is None or df.empty:
-            return jsonify({ "error": "Lottery data is still loading. Please refresh in a moment."}), 503
-
-        if not GEMINI_API_KEY:
-            return jsonify({"error": "Gemini API Key is missing in Render environment variables."}), 500
-
-        data = request.get_json(force=True)
+        data = request.get_json()
         year = data.get('year')
-
-        if not year:
-            return jsonify({"error": "Year is required"}), 400
-
-        # 2. Get stats
+        
+        # Get your lottery stats
         stats = get_consecutive_numbers_yearly_trends(df)
-        year_stat = next(
-            (item for item in stats['yearly_data']
-             if str(item['year']) == str(year)),
-            None
-        )
-
+        year_stat = next((item for item in stats['yearly_data'] if str(item['year']) == str(year)), None)
+        
         if not year_stat:
             return jsonify({"error": f"No data found for {year}"}), 404
 
-        prompt = (
-            f"Analyze Powerball consecutive number trends for {year}. "
-            f"The frequency of consecutive numbers was {year_stat['percentage']}%. "
-            f"Explain what this means for players in simple terms."
-        )
+        prompt = f"Analyze Powerball trends for {year}: {year_stat['percentage']}% have consecutive numbers. Is this normal? 3 sentences."
 
-        # ✅ FIXED: v1beta endpoint
-        url = (
-            "https://generativelanguage.googleapis.com/v1beta/"
-            f"models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-        )
-
-        payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {"text": prompt}
-                    ]
-                }
-            ]
-        }
-
-        response = requests.post(url, json=payload, timeout=15)
-        result = response.json()
-
-        # 3. Safe response handling
-        if response.status_code != 200:
-            print("Gemini API error:", result)
-            error_msg = result.get("error", {}).get("message", "Gemini API error")
-            return jsonify({"error": error_msg}), 500
-
-        candidates = result.get("candidates", [])
-        if not candidates:
-            print("Empty Gemini response:", result)
-            return jsonify({"error": "AI returned no response"}), 500
-
-        ai_text = (
-            candidates[0]
-            .get("content", {})
-            .get("parts", [{}])[0]
-            .get("text", "")
-        )
-
-        return jsonify({"summary": ai_text})
+        # CALL THE HELPER
+        analysis, error = call_groq(prompt)
+        
+        if error:
+            return jsonify({"error": error}), 500
+            
+        return jsonify({"summary": analysis})
 
     except Exception as e:
-        print("Server exception:", str(e))
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/analyze_manual_pick', methods=['POST'])
 def analyze_manual_pick_route():
