@@ -22,16 +22,6 @@ SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_ACTUAL_SUPAB
 SUPABASE_TABLE_NAME = 'powerball_draws'
 GENERATED_NUMBERS_TABLE_NAME = 'generated_powerball_numbers'
 
-prompt = (
-    f"You are a lottery data analyst. I am giving you pre-calculated statistics — do NOT use your own knowledge or make up numbers.\n\n"
-    f"DATA FOR {year}:\n"
-    f"- Consecutive number frequency: {year_stat['percentage']}%\n"
-    f"- Total draws analyzed: {year_stat.get('total_draws', 'N/A')}\n"
-    f"- Draws with consecutives: {year_stat.get('draws_with_consecutive', 'N/A')}\n\n"
-    f"TASK: Based ONLY on the data above, explain in 3-4 simple sentences what a {year_stat['percentage']}% consecutive number frequency means for Powerball players in {year}. "
-    f"Do not mention your knowledge cutoff. Do not add information beyond what is provided."
-)
-
 # --- Flask App Initialization with Template Path ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_DIR = os.path.join(BASE_DIR, '..', 'templates')
@@ -4272,6 +4262,18 @@ def analyze_consecutive_trends_ai():
             return jsonify({"error": f"No data found for {year}"}), 404
 
         prompt = f"Analyze Powerball trends for {year}: {year_stat['percentage']}% have consecutive numbers. Is this normal? 3 sentences."
+
+        prompt = (
+    f"You are a lottery data analyst. I am giving you pre-calculated statistics — do NOT use your own knowledge or make up numbers.\n\n"
+    f"DATA FOR {year}:\n"
+    f"- Consecutive number frequency: {year_stat['percentage']}%\n"
+    f"- Total draws analyzed: {year_stat.get('total_draws', 'N/A')}\n"
+    f"- Draws with consecutives: {year_stat.get('draws_with_consecutive', 'N/A')}\n\n"
+    f"TASK: Based ONLY on the data above, explain in 3-4 simple sentences what a {year_stat['percentage']}% consecutive number frequency means for Powerball players in {year}. "
+    f"Do not mention your knowledge cutoff. Do not add information beyond what is provided."
+)
+
+        ai_text, error = call_groq(prompt)
 
         # CALL THE HELPER
         analysis, error = call_groq(prompt)
