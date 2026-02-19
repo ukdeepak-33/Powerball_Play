@@ -22,6 +22,16 @@ SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_ACTUAL_SUPAB
 SUPABASE_TABLE_NAME = 'powerball_draws'
 GENERATED_NUMBERS_TABLE_NAME = 'generated_powerball_numbers'
 
+prompt = (
+    f"You are a lottery data analyst. I am giving you pre-calculated statistics — do NOT use your own knowledge or make up numbers.\n\n"
+    f"DATA FOR {year}:\n"
+    f"- Consecutive number frequency: {year_stat['percentage']}%\n"
+    f"- Total draws analyzed: {year_stat.get('total_draws', 'N/A')}\n"
+    f"- Draws with consecutives: {year_stat.get('draws_with_consecutive', 'N/A')}\n\n"
+    f"TASK: Based ONLY on the data above, explain in 3-4 simple sentences what a {year_stat['percentage']}% consecutive number frequency means for Powerball players in {year}. "
+    f"Do not mention your knowledge cutoff. Do not add information beyond what is provided."
+)
+
 # --- Flask App Initialization with Template Path ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_DIR = os.path.join(BASE_DIR, '..', 'templates')
@@ -215,17 +225,30 @@ def call_groq(prompt):
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
         return None, "Groq API Key is missing in environment variables."
-
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "llama-3.1-8b-instant",  # Best for Free Tier
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 512,
-        "temperature": 0.7
+        "model": "llama-3.1-8b-instant",
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a data analyst that interprets lottery statistics. "
+                    "Always base your response strictly on the data provided by the user. "
+                    "Never mention knowledge cutoffs, never add outside information, "
+                    "never guess or hallucinate statistics."
+                )
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "max_tokens": 300,
+        "temperature": 0.3
     }
     
     try:
