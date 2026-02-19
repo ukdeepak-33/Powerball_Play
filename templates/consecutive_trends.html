@@ -8,10 +8,10 @@
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {# Flash messages display #}
     {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
+        {% if messages % shark %}
             <div class="flash-messages space-y-3">
                 {% for category, message in messages %}
-                    <div class="p-4 rounded-lg shadow-md text-sm {% if category == 'error' %}bg-red-100 text-red-700 border border-red-200{% elif category == 'info' %}bg-blue-100 text-blue-700 border border-blue-200{% else %}bg-green-100 text-green-700 border border-blue-200{% endif %} animate-fade-in">
+                    <div class="p-4 rounded-lg shadow-md text-sm {% if category == 'error' %}bg-red-100 text-red-700 border border-red-200{% else %}bg-blue-100 text-blue-700 border border-blue-200{% endif %} animate-fade-in">
                         <p class="font-medium">{{ message }}</p>
                     </div>
                 {% endfor %}
@@ -19,413 +19,173 @@
         {% endif %}
     {% endwith %}
 
-    {# Recent Consecutive Trends Card - NOW COLLAPSIBLE #}
-    <details class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200" open> {# 'open' makes it expanded by default #}
-        <summary class="text-2xl font-bold mb-4 text-gray-800 cursor-pointer flex justify-between items-center">
-            Recent Consecutive Trends (Last 12 Months)
-            <svg class="w-6 h-6 transform transition-transform duration-200 details-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-            </svg>
-        </summary>
-        <div class="overflow-x-auto mt-4"> {# Added mt-4 for spacing after summary #}
-            <table class="min-w-full bg-white rounded-lg shadow overflow-hidden">
-                <thead class="bg-blue-100 text-blue-800">
-                    <tr>
-                        <th class="py-3 px-4 text-left text-sm font-semibold">Draw Date</th>
-                        <th class="py-3 px-4 text-left text-sm font-semibold">Consecutive Numbers Present?</th>
-                        <th class="py-3 px-4 text-left text-sm font-semibold">Sequences</th>
-                    </tr>
-                </thead>
-                <tbody id="trends-table-body" class="divide-y divide-gray-200">
-                    {# Initial data for the last 12 months #}
-                    {% if consecutive_trends %}
-                        {% for trend in consecutive_trends %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="py-3 px-4 text-sm text-gray-700">{{ trend.draw_date }}</td>
-                            <td class="py-3 px-4 text-sm text-gray-700">
-                                <span class="px-2 py-1 rounded-full text-xs font-semibold 
-                                    {% if trend.consecutive_present == 'Yes' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
-                                    {{ trend.consecutive_present }}
-                                </span>
-                            </td>
-                            <td class="py-3 px-4 text-sm text-gray-700">
-                                {% if trend.consecutive_sequences %}
-                                    {% for sequence in trend.consecutive_sequences %}
-                                        <span class="inline-flex items-center justify-center rounded-full bg-blue-500 text-white text-sm font-bold px-2 py-1 mr-2">
-                                            {{ sequence | join(', ') }}
-                                        </span>
-                                    {% endfor %}
-                                {% else %}
-                                    N/A
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="3" class="py-3 px-4 text-sm text-gray-600 text-center">No recent consecutive trends data available.</td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
+    {# AI ANALYSIS SECTION #}
+    <div class="card p-6 bg-blue-50 border border-blue-200 rounded-xl shadow-sm mb-8">
+        <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h3 class="text-xl font-bold text-blue-900 flex items-center gap-2">
+                    ✨ AI Trend Analyst <span id="target-year-label" class="text-blue-600"></span>
+                </h3>
+                <p id="ai-status" class="text-sm text-blue-700 italic">Click a bar in the chart below to select a year for analysis.</p>
+            </div>
+            <button id="run-ai-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-all shadow-md">
+                Run AI Analysis
+            </button>
         </div>
-    </details>
+        <div id="ai-response-box" class="mt-4 text-gray-800 leading-relaxed hidden bg-white p-4 rounded-lg border border-blue-100 shadow-inner">
+            </div>
+    </div>
 
-    {# Yearly Consecutive Trends Chart Card #}
+    {# CHART SECTION #}
     <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
         <h2 class="text-2xl font-bold mb-4 text-gray-800">Consecutive Numbers Trends Over Years</h2>
-        <p class="text-gray-600 mb-4">This chart shows the percentage of draws each year that contained at least one consecutive sequence of white balls. Click on a bar to see the trends for that year.</p>
-        
-        <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-4 sm:space-y-0">
-            <div class="flex-1">
-                <label for="yearSelect" class="block text-gray-700 text-sm font-bold mb-2">Filter by Year(s):</label>
-                <select id="yearSelect" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300" multiple>
-                    {# Populate with years from backend, default to all selected #}
-                    {% for year in years_for_dropdown %}
-                        <option value="{{ year }}" selected>{{ year }}</option>
-                    {% endfor %}
-                </select>
-                <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple years.</p>
-            </div>
-            <div class="flex-1">
-                <label for="sortOrderSelect" class="block text-gray-700 text-sm font-bold mb-2">Sort Sequences By:</label>
-                <select id="sortOrderSelect" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300">
-                    <option value="count_desc">Most Frequent First</option>
-                    <option value="count_asc">Least Frequent First</option>
-                    <option value="sequence_asc">Sequence Numbers Ascending</option>
-                </select>
-            </div>
+        <p class="text-sm text-gray-500 mb-4 font-medium italic">Tip: Click a specific year's bar to see its detailed draw history in the table below.</p>
+        <div class="h-80">
+            <canvas id="consecutiveTrendsChart"></canvas>
         </div>
-
-        <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-    <div class="flex justify-between items-center mb-2">
-        <h3 class="font-bold text-blue-800">✨ AI Trend Insights</h3>
-        <button id="ai-analyze-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-all shadow-sm">
-            Run AI Analysis
-        </button>
     </div>
-    <div id="ai-summary-text" class="text-gray-700 italic text-sm">
-        Click the button to generate a transformer-powered analysis of this year's trends.
+
+    {# DYNAMIC DATA TABLE SECTION #}
+    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+        <h3 id="table-title" class="text-2xl font-bold mb-4 text-gray-800">Yearly Draw History</h3>
+        <div class="overflow-x-auto">
+            <table class="min-w-full bg-white">
+                <thead class="bg-gray-50 text-gray-700 border-b border-gray-200">
+                    <tr>
+                        <th class="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider">Draw Date</th>
+                        <th class="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider">Consecutive?</th>
+                        <th class="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider">Pairs Found</th>
+                    </tr>
+                </thead>
+                <tbody id="recent-trends-body" class="divide-y divide-gray-100">
+                    </tbody>
+            </table>
+        </div>
     </div>
 </div>
-        
-        <div class="relative h-96 mb-8">
-            <canvas id="yearlyConsecutiveChart"></canvas>
-        </div>
 
-        {# Section for displaying specific consecutive sequences with dates #}
-        <div id="yearlyConsecutivePairsSection">
-            <h3 class="text-xl font-bold mb-4 text-gray-800">Consecutive Sequences in Selected Year(s) (with Dates)</h3>
-            <div id="consecutivePairsDisplay" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <p class="text-gray-600 col-span-full">Select one or more years above to see the most frequent consecutive sequences.</p>
-            </div>
-        </div>
-
-    </div>
-
-</div>
-
-<style>
-    /* Basic styling for the details arrow */
-    details > summary::-webkit-details-marker {
-        display: none; /* Hide default marker */
-    }
-    details > summary {
-        list-style: none; /* Remove default list style */
-    }
-    details[open] .details-arrow {
-        transform: rotate(180deg); /* Rotate arrow when open */
-    }
-</style>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const allYearsData = {{ yearly_consecutive_percentage_data | tojson }};
-        const allConsecutivePairsFlat = {{ all_consecutive_pairs_flat | tojson }};
+        // Data injected from Flask
+        const allDraws = {{ all_draws_json | safe }};
+        const yearlyData = {{ yearly_consecutive_percentage_data | safe }};
+        const ctx = document.getElementById('consecutiveTrendsChart').getContext('2d');
+        
+        let selectedYear = new Date().getFullYear().toString();
+        let chart;
 
-        const yearSelect = document.getElementById('yearSelect');
-        const sortOrderSelect = document.getElementById('sortOrderSelect');
-        const yearlyConsecutiveChartCtx = document.getElementById('yearlyConsecutiveChart').getContext('2d');
-        const consecutivePairsDisplay = document.getElementById('consecutivePairsDisplay');
-        let yearlyChart;
-
-        function renderConsecutivePairs() {
-            const selectedYears = Array.from(yearSelect.selectedOptions).map(option => parseInt(option.value));
-            const sortOrder = sortOrderSelect.value;
-
-            let filteredAndSortedPairs = [];
-
-            if (selectedYears.length > 0) {
-                allConsecutivePairsFlat.forEach(item => {
-                    const datesInSelectedYears = item.dates.filter(date => {
-                        const year = new Date(date).getFullYear();
-                        return selectedYears.includes(year);
-                    });
-
-                    if (datesInSelectedYears.length > 0) {
-                        filteredAndSortedPairs.push({
-                            sequence: item.sequence,
-                            count: datesInSelectedYears.length,
-                            dates: datesInSelectedYears
-                        });
-                    }
-                });
-            } else {
-                filteredAndSortedPairs = JSON.parse(JSON.stringify(allConsecutivePairsFlat));
+        // Function to update the table display
+        function updateTable(year) {
+            const tbody = document.getElementById('recent-trends-body');
+            const tableTitle = document.getElementById('table-title');
+            const label = document.getElementById('target-year-label');
+            
+            const filtered = allDraws.filter(d => d.year.toString() === year);
+            
+            label.innerText = `(${year})`;
+            tableTitle.innerText = `Detailed Draws for ${year}`;
+            tbody.innerHTML = '';
+            
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="p-8 text-center text-gray-400">No data found for this year.</td></tr>';
+                return;
             }
 
-            if (sortOrder === 'count_desc') {
-                filteredAndSortedPairs.sort((a, b) => b.count - a.count || (a.sequence && b.sequence ? a.sequence[0] - b.sequence[0] : 0));
-            } else if (sortOrder === 'count_asc') {
-                filteredAndSortedPairs.sort((a, b) => a.count - b.count || (a.sequence && b.sequence ? a.sequence[0] - b.sequence[0] : 0));
-            } else if (sortOrder === 'sequence_asc') {
-                filteredAndSortedPairs.sort((a, b) => {
-                    if (!a.sequence || !b.sequence) return 0;
-                    return a.sequence[0] - b.sequence[0];
-                });
-            }
-
-            consecutivePairsDisplay.innerHTML = '';
-
-            if (filteredAndSortedPairs.length > 0) {
-                filteredAndSortedPairs.forEach(item => {
-                    const pairElement = document.createElement('div');
-                    pairElement.className = 'bg-blue-50 p-4 rounded-lg shadow-sm flex flex-col space-y-2';
-                    
-                    const datesHtml = item.dates.map(date => `<span class="inline-block bg-blue-200 text-blue-800 text-xs px-2 py-1 rounded-full">${date}</span>`).join(' ');
-
-                    pairElement.innerHTML = `
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2">
-                                <span class="inline-flex items-center justify-center rounded-full bg-blue-600 text-white text-sm font-bold px-2 py-1">
-                                    ${item.sequence.join(', ')}
-                                </span>
-                            </div>
-                            <span class="text-gray-800 font-semibold">Appeared: ${item.count} times</span>
-                        </div>
-                        <details class="text-sm text-gray-700">
-                            <summary class="cursor-pointer font-medium text-blue-700 hover:text-blue-900">Show Dates (${item.dates.length})</summary>
-                            <div class="mt-2 flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1 bg-gray-100 rounded-md">
-                                ${datesHtml}
-                            </div>
-                        </details>
-                    `;
-                    consecutivePairsDisplay.appendChild(pairElement);
-                });
-            } else {
-                consecutivePairsDisplay.innerHTML = '<p class="text-gray-600 col-span-full">No consecutive sequences found for the selected year(s).</p>';
-            }
+            filtered.forEach(draw => {
+                const row = `
+                    <tr class="hover:bg-blue-50 transition-colors">
+                        <td class="py-3 px-4 text-sm font-medium text-gray-700">${draw.date}</td>
+                        <td class="py-3 px-4">
+                            <span class="px-2 py-1 rounded text-xs font-bold ${draw.has_consec === 'Yes' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">
+                                ${draw.has_consec}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 text-sm font-mono text-blue-600">${draw.sequences}</td>
+                    </tr>`;
+                tbody.innerHTML += row;
+            });
         }
 
-        function renderChart() {
-            const selectedYears = Array.from(yearSelect.selectedOptions).map(option => parseInt(option.value));
-            const filteredData = allYearsData.filter(item => selectedYears.includes(item.year));
+        // AI Button Handler
+        document.getElementById('run-ai-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('run-ai-btn');
+            const box = document.getElementById('ai-response-box');
+            const status = document.getElementById('ai-status');
 
-            const labels = filteredData.map(item => item.year.toString());
-            const percentages = filteredData.map(item => item.percentage);
-            const totalDraws = filteredData.map(item => item.total_draws);
-            const consecutiveDraws = filteredData.map(item => item.consecutive_draws);
-
-            if (yearlyChart) {
-                yearlyChart.destroy();
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            status.innerText = "Consulting Gemini AI for " + selectedYear + " trends...";
+            box.classList.add('hidden');
+            
+            try {
+                const res = await fetch('/api/analyze-consecutive-trends', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ year: selectedYear })
+                });
+                const data = await res.json();
+                
+                if (data.summary) {
+                    box.innerText = data.summary;
+                    box.classList.remove('hidden');
+                    status.innerText = "Analysis complete.";
+                } else {
+                    status.innerText = "Error: " + data.error;
+                }
+            } catch (e) {
+                status.innerText = "Error connecting to server.";
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
             }
+        });
 
-            yearlyChart = new Chart(yearlyConsecutiveChartCtx, {
+        // Chart Initialization
+        function renderChart() {
+            chart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: labels,
+                    labels: yearlyData.map(d => d.year),
                     datasets: [{
-                        label: '% of Draws with Consecutive Numbers',
-                        data: percentages,
-                        backgroundColor: 'rgba(59, 130, 246, 0.8)',
-                        borderColor: 'rgba(37, 99, 235, 1)',
+                        label: 'Consecutive Pair %',
+                        data: yearlyData.map(d => d.percentage),
+                        backgroundColor: 'rgba(37, 99, 235, 0.6)',
+                        hoverBackgroundColor: 'rgba(37, 99, 235, 0.9)',
+                        borderColor: '#1e40af',
                         borderWidth: 1,
-                        borderRadius: 8,
+                        borderRadius: 4
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: 'Yearly Consecutive Number Trends',
-                            font: {
-                                size: 18,
-                                weight: 'bold'
-                            },
-                            color: '#374151'
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const index = context.dataIndex;
-                                    const year = labels[index];
-                                    const percentage = percentages[index];
-                                    const total = totalDraws[index];
-                                    const consecutive = consecutiveDraws[index];
-                                    return `Year: ${year}\nPercentage: ${percentage}%\nTotal Draws: ${total}\nConsecutive Draws: ${consecutive}`;
-                                }
-                            }
+                    onClick: (evt, elements) => {
+                        if (elements.length > 0) {
+                            const idx = elements[0].index;
+                            selectedYear = chart.data.labels[idx].toString();
+                            updateTable(selectedYear);
+                            // Clear previous AI text when switching years
+                            document.getElementById('ai-response-box').classList.add('hidden');
+                            document.getElementById('ai-status').innerText = "Year " + selectedYear + " selected. Click 'Run AI Analysis' for new insights.";
                         }
                     },
                     scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Year',
-                                font: {
-                                    size: 14,
-                                    weight: 'bold'
-                                },
-                                color: '#4b5563'
-                            },
-                            grid: {
-                                display: false
-                            }
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: 'Percentage (%)',
-                                font: {
-                                    size: 14,
-                                    weight: 'bold'
-                                },
-                                color: '#4b5563'
-                            },
-                            beginAtZero: true,
+                        y: { 
+                            beginAtZero: true, 
                             max: 100,
-                            ticks: {
-                                callback: function(value) {
-                                    return value + '%';
-                                }
-                            }
+                            title: { display: true, text: 'Percentage (%)' }
                         }
                     },
-                    onClick: (event, elements) => {
-                        if (elements.length > 0) {
-                            const clickedElementIndex = elements[0].index;
-                            const year = yearlyChart.data.labels[clickedElementIndex];
-                            fetchTrendsForYear(year);
-                        }
+                    plugins: {
+                        legend: { display: false }
                     }
                 }
             });
         }
 
-        document.getElementById('ai-analyze-btn').addEventListener('click', async function() {
-    const btn = this;
-    const summaryBox = document.getElementById('ai-summary-text');
-    
-    btn.disabled = true;
-    btn.innerText = "Analyzing...";
-    summaryBox.innerText = "Processing trends with Gemini...";
-
-    try {
-        const response = await fetch('/api/analyze-consecutive-trends', { method: 'POST' });
-        const data = await response.json();
-        
-        if (data.summary) {
-            summaryBox.innerText = data.summary;
-            summaryBox.classList.remove('italic');
-        } else {
-            summaryBox.innerText = "Error: " + (data.error || "Could not generate analysis.");
-        }
-    } catch (err) {
-        summaryBox.innerText = "Failed to connect to the AI service.";
-    } finally {
-        btn.disabled = false;
-        btn.innerText = "Run AI Analysis";
-    }
-});
-    
-        function fetchTrendsForYear(year) {
-            // Update the heading to reflect the selected year
-            document.querySelector('details > summary').innerHTML = `Consecutive Trends for ${year} <svg class="w-6 h-6 transform transition-transform duration-200 details-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>`;
-            document.querySelector('details').setAttribute('open', ''); // Ensure it's open when a year is selected
-
-            fetch(`/api/consecutive_trends_by_year/${year}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    updateTrendsTable(data);
-                })
-                .catch(error => console.error('Error fetching data for year:', error));
-        }
-
-        function updateTrendsTable(trends) {
-            const tableBody = document.getElementById('trends-table-body');
-            tableBody.innerHTML = '';
-
-            if (trends && trends.length > 0) {
-                trends.forEach(trend => {
-                    const row = tableBody.insertRow();
-                    row.className = 'hover:bg-gray-50';
-
-                    const dateCell = row.insertCell(0);
-                    dateCell.className = 'py-3 px-4 text-sm text-gray-700';
-                    dateCell.innerText = trend.draw_date;
-
-                    const presentCell = row.insertCell(1);
-                    presentCell.className = 'py-3 px-4 text-sm text-gray-700';
-                    const presentSpan = document.createElement('span');
-                    presentSpan.className = `px-2 py-1 rounded-full text-xs font-semibold ${trend.consecutive_present === 'Yes' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
-                    presentSpan.innerText = trend.consecutive_present;
-                    presentCell.appendChild(presentSpan);
-
-                    const sequencesCell = row.insertCell(2);
-                    sequencesCell.className = 'py-3 px-4 text-sm text-gray-700';
-                    if (trend.consecutive_sequences && trend.consecutive_sequences.length > 0) {
-                        trend.consecutive_sequences.forEach(sequence => {
-                            const span = document.createElement('span');
-                            span.className = 'inline-flex items-center justify-center rounded-full bg-blue-500 text-white text-sm font-bold px-2 py-1 mr-2';
-                            span.innerText = sequence.join(', ');
-                            sequencesCell.appendChild(span);
-                        });
-                    } else {
-                        sequencesCell.innerText = 'N/A';
-                    }
-                });
-            } else {
-                const row = tableBody.insertRow();
-                const cell = row.insertCell(0);
-                cell.colSpan = 3;
-                cell.innerText = `No consecutive trends found for the selected year.`;
-                cell.classList.add('py-3', 'px-4', 'text-sm', 'text-gray-600', 'text-center');
-            }
-        }
-
-        Array.from(yearSelect.options).forEach(option => option.selected = true);
         renderChart();
-        renderConsecutivePairs();
-
-        // Event listener for year selection change (dropdown)
-        yearSelect.addEventListener('change', () => {
-            renderChart();
-            renderConsecutivePairs();
-        });
-        
-        // Event listener for sort order change (dropdown)
-        sortOrderSelect.addEventListener('change', () => {
-            renderConsecutivePairs();
-        });
-    
-        // Add event listener to the details element to update the arrow
-        const detailsElement = document.querySelector('details');
-        detailsElement.addEventListener('toggle', () => {
-            const arrow = detailsElement.querySelector('.details-arrow');
-            if (detailsElement.open) {
-                arrow.classList.add('rotate-180');
-            } else {
-                arrow.classList.remove('rotate-180');
-            }
-        });
+        updateTable(selectedYear);
     });
 </script>
 {% endblock %}
