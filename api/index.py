@@ -21,6 +21,7 @@ SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "YOUR_ACTUAL_SUPAB
 
 SUPABASE_TABLE_NAME = 'powerball_draws'
 GENERATED_NUMBERS_TABLE_NAME = 'generated_powerball_numbers'
+POWERBALL_RESULTS_TABLE = 'powerball_results'
 
 # --- Flask App Initialization with Template Path ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1908,6 +1909,73 @@ def check_generated_against_history(generated_white_balls, generated_powerball, 
         results["summary"][category]["draws"].sort(key=lambda x: x['date'], reverse=True)
 
     return results
+
+# --- Helper: Fetch all official draws from powerball_results ---
+def get_all_official_draws():
+    """Fetches all draws from powerball_results table."""
+    all_data = []
+    offset = 0
+    limit = 1000
+
+    try:
+        url = f"{SUPABASE_PROJECT_URL}/rest/v1/{POWERBALL_RESULTS_TABLE}"
+        headers = _get_supabase_headers(is_service_key=False)
+
+        while True:
+            params = {
+                'select': 'draw_date,number_1,number_2,number_3,number_4,number_5,powerball',
+                'order': 'draw_date.desc',
+                'offset': offset,
+                'limit': limit
+            }
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            chunk = response.json()
+            if not chunk:
+                break
+            all_data.extend(chunk)
+            offset += limit
+
+        return all_data
+
+    except Exception as e:
+        print(f"Error fetching official draws: {e}")
+        return []
+
+
+# --- Helper: Check a single pick against all official draws ---
+def check_pick_against_draws(white_balls, powerball, official_draws, min_matches=2):
+    """
+    Compares a pick against all official draws.
+    Returns list of draws where white ball matches >= min_matches.
+    """
+    results = []
+    white_balls_set = set(white_balls)
+
+    for draw in official_draws:
+        draw_whites = {
+            int(draw['number_1']), int(draw['number_2']), int(draw['number_3']),
+            int(draw['number_4']), int(draw['number_5'])
+        }
+        draw_pb = int(draw['powerball'])
+
+        white_matches = len(white_balls_set & draw_whites)
+        pb_match = (powerball == draw_pb)
+
+        if white_matches >= min_matches:
+            results.append({
+                'draw_date': draw['draw_date'],
+                'official_numbers': sorted(list(draw_whites)),
+                'official_powerball': draw_pb,
+                'white_matches': white_matches,
+                'powerball_match': pb_match,
+                'total_matches': white_matches + (1 if pb_match else 0)
+            })
+
+    # Sort by most matches first, then by date
+    results.sort(key=lambda x: (-x['white_matches'], -int(x['powerball_match']), x['draw_date']))
+    return results
+
 
 def get_grouped_patterns_over_years(df_source):
     """Analyzes grouped patterns (pairs and triplets) within defined ranges across years."""
@@ -4570,7 +4638,118 @@ def api_delete_generated_picks():
         traceback.print_exc()
         return jsonify({'success': False, 'error': f"An unexpected error occurred: {str(e)}"}), 500
 
+@app.route('/check-my-numbers')
+def check_my_numbers_route():
+    return render_template('check_my_numbers.html')
 
+# API: Manual number check
+@app.route('/api/check-numbers', methods=['POST'])
+def api_check_numbers():
+    try:
+        data = request.get_json()
+        white_balls = data.get('white_balls', [])
+        powerball = data.get('powerball')
+
+        # Validate
+        if not white_balls or len(white_balls) != 5:
+            return jsonify({'error': 'Please provide exactly 5 white balls.'}), 400
+        if powerball is None:
+            return jsonify({'error': 'Please provide a Powerball number.'}), 400
+
+        white_balls = sorted([int(n) for n in white_balls])
+        powerball = int(powerball)
+
+        if len(set(white_balls)) != 5:
+            return jsonify({'error': 'White balls must be unique.'}), 400
+        if not all(1 <= n <= 69 for n in white_balls):
+            return jsonify({'error': 'White balls must be between 1 and 69.'}), 400
+        if not (1 <= powerball <= 39):
+            return jsonify({'error': 'Powerball must be between 1 and 39.'}), 400
+
+        official_draws = get_all_official_draws()
+        if not official_draws:
+            return jsonify({'error': 'Could not load official draw data.'}), 500
+
+        matches = check_pick_against_draws(white_balls, powerball, official_draws, min_matches=2)
+
+        return jsonify({
+            'success': True,
+            'checked_numbers': white_balls,
+            'checked_powerball': powerball,
+            'total_draws_checked': len(official_draws),
+            'matches_found': len(matches),
+            'results': matches
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================
+# API: Check all saved generated picks
+# ============================================================
+
+@app.route('/api/check-saved-picks', methods=['GET'])
+def api_check_saved_picks():
+    try:
+        # Fetch saved picks
+        url = f"{SUPABASE_PROJECT_URL}/rest/v1/{GENERATED_NUMBERS_TABLE_NAME}"
+        headers = _get_supabase_headers(is_service_key=False)
+        params = {
+            'select': 'id,generated_date,number_1,number_2,number_3,number_4,number_5,powerball',
+            'order': 'generated_date.desc'
+        }
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        saved_picks = response.json()
+
+        if not saved_picks:
+            return jsonify({'success': True, 'results': [], 'message': 'No saved picks found.'})
+
+        # Fetch all official draws once
+        official_draws = get_all_official_draws()
+        if not official_draws:
+            return jsonify({'error': 'Could not load official draw data.'}), 500
+
+        results = []
+        for pick in saved_picks:
+            white_balls = sorted([
+                int(pick['number_1']), int(pick['number_2']), int(pick['number_3']),
+                int(pick['number_4']), int(pick['number_5'])
+            ])
+            powerball = int(pick['powerball'])
+            gen_date = pick['generated_date'][:10]  # YYYY-MM-DD
+
+            matches = check_pick_against_draws(white_balls, powerball, official_draws, min_matches=2)
+
+            # Only include picks that matched at least once
+            if matches:
+                results.append({
+                    'id': pick['id'],
+                    'generated_date': gen_date,
+                    'white_balls': white_balls,
+                    'powerball': powerball,
+                    'match_count': len(matches),
+                    'best_white_matches': matches[0]['white_matches'] if matches else 0,
+                    'best_pb_match': matches[0]['powerball_match'] if matches else False,
+                    'matches': matches
+                })
+
+        # Sort by best match first
+        results.sort(key=lambda x: (-x['best_white_matches'], -int(x['best_pb_match'])))
+
+        return jsonify({
+            'success': True,
+            'total_picks_checked': len(saved_picks),
+            'picks_with_matches': len(results),
+            'total_draws_checked': len(official_draws),
+            'results': results
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/white_ball_gaps', methods=['GET'])
 def api_white_ball_gaps():
