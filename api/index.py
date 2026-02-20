@@ -2246,13 +2246,23 @@ def get_consecutive_numbers_yearly_trends(df_source):
         else:
             percentage = 0.0
 
+        # Add inside the year loop, after the consecutive_draws_count logic:
+        pair_counts = defaultdict(int)
+        for _, row in yearly_df.iterrows():
+            white_balls = sorted([int(row[f'Number {i}']) for i in range(1, 6) if pd.notna(row[f'Number {i}'])])
+            for i in range(len(white_balls) - 1):
+                if white_balls[i+1] - white_balls[i] == 1:
+                    pair_key = f"{white_balls[i]}-{white_balls[i+1]}"
+                    pair_counts[pair_key] += 1
+
         yearly_trends.append({
             'year': int(year),
             'percentage': percentage,
             'total_draws': total_draws_in_year,
-            'consecutive_draws': consecutive_draws_count
+            'consecutive_draws': consecutive_draws_count,
+            'pair_counts': dict(pair_counts)   # ← add this
         })
-
+        
     flat_consecutive_sequences_list = []
     for sequence_tuple, data in all_consecutive_sequences_aggregated.items():
         flat_consecutive_sequences_list.append({
@@ -4253,38 +4263,104 @@ def analyze_consecutive_trends_ai():
     try:
         data = request.get_json()
         year = data.get('year')
-        
-        # Get your lottery stats
+
         stats = get_consecutive_numbers_yearly_trends(df)
         year_stat = next((item for item in stats['yearly_data'] if str(item['year']) == str(year)), None)
-        
+
         if not year_stat:
             return jsonify({"error": f"No data found for {year}"}), 404
 
-        prompt = f"Analyze Powerball trends for {year}: {year_stat['percentage']}% have consecutive numbers. Is this normal? 3 sentences."
-
         prompt = (
-    f"You are a lottery data analyst. I am giving you pre-calculated statistics — do NOT use your own knowledge or make up numbers.\n\n"
-    f"DATA FOR {year}:\n"
-    f"- Consecutive number frequency: {year_stat['percentage']}%\n"
-    f"- Total draws analyzed: {year_stat.get('total_draws', 'N/A')}\n"
-    f"- Draws with consecutives: {year_stat.get('draws_with_consecutive', 'N/A')}\n\n"
-    f"TASK: Based ONLY on the data above, explain in 3-4 simple sentences what a {year_stat['percentage']}% consecutive number frequency means for Powerball players in {year}. "
-    f"Do not mention your knowledge cutoff. Do not add information beyond what is provided."
-)
+            f"You are a lottery data analyst. I am giving you pre-calculated statistics — do NOT use your own knowledge or make up numbers.\n\n"
+            f"DATA FOR {year}:\n"
+            f"- Consecutive number frequency: {year_stat['percentage']}%\n"
+            f"- Total draws analyzed: {year_stat.get('total_draws', 'N/A')}\n"
+            f"- Draws with consecutives: {year_stat.get('consecutive_draws', 'N/A')}\n\n"  # ← fixed key
+            f"TASK: Based ONLY on the data above, explain in 3-4 simple sentences what a {year_stat['percentage']}% consecutive number frequency means for Powerball players in {year}. "
+            f"Do not mention your knowledge cutoff. Do not add information beyond what is provided."
+        )
 
-        ai_text, error = call_groq(prompt)
+        ai_text, error = call_groq(prompt)  # ← only ONE call
 
-        # CALL THE HELPER
-        analysis, error = call_groq(prompt)
-        
         if error:
             return jsonify({"error": error}), 500
-            
-        return jsonify({"summary": analysis})
+
+        return jsonify({"summary": ai_text})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/analyze-consecutive-suggestions', methods=['POST'])
+def analyze_consecutive_suggestions():
+    try:
+        if df is None or df.empty:
+            return jsonify({"error": "Data still loading."}), 503
+
+        stats = get_consecutive_numbers_yearly_trends(df)
+        yearly_data = stats['yearly_data']
+        all_years = [str(item['year']) for item in yearly_data]
+
+        # Build pair → {year: count} map
+        pair_by_year = {}
+        for item in yearly_data:
+            for pair, count in item.get('pair_counts', {}).items():
+                if pair not in pair_by_year:
+                    pair_by_year[pair] = {}
+                pair_by_year[pair][str(item['year'])] = count
+
+        # Pairs in every single year
+        everyyear_pairs = {
+            pair: years for pair, years in pair_by_year.items()
+            if len(years) == len(all_years)
+        }
+
+        # Top 10 by years appeared
+        frequent_pairs = sorted(pair_by_year.items(), key=lambda x: len(x[1]), reverse=True)[:10]
+
+        # Top 10 by total count
+        top_pairs_by_count = sorted(
+            [(pair, sum(y.values()), len(y)) for pair, y in pair_by_year.items()],
+            key=lambda x: x[1], reverse=True
+        )[:10]
+
+        everyyear_summary = ", ".join(everyyear_pairs.keys()) if everyyear_pairs else "None"
+        frequent_summary = "\n".join(
+            [f"  {pair}: appeared in {len(years)} of {len(all_years)} years"
+             for pair, years in frequent_pairs]
+        )
+        top_count_summary = "\n".join(
+            [f"  {pair}: {count} total times across {years} years"
+             for pair, count, years in top_pairs_by_count]
+        )
+
+        prompt = (
+            f"You are a Powerball lottery data analyst. Use ONLY the data below — no outside knowledge.\n\n"
+            f"ANALYSIS ACROSS ALL YEARS ({', '.join(all_years)}):\n\n"
+            f"1. Consecutive pairs that appeared in EVERY single year:\n   {everyyear_summary}\n\n"
+            f"2. Top 10 pairs by number of years appeared:\n{frequent_summary}\n\n"
+            f"3. Top 10 pairs by total frequency (all years combined):\n{top_count_summary}\n\n"
+            f"TASK:\n"
+            f"- Identify the most historically consistent consecutive number pairs\n"
+            f"- Suggest 2-3 specific consecutive number combinations a player might consider\n"
+            f"- Explain WHY each suggestion is backed by the data\n"
+            f"- Add a responsible gambling reminder that past data does not guarantee future results\n"
+            f"Keep response clear and structured."
+        )
+
+        ai_text, error = call_groq(prompt)
+        if error:
+            return jsonify({"error": error}), 500
+
+        return jsonify({
+            "summary": ai_text,
+            "everyyear_pairs": everyyear_pairs,
+            "top_pairs_by_count": top_pairs_by_count,
+            "years_analyzed": all_years
+        })
+
+    except Exception as e:
+        print("Exception:", str(e))
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/analyze_manual_pick', methods=['POST'])
 def analyze_manual_pick_route():
