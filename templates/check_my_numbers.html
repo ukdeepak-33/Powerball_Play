@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check My Numbers | Powerball Analyzer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --surface: #111118;
+            --surface2: #1a1a24;
+            --border: #2a2a3a;
+            --accent: #e8c547;
+            --accent2: #e05c3a;
+            --white: #f0f0f0;
+            --muted: #6b6b80;
+            --match-2: #4a7c59;
+            --match-3: #2d7dd2;
+            --match-4: #9b5de5;
+            --match-5: #e05c3a;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--white);
+            font-family: 'DM Sans', sans-serif;
+            min-height: 100vh;
+        }
+
+        /* Background grid */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(232, 197, 71, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(232, 197, 71, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 40px 24px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header */
+        .header {
+            margin-bottom: 48px;
+        }
+
+        .header-label {
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 3px;
+            color: var(--accent);
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        .header h1 {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: clamp(48px, 8vw, 80px);
+            line-height: 0.9;
+            letter-spacing: 2px;
+            color: var(--white);
+        }
+
+        .header h1 span {
+            color: var(--accent);
+        }
+
+        .header p {
+            margin-top: 16px;
+            color: var(--muted);
+            font-size: 15px;
+            font-weight: 300;
+            max-width: 500px;
+            line-height: 1.6;
+        }
+
+        /* Mode tabs */
+        .mode-tabs {
+            display: flex;
+            gap: 2px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 4px;
+            margin-bottom: 32px;
+            width: fit-content;
+        }
+
+        .mode-tab {
+            padding: 10px 24px;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            color: var(--muted);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .mode-tab.active {
+            background: var(--accent);
+            color: #000;
+        }
+
+        .mode-tab:hover:not(.active) {
+            color: var(--white);
+        }
+
+        /* Panels */
+        .panel {
+            display: none;
+        }
+        .panel.active {
+            display: block;
+        }
+
+        /* Card */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 28px;
+            margin-bottom: 24px;
+        }
+
+        .card-title {
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 2px;
+            color: var(--accent);
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        /* Number inputs */
+        .number-input-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .number-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .number-input-group label {
+            font-size: 11px;
+            color: var(--muted);
+            font-family: 'DM Mono', monospace;
+            letter-spacing: 1px;
+        }
+
+        .number-input {
+            width: 64px;
+            height: 64px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--white);
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 28px;
+            text-align: center;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .number-input:focus {
+            border-color: var(--accent);
+        }
+
+        .number-input.powerball-input {
+            border-color: var(--accent2);
+            color: var(--accent2);
+        }
+
+        .number-input.powerball-input:focus {
+            border-color: var(--accent2);
+            box-shadow: 0 0 0 2px rgba(224, 92, 58, 0.2);
+        }
+
+        .separator {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 28px;
+            color: var(--border);
+            padding-top: 24px;
+        }
+
+        /* Button */
+        .btn {
+            padding: 14px 32px;
+            border-radius: 8px;
+            border: none;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #000;
+        }
+
+        .btn-primary:hover {
+            background: #f0d060;
+            transform: translateY(-1px);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: var(--surface2);
+            color: var(--white);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* Loading */
+        .loading {
+            display: none;
+            align-items: center;
+            gap: 12px;
+            color: var(--muted);
+            font-size: 14px;
+            margin-top: 16px;
+        }
+
+        .loading.visible {
+            display: flex;
+        }
+
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Stats bar */
+        .stats-bar {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            padding: 16px 20px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            margin-bottom: 24px;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--muted);
+            font-family: 'DM Mono', monospace;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 28px;
+            color: var(--accent);
+            line-height: 1;
+        }
+
+        /* Results */
+        .results-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .result-row {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            transition: border-color 0.2s;
+            animation: fadeIn 0.3s ease forwards;
+        }
+
+        .result-row:hover {
+            border-color: var(--accent);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .result-date {
+            font-family: 'DM Mono', monospace;
+            font-size: 12px;
+            color: var(--muted);
+            min-width: 90px;
+        }
+
+        .result-balls {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            flex: 1;
+        }
+
+        .ball {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'DM Mono', monospace;
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid var(--border);
+            background: var(--surface2);
+            color: var(--muted);
+        }
+
+        .ball.matched {
+            background: var(--accent);
+            color: #000;
+            border-color: var(--accent);
+        }
+
+        .ball.powerball-ball {
+            border-color: var(--accent2);
+            color: var(--accent2);
+        }
+
+        .ball.powerball-ball.matched {
+            background: var(--accent2);
+            color: #fff;
+            border-color: var(--accent2);
+        }
+
+        .match-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-family: 'DM Mono', monospace;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .match-2 { background: rgba(74, 124, 89, 0.2); color: #6fcf97; border: 1px solid #4a7c59; }
+        .match-3 { background: rgba(45, 125, 210, 0.2); color: #56b3ff; border: 1px solid #2d7dd2; }
+        .match-4 { background: rgba(155, 93, 229, 0.2); color: #c77dff; border: 1px solid #9b5de5; }
+        .match-5 { background: rgba(224, 92, 58, 0.2); color: #ff8060; border: 1px solid #e05c3a; }
+
+        /* Saved picks */
+        .saved-pick-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            animation: fadeIn 0.3s ease forwards;
+        }
+
+        .saved-pick-header {
+            padding: 16px 20px;
+            background: var(--surface2);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            cursor: pointer;
+        }
+
+        .saved-pick-header:hover {
+            background: #1f1f2e;
+        }
+
+        .saved-pick-numbers {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .saved-pick-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .saved-pick-date {
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .pick-match-count {
+            font-family: 'DM Mono', monospace;
+            font-size: 12px;
+            color: var(--accent);
+            padding: 4px 10px;
+            background: rgba(232, 197, 71, 0.1);
+            border: 1px solid rgba(232, 197, 71, 0.3);
+            border-radius: 20px;
+        }
+
+        .saved-pick-results {
+            display: none;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .chevron {
+            color: var(--muted);
+            font-size: 12px;
+            transition: transform 0.2s;
+        }
+
+        .saved-pick-card.open .chevron {
+            transform: rotate(180deg);
+        }
+
+        .saved-pick-card.open .saved-pick-results {
+            display: flex;
+        }
+
+        /* Empty / error state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--muted);
+        }
+
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .empty-state p {
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .error-msg {
+            padding: 14px 18px;
+            background: rgba(224, 92, 58, 0.1);
+            border: 1px solid rgba(224, 92, 58, 0.3);
+            border-radius: 8px;
+            color: #ff8060;
+            font-size: 14px;
+            margin-top: 16px;
+            display: none;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 14px;
+            margin-bottom: 32px;
+            transition: color 0.2s;
+        }
+
+        .back-link:hover { color: var(--accent); }
+
+        @media (max-width: 600px) {
+            .number-input-row { gap: 6px; }
+            .number-input { width: 52px; height: 52px; font-size: 22px; }
+            .separator { font-size: 20px; }
+            .stats-bar { gap: 16px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <a href="/" class="back-link">← Back to Home</a>
+
+    <div class="header">
+        <div class="header-label">Powerball Analyzer</div>
+        <h1>Check My <span>Numbers</span></h1>
+        <p>Match your picks against 1,910+ official Powerball draws from 2010 to 2026.</p>
+    </div>
+
+    <!-- Mode Tabs -->
+    <div class="mode-tabs">
+        <button class="mode-tab active" onclick="switchMode('manual')">Manual Check</button>
+        <button class="mode-tab" onclick="switchMode('saved')">Saved Picks</button>
+    </div>
+
+    <!-- ===================== MANUAL MODE ===================== -->
+    <div id="panel-manual" class="panel active">
+        <div class="card">
+            <div class="card-title">Enter Your Numbers</div>
+            <div class="number-input-row">
+                <div class="number-input-group">
+                    <label>Ball 1</label>
+                    <input type="number" class="number-input wb-input" id="wb1" min="1" max="69" placeholder="–">
+                </div>
+                <div class="number-input-group">
+                    <label>Ball 2</label>
+                    <input type="number" class="number-input wb-input" id="wb2" min="1" max="69" placeholder="–">
+                </div>
+                <div class="number-input-group">
+                    <label>Ball 3</label>
+                    <input type="number" class="number-input wb-input" id="wb3" min="1" max="69" placeholder="–">
+                </div>
+                <div class="number-input-group">
+                    <label>Ball 4</label>
+                    <input type="number" class="number-input wb-input" id="wb4" min="1" max="69" placeholder="–">
+                </div>
+                <div class="number-input-group">
+                    <label>Ball 5</label>
+                    <input type="number" class="number-input wb-input" id="wb5" min="1" max="69" placeholder="–">
+                </div>
+                <div class="separator">+</div>
+                <div class="number-input-group">
+                    <label>Powerball</label>
+                    <input type="number" class="number-input powerball-input" id="pb" min="1" max="39" placeholder="–">
+                </div>
+            </div>
+            <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+                <button class="btn btn-primary" id="btn-check" onclick="checkManual()">Check Numbers</button>
+                <button class="btn btn-secondary" onclick="clearManual()">Clear</button>
+            </div>
+            <div class="loading" id="loading-manual">
+                <div class="spinner"></div>
+                Checking against all draws...
+            </div>
+            <div class="error-msg" id="error-manual"></div>
+        </div>
+
+        <!-- Results -->
+        <div id="manual-results" style="display:none;">
+            <div class="stats-bar" id="manual-stats"></div>
+            <div class="results-list" id="manual-results-list"></div>
+        </div>
+
+        <div id="manual-empty" style="display:none;">
+            <div class="empty-state">
+                <div class="icon">🎱</div>
+                <p>No draws found with 2 or more matching numbers.<br>Try different numbers.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== SAVED PICKS MODE ===================== -->
+    <div id="panel-saved" class="panel">
+        <div class="card">
+            <div class="card-title">Check All Saved Picks</div>
+            <p style="color: var(--muted); font-size:14px; margin-bottom:20px;">
+                Checks every pick you've saved against all official draws. Only picks with 2+ matches are shown.
+            </p>
+            <button class="btn btn-primary" id="btn-saved" onclick="checkSaved()">Run Check</button>
+            <div class="loading" id="loading-saved">
+                <div class="spinner"></div>
+                Checking all saved picks — this may take a moment...
+            </div>
+            <div class="error-msg" id="error-saved"></div>
+        </div>
+
+        <div id="saved-results" style="display:none;">
+            <div class="stats-bar" id="saved-stats"></div>
+            <div id="saved-results-list"></div>
+        </div>
+
+        <div id="saved-empty" style="display:none;">
+            <div class="empty-state">
+                <div class="icon">📭</div>
+                <p>None of your saved picks matched 2+ numbers in any draw.<br>Keep generating!</p>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // ---- Mode switching ----
+    function switchMode(mode) {
+        document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        event.target.classList.add('active');
+        document.getElementById('panel-' + mode).classList.add('active');
+    }
+
+    // ---- Helpers ----
+    function showError(elId, msg) {
+        const el = document.getElementById(elId);
+        el.textContent = msg;
+        el.style.display = 'block';
+    }
+
+    function hideError(elId) {
+        document.getElementById(elId).style.display = 'none';
+    }
+
+    function setLoading(prefix, on) {
+        document.getElementById('loading-' + prefix).classList.toggle('visible', on);
+        document.getElementById('btn-' + prefix).disabled = on;
+    }
+
+    function matchBadge(whiteMatches, pbMatch) {
+        const total = whiteMatches + (pbMatch ? 1 : 0);
+        const cls = whiteMatches >= 5 ? 'match-5' : whiteMatches >= 4 ? 'match-4' : whiteMatches >= 3 ? 'match-3' : 'match-2';
+        const pb = pbMatch ? ' + PB ⚡' : '';
+        return `<span class="match-badge ${cls}">${whiteMatches} match${whiteMatches !== 1 ? 'es' : ''}${pb}</span>`;
+    }
+
+    function renderBalls(officialNumbers, officialPb, checkedNumbers, checkedPb) {
+        const checkedSet = new Set(checkedNumbers);
+        let html = '';
+        officialNumbers.forEach(n => {
+            const matched = checkedSet.has(n) ? 'matched' : '';
+            html += `<div class="ball ${matched}">${n}</div>`;
+        });
+        const pbMatched = (officialPb === checkedPb) ? 'matched' : '';
+        html += `<div class="ball powerball-ball ${pbMatched}">${officialPb}</div>`;
+        return html;
+    }
+
+    // ---- Manual Check ----
+    function clearManual() {
+        ['wb1','wb2','wb3','wb4','wb5','pb'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('manual-results').style.display = 'none';
+        document.getElementById('manual-empty').style.display = 'none';
+        hideError('error-manual');
+    }
+
+    async function checkManual() {
+        hideError('error-manual');
+        document.getElementById('manual-results').style.display = 'none';
+        document.getElementById('manual-empty').style.display = 'none';
+
+        const wbIds = ['wb1','wb2','wb3','wb4','wb5'];
+        const white_balls = wbIds.map(id => parseInt(document.getElementById(id).value));
+        const powerball = parseInt(document.getElementById('pb').value);
+
+        if (white_balls.some(isNaN) || isNaN(powerball)) {
+            showError('error-manual', 'Please fill in all 5 white balls and the Powerball.');
+            return;
+        }
+
+        setLoading('check', true);
+        try {
+            const res = await fetch('/api/check-numbers', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ white_balls, powerball })
+            });
+            const data = await res.json();
+
+            if (!res.ok || data.error) {
+                showError('error-manual', data.error || 'Something went wrong.');
+                return;
+            }
+
+            if (data.matches_found === 0) {
+                document.getElementById('manual-empty').style.display = 'block';
+                return;
+            }
+
+            // Stats bar
+            document.getElementById('manual-stats').innerHTML = `
+                <div class="stat-item">
+                    <span class="stat-label">Draws Checked</span>
+                    <span class="stat-value">${data.total_draws_checked.toLocaleString()}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Draws Matched</span>
+                    <span class="stat-value">${data.matches_found}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Your Numbers</span>
+                    <span class="stat-value" style="font-size:18px; padding-top:4px;">
+                        ${data.checked_numbers.join(' · ')} <span style="color:var(--accent2)">PB ${data.checked_powerball}</span>
+                    </span>
+                </div>
+            `;
+
+            // Results list
+            const list = document.getElementById('manual-results-list');
+            list.innerHTML = data.results.map((r, i) => `
+                <div class="result-row" style="animation-delay:${i * 30}ms">
+                    <div class="result-date">${r.draw_date}</div>
+                    <div class="result-balls">
+                        ${renderBalls(r.official_numbers, r.official_powerball, data.checked_numbers, data.checked_powerball)}
+                    </div>
+                    ${matchBadge(r.white_matches, r.powerball_match)}
+                </div>
+            `).join('');
+
+            document.getElementById('manual-results').style.display = 'block';
+
+        } catch (e) {
+            showError('error-manual', 'Network error. Please try again.');
+        } finally {
+            setLoading('check', false);
+        }
+    }
+
+    // ---- Saved Picks Check ----
+    async function checkSaved() {
+        hideError('error-saved');
+        document.getElementById('saved-results').style.display = 'none';
+        document.getElementById('saved-empty').style.display = 'none';
+
+        setLoading('saved', true);
+        try {
+            const res = await fetch('/api/check-saved-picks');
+            const data = await res.json();
+
+            if (!res.ok || data.error) {
+                showError('error-saved', data.error || 'Something went wrong.');
+                return;
+            }
+
+            if (data.picks_with_matches === 0) {
+                document.getElementById('saved-empty').style.display = 'block';
+                return;
+            }
+
+            // Stats bar
+            document.getElementById('saved-stats').innerHTML = `
+                <div class="stat-item">
+                    <span class="stat-label">Picks Checked</span>
+                    <span class="stat-value">${data.total_picks_checked}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Picks Matched</span>
+                    <span class="stat-value">${data.picks_with_matches}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Draws Checked</span>
+                    <span class="stat-value">${data.total_draws_checked.toLocaleString()}</span>
+                </div>
+            `;
+
+            // Saved picks list (collapsible)
+            const list = document.getElementById('saved-results-list');
+            list.innerHTML = data.results.map((pick, i) => `
+                <div class="saved-pick-card" id="pick-card-${i}">
+                    <div class="saved-pick-header" onclick="togglePick(${i})">
+                        <div class="saved-pick-numbers">
+                            ${pick.white_balls.map(n => `<div class="ball" style="width:32px;height:32px;font-size:12px">${n}</div>`).join('')}
+                            <div class="ball powerball-ball" style="width:32px;height:32px;font-size:12px">${pick.powerball}</div>
+                        </div>
+                        <div class="saved-pick-meta">
+                            <span class="saved-pick-date">Saved ${pick.generated_date}</span>
+                            <span class="pick-match-count">${pick.match_count} draw${pick.match_count !== 1 ? 's' : ''} matched</span>
+                            <span class="chevron">▼</span>
+                        </div>
+                    </div>
+                    <div class="saved-pick-results" id="pick-results-${i}" style="display:none;">
+                        ${pick.matches.map((r, j) => `
+                            <div class="result-row" style="animation-delay:${j * 20}ms">
+                                <div class="result-date">${r.draw_date}</div>
+                                <div class="result-balls">
+                                    ${renderBalls(r.official_numbers, r.official_powerball, pick.white_balls, pick.powerball)}
+                                </div>
+                                ${matchBadge(r.white_matches, r.powerball_match)}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('saved-results').style.display = 'block';
+
+        } catch (e) {
+            showError('error-saved', 'Network error. Please try again.');
+        } finally {
+            setLoading('saved', false);
+        }
+    }
+
+    function togglePick(i) {
+        const card = document.getElementById('pick-card-' + i);
+        const results = document.getElementById('pick-results-' + i);
+        const isOpen = card.classList.contains('open');
+        card.classList.toggle('open', !isOpen);
+        results.style.display = isOpen ? 'none' : 'flex';
+    }
+
+    // Auto-tab between white ball inputs
+    document.querySelectorAll('.wb-input').forEach((input, idx, all) => {
+        input.addEventListener('input', () => {
+            if (input.value.length >= 2) {
+                const next = all[idx + 1] || document.getElementById('pb');
+                if (next) next.focus();
+            }
+        });
+    });
+</script>
+</body>
+</html>
