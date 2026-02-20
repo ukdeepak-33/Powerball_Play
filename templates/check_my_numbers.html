@@ -1,809 +1,365 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Check My Numbers | Powerball Analyzer</title>
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg: #0a0a0f;
-            --surface: #111118;
-            --surface2: #1a1a24;
-            --border: #2a2a3a;
-            --accent: #e8c547;
-            --accent2: #e05c3a;
-            --white: #f0f0f0;
-            --muted: #6b6b80;
-            --match-2: #4a7c59;
-            --match-3: #2d7dd2;
-            --match-4: #9b5de5;
-            --match-5: #e05c3a;
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            background: var(--bg);
-            color: var(--white);
-            font-family: 'DM Sans', sans-serif;
-            min-height: 100vh;
-        }
-
-        /* Background grid */
-        body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background-image:
-                linear-gradient(rgba(232, 197, 71, 0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(232, 197, 71, 0.03) 1px, transparent 1px);
-            background-size: 40px 40px;
-            pointer-events: none;
-            z-index: 0;
-        }
-
-        .container {
-            max-width: 960px;
-            margin: 0 auto;
-            padding: 40px 24px;
-            position: relative;
-            z-index: 1;
-        }
-
-        /* Header */
-        .header {
-            margin-bottom: 48px;
-        }
-
-        .header-label {
-            font-family: 'DM Mono', monospace;
-            font-size: 11px;
-            letter-spacing: 3px;
-            color: var(--accent);
-            text-transform: uppercase;
-            margin-bottom: 12px;
-        }
-
-        .header h1 {
-            font-family: 'Bebas Neue', sans-serif;
-            font-size: clamp(48px, 8vw, 80px);
-            line-height: 0.9;
-            letter-spacing: 2px;
-            color: var(--white);
-        }
-
-        .header h1 span {
-            color: var(--accent);
-        }
-
-        .header p {
-            margin-top: 16px;
-            color: var(--muted);
-            font-size: 15px;
-            font-weight: 300;
-            max-width: 500px;
-            line-height: 1.6;
-        }
-
-        /* Mode tabs */
-        .mode-tabs {
-            display: flex;
-            gap: 2px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 4px;
-            margin-bottom: 32px;
-            width: fit-content;
-        }
-
-        .mode-tab {
-            padding: 10px 24px;
-            border-radius: 8px;
-            border: none;
-            background: transparent;
-            color: var(--muted);
-            font-family: 'DM Sans', sans-serif;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-            white-space: nowrap;
-        }
-
-        .mode-tab.active {
-            background: var(--accent);
-            color: #000;
-        }
-
-        .mode-tab:hover:not(.active) {
-            color: var(--white);
-        }
-
-        /* Panels */
-        .panel {
-            display: none;
-        }
-        .panel.active {
-            display: block;
-        }
-
-        /* Card */
-        .card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 28px;
-            margin-bottom: 24px;
-        }
-
-        .card-title {
-            font-family: 'DM Mono', monospace;
-            font-size: 11px;
-            letter-spacing: 2px;
-            color: var(--accent);
-            text-transform: uppercase;
-            margin-bottom: 20px;
-        }
-
-        /* Number inputs */
-        .number-input-row {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            flex-wrap: wrap;
-            margin-bottom: 16px;
-        }
-
-        .number-input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .number-input-group label {
-            font-size: 11px;
-            color: var(--muted);
-            font-family: 'DM Mono', monospace;
-            letter-spacing: 1px;
-        }
-
-        .number-input {
-            width: 64px;
-            height: 64px;
-            background: var(--surface2);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            color: var(--white);
-            font-family: 'Bebas Neue', sans-serif;
-            font-size: 28px;
-            text-align: center;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        .number-input:focus {
-            border-color: var(--accent);
-        }
-
-        .number-input.powerball-input {
-            border-color: var(--accent2);
-            color: var(--accent2);
-        }
-
-        .number-input.powerball-input:focus {
-            border-color: var(--accent2);
-            box-shadow: 0 0 0 2px rgba(224, 92, 58, 0.2);
-        }
-
-        .separator {
-            font-family: 'Bebas Neue', sans-serif;
-            font-size: 28px;
-            color: var(--border);
-            padding-top: 24px;
-        }
-
-        /* Button */
-        .btn {
-            padding: 14px 32px;
-            border-radius: 8px;
-            border: none;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-primary {
-            background: var(--accent);
-            color: #000;
-        }
-
-        .btn-primary:hover {
-            background: #f0d060;
-            transform: translateY(-1px);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .btn-secondary {
-            background: var(--surface2);
-            color: var(--white);
-            border: 1px solid var(--border);
-        }
-
-        .btn-secondary:hover {
-            border-color: var(--accent);
-            color: var(--accent);
-        }
-
-        /* Loading */
-        .loading {
-            display: none;
-            align-items: center;
-            gap: 12px;
-            color: var(--muted);
-            font-size: 14px;
-            margin-top: 16px;
-        }
-
-        .loading.visible {
-            display: flex;
-        }
-
-        .spinner {
-            width: 18px;
-            height: 18px;
-            border: 2px solid var(--border);
-            border-top-color: var(--accent);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* Stats bar */
-        .stats-bar {
-            display: flex;
-            gap: 24px;
-            flex-wrap: wrap;
-            padding: 16px 20px;
-            background: var(--surface2);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            margin-bottom: 24px;
-        }
-
-        .stat-item {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .stat-label {
-            font-size: 11px;
-            color: var(--muted);
-            font-family: 'DM Mono', monospace;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
-
-        .stat-value {
-            font-family: 'Bebas Neue', sans-serif;
-            font-size: 28px;
-            color: var(--accent);
-            line-height: 1;
-        }
-
-        /* Results */
-        .results-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .result-row {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 16px 20px;
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            flex-wrap: wrap;
-            transition: border-color 0.2s;
-            animation: fadeIn 0.3s ease forwards;
-        }
-
-        .result-row:hover {
-            border-color: var(--accent);
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(6px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .result-date {
-            font-family: 'DM Mono', monospace;
-            font-size: 12px;
-            color: var(--muted);
-            min-width: 90px;
-        }
-
-        .result-balls {
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-            flex: 1;
-        }
-
-        .ball {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'DM Mono', monospace;
-            font-size: 13px;
-            font-weight: 500;
-            border: 1px solid var(--border);
-            background: var(--surface2);
-            color: var(--muted);
-        }
-
-        .ball.matched {
-            background: var(--accent);
-            color: #000;
-            border-color: var(--accent);
-        }
-
-        .ball.powerball-ball {
-            border-color: var(--accent2);
-            color: var(--accent2);
-        }
-
-        .ball.powerball-ball.matched {
-            background: var(--accent2);
-            color: #fff;
-            border-color: var(--accent2);
-        }
-
-        .match-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-family: 'DM Mono', monospace;
-            font-size: 12px;
-            font-weight: 500;
-            white-space: nowrap;
-        }
-
-        .match-2 { background: rgba(74, 124, 89, 0.2); color: #6fcf97; border: 1px solid #4a7c59; }
-        .match-3 { background: rgba(45, 125, 210, 0.2); color: #56b3ff; border: 1px solid #2d7dd2; }
-        .match-4 { background: rgba(155, 93, 229, 0.2); color: #c77dff; border: 1px solid #9b5de5; }
-        .match-5 { background: rgba(224, 92, 58, 0.2); color: #ff8060; border: 1px solid #e05c3a; }
-
-        /* Saved picks */
-        .saved-pick-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            margin-bottom: 16px;
-            overflow: hidden;
-            animation: fadeIn 0.3s ease forwards;
-        }
-
-        .saved-pick-header {
-            padding: 16px 20px;
-            background: var(--surface2);
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 12px;
-            cursor: pointer;
-        }
-
-        .saved-pick-header:hover {
-            background: #1f1f2e;
-        }
-
-        .saved-pick-numbers {
-            display: flex;
-            gap: 6px;
-            align-items: center;
-        }
-
-        .saved-pick-meta {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .saved-pick-date {
-            font-family: 'DM Mono', monospace;
-            font-size: 11px;
-            color: var(--muted);
-        }
-
-        .pick-match-count {
-            font-family: 'DM Mono', monospace;
-            font-size: 12px;
-            color: var(--accent);
-            padding: 4px 10px;
-            background: rgba(232, 197, 71, 0.1);
-            border: 1px solid rgba(232, 197, 71, 0.3);
-            border-radius: 20px;
-        }
-
-        .saved-pick-results {
-            display: none;
-            padding: 16px 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .chevron {
-            color: var(--muted);
-            font-size: 12px;
-            transition: transform 0.2s;
-        }
-
-        .saved-pick-card.open .chevron {
-            transform: rotate(180deg);
-        }
-
-        .saved-pick-card.open .saved-pick-results {
-            display: flex;
-        }
-
-        /* Empty / error state */
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: var(--muted);
-        }
-
-        .empty-state .icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-        }
-
-        .empty-state p {
-            font-size: 15px;
-            line-height: 1.6;
-        }
-
-        .error-msg {
-            padding: 14px 18px;
-            background: rgba(224, 92, 58, 0.1);
-            border: 1px solid rgba(224, 92, 58, 0.3);
-            border-radius: 8px;
-            color: #ff8060;
-            font-size: 14px;
-            margin-top: 16px;
-            display: none;
-        }
-
-        .back-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            color: var(--muted);
-            text-decoration: none;
-            font-size: 14px;
-            margin-bottom: 32px;
-            transition: color 0.2s;
-        }
-
-        .back-link:hover { color: var(--accent); }
-
-        @media (max-width: 600px) {
-            .number-input-row { gap: 6px; }
-            .number-input { width: 52px; height: 52px; font-size: 22px; }
-            .separator { font-size: 20px; }
-            .stats-bar { gap: 16px; }
-        }
-    </style>
-</head>
-<body>
-<div class="container">
-
-    <a href="/" class="back-link">← Back to Home</a>
-
-    <div class="header">
-        <div class="header-label">Powerball Analyzer</div>
-        <h1>Check My <span>Numbers</span></h1>
-        <p>Match your picks against 1,910+ official Powerball draws from 2010 to 2026.</p>
-    </div>
+{% extends "base.html" %}
+{% block title %}Check My Numbers{% endblock %}
+{% block page_heading %}Check My Numbers{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-6">
+
+    <!-- Subtitle -->
+    <p class="text-gray-500 text-sm mb-6">
+        Match your picks against official Powerball draws from 2010 to 2026.
+    </p>
 
     <!-- Mode Tabs -->
-    <div class="mode-tabs">
-        <button class="mode-tab active" onclick="switchMode('manual')">Manual Check</button>
-        <button class="mode-tab" onclick="switchMode('saved')">Saved Picks</button>
+    <div class="flex space-x-2 mb-6">
+        <button id="tab-manual"
+            onclick="switchMode('manual')"
+            class="px-5 py-2 rounded-full text-sm font-semibold bg-blue-600 text-white transition duration-200">
+            Manual Check
+        </button>
+        <button id="tab-saved"
+            onclick="switchMode('saved')"
+            class="px-5 py-2 rounded-full text-sm font-semibold bg-white text-gray-600 border border-gray-300 hover:border-blue-400 hover:text-blue-600 transition duration-200">
+            Saved Picks
+        </button>
     </div>
 
     <!-- ===================== MANUAL MODE ===================== -->
-    <div id="panel-manual" class="panel active">
-        <div class="card">
-            <div class="card-title">Enter Your Numbers</div>
-            <div class="number-input-row">
-                <div class="number-input-group">
-                    <label>Ball 1</label>
-                    <input type="number" class="number-input wb-input" id="wb1" min="1" max="69" placeholder="–">
+    <div id="panel-manual">
+
+        <div class="bg-white rounded-xl shadow-md p-6 mb-6">
+            <h2 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Enter Your Numbers</h2>
+
+            <!-- Number Inputs -->
+            <div class="flex flex-wrap items-end gap-3 mb-5">
+                <div class="flex flex-col items-center gap-1">
+                    <span class="text-xs text-gray-400 font-medium">Ball 1</span>
+                    <input type="number" id="wb1" min="1" max="69" placeholder="–"
+                        class="wb-input w-14 h-14 text-center text-xl font-bold border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 text-gray-800 transition">
                 </div>
-                <div class="number-input-group">
-                    <label>Ball 2</label>
-                    <input type="number" class="number-input wb-input" id="wb2" min="1" max="69" placeholder="–">
+                <div class="flex flex-col items-center gap-1">
+                    <span class="text-xs text-gray-400 font-medium">Ball 2</span>
+                    <input type="number" id="wb2" min="1" max="69" placeholder="–"
+                        class="wb-input w-14 h-14 text-center text-xl font-bold border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 text-gray-800 transition">
                 </div>
-                <div class="number-input-group">
-                    <label>Ball 3</label>
-                    <input type="number" class="number-input wb-input" id="wb3" min="1" max="69" placeholder="–">
+                <div class="flex flex-col items-center gap-1">
+                    <span class="text-xs text-gray-400 font-medium">Ball 3</span>
+                    <input type="number" id="wb3" min="1" max="69" placeholder="–"
+                        class="wb-input w-14 h-14 text-center text-xl font-bold border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 text-gray-800 transition">
                 </div>
-                <div class="number-input-group">
-                    <label>Ball 4</label>
-                    <input type="number" class="number-input wb-input" id="wb4" min="1" max="69" placeholder="–">
+                <div class="flex flex-col items-center gap-1">
+                    <span class="text-xs text-gray-400 font-medium">Ball 4</span>
+                    <input type="number" id="wb4" min="1" max="69" placeholder="–"
+                        class="wb-input w-14 h-14 text-center text-xl font-bold border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 text-gray-800 transition">
                 </div>
-                <div class="number-input-group">
-                    <label>Ball 5</label>
-                    <input type="number" class="number-input wb-input" id="wb5" min="1" max="69" placeholder="–">
+                <div class="flex flex-col items-center gap-1">
+                    <span class="text-xs text-gray-400 font-medium">Ball 5</span>
+                    <input type="number" id="wb5" min="1" max="69" placeholder="–"
+                        class="wb-input w-14 h-14 text-center text-xl font-bold border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 text-gray-800 transition">
                 </div>
-                <div class="separator">+</div>
-                <div class="number-input-group">
-                    <label>Powerball</label>
-                    <input type="number" class="number-input powerball-input" id="pb" min="1" max="39" placeholder="–">
+
+                <div class="flex flex-col items-center justify-end pb-2">
+                    <span class="text-2xl font-bold text-gray-300">+</span>
+                </div>
+
+                <div class="flex flex-col items-center gap-1">
+                    <span class="text-xs text-red-400 font-medium">Powerball</span>
+                    <input type="number" id="pb" min="1" max="39" placeholder="–"
+                        class="w-14 h-14 text-center text-xl font-bold border-2 border-red-300 rounded-xl focus:outline-none focus:border-red-500 text-red-500 transition">
                 </div>
             </div>
-            <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:8px;">
-                <button class="btn btn-primary" id="btn-check" onclick="checkManual()">Check Numbers</button>
-                <button class="btn btn-secondary" onclick="clearManual()">Clear</button>
+
+            <!-- Buttons -->
+            <div class="flex items-center gap-3 flex-wrap">
+                <button onclick="checkManual()" id="btn-check"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg transition duration-200">
+                    Check Numbers
+                </button>
+                <button onclick="clearManual()"
+                    class="bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold px-6 py-2.5 rounded-lg transition duration-200">
+                    Clear
+                </button>
             </div>
-            <div class="loading" id="loading-manual">
-                <div class="spinner"></div>
+
+            <!-- Loading -->
+            <div id="loading-check" class="hidden mt-4 flex items-center gap-2 text-sm text-gray-400">
+                <svg class="animate-spin h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                </svg>
                 Checking against all draws...
             </div>
-            <div class="error-msg" id="error-manual"></div>
+
+            <!-- Error -->
+            <div id="error-manual" class="hidden mt-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm"></div>
         </div>
 
-        <!-- Results -->
-        <div id="manual-results" style="display:none;">
-            <div class="stats-bar" id="manual-stats"></div>
-            <div class="results-list" id="manual-results-list"></div>
-        </div>
-
-        <div id="manual-empty" style="display:none;">
-            <div class="empty-state">
-                <div class="icon">🎱</div>
-                <p>No draws found with 2 or more matching numbers.<br>Try different numbers.</p>
+        <!-- Manual Results -->
+        <div id="manual-results" class="hidden">
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-5">
+                <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Draws Checked</p>
+                    <p id="stat-total" class="text-3xl font-extrabold text-gray-800">–</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Draws Matched</p>
+                    <p id="stat-matched" class="text-3xl font-extrabold text-blue-600">–</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100 col-span-2 sm:col-span-1">
+                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Your Numbers</p>
+                    <p id="stat-numbers" class="text-sm font-semibold text-gray-700 mt-1">–</p>
+                </div>
             </div>
+
+            <div class="bg-white rounded-xl shadow-md overflow-hidden">
+                <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Matching Draws</span>
+                    <span class="text-xs text-gray-400">Sorted by best match</span>
+                </div>
+                <div id="manual-results-list" class="divide-y divide-gray-50"></div>
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="manual-empty" class="hidden bg-white rounded-xl shadow-md p-12 text-center">
+            <div class="text-5xl mb-4">🎱</div>
+            <p class="text-gray-500">No draws found with 2 or more matching numbers.<br>Try different numbers.</p>
         </div>
     </div>
 
     <!-- ===================== SAVED PICKS MODE ===================== -->
-    <div id="panel-saved" class="panel">
-        <div class="card">
-            <div class="card-title">Check All Saved Picks</div>
-            <p style="color: var(--muted); font-size:14px; margin-bottom:20px;">
+    <div id="panel-saved" class="hidden">
+
+        <div class="bg-white rounded-xl shadow-md p-6 mb-6">
+            <h2 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Check All Saved Picks</h2>
+            <p class="text-sm text-gray-500 mb-5">
                 Checks every pick you've saved against all official draws. Only picks with 2+ matches are shown.
             </p>
-            <button class="btn btn-primary" id="btn-saved" onclick="checkSaved()">Run Check</button>
-            <div class="loading" id="loading-saved">
-                <div class="spinner"></div>
+            <button onclick="checkSaved()" id="btn-saved"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg transition duration-200">
+                Run Check
+            </button>
+
+            <!-- Loading -->
+            <div id="loading-saved" class="hidden mt-4 flex items-center gap-2 text-sm text-gray-400">
+                <svg class="animate-spin h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                </svg>
                 Checking all saved picks — this may take a moment...
             </div>
-            <div class="error-msg" id="error-saved"></div>
+
+            <!-- Error -->
+            <div id="error-saved" class="hidden mt-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm"></div>
         </div>
 
-        <div id="saved-results" style="display:none;">
-            <div class="stats-bar" id="saved-stats"></div>
-            <div id="saved-results-list"></div>
-        </div>
-
-        <div id="saved-empty" style="display:none;">
-            <div class="empty-state">
-                <div class="icon">📭</div>
-                <p>None of your saved picks matched 2+ numbers in any draw.<br>Keep generating!</p>
+        <!-- Saved Results -->
+        <div id="saved-results" class="hidden">
+            <div class="grid grid-cols-3 gap-4 mb-5">
+                <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Picks Checked</p>
+                    <p id="stat-picks-total" class="text-3xl font-extrabold text-gray-800">–</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Picks Matched</p>
+                    <p id="stat-picks-matched" class="text-3xl font-extrabold text-blue-600">–</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Draws Checked</p>
+                    <p id="stat-draws-checked" class="text-3xl font-extrabold text-gray-800">–</p>
+                </div>
             </div>
+            <div id="saved-results-list" class="space-y-3"></div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="saved-empty" class="hidden bg-white rounded-xl shadow-md p-12 text-center">
+            <div class="text-5xl mb-4">📭</div>
+            <p class="text-gray-500">None of your saved picks matched 2+ numbers in any draw.<br>Keep generating!</p>
         </div>
     </div>
 
 </div>
+{% endblock %}
 
+
+{% block scripts %}
+{{ super() }}
 <script>
-    // ---- Mode switching ----
-    function switchMode(mode) {
-        document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-        event.target.classList.add('active');
-        document.getElementById('panel-' + mode).classList.add('active');
-    }
 
-    // ---- Helpers ----
-    function showError(elId, msg) {
-        const el = document.getElementById(elId);
-        el.textContent = msg;
-        el.style.display = 'block';
-    }
-
-    function hideError(elId) {
-        document.getElementById(elId).style.display = 'none';
-    }
-
-    function setLoading(prefix, on) {
-        document.getElementById('loading-' + prefix).classList.toggle('visible', on);
-        document.getElementById('btn-' + prefix).disabled = on;
-    }
-
+    // ── Match badge ───────────────────────────────────────────
     function matchBadge(whiteMatches, pbMatch) {
-        const total = whiteMatches + (pbMatch ? 1 : 0);
-        const cls = whiteMatches >= 5 ? 'match-5' : whiteMatches >= 4 ? 'match-4' : whiteMatches >= 3 ? 'match-3' : 'match-2';
         const pb = pbMatch ? ' + PB ⚡' : '';
-        return `<span class="match-badge ${cls}">${whiteMatches} match${whiteMatches !== 1 ? 'es' : ''}${pb}</span>`;
+        let cls = 'bg-green-100 text-green-700 border-green-300';
+        if (whiteMatches >= 5)      cls = 'bg-red-100 text-red-700 border-red-300';
+        else if (whiteMatches >= 4) cls = 'bg-purple-100 text-purple-700 border-purple-300';
+        else if (whiteMatches >= 3) cls = 'bg-blue-100 text-blue-700 border-blue-300';
+        return `<span class="text-xs font-semibold px-3 py-1 rounded-full border ${cls} whitespace-nowrap">
+                    ${whiteMatches} match${whiteMatches !== 1 ? 'es' : ''}${pb}
+                </span>`;
     }
 
+    // ── Render balls ──────────────────────────────────────────
     function renderBalls(officialNumbers, officialPb, checkedNumbers, checkedPb) {
         const checkedSet = new Set(checkedNumbers);
-        let html = '';
+        let html = '<div class="flex flex-wrap gap-1.5 items-center">';
         officialNumbers.forEach(n => {
-            const matched = checkedSet.has(n) ? 'matched' : '';
-            html += `<div class="ball ${matched}">${n}</div>`;
+            const matched = checkedSet.has(n);
+            html += `<span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold border
+                        ${matched ? 'bg-blue-500 text-white border-blue-600' : 'bg-gray-100 text-gray-500 border-gray-200'}">${n}</span>`;
         });
-        const pbMatched = (officialPb === checkedPb) ? 'matched' : '';
-        html += `<div class="ball powerball-ball ${pbMatched}">${officialPb}</div>`;
+        const pbMatched = officialPb === checkedPb;
+        html += `<span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold border ml-1
+                    ${pbMatched ? 'bg-red-500 text-white border-red-600' : 'bg-red-50 text-red-400 border-red-200'}">${officialPb}</span>`;
+        html += '</div>';
         return html;
     }
 
-    // ---- Manual Check ----
+    // ── Mode switching ────────────────────────────────────────
+    function switchMode(mode) {
+        const isManual = mode === 'manual';
+        document.getElementById('panel-manual').classList.toggle('hidden', !isManual);
+        document.getElementById('panel-saved').classList.toggle('hidden', isManual);
+
+        const tabManual = document.getElementById('tab-manual');
+        const tabSaved  = document.getElementById('tab-saved');
+
+        if (isManual) {
+            tabManual.className = 'px-5 py-2 rounded-full text-sm font-semibold bg-blue-600 text-white transition duration-200';
+            tabSaved.className  = 'px-5 py-2 rounded-full text-sm font-semibold bg-white text-gray-600 border border-gray-300 hover:border-blue-400 hover:text-blue-600 transition duration-200';
+        } else {
+            tabSaved.className  = 'px-5 py-2 rounded-full text-sm font-semibold bg-blue-600 text-white transition duration-200';
+            tabManual.className = 'px-5 py-2 rounded-full text-sm font-semibold bg-white text-gray-600 border border-gray-300 hover:border-blue-400 hover:text-blue-600 transition duration-200';
+        }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────
+    function showError(id, msg) {
+        const el = document.getElementById('error-' + id);
+        el.textContent = msg;
+        el.classList.remove('hidden');
+    }
+    function hideError(id) {
+        document.getElementById('error-' + id).classList.add('hidden');
+    }
+    function setLoading(id, on) {
+        document.getElementById('loading-' + id).classList.toggle('hidden', !on);
+        document.getElementById('btn-' + id).disabled = on;
+    }
+
+    // ── Manual Check ─────────────────────────────────────────
     function clearManual() {
         ['wb1','wb2','wb3','wb4','wb5','pb'].forEach(id => document.getElementById(id).value = '');
-        document.getElementById('manual-results').style.display = 'none';
-        document.getElementById('manual-empty').style.display = 'none';
-        hideError('error-manual');
+        document.getElementById('manual-results').classList.add('hidden');
+        document.getElementById('manual-empty').classList.add('hidden');
+        hideError('manual');
     }
 
     async function checkManual() {
-        hideError('error-manual');
-        document.getElementById('manual-results').style.display = 'none';
-        document.getElementById('manual-empty').style.display = 'none';
+        hideError('manual');
+        document.getElementById('manual-results').classList.add('hidden');
+        document.getElementById('manual-empty').classList.add('hidden');
 
-        const wbIds = ['wb1','wb2','wb3','wb4','wb5'];
-        const white_balls = wbIds.map(id => parseInt(document.getElementById(id).value));
-        const powerball = parseInt(document.getElementById('pb').value);
+        const white_balls = ['wb1','wb2','wb3','wb4','wb5'].map(id => parseInt(document.getElementById(id).value));
+        const powerball   = parseInt(document.getElementById('pb').value);
 
         if (white_balls.some(isNaN) || isNaN(powerball)) {
-            showError('error-manual', 'Please fill in all 5 white balls and the Powerball.');
+            showError('manual', 'Please fill in all 5 white balls and the Powerball.');
             return;
         }
 
         setLoading('check', true);
         try {
-            const res = await fetch('/api/check-numbers', {
+            const res  = await fetch('/api/check-numbers', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ white_balls, powerball })
             });
             const data = await res.json();
 
             if (!res.ok || data.error) {
-                showError('error-manual', data.error || 'Something went wrong.');
+                showError('manual', data.error || 'Something went wrong.');
                 return;
             }
 
             if (data.matches_found === 0) {
-                document.getElementById('manual-empty').style.display = 'block';
+                document.getElementById('manual-empty').classList.remove('hidden');
                 return;
             }
 
-            // Stats bar
-            document.getElementById('manual-stats').innerHTML = `
-                <div class="stat-item">
-                    <span class="stat-label">Draws Checked</span>
-                    <span class="stat-value">${data.total_draws_checked.toLocaleString()}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Draws Matched</span>
-                    <span class="stat-value">${data.matches_found}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Your Numbers</span>
-                    <span class="stat-value" style="font-size:18px; padding-top:4px;">
-                        ${data.checked_numbers.join(' · ')} <span style="color:var(--accent2)">PB ${data.checked_powerball}</span>
-                    </span>
-                </div>
-            `;
+            document.getElementById('stat-total').textContent   = data.total_draws_checked.toLocaleString();
+            document.getElementById('stat-matched').textContent = data.matches_found;
+            document.getElementById('stat-numbers').textContent =
+                data.checked_numbers.join(' · ') + '  PB ' + data.checked_powerball;
 
-            // Results list
-            const list = document.getElementById('manual-results-list');
-            list.innerHTML = data.results.map((r, i) => `
-                <div class="result-row" style="animation-delay:${i * 30}ms">
-                    <div class="result-date">${r.draw_date}</div>
-                    <div class="result-balls">
-                        ${renderBalls(r.official_numbers, r.official_powerball, data.checked_numbers, data.checked_powerball)}
-                    </div>
+            document.getElementById('manual-results-list').innerHTML = data.results.map(r => `
+                <div class="flex flex-wrap items-center gap-3 px-5 py-3 hover:bg-gray-50 transition">
+                    <span class="text-xs font-mono text-gray-400 w-24 shrink-0">${r.draw_date}</span>
+                    ${renderBalls(r.official_numbers, r.official_powerball, data.checked_numbers, data.checked_powerball)}
                     ${matchBadge(r.white_matches, r.powerball_match)}
                 </div>
             `).join('');
 
-            document.getElementById('manual-results').style.display = 'block';
+            document.getElementById('manual-results').classList.remove('hidden');
 
         } catch (e) {
-            showError('error-manual', 'Network error. Please try again.');
+            showError('manual', 'Network error. Please try again.');
         } finally {
             setLoading('check', false);
         }
     }
 
-    // ---- Saved Picks Check ----
+    // ── Saved Picks Check ─────────────────────────────────────
     async function checkSaved() {
-        hideError('error-saved');
-        document.getElementById('saved-results').style.display = 'none';
-        document.getElementById('saved-empty').style.display = 'none';
+        hideError('saved');
+        document.getElementById('saved-results').classList.add('hidden');
+        document.getElementById('saved-empty').classList.add('hidden');
 
         setLoading('saved', true);
         try {
-            const res = await fetch('/api/check-saved-picks');
+            const res  = await fetch('/api/check-saved-picks');
             const data = await res.json();
 
             if (!res.ok || data.error) {
-                showError('error-saved', data.error || 'Something went wrong.');
+                showError('saved', data.error || 'Something went wrong.');
                 return;
             }
 
             if (data.picks_with_matches === 0) {
-                document.getElementById('saved-empty').style.display = 'block';
+                document.getElementById('saved-empty').classList.remove('hidden');
                 return;
             }
 
-            // Stats bar
-            document.getElementById('saved-stats').innerHTML = `
-                <div class="stat-item">
-                    <span class="stat-label">Picks Checked</span>
-                    <span class="stat-value">${data.total_picks_checked}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Picks Matched</span>
-                    <span class="stat-value">${data.picks_with_matches}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Draws Checked</span>
-                    <span class="stat-value">${data.total_draws_checked.toLocaleString()}</span>
-                </div>
-            `;
+            document.getElementById('stat-picks-total').textContent   = data.total_picks_checked;
+            document.getElementById('stat-picks-matched').textContent = data.picks_with_matches;
+            document.getElementById('stat-draws-checked').textContent = data.total_draws_checked.toLocaleString();
 
-            // Saved picks list (collapsible)
-            const list = document.getElementById('saved-results-list');
-            list.innerHTML = data.results.map((pick, i) => `
-                <div class="saved-pick-card" id="pick-card-${i}">
-                    <div class="saved-pick-header" onclick="togglePick(${i})">
-                        <div class="saved-pick-numbers">
-                            ${pick.white_balls.map(n => `<div class="ball" style="width:32px;height:32px;font-size:12px">${n}</div>`).join('')}
-                            <div class="ball powerball-ball" style="width:32px;height:32px;font-size:12px">${pick.powerball}</div>
+            document.getElementById('saved-results-list').innerHTML = data.results.map((pick, i) => `
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div onclick="togglePick(${i})"
+                        class="flex flex-wrap items-center justify-between gap-3 px-5 py-4 cursor-pointer hover:bg-gray-50 transition">
+                        <div class="flex flex-wrap gap-1.5 items-center">
+                            ${pick.white_balls.map(n =>
+                                `<span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200">${n}</span>`
+                            ).join('')}
+                            <span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold bg-red-50 text-red-500 border border-red-200 ml-1">${pick.powerball}</span>
                         </div>
-                        <div class="saved-pick-meta">
-                            <span class="saved-pick-date">Saved ${pick.generated_date}</span>
-                            <span class="pick-match-count">${pick.match_count} draw${pick.match_count !== 1 ? 's' : ''} matched</span>
-                            <span class="chevron">▼</span>
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs text-gray-400 font-mono">Saved ${pick.generated_date}</span>
+                            <span class="text-xs font-semibold px-3 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200">
+                                ${pick.match_count} draw${pick.match_count !== 1 ? 's' : ''} matched
+                            </span>
+                            <svg id="chevron-${i}" class="w-4 h-4 text-gray-400 transition-transform duration-200"
+                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
                         </div>
                     </div>
-                    <div class="saved-pick-results" id="pick-results-${i}" style="display:none;">
-                        ${pick.matches.map((r, j) => `
-                            <div class="result-row" style="animation-delay:${j * 20}ms">
-                                <div class="result-date">${r.draw_date}</div>
-                                <div class="result-balls">
-                                    ${renderBalls(r.official_numbers, r.official_powerball, pick.white_balls, pick.powerball)}
-                                </div>
+                    <div id="pick-results-${i}" class="hidden divide-y divide-gray-50 border-t border-gray-100">
+                        ${pick.matches.map(r => `
+                            <div class="flex flex-wrap items-center gap-3 px-5 py-3 hover:bg-gray-50 transition">
+                                <span class="text-xs font-mono text-gray-400 w-24 shrink-0">${r.draw_date}</span>
+                                ${renderBalls(r.official_numbers, r.official_powerball, pick.white_balls, pick.powerball)}
                                 ${matchBadge(r.white_matches, r.powerball_match)}
                             </div>
                         `).join('')}
@@ -811,24 +367,25 @@
                 </div>
             `).join('');
 
-            document.getElementById('saved-results').style.display = 'block';
+            document.getElementById('saved-results').classList.remove('hidden');
 
         } catch (e) {
-            showError('error-saved', 'Network error. Please try again.');
+            showError('saved', 'Network error. Please try again.');
         } finally {
             setLoading('saved', false);
         }
     }
 
+    // ── Toggle accordion ──────────────────────────────────────
     function togglePick(i) {
-        const card = document.getElementById('pick-card-' + i);
         const results = document.getElementById('pick-results-' + i);
-        const isOpen = card.classList.contains('open');
-        card.classList.toggle('open', !isOpen);
-        results.style.display = isOpen ? 'none' : 'flex';
+        const chevron = document.getElementById('chevron-' + i);
+        const isOpen  = !results.classList.contains('hidden');
+        results.classList.toggle('hidden', isOpen);
+        chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
     }
 
-    // Auto-tab between white ball inputs
+    // ── Auto-advance inputs ───────────────────────────────────
     document.querySelectorAll('.wb-input').forEach((input, idx, all) => {
         input.addEventListener('input', () => {
             if (input.value.length >= 2) {
@@ -837,6 +394,6 @@
             }
         });
     });
+
 </script>
-</body>
-</html>
+{% endblock %}
