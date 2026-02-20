@@ -3,183 +3,538 @@
 {% block page_heading %}Check My Numbers{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto px-4 py-6">
 
-    <!-- Subtitle -->
-    <p class="text-gray-500 text-sm mb-6">
-        Match your picks against official Powerball draws from 2010 to 2026.
-    </p>
+<style>
+    /* ── Dark theme scoped to this page ── */
+    #cmn-wrapper {
+        --bg:       #0a0a0f;
+        --surface:  #111118;
+        --surface2: #1a1a24;
+        --border:   #2a2a3a;
+        --accent:   #e8c547;
+        --accent2:  #e05c3a;
+        --white:    #f0f0f0;
+        --muted:    #6b6b80;
 
-    <!-- Mode Tabs -->
-    <div class="flex space-x-2 mb-6">
-        <button id="tab-manual"
-            onclick="switchMode('manual')"
-            class="px-5 py-2 rounded-full text-sm font-semibold bg-blue-600 text-white transition duration-200">
-            Manual Check
-        </button>
-        <button id="tab-saved"
-            onclick="switchMode('saved')"
-            class="px-5 py-2 rounded-full text-sm font-semibold bg-white text-gray-600 border border-gray-300 hover:border-blue-400 hover:text-blue-600 transition duration-200">
-            Saved Picks
-        </button>
+        background: var(--bg);
+        color: var(--white);
+        font-family: 'Inter', sans-serif;
+        min-height: calc(100vh - 64px);
+        padding: 36px 24px;
+        position: relative;
+    }
+
+    /* Grid background */
+    #cmn-wrapper::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background-image:
+            linear-gradient(rgba(232,197,71,0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(232,197,71,0.03) 1px, transparent 1px);
+        background-size: 40px 40px;
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    #cmn-wrapper > * { position: relative; z-index: 1; }
+
+    /* Header */
+    .cmn-label {
+        font-size: 11px;
+        letter-spacing: 3px;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 6px;
+        font-weight: 600;
+    }
+
+    .cmn-subtitle {
+        color: var(--muted);
+        font-size: 14px;
+        margin-bottom: 32px;
+        font-weight: 300;
+    }
+
+    /* Tabs */
+    .cmn-tabs {
+        display: flex;
+        gap: 4px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 4px;
+        width: fit-content;
+        margin-bottom: 28px;
+    }
+
+    .cmn-tab {
+        padding: 9px 22px;
+        border-radius: 7px;
+        border: none;
+        background: transparent;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .cmn-tab.active {
+        background: var(--accent);
+        color: #000;
+    }
+
+    .cmn-tab:hover:not(.active) { color: var(--white); }
+
+    /* Card */
+    .cmn-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 28px;
+        margin-bottom: 20px;
+    }
+
+    .cmn-card-title {
+        font-size: 10px;
+        letter-spacing: 2px;
+        color: var(--accent);
+        text-transform: uppercase;
+        font-weight: 700;
+        margin-bottom: 20px;
+    }
+
+    /* Number inputs */
+    .cmn-input-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: flex-end;
+        margin-bottom: 20px;
+    }
+
+    .cmn-input-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .cmn-input-group label {
+        font-size: 10px;
+        color: var(--muted);
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        font-weight: 600;
+    }
+
+    .cmn-input {
+        width: 60px;
+        height: 60px;
+        background: var(--surface2);
+        border: 2px solid var(--border);
+        border-radius: 12px;
+        color: var(--white);
+        font-size: 22px;
+        font-weight: 700;
+        text-align: center;
+        outline: none;
+        transition: border-color 0.2s;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .cmn-input:focus { border-color: var(--accent); }
+
+    .cmn-input.pb-input {
+        border-color: rgba(224,92,58,0.5);
+        color: var(--accent2);
+    }
+
+    .cmn-input.pb-input:focus { border-color: var(--accent2); }
+
+    .cmn-sep {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--border);
+        padding-bottom: 8px;
+    }
+
+    /* Buttons */
+    .cmn-btn-primary {
+        padding: 12px 28px;
+        background: var(--accent);
+        color: #000;
+        border: none;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .cmn-btn-primary:hover { background: #f0d060; transform: translateY(-1px); }
+    .cmn-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .cmn-btn-secondary {
+        padding: 12px 28px;
+        background: var(--surface2);
+        color: var(--white);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .cmn-btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Loading */
+    .cmn-loading {
+        display: none;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 14px;
+    }
+
+    .cmn-loading.visible { display: flex; }
+
+    .cmn-spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid var(--border);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: cmn-spin 0.7s linear infinite;
+        flex-shrink: 0;
+    }
+
+    @keyframes cmn-spin { to { transform: rotate(360deg); } }
+
+    /* Error */
+    .cmn-error {
+        display: none;
+        margin-top: 14px;
+        padding: 12px 16px;
+        background: rgba(224,92,58,0.1);
+        border: 1px solid rgba(224,92,58,0.3);
+        border-radius: 8px;
+        color: #ff8060;
+        font-size: 13px;
+    }
+
+    /* Stats bar */
+    .cmn-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+        margin-bottom: 20px;
+    }
+
+    .cmn-stat {
+        flex: 1;
+        min-width: 120px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px 18px;
+    }
+
+    .cmn-stat-label {
+        font-size: 10px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+
+    .cmn-stat-value {
+        font-size: 28px;
+        font-weight: 800;
+        color: var(--accent);
+        line-height: 1;
+    }
+
+    .cmn-stat-value.white { color: var(--white); }
+
+    /* Results list */
+    .cmn-results-wrap {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        overflow: hidden;
+    }
+
+    .cmn-results-header {
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .cmn-results-header span {
+        font-size: 10px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        font-weight: 600;
+    }
+
+    .cmn-result-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        transition: background 0.15s;
+        animation: cmn-fadein 0.3s ease forwards;
+    }
+
+    .cmn-result-row:last-child { border-bottom: none; }
+    .cmn-result-row:hover { background: var(--surface2); }
+
+    @keyframes cmn-fadein {
+        from { opacity: 0; transform: translateY(5px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .cmn-date {
+        font-size: 11px;
+        color: var(--muted);
+        font-family: 'Courier New', monospace;
+        min-width: 88px;
+    }
+
+    .cmn-balls {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        align-items: center;
+        flex: 1;
+    }
+
+    .cmn-ball {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+        border: 1px solid var(--border);
+        background: var(--surface2);
+        color: var(--muted);
+        transition: all 0.15s;
+    }
+
+    .cmn-ball.matched {
+        background: var(--accent);
+        color: #000;
+        border-color: var(--accent);
+    }
+
+    .cmn-ball.pb-ball {
+        border-color: rgba(224,92,58,0.4);
+        color: var(--accent2);
+    }
+
+    .cmn-ball.pb-ball.matched {
+        background: var(--accent2);
+        color: #fff;
+        border-color: var(--accent2);
+    }
+
+    /* Match badge */
+    .cmn-badge {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 4px 12px;
+        border-radius: 20px;
+        white-space: nowrap;
+        border: 1px solid;
+    }
+
+    .badge-2 { background: rgba(74,124,89,0.2);  color: #6fcf97; border-color: #4a7c59; }
+    .badge-3 { background: rgba(45,125,210,0.2); color: #56b3ff; border-color: #2d7dd2; }
+    .badge-4 { background: rgba(155,93,229,0.2); color: #c77dff; border-color: #9b5de5; }
+    .badge-5 { background: rgba(224,92,58,0.2);  color: #ff8060; border-color: #e05c3a; }
+
+    /* Saved pick cards */
+    .cmn-pick-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        margin-bottom: 10px;
+        animation: cmn-fadein 0.3s ease forwards;
+    }
+
+    .cmn-pick-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px 20px;
+        background: var(--surface2);
+        border-bottom: 1px solid transparent;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+
+    .cmn-pick-header:hover { background: #1f1f2e; }
+
+    .cmn-pick-card.open .cmn-pick-header {
+        border-bottom-color: var(--border);
+    }
+
+    .cmn-pick-meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .cmn-pick-date {
+        font-size: 11px;
+        color: var(--muted);
+        font-family: 'Courier New', monospace;
+    }
+
+    .cmn-pick-count {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 20px;
+        background: rgba(232,197,71,0.1);
+        border: 1px solid rgba(232,197,71,0.3);
+        color: var(--accent);
+    }
+
+    .cmn-chevron {
+        color: var(--muted);
+        font-size: 11px;
+        transition: transform 0.2s;
+        display: inline-block;
+    }
+
+    .cmn-pick-card.open .cmn-chevron { transform: rotate(180deg); }
+
+    .cmn-pick-body { display: none; }
+    .cmn-pick-card.open .cmn-pick-body { display: block; }
+
+    /* Empty state */
+    .cmn-empty {
+        text-align: center;
+        padding: 64px 20px;
+        color: var(--muted);
+    }
+
+    .cmn-empty .icon { font-size: 48px; margin-bottom: 14px; }
+    .cmn-empty p { font-size: 14px; line-height: 1.7; }
+</style>
+
+<div id="cmn-wrapper">
+    <div style="max-width:900px; margin:0 auto;">
+
+        <!-- Header -->
+        <div class="cmn-label">Powerball Analyzer</div>
+        <p class="cmn-subtitle">Match your picks against 1,910+ official draws from 2010 to 2026.</p>
+
+        <!-- Tabs -->
+        <div class="cmn-tabs">
+            <button class="cmn-tab active" id="tab-manual" onclick="cmnSwitchMode('manual')">Manual Check</button>
+            <button class="cmn-tab"        id="tab-saved"  onclick="cmnSwitchMode('saved')">Saved Picks</button>
+        </div>
+
+        <!-- ══════════ MANUAL PANEL ══════════ -->
+        <div id="panel-manual">
+            <div class="cmn-card">
+                <div class="cmn-card-title">Enter Your Numbers</div>
+                <div class="cmn-input-row">
+                    <div class="cmn-input-group"><label>Ball 1</label><input type="number" id="wb1" class="cmn-input wb-input" min="1" max="69" placeholder="–"></div>
+                    <div class="cmn-input-group"><label>Ball 2</label><input type="number" id="wb2" class="cmn-input wb-input" min="1" max="69" placeholder="–"></div>
+                    <div class="cmn-input-group"><label>Ball 3</label><input type="number" id="wb3" class="cmn-input wb-input" min="1" max="69" placeholder="–"></div>
+                    <div class="cmn-input-group"><label>Ball 4</label><input type="number" id="wb4" class="cmn-input wb-input" min="1" max="69" placeholder="–"></div>
+                    <div class="cmn-input-group"><label>Ball 5</label><input type="number" id="wb5" class="cmn-input wb-input" min="1" max="69" placeholder="–"></div>
+                    <div class="cmn-sep">+</div>
+                    <div class="cmn-input-group"><label style="color:#e05c3a">Powerball</label><input type="number" id="pb" class="cmn-input pb-input" min="1" max="39" placeholder="–"></div>
+                </div>
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <button class="cmn-btn-primary"   id="btn-check" onclick="cmnCheckManual()">Check Numbers</button>
+                    <button class="cmn-btn-secondary" onclick="cmnClear()">Clear</button>
+                </div>
+                <div class="cmn-loading" id="loading-check"><div class="cmn-spinner"></div>Checking against all draws...</div>
+                <div class="cmn-error"   id="error-manual"></div>
+            </div>
+
+            <!-- Results -->
+            <div id="manual-results" style="display:none;">
+                <div class="cmn-stats">
+                    <div class="cmn-stat"><div class="cmn-stat-label">Draws Checked</div><div class="cmn-stat-value white" id="stat-total">–</div></div>
+                    <div class="cmn-stat"><div class="cmn-stat-label">Draws Matched</div><div class="cmn-stat-value"       id="stat-matched">–</div></div>
+                    <div class="cmn-stat" style="flex:2"><div class="cmn-stat-label">Your Numbers</div><div style="font-size:14px;font-weight:700;color:var(--white);margin-top:4px" id="stat-numbers">–</div></div>
+                </div>
+                <div class="cmn-results-wrap">
+                    <div class="cmn-results-header">
+                        <span>Matching Draws</span>
+                        <span>Sorted by best match</span>
+                    </div>
+                    <div id="manual-results-list"></div>
+                </div>
+            </div>
+
+            <div id="manual-empty" style="display:none;" class="cmn-card">
+                <div class="cmn-empty">
+                    <div class="icon">🎱</div>
+                    <p>No draws found with 2 or more matching numbers.<br>Try different numbers.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══════════ SAVED PICKS PANEL ══════════ -->
+        <div id="panel-saved" style="display:none;">
+            <div class="cmn-card">
+                <div class="cmn-card-title">Check All Saved Picks</div>
+                <p style="color:var(--muted); font-size:13px; margin-bottom:20px; line-height:1.6;">
+                    Checks every pick you've saved against all official draws.<br>Only picks with 2+ matches are shown.
+                </p>
+                <button class="cmn-btn-primary" id="btn-saved" onclick="cmnCheckSaved()">Run Check</button>
+                <div class="cmn-loading" id="loading-saved"><div class="cmn-spinner"></div>Checking all saved picks — this may take a moment...</div>
+                <div class="cmn-error"   id="error-saved"></div>
+            </div>
+
+            <!-- Results -->
+            <div id="saved-results" style="display:none;">
+                <div class="cmn-stats">
+                    <div class="cmn-stat"><div class="cmn-stat-label">Picks Checked</div><div class="cmn-stat-value white" id="stat-picks-total">–</div></div>
+                    <div class="cmn-stat"><div class="cmn-stat-label">Picks Matched</div><div class="cmn-stat-value"       id="stat-picks-matched">–</div></div>
+                    <div class="cmn-stat"><div class="cmn-stat-label">Draws Checked</div><div class="cmn-stat-value white" id="stat-draws-checked">–</div></div>
+                </div>
+                <div id="saved-results-list"></div>
+            </div>
+
+            <div id="saved-empty" style="display:none;" class="cmn-card">
+                <div class="cmn-empty">
+                    <div class="icon">📭</div>
+                    <p>None of your saved picks matched 2+ numbers in any draw.<br>Keep generating!</p>
+                </div>
+            </div>
+        </div>
+
     </div>
-
-    <!-- ===================== MANUAL MODE ===================== -->
-    <div id="panel-manual">
-
-        <div class="bg-white rounded-xl shadow-md p-6 mb-6">
-            <h2 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Enter Your Numbers</h2>
-
-            <!-- Number Inputs -->
-            <div class="flex flex-wrap items-end gap-3 mb-5">
-                <div class="flex flex-col items-center gap-1">
-                    <span class="text-xs text-gray-400 font-medium">Ball 1</span>
-                    <input type="number" id="wb1" min="1" max="69" placeholder="–"
-                        class="wb-input w-14 h-14 text-center text-xl font-bold border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 text-gray-800 transition">
-                </div>
-                <div class="flex flex-col items-center gap-1">
-                    <span class="text-xs text-gray-400 font-medium">Ball 2</span>
-                    <input type="number" id="wb2" min="1" max="69" placeholder="–"
-                        class="wb-input w-14 h-14 text-center text-xl font-bold border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 text-gray-800 transition">
-                </div>
-                <div class="flex flex-col items-center gap-1">
-                    <span class="text-xs text-gray-400 font-medium">Ball 3</span>
-                    <input type="number" id="wb3" min="1" max="69" placeholder="–"
-                        class="wb-input w-14 h-14 text-center text-xl font-bold border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 text-gray-800 transition">
-                </div>
-                <div class="flex flex-col items-center gap-1">
-                    <span class="text-xs text-gray-400 font-medium">Ball 4</span>
-                    <input type="number" id="wb4" min="1" max="69" placeholder="–"
-                        class="wb-input w-14 h-14 text-center text-xl font-bold border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 text-gray-800 transition">
-                </div>
-                <div class="flex flex-col items-center gap-1">
-                    <span class="text-xs text-gray-400 font-medium">Ball 5</span>
-                    <input type="number" id="wb5" min="1" max="69" placeholder="–"
-                        class="wb-input w-14 h-14 text-center text-xl font-bold border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 text-gray-800 transition">
-                </div>
-
-                <div class="flex flex-col items-center justify-end pb-2">
-                    <span class="text-2xl font-bold text-gray-300">+</span>
-                </div>
-
-                <div class="flex flex-col items-center gap-1">
-                    <span class="text-xs text-red-400 font-medium">Powerball</span>
-                    <input type="number" id="pb" min="1" max="39" placeholder="–"
-                        class="w-14 h-14 text-center text-xl font-bold border-2 border-red-300 rounded-xl focus:outline-none focus:border-red-500 text-red-500 transition">
-                </div>
-            </div>
-
-            <!-- Buttons -->
-            <div class="flex items-center gap-3 flex-wrap">
-                <button onclick="checkManual()" id="btn-check"
-                    class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg transition duration-200">
-                    Check Numbers
-                </button>
-                <button onclick="clearManual()"
-                    class="bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold px-6 py-2.5 rounded-lg transition duration-200">
-                    Clear
-                </button>
-            </div>
-
-            <!-- Loading -->
-            <div id="loading-check" class="hidden mt-4 flex items-center gap-2 text-sm text-gray-400">
-                <svg class="animate-spin h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-                </svg>
-                Checking against all draws...
-            </div>
-
-            <!-- Error -->
-            <div id="error-manual" class="hidden mt-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm"></div>
-        </div>
-
-        <!-- Manual Results -->
-        <div id="manual-results" class="hidden">
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-5">
-                <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Draws Checked</p>
-                    <p id="stat-total" class="text-3xl font-extrabold text-gray-800">–</p>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Draws Matched</p>
-                    <p id="stat-matched" class="text-3xl font-extrabold text-blue-600">–</p>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100 col-span-2 sm:col-span-1">
-                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Your Numbers</p>
-                    <p id="stat-numbers" class="text-sm font-semibold text-gray-700 mt-1">–</p>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-md overflow-hidden">
-                <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-                    <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Matching Draws</span>
-                    <span class="text-xs text-gray-400">Sorted by best match</span>
-                </div>
-                <div id="manual-results-list" class="divide-y divide-gray-50"></div>
-            </div>
-        </div>
-
-        <!-- Empty State -->
-        <div id="manual-empty" class="hidden bg-white rounded-xl shadow-md p-12 text-center">
-            <div class="text-5xl mb-4">🎱</div>
-            <p class="text-gray-500">No draws found with 2 or more matching numbers.<br>Try different numbers.</p>
-        </div>
-    </div>
-
-    <!-- ===================== SAVED PICKS MODE ===================== -->
-    <div id="panel-saved" class="hidden">
-
-        <div class="bg-white rounded-xl shadow-md p-6 mb-6">
-            <h2 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Check All Saved Picks</h2>
-            <p class="text-sm text-gray-500 mb-5">
-                Checks every pick you've saved against all official draws. Only picks with 2+ matches are shown.
-            </p>
-            <button onclick="checkSaved()" id="btn-saved"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg transition duration-200">
-                Run Check
-            </button>
-
-            <!-- Loading -->
-            <div id="loading-saved" class="hidden mt-4 flex items-center gap-2 text-sm text-gray-400">
-                <svg class="animate-spin h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-                </svg>
-                Checking all saved picks — this may take a moment...
-            </div>
-
-            <!-- Error -->
-            <div id="error-saved" class="hidden mt-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm"></div>
-        </div>
-
-        <!-- Saved Results -->
-        <div id="saved-results" class="hidden">
-            <div class="grid grid-cols-3 gap-4 mb-5">
-                <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Picks Checked</p>
-                    <p id="stat-picks-total" class="text-3xl font-extrabold text-gray-800">–</p>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Picks Matched</p>
-                    <p id="stat-picks-matched" class="text-3xl font-extrabold text-blue-600">–</p>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-                    <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Draws Checked</p>
-                    <p id="stat-draws-checked" class="text-3xl font-extrabold text-gray-800">–</p>
-                </div>
-            </div>
-            <div id="saved-results-list" class="space-y-3"></div>
-        </div>
-
-        <!-- Empty State -->
-        <div id="saved-empty" class="hidden bg-white rounded-xl shadow-md p-12 text-center">
-            <div class="text-5xl mb-4">📭</div>
-            <p class="text-gray-500">None of your saved picks matched 2+ numbers in any draw.<br>Keep generating!</p>
-        </div>
-    </div>
-
 </div>
+
 {% endblock %}
 
 
@@ -187,88 +542,71 @@
 {{ super() }}
 <script>
 
-    // ── Match badge ───────────────────────────────────────────
-    function matchBadge(whiteMatches, pbMatch) {
-        const pb = pbMatch ? ' + PB ⚡' : '';
-        let cls = 'bg-green-100 text-green-700 border-green-300';
-        if (whiteMatches >= 5)      cls = 'bg-red-100 text-red-700 border-red-300';
-        else if (whiteMatches >= 4) cls = 'bg-purple-100 text-purple-700 border-purple-300';
-        else if (whiteMatches >= 3) cls = 'bg-blue-100 text-blue-700 border-blue-300';
-        return `<span class="text-xs font-semibold px-3 py-1 rounded-full border ${cls} whitespace-nowrap">
-                    ${whiteMatches} match${whiteMatches !== 1 ? 'es' : ''}${pb}
-                </span>`;
+    // ── Badge ─────────────────────────────────────────────────
+    function cmnBadge(whiteMatches, pbMatch) {
+        const pb  = pbMatch ? ' + PB ⚡' : '';
+        const cls = whiteMatches >= 5 ? 'badge-5'
+                  : whiteMatches >= 4 ? 'badge-4'
+                  : whiteMatches >= 3 ? 'badge-3' : 'badge-2';
+        return `<span class="cmn-badge ${cls}">${whiteMatches} match${whiteMatches !== 1 ? 'es' : ''}${pb}</span>`;
     }
 
-    // ── Render balls ──────────────────────────────────────────
-    function renderBalls(officialNumbers, officialPb, checkedNumbers, checkedPb) {
-        const checkedSet = new Set(checkedNumbers);
-        let html = '<div class="flex flex-wrap gap-1.5 items-center">';
-        officialNumbers.forEach(n => {
-            const matched = checkedSet.has(n);
-            html += `<span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold border
-                        ${matched ? 'bg-blue-500 text-white border-blue-600' : 'bg-gray-100 text-gray-500 border-gray-200'}">${n}</span>`;
+    // ── Balls ─────────────────────────────────────────────────
+    function cmnBalls(officialNums, officialPb, checkedNums, checkedPb) {
+        const set = new Set(checkedNums);
+        let h = '<div class="cmn-balls">';
+        officialNums.forEach(n => {
+            h += `<div class="cmn-ball ${set.has(n) ? 'matched' : ''}">${n}</div>`;
         });
-        const pbMatched = officialPb === checkedPb;
-        html += `<span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold border ml-1
-                    ${pbMatched ? 'bg-red-500 text-white border-red-600' : 'bg-red-50 text-red-400 border-red-200'}">${officialPb}</span>`;
-        html += '</div>';
-        return html;
+        h += `<div class="cmn-ball pb-ball ${officialPb === checkedPb ? 'matched' : ''}">${officialPb}</div>`;
+        h += '</div>';
+        return h;
     }
 
-    // ── Mode switching ────────────────────────────────────────
-    function switchMode(mode) {
+    // ── Mode switch ───────────────────────────────────────────
+    function cmnSwitchMode(mode) {
         const isManual = mode === 'manual';
-        document.getElementById('panel-manual').classList.toggle('hidden', !isManual);
-        document.getElementById('panel-saved').classList.toggle('hidden', isManual);
-
-        const tabManual = document.getElementById('tab-manual');
-        const tabSaved  = document.getElementById('tab-saved');
-
-        if (isManual) {
-            tabManual.className = 'px-5 py-2 rounded-full text-sm font-semibold bg-blue-600 text-white transition duration-200';
-            tabSaved.className  = 'px-5 py-2 rounded-full text-sm font-semibold bg-white text-gray-600 border border-gray-300 hover:border-blue-400 hover:text-blue-600 transition duration-200';
-        } else {
-            tabSaved.className  = 'px-5 py-2 rounded-full text-sm font-semibold bg-blue-600 text-white transition duration-200';
-            tabManual.className = 'px-5 py-2 rounded-full text-sm font-semibold bg-white text-gray-600 border border-gray-300 hover:border-blue-400 hover:text-blue-600 transition duration-200';
-        }
+        document.getElementById('panel-manual').style.display = isManual ? 'block' : 'none';
+        document.getElementById('panel-saved').style.display  = isManual ? 'none'  : 'block';
+        document.getElementById('tab-manual').classList.toggle('active', isManual);
+        document.getElementById('tab-saved').classList.toggle('active', !isManual);
     }
 
     // ── Helpers ───────────────────────────────────────────────
-    function showError(id, msg) {
+    function cmnErr(id, msg) {
         const el = document.getElementById('error-' + id);
         el.textContent = msg;
-        el.classList.remove('hidden');
+        el.style.display = 'block';
     }
-    function hideError(id) {
-        document.getElementById('error-' + id).classList.add('hidden');
-    }
-    function setLoading(id, on) {
-        document.getElementById('loading-' + id).classList.toggle('hidden', !on);
+    function cmnHideErr(id) { document.getElementById('error-' + id).style.display = 'none'; }
+
+    function cmnLoading(id, on) {
+        document.getElementById('loading-' + id).classList.toggle('visible', on);
         document.getElementById('btn-' + id).disabled = on;
     }
 
-    // ── Manual Check ─────────────────────────────────────────
-    function clearManual() {
+    // ── Manual check ─────────────────────────────────────────
+    function cmnClear() {
         ['wb1','wb2','wb3','wb4','wb5','pb'].forEach(id => document.getElementById(id).value = '');
-        document.getElementById('manual-results').classList.add('hidden');
-        document.getElementById('manual-empty').classList.add('hidden');
-        hideError('manual');
+        document.getElementById('manual-results').style.display = 'none';
+        document.getElementById('manual-empty').style.display   = 'none';
+        cmnHideErr('manual');
     }
 
-    async function checkManual() {
-        hideError('manual');
-        document.getElementById('manual-results').classList.add('hidden');
-        document.getElementById('manual-empty').classList.add('hidden');
+    async function cmnCheckManual() {
+        cmnHideErr('manual');
+        document.getElementById('manual-results').style.display = 'none';
+        document.getElementById('manual-empty').style.display   = 'none';
 
         const white_balls = ['wb1','wb2','wb3','wb4','wb5'].map(id => parseInt(document.getElementById(id).value));
         const powerball   = parseInt(document.getElementById('pb').value);
 
         if (white_balls.some(isNaN) || isNaN(powerball)) {
-            showError('manual', 'Please fill in all 5 white balls and the Powerball.');
+            cmnErr('manual', 'Please fill in all 5 white balls and the Powerball.');
             return;
         }
 
-        setLoading('check', true);
+        cmnLoading('check', true);
         try {
             const res  = await fetch('/api/check-numbers', {
                 method: 'POST',
@@ -277,56 +615,50 @@
             });
             const data = await res.json();
 
-            if (!res.ok || data.error) {
-                showError('manual', data.error || 'Something went wrong.');
-                return;
-            }
+            if (!res.ok || data.error) { cmnErr('manual', data.error || 'Something went wrong.'); return; }
 
             if (data.matches_found === 0) {
-                document.getElementById('manual-empty').classList.remove('hidden');
+                document.getElementById('manual-empty').style.display = 'block';
                 return;
             }
 
             document.getElementById('stat-total').textContent   = data.total_draws_checked.toLocaleString();
             document.getElementById('stat-matched').textContent = data.matches_found;
             document.getElementById('stat-numbers').textContent =
-                data.checked_numbers.join(' · ') + '  PB ' + data.checked_powerball;
+                data.checked_numbers.join(' · ') + '   PB ' + data.checked_powerball;
 
-            document.getElementById('manual-results-list').innerHTML = data.results.map(r => `
-                <div class="flex flex-wrap items-center gap-3 px-5 py-3 hover:bg-gray-50 transition">
-                    <span class="text-xs font-mono text-gray-400 w-24 shrink-0">${r.draw_date}</span>
-                    ${renderBalls(r.official_numbers, r.official_powerball, data.checked_numbers, data.checked_powerball)}
-                    ${matchBadge(r.white_matches, r.powerball_match)}
+            document.getElementById('manual-results-list').innerHTML = data.results.map((r, i) => `
+                <div class="cmn-result-row" style="animation-delay:${i * 25}ms">
+                    <div class="cmn-date">${r.draw_date}</div>
+                    ${cmnBalls(r.official_numbers, r.official_powerball, data.checked_numbers, data.checked_powerball)}
+                    ${cmnBadge(r.white_matches, r.powerball_match)}
                 </div>
             `).join('');
 
-            document.getElementById('manual-results').classList.remove('hidden');
+            document.getElementById('manual-results').style.display = 'block';
 
-        } catch (e) {
-            showError('manual', 'Network error. Please try again.');
+        } catch(e) {
+            cmnErr('manual', 'Network error. Please try again.');
         } finally {
-            setLoading('check', false);
+            cmnLoading('check', false);
         }
     }
 
-    // ── Saved Picks Check ─────────────────────────────────────
-    async function checkSaved() {
-        hideError('saved');
-        document.getElementById('saved-results').classList.add('hidden');
-        document.getElementById('saved-empty').classList.add('hidden');
+    // ── Saved picks check ─────────────────────────────────────
+    async function cmnCheckSaved() {
+        cmnHideErr('saved');
+        document.getElementById('saved-results').style.display = 'none';
+        document.getElementById('saved-empty').style.display   = 'none';
 
-        setLoading('saved', true);
+        cmnLoading('saved', true);
         try {
             const res  = await fetch('/api/check-saved-picks');
             const data = await res.json();
 
-            if (!res.ok || data.error) {
-                showError('saved', data.error || 'Something went wrong.');
-                return;
-            }
+            if (!res.ok || data.error) { cmnErr('saved', data.error || 'Something went wrong.'); return; }
 
             if (data.picks_with_matches === 0) {
-                document.getElementById('saved-empty').classList.remove('hidden');
+                document.getElementById('saved-empty').style.display = 'block';
                 return;
             }
 
@@ -335,54 +667,42 @@
             document.getElementById('stat-draws-checked').textContent = data.total_draws_checked.toLocaleString();
 
             document.getElementById('saved-results-list').innerHTML = data.results.map((pick, i) => `
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div onclick="togglePick(${i})"
-                        class="flex flex-wrap items-center justify-between gap-3 px-5 py-4 cursor-pointer hover:bg-gray-50 transition">
-                        <div class="flex flex-wrap gap-1.5 items-center">
-                            ${pick.white_balls.map(n =>
-                                `<span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200">${n}</span>`
-                            ).join('')}
-                            <span class="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold bg-red-50 text-red-500 border border-red-200 ml-1">${pick.powerball}</span>
+                <div class="cmn-pick-card" id="pick-${i}">
+                    <div class="cmn-pick-header" onclick="cmnToggle(${i})">
+                        <div class="cmn-balls">
+                            ${pick.white_balls.map(n => `<div class="cmn-ball">${n}</div>`).join('')}
+                            <div class="cmn-ball pb-ball">${pick.powerball}</div>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <span class="text-xs text-gray-400 font-mono">Saved ${pick.generated_date}</span>
-                            <span class="text-xs font-semibold px-3 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200">
-                                ${pick.match_count} draw${pick.match_count !== 1 ? 's' : ''} matched
-                            </span>
-                            <svg id="chevron-${i}" class="w-4 h-4 text-gray-400 transition-transform duration-200"
-                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                            </svg>
+                        <div class="cmn-pick-meta">
+                            <span class="cmn-pick-date">Saved ${pick.generated_date}</span>
+                            <span class="cmn-pick-count">${pick.match_count} draw${pick.match_count !== 1 ? 's' : ''} matched</span>
+                            <span class="cmn-chevron">▼</span>
                         </div>
                     </div>
-                    <div id="pick-results-${i}" class="hidden divide-y divide-gray-50 border-t border-gray-100">
-                        ${pick.matches.map(r => `
-                            <div class="flex flex-wrap items-center gap-3 px-5 py-3 hover:bg-gray-50 transition">
-                                <span class="text-xs font-mono text-gray-400 w-24 shrink-0">${r.draw_date}</span>
-                                ${renderBalls(r.official_numbers, r.official_powerball, pick.white_balls, pick.powerball)}
-                                ${matchBadge(r.white_matches, r.powerball_match)}
+                    <div class="cmn-pick-body" id="pick-body-${i}">
+                        ${pick.matches.map((r, j) => `
+                            <div class="cmn-result-row" style="animation-delay:${j * 20}ms">
+                                <div class="cmn-date">${r.draw_date}</div>
+                                ${cmnBalls(r.official_numbers, r.official_powerball, pick.white_balls, pick.powerball)}
+                                ${cmnBadge(r.white_matches, r.powerball_match)}
                             </div>
                         `).join('')}
                     </div>
                 </div>
             `).join('');
 
-            document.getElementById('saved-results').classList.remove('hidden');
+            document.getElementById('saved-results').style.display = 'block';
 
-        } catch (e) {
-            showError('saved', 'Network error. Please try again.');
+        } catch(e) {
+            cmnErr('saved', 'Network error. Please try again.');
         } finally {
-            setLoading('saved', false);
+            cmnLoading('saved', false);
         }
     }
 
     // ── Toggle accordion ──────────────────────────────────────
-    function togglePick(i) {
-        const results = document.getElementById('pick-results-' + i);
-        const chevron = document.getElementById('chevron-' + i);
-        const isOpen  = !results.classList.contains('hidden');
-        results.classList.toggle('hidden', isOpen);
-        chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+    function cmnToggle(i) {
+        document.getElementById('pick-' + i).classList.toggle('open');
     }
 
     // ── Auto-advance inputs ───────────────────────────────────
