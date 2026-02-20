@@ -237,7 +237,7 @@ def call_groq(prompt):
                 "content": prompt
             }
         ],
-        "max_tokens": 300,
+        "max_tokens": 500,
         "temperature": 0.3
     }
     
