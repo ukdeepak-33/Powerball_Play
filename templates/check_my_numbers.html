@@ -308,10 +308,11 @@
     }
 
     .cmn-date {
-        font-size: 11px;
-        color: var(--muted);
+        font-size: 13px;
+        color: var(--white);
         font-family: 'Courier New', monospace;
-        min-width: 88px;
+        min-width: 96px;
+        font-weight: 600;
     }
 
     .cmn-balls {
@@ -624,8 +625,13 @@
 
             document.getElementById('stat-total').textContent   = data.total_draws_checked.toLocaleString();
             document.getElementById('stat-matched').textContent = data.matches_found;
-            document.getElementById('stat-numbers').textContent =
-                data.checked_numbers.join(' · ') + '   PB ' + data.checked_powerball;
+
+            const wbHtml = data.checked_numbers.map(n =>
+                `<div class="cmn-ball matched" style="width:30px;height:30px;font-size:11px">${n}</div>`
+            ).join('');
+            const pbHtml = `<div class="cmn-ball pb-ball matched" style="width:30px;height:30px;font-size:11px">${data.checked_powerball}</div>`;
+            document.getElementById('stat-numbers').innerHTML =
+                `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">${wbHtml}${pbHtml}</div>`;
 
             document.getElementById('manual-results-list').innerHTML = data.results.map((r, i) => `
                 <div class="cmn-result-row" style="animation-delay:${i * 25}ms">
