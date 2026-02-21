@@ -333,30 +333,7 @@
                 gap: 10px;
             }
         }
-        /* Fixed home icon */
-        .home-icon-fixed {
-            position: fixed !important;
-            top: 16px;
-            left: 16px;
-            z-index: 99999;
-            background: rgba(30, 60, 114, 0.85);
-            backdrop-filter: blur(6px);
-            border: 1px solid rgba(255,255,255,0.3);
-            color: white;
-            text-decoration: none;
-            width: 44px;
-            height: 44px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 22px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            transition: background 0.2s;
-        }
-        .home-icon-fixed:hover {
-            background: rgba(42, 82, 152, 0.95);
-        }
+
     </style>
 </head>
 <body>
@@ -370,6 +347,24 @@
             <div class="control-section">
                 <div class="control-label">📅 Select Year:</div>
                 <div class="year-tabs">
+                    <a href="{{ url_for('index') }}" title="Go to Home" style="
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 40px;
+                        height: 36px;
+                        border-radius: 20px;
+                        background: #1e3c72;
+                        color: white;
+                        text-decoration: none;
+                        font-size: 18px;
+                        border: 2px solid #2a5298;
+                        transition: background 0.2s, transform 0.2s;
+                        flex-shrink: 0;
+                    "
+                    onmouseover="this.style.background='#2a5298'; this.style.transform='scale(1.08)'"
+                    onmouseout="this.style.background='#1e3c72'; this.style.transform='scale(1)'"
+                    >🏠</a>
                     <button class="tab active" onclick="showYear(2026)">2026</button>
                     <button class="tab" onclick="showYear(2025)">2025</button>
                     <button class="tab" onclick="showYear(2024)">2024</button>
@@ -1310,7 +1305,5 @@
             showMessage('bulk-import-message', 'Data exported successfully', false);
         }
     </script>
-    <!-- Home icon: placed as last child of body to avoid stacking context issues -->
-    <a href="{{ url_for('index') }}" class="home-icon-fixed" title="Go to Home">🏠</a>
 </body>
 </html>
