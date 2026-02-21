@@ -3660,6 +3660,7 @@ def frequency_analysis_route():
     return render_template('frequency_analysis.html',
                            white_ball_freq=white_ball_freq_list,
                            powerball_freq=powerball_freq_list)
+    
 @app.route('/positional_analysis')
 def positional_analysis_route():
     if df.empty:
@@ -4555,6 +4556,10 @@ def yearly_white_ball_trends_route():
 
     return render_template('yearly_white_ball_trends.html',
                            years=years_for_display)
+
+@app.route('/ai-assistant')
+def ai_assistant():
+    return render_template('ai_assistant.html')
 
 
 # --- API Endpoints ---
