@@ -837,6 +837,181 @@ def _get_current_year_frequency_groups():
     
     return frequency_groups
 
+# ── Helper: Get full frequency map for all white balls ───────
+def _get_full_frequency_map(df_source):
+    """Returns {number: frequency_count} for all white balls across all history."""
+    if df_source.empty:
+        return {}
+    all_nums = df_source[['Number 1','Number 2','Number 3','Number 4','Number 5']].values.flatten()
+    freq = pd.Series(all_nums).value_counts()
+    return {int(k): int(v) for k, v in freq.items()}
+
+
+# ── Helper: Get hot/cold sets (last 90 draws) ────────────────
+def _get_hot_cold_sets(df_source, hot_top=15, cold_top=15):
+    """Returns sets of hot and cold numbers based on last 90 draws."""
+    if df_source.empty:
+        return set(), set()
+    recent = df_source.sort_values('Draw Date_dt', ascending=False).head(90)
+    all_nums = recent[['Number 1','Number 2','Number 3','Number 4','Number 5']].values.flatten()
+    freq = pd.Series(all_nums).value_counts()
+    hot  = set(int(n) for n in freq.nlargest(hot_top).index)
+    cold = set(int(n) for n in freq.nsmallest(cold_top).index)
+    return hot, cold
+
+
+# ── Helper: Get powerball frequency map ──────────────────────
+def _get_pb_frequency_map(df_source):
+    """Returns {powerball: frequency_count}."""
+    if df_source.empty:
+        return {}
+    freq = df_source['Powerball'].value_counts()
+    return {int(k): int(v) for k, v in freq.items()}
+
+
+# ── Helper: Score a single candidate set ────────────────────
+def _score_enhanced_pick(white_balls, powerball, freq_map, hot_set, cold_set, pb_freq_map, df_source):
+    """
+    Scores a candidate pick 0–100 based on:
+      - Frequency score (30 pts): how often each number has appeared
+      - Hot number bonus (25 pts): numbers trending in last 90 draws
+      - Pattern score (25 pts): consecutive pairs, decade balance, odd/even balance
+      - Powerball score (20 pts): powerball frequency
+    Returns (score_0_to_100, reasons_dict)
+    """
+    score = 0
+    reasons = {}
+
+    # ── 1. Frequency score (30 pts) ───────────────────────────
+    if freq_map:
+        max_freq = max(freq_map.values()) if freq_map else 1
+        freq_scores = [freq_map.get(n, 0) / max_freq for n in white_balls]
+        freq_contribution = (sum(freq_scores) / 5) * 30
+        score += freq_contribution
+
+        # Tag each number
+        for n in white_balls:
+            f = freq_map.get(n, 0)
+            pct = f / max_freq if max_freq else 0
+            if pct >= 0.75:
+                reasons[n] = reasons.get(n, []) + ['High frequency']
+            elif pct >= 0.45:
+                reasons[n] = reasons.get(n, []) + ['Moderate frequency']
+            else:
+                reasons[n] = reasons.get(n, []) + ['Low frequency']
+
+    # ── 2. Hot/cold score (25 pts) ────────────────────────────
+    hot_count  = sum(1 for n in white_balls if n in hot_set)
+    cold_count = sum(1 for n in white_balls if n in cold_set)
+
+    # Ideal: 2-3 hot, 1-2 cold (balanced approach)
+    if 2 <= hot_count <= 3:
+        score += 25
+    elif hot_count == 1 or hot_count == 4:
+        score += 15
+    else:
+        score += 5
+
+    for n in white_balls:
+        if n in hot_set:
+            reasons[n] = reasons.get(n, []) + ['🔥 Hot number']
+        elif n in cold_set:
+            reasons[n] = reasons.get(n, []) + ['❄️ Cold number']
+        else:
+            reasons[n] = reasons.get(n, []) + ['Neutral trend']
+
+    # ── 3. Pattern score (25 pts) ─────────────────────────────
+    sorted_wb = sorted(white_balls)
+    pattern_score = 0
+
+    # Consecutive pairs (historically common)
+    consec_count = sum(1 for i in range(len(sorted_wb)-1) if sorted_wb[i+1] - sorted_wb[i] == 1)
+    if consec_count == 1:
+        pattern_score += 10  # 1 consecutive pair is ideal
+        for i in range(len(sorted_wb)-1):
+            if sorted_wb[i+1] - sorted_wb[i] == 1:
+                reasons[sorted_wb[i]]   = reasons.get(sorted_wb[i], [])   + ['Consecutive pair']
+                reasons[sorted_wb[i+1]] = reasons.get(sorted_wb[i+1], []) + ['Consecutive pair']
+    elif consec_count == 0:
+        pattern_score += 5
+
+    # Decade balance (numbers spread across ranges)
+    decades = set(n // 10 for n in sorted_wb)
+    if len(decades) >= 3:
+        pattern_score += 10  # Good spread
+    elif len(decades) >= 2:
+        pattern_score += 5
+
+    # Odd/even balance (3/2 or 2/3 is most common historically)
+    odd_count  = sum(1 for n in white_balls if n % 2 != 0)
+    even_count = 5 - odd_count
+    if odd_count in [2, 3]:
+        pattern_score += 5
+
+    score += min(pattern_score, 25)
+
+    # ── 4. Powerball score (20 pts) ───────────────────────────
+    if pb_freq_map:
+        max_pb_freq = max(pb_freq_map.values()) if pb_freq_map else 1
+        pb_pct = pb_freq_map.get(powerball, 0) / max_pb_freq
+        score += pb_pct * 20
+
+    # Normalize to 0–100
+    final_score = min(round(score), 100)
+    return final_score, reasons
+
+
+# ── Helper: Call Groq for explanation ────────────────────────
+def _get_groq_explanation(sets_data):
+    """
+    Calls Groq to generate a brief AI explanation for the generated sets.
+    Returns explanation string or None on failure.
+    """
+    GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+    if not GROQ_API_KEY:
+        return None
+
+    # Build a compact summary for the prompt
+    sets_summary = []
+    for i, s in enumerate(sets_data[:3], 1):  # Limit to first 3 sets for token efficiency
+        wb = s['white_balls']
+        pb = s['powerball']
+        score = s['confidence_score']
+        hot_nums  = [n for n, tags in s['reasons'].items() if '🔥' in ' '.join(tags)]
+        cold_nums = [n for n, tags in s['reasons'].items() if '❄️' in ' '.join(tags)]
+        consec    = [n for n, tags in s['reasons'].items() if 'Consecutive' in ' '.join(tags)]
+        sets_summary.append(
+            f"Set {i}: {wb} PB:{pb} | Score:{score}% | Hot:{hot_nums} | Cold:{cold_nums} | Consecutive pairs:{consec}"
+        )
+
+    prompt = f"""You are a Powerball analysis assistant. Briefly explain these generated number sets in 2-3 sentences total. 
+Focus on why these sets are statistically interesting based on hot/cold trends, frequency patterns, and number spread.
+Be concise and factual. Do not make promises about winning.
+
+{chr(10).join(sets_summary)}"""
+
+    try:
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.1-8b-instant",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 200,
+                "temperature": 0.4
+            },
+            timeout=10
+        )
+        if response.status_code == 200:
+            return response.json()['choices'][0]['message']['content'].strip()
+    except Exception as e:
+        print(f"Groq explanation error: {e}")
+
+    return None
+
 def initialize_core_data():
     """Initializes and loads all core data from Supabase and performs initial analyses."""
     global df, last_draw, historical_white_ball_sets, white_ball_co_occurrence_lookup, last_analysis_cache_update
@@ -6050,6 +6225,135 @@ def get_yearly_decade_pairs_with_counts():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": "Internal Server Error"}), 500
+
+@app.route('/api/generate_enhanced_picks', methods=['POST'])
+def generate_enhanced_picks():
+    """
+    Enhanced generator: uses frequency + hot/cold + pattern scoring.
+    Returns JSON with scored picks, per-number reasons, and AI explanation.
+    """
+    if df.empty:
+        return jsonify({'success': False, 'error': 'Historical data not loaded.'}), 500
+
+    try:
+        data = request.get_json()
+        num_sets        = max(1, min(10, int(data.get('num_sets', 3))))
+        excluded        = set(int(n) for n in data.get('excluded_numbers', []) if str(n).isdigit())
+        strategy        = data.get('strategy', 'balanced')  # balanced | hot_heavy | cold_heavy | pattern_focus
+
+        # Build analysis data once
+        freq_map    = _get_full_frequency_map(df)
+        hot_set, cold_set = _get_hot_cold_sets(df)
+        pb_freq_map = _get_pb_frequency_map(df)
+
+        # Adjust pools based on strategy
+        if strategy == 'hot_heavy':
+            # Bias pool: 60% hot numbers
+            hot_pool  = [n for n in range(1, 70) if n in hot_set and n not in excluded]
+            rest_pool = [n for n in range(1, 70) if n not in hot_set and n not in excluded]
+        elif strategy == 'cold_heavy':
+            # Bias pool: favour cold numbers (due numbers)
+            cold_pool = [n for n in range(1, 70) if n in cold_set and n not in excluded]
+            rest_pool = [n for n in range(1, 70) if n not in cold_set and n not in excluded]
+        else:
+            # Balanced or pattern_focus: full pool
+            pass
+
+        full_pool = [n for n in range(1, 70) if n not in excluded]
+        pb_pool   = list(range(1, 27))  # Current powerball range 1–26
+
+        if len(full_pool) < 5:
+            return jsonify({'success': False, 'error': 'Too many numbers excluded. Please reduce exclusions.'}), 400
+
+        results = []
+        max_attempts = 500 * num_sets
+        generated_combos = set()  # Avoid duplicates
+
+        for _ in range(num_sets):
+            best_score   = -1
+            best_wb      = None
+            best_pb      = None
+            best_reasons = {}
+
+            for attempt in range(max_attempts // num_sets):
+                # Build candidate based on strategy
+                if strategy == 'hot_heavy' and len(hot_pool) >= 3:
+                    hot_pick  = random.sample(hot_pool,  min(3, len(hot_pool)))
+                    rest_pick = random.sample([n for n in rest_pool if n not in hot_pick],
+                                              max(0, 5 - len(hot_pick)))
+                    candidate_wb = sorted(hot_pick + rest_pick)
+                elif strategy == 'cold_heavy' and len(cold_pool) >= 2:
+                    cold_pick = random.sample(cold_pool, min(2, len(cold_pool)))
+                    rest_pick = random.sample([n for n in rest_pool if n not in cold_pick],
+                                              max(0, 5 - len(cold_pick)))
+                    candidate_wb = sorted(cold_pick + rest_pick)
+                else:
+                    candidate_wb = sorted(random.sample(full_pool, 5))
+
+                candidate_pb = random.choice(pb_pool)
+                combo_key    = (tuple(candidate_wb), candidate_pb)
+
+                if combo_key in generated_combos:
+                    continue
+
+                score, reasons = _score_enhanced_pick(
+                    candidate_wb, candidate_pb,
+                    freq_map, hot_set, cold_set, pb_freq_map, df
+                )
+
+                if score > best_score:
+                    best_score   = score
+                    best_wb      = candidate_wb
+                    best_pb      = candidate_pb
+                    best_reasons = reasons
+
+            if best_wb:
+                generated_combos.add((tuple(best_wb), best_pb))
+
+                # Build per-number reason tags
+                reason_tags = {}
+                for n in best_wb:
+                    tags = list(dict.fromkeys(best_reasons.get(n, ['Balanced pick'])))  # dedupe
+                    reason_tags[str(n)] = tags
+
+                # Powerball reason
+                pb_freq  = pb_freq_map.get(best_pb, 0)
+                max_pbf  = max(pb_freq_map.values()) if pb_freq_map else 1
+                pb_label = 'High frequency PB' if pb_freq / max_pbf >= 0.7 else \
+                           'Moderate frequency PB' if pb_freq / max_pbf >= 0.4 else 'Low frequency PB'
+
+                results.append({
+                    'white_balls':       best_wb,
+                    'powerball':         best_pb,
+                    'confidence_score':  best_score,
+                    'reasons':           best_reasons,  # for Groq prompt
+                    'reason_tags':       reason_tags,
+                    'pb_reason':         pb_label,
+                    'hot_numbers':       [n for n in best_wb if n in hot_set],
+                    'cold_numbers':      [n for n in best_wb if n in cold_set],
+                })
+
+        # Sort by confidence score descending
+        results.sort(key=lambda x: -x['confidence_score'])
+
+        # Get AI explanation (non-blocking — skip if Groq unavailable)
+        ai_explanation = _get_groq_explanation(results)
+
+        # Clean up internal 'reasons' dict before sending to client
+        for r in results:
+            r.pop('reasons', None)
+
+        return jsonify({
+            'success':        True,
+            'sets':           results,
+            'total_draws':    len(df),
+            'ai_explanation': ai_explanation,
+            'strategy':       strategy
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
         
 # Initialize core data on app startup
 initialize_core_data()
