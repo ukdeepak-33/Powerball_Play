@@ -471,6 +471,318 @@
     }
 </style>
 
+{# ═══════════════════════════════════════════════════════════════
+    ENHANCED PICK GENERATOR — Add this card to index.html
+    Place it after the Smart Pick Generator card section
+    ═══════════════════════════════════════════════════════════════ #}
+
+<div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200 mt-8" id="enhanced-generator-card">
+
+    {# ── Header ── #}
+    <div class="flex items-center justify-between mb-2">
+        <h2 class="text-2xl font-bold text-gray-800">⚡ Enhanced Pick Generator</h2>
+        <span class="text-xs bg-indigo-100 text-indigo-700 font-semibold px-3 py-1 rounded-full">AI Powered</span>
+    </div>
+    <p class="text-gray-600 mb-6 text-sm">
+        Generates picks scored by <strong>frequency analysis</strong>, <strong>hot/cold trends</strong>, and <strong>pattern matching</strong>.
+        Each set includes a confidence score and reason for every number picked.
+    </p>
+
+    {# ── Controls ── #}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+
+        {# Number of sets #}
+        <div>
+            <label class="block text-gray-700 text-sm font-bold mb-2">Number of Sets (1–10)</label>
+            <input type="number" id="enh-num-sets" min="1" max="10" value="3"
+                   class="shadow border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        </div>
+
+        {# Strategy #}
+        <div>
+            <label class="block text-gray-700 text-sm font-bold mb-2">Generation Strategy</label>
+            <select id="enh-strategy"
+                    class="shadow border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                <option value="balanced">⚖️ Balanced (hot + cold + frequency)</option>
+                <option value="hot_heavy">🔥 Hot Heavy (favour trending numbers)</option>
+                <option value="cold_heavy">❄️ Cold Heavy (favour due numbers)</option>
+                <option value="pattern_focus">🔢 Pattern Focus (consecutive + spread)</option>
+            </select>
+        </div>
+
+        {# Excluded numbers #}
+        <div>
+            <label class="block text-gray-700 text-sm font-bold mb-2">Exclude Numbers <span class="font-normal text-gray-400">(comma separated)</span></label>
+            <input type="text" id="enh-excluded" placeholder="e.g. 4, 18, 55"
+                   class="shadow border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        </div>
+    </div>
+
+    {# ── Generate button ── #}
+    <button id="enh-generate-btn" onclick="enhGeneratePicks()"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg transition duration-200 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+        Generate Enhanced Picks
+    </button>
+
+    {# ── Loading ── #}
+    <div id="enh-loading" class="hidden mt-4 flex items-center gap-3 text-indigo-600 text-sm font-medium">
+        <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        Analyzing historical data and scoring picks...
+    </div>
+
+    {# ── Error ── #}
+    <div id="enh-error" class="hidden mt-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm"></div>
+
+    {# ── AI Explanation ── #}
+    <div id="enh-ai-box" class="hidden mt-6 p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="text-indigo-600 font-bold text-sm">🤖 AI Analysis</span>
+        </div>
+        <p id="enh-ai-text" class="text-gray-700 text-sm leading-relaxed"></p>
+    </div>
+
+    {# ── Results ── #}
+    <div id="enh-results" class="hidden mt-6 space-y-4">
+        <div class="flex items-center justify-between">
+            <h3 class="text-lg font-bold text-gray-800">Generated Picks</h3>
+            <button onclick="enhSaveAll()"
+                    class="text-sm bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-4 rounded-lg transition">
+                💾 Save All
+            </button>
+        </div>
+        <div id="enh-picks-list" class="space-y-4"></div>
+    </div>
+
+</div>
+
+{# ── Styles for Enhanced Generator ── #}
+<style>
+    .enh-ball {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        font-weight: 700;
+        font-size: 14px;
+        color: white;
+        flex-shrink: 0;
+    }
+    .enh-ball-white { background: #3b82f6; }
+    .enh-ball-hot   { background: #ef4444; }
+    .enh-ball-cold  { background: #06b6d4; }
+    .enh-ball-pb    { background: #ef4444; border: 2px solid #b91c1c; }
+
+    .enh-tag {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 600;
+        padding: 1px 7px;
+        border-radius: 20px;
+        border: 1px solid;
+        white-space: nowrap;
+    }
+    .enh-tag-hot  { background: rgba(239,68,68,0.1);  color: #dc2626; border-color: #fca5a5; }
+    .enh-tag-cold { background: rgba(6,182,212,0.1);  color: #0891b2; border-color: #a5f3fc; }
+    .enh-tag-freq { background: rgba(99,102,241,0.1); color: #4f46e5; border-color: #c7d2fe; }
+    .enh-tag-pat  { background: rgba(16,185,129,0.1); color: #059669; border-color: #a7f3d0; }
+    .enh-tag-neu  { background: rgba(107,114,128,0.1);color: #4b5563; border-color: #d1d5db; }
+
+    .enh-confidence-bar {
+        height: 6px;
+        border-radius: 3px;
+        background: #e5e7eb;
+        overflow: hidden;
+    }
+    .enh-confidence-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.6s ease;
+    }
+
+    .enh-pick-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        overflow: hidden;
+        transition: box-shadow 0.2s;
+    }
+    .enh-pick-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+</style>
+
+{# ── JavaScript ── #}
+<script>
+    let enhCurrentSets = [];
+
+    function enhTagClass(tag) {
+        if (tag.includes('🔥') || tag.includes('Hot'))    return 'enh-tag-hot';
+        if (tag.includes('❄️') || tag.includes('Cold'))   return 'enh-tag-cold';
+        if (tag.includes('frequency'))                     return 'enh-tag-freq';
+        if (tag.includes('Consecutive') || tag.includes('Decade') || tag.includes('pair')) return 'enh-tag-pat';
+        return 'enh-tag-neu';
+    }
+
+    function enhBallClass(num, hotNums, coldNums) {
+        if (hotNums.includes(num))  return 'enh-ball enh-ball-hot';
+        if (coldNums.includes(num)) return 'enh-ball enh-ball-cold';
+        return 'enh-ball enh-ball-white';
+    }
+
+    function enhConfidenceColor(score) {
+        if (score >= 75) return '#10b981'; // green
+        if (score >= 55) return '#f59e0b'; // amber
+        return '#ef4444';                  // red
+    }
+
+    function enhConfidenceLabel(score) {
+        if (score >= 75) return '⭐ Strong';
+        if (score >= 55) return '✅ Good';
+        if (score >= 40) return '🔵 Fair';
+        return '⚪ Weak';
+    }
+
+    async function enhGeneratePicks() {
+        const numSets  = parseInt(document.getElementById('enh-num-sets').value) || 3;
+        const strategy = document.getElementById('enh-strategy').value;
+        const excluded = document.getElementById('enh-excluded').value
+            .split(',').map(s => s.trim()).filter(s => /^\d+$/.test(s)).map(Number);
+
+        // Reset UI
+        document.getElementById('enh-loading').classList.remove('hidden');
+        document.getElementById('enh-error').classList.add('hidden');
+        document.getElementById('enh-results').classList.add('hidden');
+        document.getElementById('enh-ai-box').classList.add('hidden');
+        document.getElementById('enh-generate-btn').disabled = true;
+
+        try {
+            const res = await fetch('/api/generate_enhanced_picks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ num_sets: numSets, strategy, excluded_numbers: excluded })
+            });
+            const data = await res.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Unknown error');
+            }
+
+            enhCurrentSets = data.sets;
+            enhRenderPicks(data.sets, data.total_draws);
+
+            // Show AI explanation if available
+            if (data.ai_explanation) {
+                document.getElementById('enh-ai-text').textContent = data.ai_explanation;
+                document.getElementById('enh-ai-box').classList.remove('hidden');
+            }
+
+            document.getElementById('enh-results').classList.remove('hidden');
+
+        } catch (err) {
+            document.getElementById('enh-error').textContent = 'Error: ' + err.message;
+            document.getElementById('enh-error').classList.remove('hidden');
+        } finally {
+            document.getElementById('enh-loading').classList.add('hidden');
+            document.getElementById('enh-generate-btn').disabled = false;
+        }
+    }
+
+    function enhRenderPicks(sets, totalDraws) {
+        const container = document.getElementById('enh-picks-list');
+        container.innerHTML = '';
+
+        sets.forEach((pick, idx) => {
+            const color = enhConfidenceColor(pick.confidence_score);
+            const label = enhConfidenceLabel(pick.confidence_score);
+
+            // Build balls HTML
+            let ballsHtml = pick.white_balls.map(n => {
+                const cls  = enhBallClass(n, pick.hot_numbers, pick.cold_numbers);
+                const tags = (pick.reason_tags[String(n)] || []).slice(0, 2)
+                    .map(t => `<span class="enh-tag ${enhTagClass(t)}">${t}</span>`).join('');
+                return `
+                    <div class="flex flex-col items-center gap-1">
+                        <div class="${cls}">${n}</div>
+                        <div class="flex flex-wrap gap-1 justify-center" style="max-width:60px">${tags}</div>
+                    </div>`;
+            }).join('');
+
+            // Powerball
+            ballsHtml += `
+                <div class="flex flex-col items-center gap-1 ml-2">
+                    <div class="enh-ball enh-ball-pb">${pick.powerball}</div>
+                    <div class="flex flex-wrap gap-1 justify-center" style="max-width:60px">
+                        <span class="enh-tag enh-tag-neu">${pick.pb_reason.replace(' PB','')}</span>
+                    </div>
+                </div>`;
+
+            const card = document.createElement('div');
+            card.className = 'enh-pick-card';
+            card.innerHTML = `
+                <div class="p-4">
+                    <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                        <span class="text-sm font-bold text-gray-500">SET ${idx + 1}</span>
+                        <div class="flex items-center gap-3">
+                            <div style="min-width:140px">
+                                <div class="flex justify-between text-xs text-gray-500 mb-1">
+                                    <span>Confidence</span>
+                                    <span style="color:${color};font-weight:700">${pick.confidence_score}% ${label}</span>
+                                </div>
+                                <div class="enh-confidence-bar">
+                                    <div class="enh-confidence-fill" style="width:${pick.confidence_score}%;background:${color}"></div>
+                                </div>
+                            </div>
+                            <button onclick="enhSaveOne(${idx})"
+                                    class="text-xs bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded-lg transition">
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex items-start flex-wrap gap-3">${ballsHtml}</div>
+                </div>
+                <div class="px-4 py-2 bg-gray-50 border-t border-gray-100 text-xs text-gray-400">
+                    🔴 Hot number &nbsp;|&nbsp; 🔵 Cold number &nbsp;|&nbsp; 🔵 Regular
+                    &nbsp;&nbsp;·&nbsp;&nbsp; Analyzed against ${totalDraws.toLocaleString()} historical draws
+                </div>`;
+
+            container.appendChild(card);
+        });
+    }
+
+    async function enhSaveOne(idx) {
+        const pick = enhCurrentSets[idx];
+        if (!pick) return;
+        await enhSavePick(pick.white_balls, pick.powerball);
+    }
+
+    async function enhSaveAll() {
+        if (!enhCurrentSets.length) return;
+        for (const pick of enhCurrentSets) {
+            await enhSavePick(pick.white_balls, pick.powerball);
+        }
+        alert(`✅ ${enhCurrentSets.length} picks saved successfully!`);
+    }
+
+    async function enhSavePick(whiteBalls, powerball) {
+        const form = new FormData();
+        form.append('generated_white_balls', whiteBalls.join(','));
+        form.append('generated_powerball', powerball);
+        try {
+            await fetch("{{ url_for('save_multiple_generated_picks_route') }}", {
+                method: 'POST', body: form
+            });
+        } catch (e) {
+            console.error('Save error:', e);
+        }
+    }
+</script>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
