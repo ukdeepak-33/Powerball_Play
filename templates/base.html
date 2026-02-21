@@ -126,14 +126,15 @@
 
         /* Sidebar specific styles */
         .sidebar {
-            transition: width 0.3s ease-in-out, transform 0.3s ease-in-out;
+            transition: transform 0.3s ease-in-out, width 0.3s ease-in-out;
             transform: translateX(-100%); /* Hidden by default on mobile */
-            z-index: 50; /* Ensure it's above other content on mobile */
-            height: 100vh; /* Make it take full viewport height */
-            overflow-y: auto; /* Enable vertical scrolling */
+            z-index: 50;
+            height: 100vh;
+            overflow-y: auto;
+            width: 272px; /* Fixed width when open on mobile */
         }
         .sidebar.open {
-            transform: translateX(0); /* Visible when open on mobile */
+            transform: translateX(0); /* Slide in on mobile */
         }
 
         /* Overlay for mobile when sidebar is open */
@@ -283,6 +284,8 @@
                 </a></li>
                 {# NEW AI ASSISTANT SECTION #}
                <li class="mt-4"><div class="px-3 py-1 text-gray-500 text-sm font-semibold uppercase">AI Tools</div></li>
+                {# NEW AI ASSISTANT SECTION #}
+               <li class="mt-4"><div class="px-3 py-1 text-gray-500 text-sm font-semibold uppercase">AI Tools</div></li>
                <li><a href="{{ url_for('ai_assistant') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
                   <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
                AI Assistant
@@ -311,17 +314,13 @@
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6C4.895 2 4 2.895 4 4V20C4 21.105 4.895 22 6 22H18C19.105 22 20 21.105 20 20V8L14 2ZM18 20H6V4H13V9H18V20Z"></path></svg>
                     Generated History
                 </a></li>
-                <li><a href="{{ url_for('historical_data_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6C4.895 2 4 2.895 4 4V20C4 21.105 4.895 22 6 22H18C19.105 22 20 21.105 20 20V8L14 2ZM18 20H6V4H13V9H18V20Z"></path></svg>
-                    Historical Data
-                </a></li>
-                <li><a href="{{ url_for('pairs_analysis') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M10 20a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-1h-4v1zM6 6a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6zm0 6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-2z"></path></svg>
-                    Pairs Analysis
+                <li><a href="{{ url_for('check_my_numbers_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                    Check My Numbers
                 </a></li>
                 <li><a href="{{ url_for('powerball_position_frequency_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L4 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-8-3zm-1 15.93V13h2v4.93c0 .5-.19 1-.52 1.38L12 20.35l-.48-.04c-.33-.03-.52-.53-.52-1.03z"></path></svg>
-                    Powerball Last Digit Analysis
+                    Powerball Position Freq
                 </a></li>
             </ul>
         </nav>
@@ -357,15 +356,21 @@
             const sidebarOverlay = document.getElementById('sidebarOverlay');
 
             const openSidebar = () => {
+                sidebar.style.width = '272px'; // Give it a real width on mobile
                 sidebar.classList.add('open');
                 sidebarOverlay.classList.remove('hidden');
-                setTimeout(() => sidebarOverlay.classList.add('open'), 10); // Fade in overlay
+                setTimeout(() => sidebarOverlay.classList.add('open'), 10);
             };
 
             const closeSidebar = () => {
                 sidebar.classList.remove('open');
                 sidebarOverlay.classList.remove('open');
-                setTimeout(() => sidebarOverlay.classList.add('hidden'), 300); // Hide after fade out
+                setTimeout(() => {
+                    sidebarOverlay.classList.add('hidden');
+                    if (window.innerWidth < 768) {
+                        sidebar.style.width = '272px'; // Keep width set, transform hides it
+                    }
+                }, 300);
             };
 
             if (menuToggle) {
@@ -404,10 +409,8 @@
                     sidebarOverlay.classList.add('hidden'); // Ensure overlay is hidden
                     sidebarOverlay.classList.remove('open'); // Ensure overlay is not fading in
                 } else { // Mobile view
-                    sidebar.style.width = '0'; // Hidden by default
+                    sidebar.style.width = '272px'; // Width is always set; transform hides/shows it
                     mainContent.style.marginLeft = '0';
-                    // sidebar.classList.remove('open'); // Keep state if already open
-                    // sidebarOverlay handles its own hidden/open state via button
                 }
 
                 if (window.innerWidth >= 1024) { // lg breakpoint
