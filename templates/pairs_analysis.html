@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block title %}Powerball Pair Analysis{% endblock %}
+
+{% block page_heading %}White Ball Pair Analysis{% endblock %}
+
+{% block content %}
+<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="bg-white rounded-xl shadow-lg p-6">
+        <p class="text-gray-700 text-lg mb-6">
+            Explore white ball pairs by common last digit, by their numerical difference, or by decade. Drawn pairs are marked with a strike-through for easy analysis.
+        </p>
+
+        <div class="flex border-b border-gray-200 mb-6">
+            <button id="last-digit-tab-btn" class="py-2 px-4 font-semibold text-gray-600 border-b-2 border-transparent hover:text-indigo-600 hover:border-indigo-600 focus:outline-none transition-colors duration-200">
+                Pairs by Last Digit
+            </button>
+            <button id="difference-tab-btn" class="py-2 px-4 font-semibold text-gray-600 border-b-2 border-transparent hover:text-indigo-600 hover:border-indigo-600 focus:outline-none transition-colors duration-200">
+                Pairs by Difference
+            </button>
+            <button id="decade-tab-btn" class="py-2 px-4 font-semibold text-gray-600 border-b-2 border-transparent hover:text-indigo-600 hover:border-indigo-600 focus:outline-none transition-colors duration-200">
+                Pairs by Decade
+            </button>
+        </div>
+
+        <div id="last-digit-tab" class="tab-content space-y-8">
+            <div id="last-digit-years-container">
+                <div id="loading-last-digit" class="text-center text-gray-500">
+                    Loading Last-Digit Pair data...
+                </div>
+            </div>
+        </div>
+
+        <div id="difference-tab" class="tab-content hidden space-y-8">
+            <div id="difference-years-container">
+                <div id="loading-difference" class="text-center text-gray-500">
+                    Loading Difference Pair data...
+                </div>
+            </div>
+        </div>
+        
+        <div id="decade-tab" class="tab-content hidden space-y-8">
+            <div id="decade-years-container">
+                <div id="loading-decade" class="text-center text-gray-500">
+                    Loading Decade Pair data...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Tab elements
+        const lastDigitTabBtn = document.getElementById('last-digit-tab-btn');
+        const differenceTabBtn = document.getElementById('difference-tab-btn');
+        const decadeTabBtn = document.getElementById('decade-tab-btn');
+        const lastDigitTab = document.getElementById('last-digit-tab');
+        const differenceTab = document.getElementById('difference-tab');
+        const decadeTab = document.getElementById('decade-tab');
+
+        // Data containers
+        const lastDigitYearsContainer = document.getElementById('last-digit-years-container');
+        const differenceYearsContainer = document.getElementById('difference-years-container');
+        const decadeYearsContainer = document.getElementById('decade-years-container');
+
+        // Data caches to avoid re-fetching
+        let lastDigitData = null;
+        let differenceData = null;
+        let decadeData = null;
+
+        // Function to render the yearly pairs
+        function renderYearlyPairs(container, yearlyData) {
+            container.innerHTML = '';
+            
+            const sortedYears = Object.keys(yearlyData).sort((a, b) => b - a);
+
+            sortedYears.forEach(year => {
+                const yearData = yearlyData[year];
+                
+                const yearDetails = document.createElement('details');
+                yearDetails.className = 'bg-gray-100 p-4 rounded-lg shadow-sm';
+                
+                const yearSummary = document.createElement('summary');
+                yearSummary.className = 'cursor-pointer font-bold text-xl text-gray-800';
+                yearSummary.textContent = `${year} Pairs Analysis`;
+                yearDetails.appendChild(yearSummary);
+
+                const yearContentDiv = document.createElement('div');
+                yearContentDiv.className = 'mt-4 space-y-6';
+
+                yearData.forEach(group => {
+                    const groupDiv = document.createElement('div');
+                    groupDiv.className = 'mb-4';
+                    
+                    const groupTitle = document.createElement('h3');
+                    groupTitle.className = 'text-lg font-bold text-gray-700 mb-2';
+                    groupTitle.textContent = group.group_name;
+                    groupDiv.appendChild(groupTitle);
+                    
+                    const pairsGrid = document.createElement('div');
+                    pairsGrid.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2';
+
+                    group.pairs.forEach(pairData => {
+                        const pairSpan = document.createElement('span');
+                        pairSpan.className = 'pair-item text-sm text-gray-700';
+                        
+                        if (Array.isArray(pairData.pair) && pairData.pair.length >= 2) {
+                            pairSpan.textContent = `(${pairData.pair[0]}, ${pairData.pair[1]})`;
+                        } else {
+                            pairSpan.textContent = `(${pairData.pair})`;
+                        }
+                        
+                        if (pairData.hit_count > 0) {
+                            let strikeThroughClass = '';
+                            if (pairData.hit_count === 1) {
+                                strikeThroughClass = 'strike-one';
+                            } else if (pairData.hit_count === 2) {
+                                strikeThroughClass = 'strike-two';
+                            } else if (pairData.hit_count === 3) {
+                                strikeThroughClass = 'strike-three';
+                            } else if (pairData.hit_count === 4) {
+                                strikeThroughClass = 'strike-four';
+                            } else if (pairData.hit_count === 5) {
+                                strikeThroughClass = 'strike-five';
+                            } else if (pairData.hit_count >= 6) {
+                                strikeThroughClass = 'strike-six';
+                            }
+                            pairSpan.classList.add(strikeThroughClass);
+                        }
+                        
+                        pairsGrid.appendChild(pairSpan);
+                    });
+
+                    groupDiv.appendChild(pairsGrid);
+                    yearContentDiv.appendChild(groupDiv);
+                });
+                
+                yearDetails.appendChild(yearContentDiv);
+                container.appendChild(yearDetails);
+            });
+        }
+        
+        async function fetchLastDigitData() {
+            if (lastDigitData) {
+                renderYearlyPairs(lastDigitYearsContainer, lastDigitData);
+                return;
+            }
+            try {
+                const response = await fetch('/api/yearly-pairs-with-draw-counts');
+                lastDigitData = await response.json();
+                renderYearlyPairs(lastDigitYearsContainer, lastDigitData);
+            } catch (error) {
+                console.error('Error fetching last-digit pair data:', error);
+                lastDigitYearsContainer.innerHTML = '<p class="text-red-500 text-center">Failed to load last-digit pair data. Please try again later.</p>';
+            }
+        }
+
+        async function fetchDifferenceData() {
+            if (differenceData) {
+                renderYearlyPairs(differenceYearsContainer, differenceData);
+                return;
+            }
+            try {
+                const response = await fetch('/api/yearly-difference-pairs-with-draw-counts');
+                differenceData = await response.json();
+                renderYearlyPairs(differenceYearsContainer, differenceData);
+            } catch (error) {
+                console.error('Error fetching difference pair data:', error);
+                differenceYearsContainer.innerHTML = '<p class="text-red-500 text-center">Failed to load difference pair data. Please try again later.</p>';
+            }
+        }
+
+        async function fetchDecadeData() {
+            if (decadeData) {
+                renderYearlyPairs(decadeYearsContainer, decadeData);
+                return;
+            }
+            try {
+                const response = await fetch('/api/yearly-decade-pairs-with-draw-counts');
+                decadeData = await response.json();
+                renderYearlyPairs(decadeYearsContainer, decadeData);
+            } catch (error) {
+                console.error('Error fetching decade pair data:', error);
+                decadeYearsContainer.innerHTML = '<p class="text-red-500 text-center">Failed to load decade pair data. Please try again later.</p>';
+            }
+        }
+
+        function setActiveTab(tabBtn, tabContent) {
+            lastDigitTabBtn.classList.remove('border-indigo-600', 'text-indigo-600');
+            lastDigitTabBtn.classList.add('border-transparent', 'text-gray-600');
+            differenceTabBtn.classList.remove('border-indigo-600', 'text-indigo-600');
+            differenceTabBtn.classList.add('border-transparent', 'text-gray-600');
+            decadeTabBtn.classList.remove('border-indigo-600', 'text-indigo-600');
+            decadeTabBtn.classList.add('border-transparent', 'text-gray-600');
+            
+            lastDigitTab.classList.add('hidden');
+            differenceTab.classList.add('hidden');
+            decadeTab.classList.add('hidden');
+
+            tabBtn.classList.add('border-indigo-600', 'text-indigo-600');
+            tabBtn.classList.remove('border-transparent', 'text-gray-600');
+            tabContent.classList.remove('hidden');
+        }
+
+        lastDigitTabBtn.addEventListener('click', () => {
+            setActiveTab(lastDigitTabBtn, lastDigitTab);
+            fetchLastDigitData();
+        });
+
+        differenceTabBtn.addEventListener('click', () => {
+            setActiveTab(differenceTabBtn, differenceTab);
+            fetchDifferenceData();
+        });
+
+        decadeTabBtn.addEventListener('click', () => {
+            setActiveTab(decadeTabBtn, decadeTab);
+            fetchDecadeData();
+        });
+        
+        setActiveTab(lastDigitTabBtn, lastDigitTab);
+        fetchLastDigitData();
+    });
+</script>
+
+<style>
+    .pair-item {
+        white-space: nowrap;
+    }
+
+    .strike-one {
+        text-decoration: line-through;
+        text-decoration-thickness: 1px;
+    }
+    
+    .strike-two {
+        text-decoration: line-through;
+        text-decoration-thickness: 2px;
+    }
+    
+    .strike-three {
+        text-decoration: line-through;
+        text-decoration-thickness: 3px;
+        color: #ef4444; /* Red for three strikes */
+    }
+
+    .strike-four {
+        text-decoration: line-through;
+        text-decoration-thickness: 4px;
+        color: #eab308; /* Yellow for four strikes */
+    }
+
+    .strike-five {
+        text-decoration: line-through;
+        text-decoration-thickness: 5px;
+        color: #a855f7; /* Purple for five strikes */
+    }
+
+    .strike-six {
+        text-decoration: line-through;
+        text-decoration-thickness: 6px;
+        color: #0d9488; /* Teal for six or more strikes */
+    }
+</style>
+{% endblock %}
