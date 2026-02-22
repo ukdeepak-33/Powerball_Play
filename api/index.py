@@ -4370,6 +4370,7 @@ def save_official_draw_route():
     return redirect(url_for('index'))
 
 @app.route('/save_multiple_generated_picks', methods=['POST'], endpoint='save_multiple_index')
+@app.route('/save_multiple_generated_picks', methods=['POST'], endpoint='save_multiple_generated_picks_route')
 def save_multiple_generated_picks_route():
     # ... existing implementation ...
     try:
@@ -4404,6 +4405,7 @@ def save_multiple_generated_picks_route():
     return redirect(url_for('index'))
 
 @app.route('/api/save_multiple_smart_picks', methods=['POST'], endpoint='save_multiple_smart')
+@app.route('/api/save_multiple_smart_picks_fn', methods=['POST'], endpoint='save_multiple_smart_picks_route')
 def save_multiple_smart_picks_route():
     """Save multiple generated picks from the dedicated smart pick generator page."""
     try:
@@ -5200,6 +5202,7 @@ def save_manual_pick_route():
 
 # Route for the smart pick generator on the main index page
 @app.route('/api/generate_smart_picks', methods=['POST'], endpoint='generate_smart_picks_index')
+@app.route('/api/generate_smart_picks_fn', methods=['POST'], endpoint='generate_smart_picks_for_index')
 @app.route('/api/generate_smart_picks_api', methods=['POST'], endpoint='generate_smart_picks_api')
 def generate_smart_picks_for_index():
     if df.empty:
@@ -5282,6 +5285,7 @@ def generate_smart_picks_for_index():
 
 # Route for the dedicated smart pick generator page
 @app.route('/api/generate_advanced_picks', methods=['POST'], endpoint='generate_smart_picks_dedicated')
+@app.route('/api/generate_advanced_picks_fn', methods=['POST'], endpoint='generate_smart_picks_for_dedicated_page')
 def generate_smart_picks_for_dedicated_page():
     """Handle smart pick generation for the dedicated page."""
     if df.empty:
