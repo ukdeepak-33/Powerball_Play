@@ -333,6 +333,7 @@
                 gap: 10px;
             }
         }
+
     </style>
 </head>
 <body>
@@ -346,6 +347,24 @@
             <div class="control-section">
                 <div class="control-label">📅 Select Year:</div>
                 <div class="year-tabs">
+                    <a href="{{ url_for('index') }}" title="Go to Home" style="
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 40px;
+                        height: 36px;
+                        border-radius: 20px;
+                        background: #1e3c72;
+                        color: white;
+                        text-decoration: none;
+                        font-size: 18px;
+                        border: 2px solid #2a5298;
+                        transition: background 0.2s, transform 0.2s;
+                        flex-shrink: 0;
+                    "
+                    onmouseover="this.style.background='#2a5298'; this.style.transform='scale(1.08)'"
+                    onmouseout="this.style.background='#1e3c72'; this.style.transform='scale(1)'"
+                    >🏠</a>
                     <button class="tab active" onclick="showYear(2026)">2026</button>
                     <button class="tab" onclick="showYear(2025)">2025</button>
                     <button class="tab" onclick="showYear(2024)">2024</button>
