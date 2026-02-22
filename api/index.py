@@ -5339,52 +5339,6 @@ def generate_smart_picks_for_dedicated_page():
         return jsonify({'success': False, 'error': str(e)})
 
 
-@app.route('/save_multiple_generated_picks', methods=['POST'])
-def save_multiple_generated_picks_route():
-    """Save multiple generated picks from the smart pick generator."""
-    try:
-        data = request.get_json()
-        picks_to_save = data.get('picks', [])
-        
-        if not picks_to_save:
-            return jsonify({"success": False, "message": "No picks provided to save."}), 400
-        
-        saved_count = 0
-        failed_count = 0
-        messages = []
-        
-        for pick in picks_to_save:
-            white_balls = pick.get('white_balls')
-            powerball = pick.get('powerball')
-            
-            if not white_balls or len(white_balls) != 5 or powerball is None:
-                messages.append(f"Skipping invalid pick: {pick}")
-                failed_count += 1
-                continue
-            
-            try:
-                white_balls = sorted([int(n) for n in white_balls])
-                powerball = int(powerball)
-            except ValueError:
-                messages.append(f"Skipping pick due to invalid number format: {pick}")
-                failed_count += 1
-                continue
-            
-            success, message = save_generated_numbers_to_db(white_balls, powerball)
-            if success:
-                saved_count += 1
-                messages.append(f"Saved: {', '.join(map(str, white_balls))} + {powerball}")
-            else:
-                failed_count += 1
-                messages.append(f"Failed to save {', '.join(map(str, white_balls))} + {powerball}: {message}")
-        
-        status_message = f"Successfully saved {saved_count} pick(s). Failed to save {failed_count} pick(s)."
-        return jsonify({"success": True, "message": status_message, "details": messages}), 200
-        
-    except Exception as e:
-        return jsonify({"success": False, "message": f"An unexpected error occurred: {str(e)}"}), 500
-
-
 @app.route('/sum_trends_and_gaps')
 def sum_trends_and_gaps_route():
     if df.empty:
@@ -5942,34 +5896,6 @@ def api_white_ball_trends_route():
         'period_labels': period_labels
     })
 
-@app.route('/api/generate_smart_picks', methods=['POST'])
-def generate_smart_picks_api():
-    """
-    Generates Powerball picks based on a set of historically common, rule-based criteria.
-    This replaces the ML/DL smart pick generation.
-    """
-    try:
-        data = request.get_json(silent=True) or request.form.to_dict()
-        num_sets_to_generate = int(data.get('numSetsToGenerate', 1))
-        excluded_numbers_str = data.get('excludedNumbers', '')
-        excluded_numbers = [int(n.strip()) for n in excluded_numbers_str.split(',') if n.strip().isdigit()]
-
-        generated_sets, last_draw_dates, ml_cluster_info = _generate_smart_pick(num_sets_to_generate, excluded_numbers)
-
-        return jsonify({
-            'success': True,
-            'generated_sets': generated_sets,
-            'last_draw_dates': last_draw_dates,
-            'ml_cluster_info': ml_cluster_info
-        })
-
-    except ValueError as e:
-        return jsonify({'success': False, 'error': str(e)}), 400
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
-
-# --- CUSTOM COMBINATIONS ROUTE (Corrected to fix data passing) ---
 @app.route('/custom_combinations')
 def custom_combinations_route():
     print("--- custom_combinations_route IS BEING CALLED! ---")
@@ -6588,6 +6514,254 @@ def api_check_saved_picks():
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+
+# ══ Additional routes merged from dev ══
+
+@app.route('/api/analyze-consecutive-suggestions', methods=['POST'])
+def analyze_consecutive_suggestions():
+    try:
+        if df is None or df.empty:
+            return jsonify({"error": "Data still loading."}), 503
+
+        stats = get_consecutive_numbers_yearly_trends(df)
+        yearly_data = stats['yearly_data']
+        all_years = [str(item['year']) for item in yearly_data]
+
+        # Build pair → {year: count} map
+        pair_by_year = {}
+        for item in yearly_data:
+            for pair, count in item.get('pair_counts', {}).items():
+                if pair not in pair_by_year:
+                    pair_by_year[pair] = {}
+                pair_by_year[pair][str(item['year'])] = count
+
+        # Pairs in every single year
+        everyyear_pairs = {
+            pair: years for pair, years in pair_by_year.items()
+            if len(years) == len(all_years)
+        }
+
+        # Top 10 by years appeared
+        frequent_pairs = sorted(pair_by_year.items(), key=lambda x: len(x[1]), reverse=True)[:10]
+
+        # Top 10 by total count
+        top_pairs_by_count = sorted(
+            [(pair, sum(y.values()), len(y)) for pair, y in pair_by_year.items()],
+            key=lambda x: x[1], reverse=True
+        )[:10]
+
+        everyyear_summary = ", ".join(everyyear_pairs.keys()) if everyyear_pairs else "None"
+        frequent_summary = "\n".join(
+            [f"  {pair}: appeared in {len(years)} of {len(all_years)} years"
+             for pair, years in frequent_pairs]
+        )
+        top_count_summary = "\n".join(
+            [f"  {pair}: {count} total times across {years} years"
+             for pair, count, years in top_pairs_by_count]
+        )
+
+        prompt = (
+            f"You are a Powerball lottery data analyst. Use ONLY the data below — no outside knowledge.\n\n"
+            f"ANALYSIS ACROSS ALL YEARS ({', '.join(all_years)}):\n\n"
+            f"1. Consecutive pairs that appeared in EVERY single year:\n   {everyyear_summary}\n\n"
+            f"2. Top 10 pairs by number of years appeared:\n{frequent_summary}\n\n"
+            f"3. Top 10 pairs by total frequency (all years combined):\n{top_count_summary}\n\n"
+            f"TASK:\n"
+            f"- Identify the most historically consistent consecutive number pairs\n"
+            f"- Suggest 2-3 specific consecutive number combinations a player might consider\n"
+            f"- Explain WHY each suggestion is backed by the data\n"
+            f"- Add a responsible gambling reminder that past data does not guarantee future results\n"
+            f"Keep response clear and structured."
+        )
+
+        ai_text, error = call_groq(prompt)
+        if error:
+            return jsonify({"error": error}), 500
+
+        return jsonify({
+            "summary": ai_text,
+            "everyyear_pairs": everyyear_pairs,
+            "top_pairs_by_count": top_pairs_by_count,
+            "years_analyzed": all_years
+        })
+
+    except Exception as e:
+        print("Exception:", str(e))
+        return jsonify({"error": "Internal server error"}), 500
+
+
+
+
+
+@app.route('/api/analyze-consecutive-trends', methods=['POST'])
+def analyze_consecutive_trends_ai():
+    try:
+        data = request.get_json()
+        year = data.get('year')
+
+        stats = get_consecutive_numbers_yearly_trends(df)
+        year_stat = next((item for item in stats['yearly_data'] if str(item['year']) == str(year)), None)
+
+        if not year_stat:
+            return jsonify({"error": f"No data found for {year}"}), 404
+
+        prompt = (
+            f"You are a lottery data analyst. I am giving you pre-calculated statistics — do NOT use your own knowledge or make up numbers.\n\n"
+            f"DATA FOR {year}:\n"
+            f"- Consecutive number frequency: {year_stat['percentage']}%\n"
+            f"- Total draws analyzed: {year_stat.get('total_draws', 'N/A')}\n"
+            f"- Draws with consecutives: {year_stat.get('consecutive_draws', 'N/A')}\n\n"  # ← fixed key
+            f"TASK: Based ONLY on the data above, explain in 3-4 simple sentences what a {year_stat['percentage']}% consecutive number frequency means for Powerball players in {year}. "
+            f"Do not mention your knowledge cutoff. Do not add information beyond what is provided."
+        )
+
+        ai_text, error = call_groq(prompt)  # ← only ONE call
+
+        if error:
+            return jsonify({"error": error}), 500
+
+        return jsonify({"summary": ai_text})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
+
+
+@app.route('/generate_smart_picks_route', methods=['POST'])
+def generate_smart_picks_route():
+    if df.empty:
+        return jsonify({'success': False, 'error': "Historical data not loaded or is empty. Please check Supabase connection."}), 500
+
+    try:
+        data = request.json 
+        num_sets_to_generate = int(data.get('num_sets_to_generate', 1))
+        excluded_numbers_input = data.get('excluded_numbers', '')
+        excluded_numbers_local = [int(num.strip()) for num in excluded_numbers_input.split(',') if num.strip().isdigit()] if excluded_numbers_input else []
+        
+        num_from_group_a = int(data.get('num_from_group_a', 0))
+        odd_even_choice = data.get('odd_even_choice', 'Any')
+        
+        selected_sum_range_label = data.get('sum_range_filter', 'Any')
+        selected_sum_range_tuple = SUM_RANGES.get(selected_sum_range_label)
+
+        prioritize_monthly_hot = data.get('prioritize_monthly_hot', False) 
+        prioritize_grouped_patterns = data.get('prioritize_grouped_patterns', False)
+        prioritize_special_patterns = data.get('prioritize_special_patterns', False)
+        prioritize_consecutive_patterns = data.get('prioritize_consecutive_patterns', False)
+        
+        # Get the new preferences
+        one_unpicked_four_picked = data.get('preference_one_unpicked', False)
+        two_unpicked_three_picked = data.get('preference_two_unpicked', False)
+        two_same_frequency = data.get('preference_two_same_frequency', False)
+        five_unpicked_same_freq = data.get('preference_five_unpicked', False)
+        
+        force_specific_pattern_input = data.get('force_specific_pattern', '') 
+        force_specific_pattern = []
+        if force_specific_pattern_input:
+            force_specific_pattern = sorted([int(num.strip()) for num in force_specific_pattern_input.split(',') if num.strip().isdigit()])
+            if not (2 <= len(force_specific_pattern) <= 3):
+                raise ValueError("Forced specific pattern must contain 2 or 3 numbers.")
+            for num in force_specific_pattern:
+                if not (GLOBAL_WHITE_BALL_RANGE[0] <= num <= GLOBAL_WHITE_BALL_RANGE[1]):
+                    raise ValueError(f"Forced number {num} is outside the valid white ball range (1-69).")
+                if num in excluded_numbers_local:
+                    raise ValueError(f"Forced number {num} is also in the excluded numbers list. Please remove it from excluded.")
+            if len(set(force_specific_pattern)) != len(force_specific_pattern):
+                raise ValueError("Forced specific pattern numbers must be unique.")
+
+        # Get current month/year data if needed
+        picked_numbers = []
+        unpicked_numbers = []
+        frequency_groups = {}
+        
+        if one_unpicked_four_picked or two_unpicked_three_picked:
+            picked_numbers, unpicked_numbers = _get_current_month_picked_unpicked()
+            
+        if two_same_frequency:
+            frequency_groups = _get_current_year_frequency_groups()
+
+        generated_sets = generate_smart_picks(
+            df_source=df,
+            num_sets=num_sets_to_generate,
+            excluded_numbers=excluded_numbers_local,
+            num_from_group_a=num_from_group_a,
+            odd_even_choice=odd_even_choice,
+            sum_range_tuple=selected_sum_range_tuple,
+            prioritize_monthly_hot=prioritize_monthly_hot,
+            prioritize_grouped_patterns=prioritize_grouped_patterns,
+            prioritize_special_patterns=prioritize_special_patterns,
+            prioritize_consecutive_patterns=prioritize_consecutive_patterns,
+            force_specific_pattern=force_specific_pattern,
+            one_unpicked_four_picked=one_unpicked_four_picked,
+            two_unpicked_three_picked=two_unpicked_three_picked,
+            two_same_frequency=two_same_frequency,
+            picked_numbers=picked_numbers,
+            unpicked_numbers=unpicked_numbers,
+            frequency_groups=frequency_groups
+        )
+        
+        last_draw_dates = {}
+        if generated_sets:
+            last_draw_dates = find_last_draw_dates_for_numbers(df, generated_sets[-1]['white_balls'], generated_sets[-1]['powerball'])
+
+        return jsonify({
+            'success': True,
+            'generated_sets': generated_sets,
+            'last_draw_dates': last_draw_dates
+        })
+
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
+        
+
+
+
+
+@app.route('/save_generated_pick', methods=['POST'])
+def save_generated_pick_route():
+    try:
+        white_balls_str = request.form.get('generated_white_balls')
+        powerball_str = request.form.get('generated_powerball')
+
+        if not white_balls_str or not powerball_str:
+            flash("No numbers generated to save.", 'error')
+            return redirect(url_for('index'))
+
+        white_balls = [int(x.strip()) for x in white_balls_str.split(',') if x.strip().isdigit()]
+        powerball = int(powerball_str)
+
+        if len(white_balls) != 5:
+            flash("Invalid white balls format. Expected 5 numbers.", 'error')
+            return redirect(url_for('index'))
+
+        if not (all(1 <= n <= 69 for n in white_balls) and 1 <= powerball <= 26):
+            flash("White balls must be between 1-69 and Powerball between 1-26 for saving.", 'error')
+            return redirect(url_for('index'))
+
+        success, message = save_generated_numbers_to_db(white_balls, powerball)
+        if success:
+            flash(message, 'info')
+        else:
+            flash(message, 'error')
+
+    except ValueError:
+        flash("Invalid number format for saving generated numbers.", 'error')
+    except Exception as e:
+        flash(f"An error occurred while saving generated numbers: {e}", 'error')
+    return redirect(url_for('index'))
+
+
+
+# Initialize core data on app startup
+initialize_core_data()
+
 
 # Initialize core data on app startup
 initialize_core_data()
