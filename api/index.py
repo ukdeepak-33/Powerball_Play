@@ -5200,6 +5200,7 @@ def save_manual_pick_route():
 
 # Route for the smart pick generator on the main index page
 @app.route('/api/generate_smart_picks', methods=['POST'], endpoint='generate_smart_picks_index')
+@app.route('/api/generate_smart_picks_api', methods=['POST'], endpoint='generate_smart_picks_api')
 def generate_smart_picks_for_index():
     if df.empty:
         flash("Cannot generate smart picks: Historical data not loaded.", 'error')
