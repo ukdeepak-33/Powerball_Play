@@ -126,15 +126,14 @@
 
         /* Sidebar specific styles */
         .sidebar {
-            transition: transform 0.3s ease-in-out, width 0.3s ease-in-out;
+            transition: width 0.3s ease-in-out, transform 0.3s ease-in-out;
             transform: translateX(-100%); /* Hidden by default on mobile */
-            z-index: 50;
-            height: 100vh;
-            overflow-y: auto;
-            width: 272px; /* Fixed width when open on mobile */
+            z-index: 50; /* Ensure it's above other content on mobile */
+            height: 100vh; /* Make it take full viewport height */
+            overflow-y: auto; /* Enable vertical scrolling */
         }
         .sidebar.open {
-            transform: translateX(0); /* Slide in on mobile */
+            transform: translateX(0); /* Visible when open on mobile */
         }
 
         /* Overlay for mobile when sidebar is open */
@@ -284,12 +283,10 @@
                 </a></li>
                 {# NEW AI ASSISTANT SECTION #}
                <li class="mt-4"><div class="px-3 py-1 text-gray-500 text-sm font-semibold uppercase">AI Tools</div></li>
-                {# NEW AI ASSISTANT SECTION #}
-               <li class="mt-4"><div class="px-3 py-1 text-gray-500 text-sm font-semibold uppercase">AI Tools</div></li>
-               <li><a href="{{ url_for('ai_assistant') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
-               AI Assistant
-               </a></li>
+                <li><a href="{{ url_for('ai_assistant') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                    AI Assistant
+                </a></li>
                 <li><a href="{{ url_for('simulate_multiple_draws_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.63.09-1.24.22-1.83l.86.63c.12.09.28.16.44.16.29 0 .5-.21.5-.5V8.5c0-.28-.22-.5-.5-.5H6c-.28 0-.5.22-.5.5v2c0 .28-.22.5-.5.5s-.5-.22-.5-.5v-2c0-.28-.22-.5-.5-.5H3c-.28 0-.5.22-.5.5v.5c0 4.14 3.36 7.5 7.5 7.5 3.32 0 6.13-2.14 7.15-5.11l-1.3-.46c-.29-.1-.62.06-.72.35-.1.29.06.62.35.72l1.55.55c.08-.02.16-.04.24-.07.69-2.02.59-4.32-.24-6.32l.74-.53c.2-.14.26-.41.14-.62-.14-.2-.41-.26-.62-.14l-1.34.95C17.1 9.07 18 10.46 18 12c0 3.31-2.69 6-6 6zm6-9c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zM7 9c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zM12 4c-1.55 0-2.88.82-3.64 2.05l1.37.98c.2.14.26.41.14.62-.14-.2-.41-.26-.62-.14L7.5 7.5c-1.42 1.95-1.52 4.41-.3 6.38l-.75.54c-.2.14-.26.41-.14.62.14.2.08-.47-.14-.62l-1.34-.95C7.9 16.93 10 18 12 18s4.1-1.07 5.66-2.8l1.34.95c.2.14.47.08.62-.14.14-.2.08-.47-.14-.62l-.75-.54C17.52 11.59 17.52 8.05 15.5 6.05L14 7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"></path></svg>
                     Simulate Draws
@@ -315,8 +312,20 @@
                     Generated History
                 </a></li>
                 <li><a href="{{ url_for('check_my_numbers_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
-                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"></path></svg>
                     Check My Numbers
+                </a></li>
+                <li><a href="{{ url_for('historical_data_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"></path></svg>
+                    Historical Data
+                </a></li>
+                <li><a href="{{ url_for('pairs_analysis') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"></path></svg>
+                    Pairs Analysis
+                </a></li>
+                <li><a href="{{ url_for('white_ball_gap_analysis_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
+                    <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"></path></svg>
+                    White Ball Gap Analysis
                 </a></li>
                 <li><a href="{{ url_for('powerball_position_frequency_route') }}" class="flex items-center p-3 rounded-lg hover:bg-gray-700 transition duration-200 ease-in-out">
                     <svg class="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L4 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-8-3zm-1 15.93V13h2v4.93c0 .5-.19 1-.52 1.38L12 20.35l-.48-.04c-.33-.03-.52-.53-.52-1.03z"></path></svg>
@@ -356,21 +365,15 @@
             const sidebarOverlay = document.getElementById('sidebarOverlay');
 
             const openSidebar = () => {
-                sidebar.style.width = '272px'; // Give it a real width on mobile
                 sidebar.classList.add('open');
                 sidebarOverlay.classList.remove('hidden');
-                setTimeout(() => sidebarOverlay.classList.add('open'), 10);
+                setTimeout(() => sidebarOverlay.classList.add('open'), 10); // Fade in overlay
             };
 
             const closeSidebar = () => {
                 sidebar.classList.remove('open');
                 sidebarOverlay.classList.remove('open');
-                setTimeout(() => {
-                    sidebarOverlay.classList.add('hidden');
-                    if (window.innerWidth < 768) {
-                        sidebar.style.width = '272px'; // Keep width set, transform hides it
-                    }
-                }, 300);
+                setTimeout(() => sidebarOverlay.classList.add('hidden'), 300); // Hide after fade out
             };
 
             if (menuToggle) {
@@ -409,8 +412,10 @@
                     sidebarOverlay.classList.add('hidden'); // Ensure overlay is hidden
                     sidebarOverlay.classList.remove('open'); // Ensure overlay is not fading in
                 } else { // Mobile view
-                    sidebar.style.width = '272px'; // Width is always set; transform hides/shows it
+                    sidebar.style.width = '0'; // Hidden by default
                     mainContent.style.marginLeft = '0';
+                    // sidebar.classList.remove('open'); // Keep state if already open
+                    // sidebarOverlay handles its own hidden/open state via button
                 }
 
                 if (window.innerWidth >= 1024) { // lg breakpoint
