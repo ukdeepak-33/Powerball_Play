@@ -2,7 +2,7 @@
 
 {% block title %}Powerball Analysis{% endblock %}
 
-{% block page_heading %}Powerball Analytics Hub{% endblock %}
+{% block page_heading %}Powerball Number Generator & Analysis{% endblock %}
 
 {% block content %}
 <div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8"> {# Added max-width and padding for better layout #}
@@ -836,32 +836,7 @@
     }
 
 
-        // Function to display flash messages directly in JS
-        function showFlashMessage(message, category) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `p-4 rounded-lg shadow-md text-sm animate-fade-in ${
-                category === 'error' ? 'bg-red-100 text-red-700 border border-red-200' :
-                category === 'info' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
-                'bg-green-100 text-green-700 border border-green-200'
-            }`;
-            messageDiv.innerHTML = `<p class="font-medium">${message}</p>`;
-            
-            // Prepend to the flash messages container
-            if (flashMessagesDiv) {
-                flashMessagesDiv.innerHTML = ''; // Clear previous messages
-                flashMessagesDiv.appendChild(messageDiv);
-            } else {
-                // If the container doesn't exist (e.g., initial page load without messages), create and append
-                const tempFlashContainer = document.createElement('div');
-                tempFlashContainer.className = 'flash-messages space-y-3';
-                document.querySelector('.space-y-8.max-w-6xl.mx-auto.px-4.sm\\:px-6.lg\\:px-8.py-8').prepend(tempFlashContainer);
-                tempFlashContainer.appendChild(messageDiv);
-            }
-
-            setTimeout(() => {
-                messageDiv.remove();
-            }, 5000); // Message disappears after 5 seconds
-        }
+        // showFlashMessage is defined globally below
 
         // --- Smart Pick Generator Logic (unchanged) ---
         generateSmartPicksBtn.addEventListener('click', async function() {
@@ -1013,21 +988,19 @@
             });
         }
 
-       // --- Function to Save Multiple Picks (for both single and all saves) ---
+       // --- Function to Save Multiple Picks (global scope) ---
 async function saveMultiplePicks(picks) {
     try {
         const response = await fetch('/save_multiple_generated_picks', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({picks: picks})
         });
 
         const data = await response.json();
 
         if (response.ok) {
-            showFlashMessage(data.message, 'info');
+            showFlashMessage(data.message || 'Picks saved successfully!', 'info');
         } else {
             showFlashMessage(data.message || 'Error saving picks.', 'error');
         }
@@ -1037,29 +1010,49 @@ async function saveMultiplePicks(picks) {
     }
 }
 
-// --- Fix for draw_date element ---
-const drawDateElement = document.getElementById('draw_date');
-if (drawDateElement) {
-    drawDateElement.addEventListener('click', function() {
-        // Add your draw_date click handling logic here
-        console.log('draw_date clicked!');
-    });
-} else {
-    console.warn('Element with ID "draw_date" not found - check your HTML');
+// --- Global showFlashMessage (accessible everywhere) ---
+function showFlashMessage(message, category) {
+    const flashMessagesDiv = document.querySelector('.flash-messages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `p-4 rounded-lg shadow-md text-sm ${
+        category === 'error' ? 'bg-red-100 text-red-700 border border-red-200' :
+        category === 'info'  ? 'bg-blue-100 text-blue-700 border border-blue-200' :
+                               'bg-green-100 text-green-700 border border-green-200'
+    }`;
+    messageDiv.innerHTML = `<p class="font-medium">${message}</p>`;
+
+    if (flashMessagesDiv) {
+        flashMessagesDiv.innerHTML = '';
+        flashMessagesDiv.appendChild(messageDiv);
+        // Scroll to top so user sees the message
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+        // Create container if it doesn't exist
+        const container = document.createElement('div');
+        container.className = 'flash-messages space-y-3 mb-4';
+        const mainArea = document.querySelector('main') || document.body;
+        mainArea.prepend(container);
+        container.appendChild(messageDiv);
+    }
+
+    // Auto-dismiss after 4 seconds
+    setTimeout(() => { messageDiv.remove(); }, 4000);
 }
 
-// --- Existing save for individual general picks (updated to use saveMultiplePicks) ---
+// --- Save individual general picks ---
 document.body.addEventListener('click', async function(event) {
-    if (event.target.classList.contains('save-general-pick-btn')) { // Changed class
+    if (event.target.classList.contains('save-general-pick-btn')) {
         const pickItem = event.target.closest('.generated-pick-item');
         if (pickItem) {
-            const whiteBallsStr = pickItem.dataset.whiteBalls;
-            const powerballStr = pickItem.dataset.powerball;
-            const whiteBalls = whiteBallsStr.split(',').map(Number);
-            const powerball = Number(powerballStr);
-            saveMultiplePicks([{ white_balls: whiteBalls, powerball: powerball }]);
+            const whiteBalls = pickItem.dataset.whiteBalls.split(',').map(Number);
+            const powerball  = Number(pickItem.dataset.powerball);
+            event.target.textContent = 'Saving...';
+            event.target.disabled = true;
+            await saveMultiplePicks([{ white_balls: whiteBalls, powerball: powerball }]);
+            event.target.textContent = '✓ Saved';
+            event.target.classList.replace('bg-green-500', 'bg-gray-400');
         }
     }
-}); // <-- This is the closing of the DOMContentLoaded event listener
+});
 </script>
 {% endblock %}
