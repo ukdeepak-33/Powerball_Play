@@ -126,14 +126,15 @@
 
         /* Sidebar specific styles */
         .sidebar {
-            transition: width 0.3s ease-in-out, transform 0.3s ease-in-out;
+            transition: transform 0.3s ease-in-out;
             transform: translateX(-100%); /* Hidden by default on mobile */
-            z-index: 50; /* Ensure it's above other content on mobile */
-            height: 100vh; /* Make it take full viewport height */
-            overflow-y: auto; /* Enable vertical scrolling */
+            z-index: 50;
+            height: 100vh;
+            overflow-y: auto;
+            width: 272px; /* Always full width — transform handles show/hide on mobile */
         }
         .sidebar.open {
-            transform: translateX(0); /* Visible when open on mobile */
+            transform: translateX(0); /* Slide in on mobile */
         }
 
         /* Overlay for mobile when sidebar is open */
@@ -155,26 +156,26 @@
         /* Responsive adjustments */
         @media (min-width: 768px) { /* md breakpoint */
             .sidebar {
-                width: 192px; /* md:w-48 */
+                width: 192px;
                 transform: translateX(0); /* Always visible on md and larger */
             }
             .sidebar-overlay {
-                display: none; /* No overlay on md and larger */
+                display: none;
             }
             .main-content {
-                margin-left: 192px; /* Push content over by sidebar width */
+                margin-left: 192px;
             }
             .menu-toggle {
-                display: none; /* Hide toggle button on md and larger, as sidebar is always open */
+                display: none;
             }
         }
 
         @media (min-width: 1024px) { /* lg breakpoint */
             .sidebar {
-                width: 256px; /* lg:w-64 */
+                width: 256px;
             }
             .main-content {
-                margin-left: 256px; /* Adjust content push for larger sidebar */
+                margin-left: 256px;
             }
         }
     </style>
@@ -184,8 +185,8 @@
     <div id="sidebarOverlay" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-40 hidden md:hidden"></div>
 
     {# Left Sidebar #}
-    <aside id="sidebar" class="sidebar fixed top-0 left-0 h-full bg-gray-800 text-white p-6 shadow-xl w-0 md:w-48 lg:w-64">
-        <div class="text-2xl font-bold mb-8 text-center text-blue-300">Powerball Pro</div>
+    <aside id="sidebar" class="sidebar fixed top-0 left-0 h-full bg-gray-800 text-white p-6 shadow-xl">
+        <div class="text-2xl font-bold mb-8 text-center text-blue-300">Powerball Analytics Hub</div>
         <nav>
             <ul class="space-y-3">
                 {# TOP 13 PREFERENCES #}
@@ -406,16 +407,16 @@
             // Handle initial state and resize for desktop and tablet
             const adjustLayout = () => {
                 if (window.innerWidth >= 768) { // md breakpoint
-                    sidebar.style.width = '192px'; // md:w-48
+                    sidebar.style.transform = 'translateX(0)'; // Always visible
                     mainContent.style.marginLeft = '192px';
-                    sidebar.classList.remove('open'); // Ensure 'open' class doesn't interfere
-                    sidebarOverlay.classList.add('hidden'); // Ensure overlay is hidden
-                    sidebarOverlay.classList.remove('open'); // Ensure overlay is not fading in
-                } else { // Mobile view
-                    sidebar.style.width = '0'; // Hidden by default
+                    sidebar.classList.remove('open');
+                    sidebarOverlay.classList.add('hidden');
+                    sidebarOverlay.classList.remove('open');
+                } else { // Mobile view — use transform only, width stays 272px
+                    if (!sidebar.classList.contains('open')) {
+                        sidebar.style.transform = 'translateX(-100%)';
+                    }
                     mainContent.style.marginLeft = '0';
-                    // sidebar.classList.remove('open'); // Keep state if already open
-                    // sidebarOverlay handles its own hidden/open state via button
                 }
 
                 if (window.innerWidth >= 1024) { // lg breakpoint
