@@ -4372,37 +4372,73 @@ def save_official_draw_route():
 @app.route('/save_multiple_generated_picks', methods=['POST'], endpoint='save_multiple_index')
 @app.route('/save_multiple_generated_picks', methods=['POST'], endpoint='save_multiple_generated_picks_route')
 def save_multiple_generated_picks_route():
-    # ... existing implementation ...
     try:
-        white_balls_str = request.form.get('generated_white_balls')
-        powerball_str = request.form.get('generated_powerball')
+        # ── Handle JSON requests (from JS fetch calls) ──────────
+        if request.is_json:
+            data = request.get_json()
+            picks = data.get('picks', [])
+            if not picks:
+                return jsonify({'success': False, 'message': 'No picks provided.'}), 400
 
-        if not white_balls_str or not powerball_str:
-            flash("No numbers generated to save.", 'error')
-            return redirect(url_for('index'))
+            saved_count = 0
+            errors = []
+            for pick in picks:
+                try:
+                    white_balls = [int(n) for n in pick.get('white_balls', [])]
+                    powerball   = int(pick.get('powerball'))
+                    if len(white_balls) != 5:
+                        errors.append(f"Invalid white balls count: {white_balls}")
+                        continue
+                    if not (all(1 <= n <= 69 for n in white_balls) and 1 <= powerball <= 26):
+                        errors.append(f"Numbers out of range: {white_balls} PB:{powerball}")
+                        continue
+                    success, message = save_generated_numbers_to_db(white_balls, powerball)
+                    if success:
+                        saved_count += 1
+                    else:
+                        errors.append(message)
+                except Exception as e:
+                    errors.append(str(e))
 
-        white_balls = [int(x.strip()) for x in white_balls_str.split(',') if x.strip().isdigit()]
-        powerball = int(powerball_str)
+            if saved_count > 0:
+                return jsonify({'success': True, 'message': f'{saved_count} pick(s) saved successfully!'})
+            else:
+                return jsonify({'success': False, 'message': errors[0] if errors else 'Failed to save picks.'}), 400
 
-        if len(white_balls) != 5:
-            flash("Invalid white balls format. Expected 5 numbers.", 'error')
-            return redirect(url_for('index'))
-
-        if not (all(1 <= n <= 69 for n in white_balls) and 1 <= powerball <= 26):
-            flash("White balls must be between 1-69 and Powerball between 1-26 for saving.", 'error')
-            return redirect(url_for('index'))
-
-        success, message = save_generated_numbers_to_db(white_balls, powerball)
-        if success:
-            flash(message, 'info')
+        # ── Handle form submissions (from HTML forms) ────────────
         else:
-            flash(message, 'error')
+            white_balls_str = request.form.get('generated_white_balls')
+            powerball_str   = request.form.get('generated_powerball')
+
+            if not white_balls_str or not powerball_str:
+                flash("No numbers generated to save.", 'error')
+                return redirect(url_for('index'))
+
+            white_balls = [int(x.strip()) for x in white_balls_str.split(',') if x.strip().isdigit()]
+            powerball   = int(powerball_str)
+
+            if len(white_balls) != 5:
+                flash("Invalid white balls format. Expected 5 numbers.", 'error')
+                return redirect(url_for('index'))
+
+            if not (all(1 <= n <= 69 for n in white_balls) and 1 <= powerball <= 26):
+                flash("Numbers out of valid range.", 'error')
+                return redirect(url_for('index'))
+
+            success, message = save_generated_numbers_to_db(white_balls, powerball)
+            flash(message, 'info' if success else 'error')
+            return redirect(url_for('index'))
 
     except ValueError:
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Invalid number format.'}), 400
         flash("Invalid number format for saving generated numbers.", 'error')
+        return redirect(url_for('index'))
     except Exception as e:
-        flash(f"An error occurred while saving generated numbers: {e}", 'error')
-    return redirect(url_for('index'))
+        if request.is_json:
+            return jsonify({'success': False, 'message': str(e)}), 500
+        flash(f"An error occurred while saving: {e}", 'error')
+        return redirect(url_for('index'))
 
 @app.route('/api/save_multiple_smart_picks', methods=['POST'], endpoint='save_multiple_smart')
 @app.route('/api/save_multiple_smart_picks_fn', methods=['POST'], endpoint='save_multiple_smart_picks_route')
@@ -6762,10 +6798,6 @@ def save_generated_pick_route():
         flash(f"An error occurred while saving generated numbers: {e}", 'error')
     return redirect(url_for('index'))
 
-
-
-# Initialize core data on app startup
-initialize_core_data()
 
 
 # Initialize core data on app startup
