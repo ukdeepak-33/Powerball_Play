@@ -126,23 +126,36 @@
 
         /* Sidebar specific styles */
         .sidebar {
-            transition: transform 0.3s ease-in-out;
-            transform: translateX(-100%); /* Hidden by default on mobile */
-            z-index: 50;
+            position: fixed;
+            top: 0;
+            left: 0;
             height: 100vh;
+            width: 272px;
+            z-index: 9999;
             overflow-y: auto;
-            width: 272px; /* Always full width — transform handles show/hide on mobile */
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+            background-color: #1f2937; /* bg-gray-800 */
+            color: white;
+            padding: 1.5rem;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.5);
         }
         .sidebar.open {
-            transform: translateX(0); /* Slide in on mobile */
+            transform: translateX(0) !important;
         }
 
-        /* Overlay for mobile when sidebar is open */
+        /* Overlay */
         .sidebar-overlay {
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 40;
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0,0,0,0.6);
+            z-index: 9998;
             opacity: 0;
             transition: opacity 0.3s ease-in-out;
+            display: none;
+        }
+        .sidebar-overlay.visible {
+            display: block;
         }
         .sidebar-overlay.open {
             opacity: 1;
@@ -150,27 +163,28 @@
 
         /* Main content area */
         .main-content {
-            transition: margin-left 0.3s ease-in-out; /* Smooth transition for content shift */
+            transition: margin-left 0.3s ease-in-out;
         }
 
-        /* Responsive adjustments */
-        @media (min-width: 768px) { /* md breakpoint */
+        /* Desktop/tablet */
+        @media (min-width: 768px) {
             .sidebar {
                 width: 192px;
-                transform: translateX(0); /* Always visible on md and larger */
+                transform: translateX(0) !important;
+                z-index: 50;
+                box-shadow: none;
             }
             .sidebar-overlay {
-                display: none;
+                display: none !important;
             }
             .main-content {
                 margin-left: 192px;
             }
-            .menu-toggle {
+            #menuToggle {
                 display: none;
             }
         }
-
-        @media (min-width: 1024px) { /* lg breakpoint */
+        @media (min-width: 1024px) {
             .sidebar {
                 width: 256px;
             }
@@ -182,7 +196,7 @@
 </head>
 <body class="flex min-h-screen">
     {# Sidebar Overlay (for mobile) #}
-    <div id="sidebarOverlay" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-40 hidden md:hidden"></div>
+    <div id="sidebarOverlay" class="sidebar-overlay"></div>
 
     {# Left Sidebar #}
     <aside id="sidebar" class="sidebar fixed top-0 left-0 h-full bg-gray-800 text-white p-6 shadow-xl">
@@ -360,76 +374,47 @@
     {% block scripts %}
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const sidebar = document.getElementById('sidebar');
-            const menuToggle = document.getElementById('menuToggle');
-            const mainContent = document.getElementById('mainContent');
-            const sidebarOverlay = document.getElementById('sidebarOverlay');
+            const sidebar  = document.getElementById('sidebar');
+            const toggle   = document.getElementById('menuToggle');
+            const main     = document.getElementById('mainContent');
+            const overlay  = document.getElementById('sidebarOverlay');
 
-            const openSidebar = () => {
+            function openSidebar() {
                 sidebar.classList.add('open');
-                sidebarOverlay.classList.remove('hidden');
-                setTimeout(() => sidebarOverlay.classList.add('open'), 10); // Fade in overlay
-            };
+                overlay.classList.add('visible');
+                setTimeout(() => overlay.classList.add('open'), 10);
+            }
 
-            const closeSidebar = () => {
+            function closeSidebar() {
                 sidebar.classList.remove('open');
-                sidebarOverlay.classList.remove('open');
-                setTimeout(() => sidebarOverlay.classList.add('hidden'), 300); // Hide after fade out
-            };
+                overlay.classList.remove('open');
+                setTimeout(() => overlay.classList.remove('visible'), 300);
+            }
 
-            if (menuToggle) {
-                menuToggle.addEventListener('click', () => {
-                    if (sidebar.classList.contains('open')) {
-                        closeSidebar();
-                    } else {
-                        openSidebar();
-                    }
+            if (toggle) {
+                toggle.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
                 });
             }
 
-            // Close sidebar if a link is clicked (mobile only)
+            overlay.addEventListener('click', closeSidebar);
+
             sidebar.querySelectorAll('a').forEach(link => {
                 link.addEventListener('click', () => {
-                    if (window.innerWidth < 768) { // Only on screens smaller than md
-                        closeSidebar();
-                    }
+                    if (window.innerWidth < 768) closeSidebar();
                 });
             });
 
-            // Close sidebar if clicked outside (only on mobile when opened)
-            document.addEventListener('click', (event) => {
-                if (window.innerWidth < 768 && sidebar.classList.contains('open') &&
-                    !sidebar.contains(event.target) && (menuToggle && !menuToggle.contains(event.target))) {
-                    closeSidebar();
+            window.addEventListener('resize', () => {
+                if (window.innerWidth >= 768) {
+                    sidebar.classList.remove('open');
+                    overlay.classList.remove('open', 'visible');
+                    main.style.marginLeft = window.innerWidth >= 1024 ? '256px' : '192px';
+                } else {
+                    main.style.marginLeft = '0';
                 }
             });
-
-            // Handle initial state and resize for desktop and tablet
-            const adjustLayout = () => {
-                if (window.innerWidth >= 768) { // md breakpoint
-                    sidebar.style.transform = 'translateX(0)'; // Always visible
-                    mainContent.style.marginLeft = '192px';
-                    sidebar.classList.remove('open');
-                    sidebarOverlay.classList.add('hidden');
-                    sidebarOverlay.classList.remove('open');
-                } else { // Mobile view — use transform only, width stays 272px
-                    if (!sidebar.classList.contains('open')) {
-                        sidebar.style.transform = 'translateX(-100%)';
-                    }
-                    mainContent.style.marginLeft = '0';
-                }
-
-                if (window.innerWidth >= 1024) { // lg breakpoint
-                    sidebar.style.width = '256px'; // lg:w-64
-                    mainContent.style.marginLeft = '256px';
-                }
-            };
-
-            // Run on load and resize
-            adjustLayout();
-            window.addEventListener('resize', adjustLayout);
         });
     </script>
-   {% endblock %} 
-</body>
-</html>
+    {% endblock %}
