@@ -443,6 +443,114 @@
 
     .cmn-empty .icon { font-size: 48px; margin-bottom: 14px; }
     .cmn-empty p { font-size: 14px; line-height: 1.7; }
+
+    /* ── Pair / Triplet Frequency Section ── */
+    .cmn-freq-section {
+        margin-top: 24px;
+    }
+
+    .cmn-freq-toggle {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .cmn-freq-btn {
+        padding: 7px 18px;
+        border-radius: 20px;
+        border: 1px solid var(--border);
+        background: var(--surface2);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .cmn-freq-btn.active {
+        background: var(--accent);
+        color: #000;
+        border-color: var(--accent);
+    }
+
+    .cmn-freq-btn:hover:not(.active) { color: var(--white); border-color: var(--muted); }
+
+    .cmn-freq-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 10px;
+    }
+
+    .cmn-freq-item {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        transition: border-color 0.15s;
+    }
+
+    .cmn-freq-item:hover { border-color: var(--accent); }
+
+    .cmn-freq-balls {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+    }
+
+    .cmn-freq-ball {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 700;
+        background: var(--accent);
+        color: #000;
+    }
+
+    .cmn-freq-count {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        flex-shrink: 0;
+    }
+
+    .cmn-freq-num {
+        font-size: 22px;
+        font-weight: 800;
+        color: var(--accent);
+        line-height: 1;
+    }
+
+    .cmn-freq-label {
+        font-size: 9px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .cmn-freq-bar {
+        height: 3px;
+        background: var(--border);
+        border-radius: 2px;
+        margin-top: 8px;
+        overflow: hidden;
+    }
+
+    .cmn-freq-bar-fill {
+        height: 100%;
+        background: var(--accent);
+        border-radius: 2px;
+        transition: width 0.6s ease;
+    }
 </style>
 
 <div id="cmn-wrapper">
@@ -492,6 +600,24 @@
                         <span>Sorted by best match</span>
                     </div>
                     <div id="manual-results-list"></div>
+                </div>
+
+                <!-- ── Pair & Triplet Frequency ── -->
+                <div class="cmn-freq-section" id="freq-section" style="display:none;">
+                    <div class="cmn-results-wrap">
+                        <div class="cmn-results-header">
+                            <span>Your Number Combinations — Historical Frequency</span>
+                            <span id="freq-subtitle">How often your pairs & triplets appeared together</span>
+                        </div>
+                        <div style="padding:16px 20px;">
+                            <div class="cmn-freq-toggle">
+                                <button class="cmn-freq-btn active" onclick="cmnShowFreq('pairs')">Pairs (2 numbers)</button>
+                                <button class="cmn-freq-btn"       onclick="cmnShowFreq('triplets')">Triplets (3 numbers)</button>
+                            </div>
+                            <div class="cmn-freq-grid" id="freq-pairs-grid"></div>
+                            <div class="cmn-freq-grid" id="freq-triplets-grid" style="display:none;"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -591,6 +717,7 @@
         ['wb1','wb2','wb3','wb4','wb5','pb'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('manual-results').style.display = 'none';
         document.getElementById('manual-empty').style.display   = 'none';
+        document.getElementById('freq-section').style.display   = 'none';
         cmnHideErr('manual');
     }
 
@@ -642,6 +769,9 @@
             `).join('');
 
             document.getElementById('manual-results').style.display = 'block';
+
+            // ── Show pair/triplet frequency analysis ──
+            cmnShowFreqSection(data.checked_numbers, data.results);
 
         } catch(e) {
             cmnErr('manual', 'Network error. Please try again.');
@@ -720,6 +850,87 @@
             }
         });
     });
+
+    // ── Pair & Triplet Frequency ──────────────────────────────
+    let cmnFreqData = { pairs: [], triplets: [] };
+
+    function cmnComputeFrequency(checkedNumbers, results) {
+        // Build all pairs and triplets from user's 5 numbers
+        const nums = checkedNumbers;
+        const pairs    = [];
+        const triplets = [];
+
+        for (let i = 0; i < nums.length; i++) {
+            for (let j = i + 1; j < nums.length; j++) {
+                pairs.push([nums[i], nums[j]]);
+                for (let k = j + 1; k < nums.length; k++) {
+                    triplets.push([nums[i], nums[j], nums[k]]);
+                }
+            }
+        }
+
+        // Count how many matching draws contain each pair/triplet
+        function countCombo(combo, results) {
+            const comboSet = new Set(combo);
+            return results.filter(r => {
+                const official = new Set(r.official_numbers);
+                return [...comboSet].every(n => official.has(n));
+            }).length;
+        }
+
+        const pairCounts    = pairs.map(p    => ({ nums: p, count: countCombo(p, results) }))
+                                   .sort((a, b) => b.count - a.count);
+        const tripletCounts = triplets.map(t  => ({ nums: t, count: countCombo(t, results) }))
+                                      .sort((a, b) => b.count - a.count);
+
+        return { pairs: pairCounts, triplets: tripletCounts };
+    }
+
+    function cmnRenderFreqGrid(items, gridId) {
+        const maxCount = items.length > 0 ? items[0].count : 1;
+        const grid = document.getElementById(gridId);
+        if (items.every(i => i.count === 0)) {
+            grid.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:8px 0;">No matches found in historical draws.</p>';
+            return;
+        }
+        grid.innerHTML = items.map(item => `
+            <div class="cmn-freq-item">
+                <div>
+                    <div class="cmn-freq-balls">
+                        ${item.nums.map(n => `<div class="cmn-freq-ball">${n}</div>`).join('<span style="color:var(--muted);font-size:10px;font-weight:700">+</span>')}
+                    </div>
+                    <div class="cmn-freq-bar" style="width:100%;margin-top:8px;">
+                        <div class="cmn-freq-bar-fill" style="width:${maxCount > 0 ? Math.round((item.count / maxCount) * 100) : 0}%"></div>
+                    </div>
+                </div>
+                <div class="cmn-freq-count">
+                    <div class="cmn-freq-num">${item.count}</div>
+                    <div class="cmn-freq-label">draws</div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function cmnShowFreq(type) {
+        // Toggle buttons
+        document.querySelectorAll('.cmn-freq-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        // Toggle grids
+        document.getElementById('freq-pairs-grid').style.display    = type === 'pairs'    ? 'grid' : 'none';
+        document.getElementById('freq-triplets-grid').style.display = type === 'triplets' ? 'grid' : 'none';
+    }
+
+    function cmnShowFreqSection(checkedNumbers, results) {
+        if (results.length === 0) return;
+        cmnFreqData = cmnComputeFrequency(checkedNumbers, results);
+        cmnRenderFreqGrid(cmnFreqData.pairs,    'freq-pairs-grid');
+        cmnRenderFreqGrid(cmnFreqData.triplets, 'freq-triplets-grid');
+        document.getElementById('freq-section').style.display = 'block';
+        // Reset to pairs view
+        document.querySelectorAll('.cmn-freq-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
+        document.getElementById('freq-pairs-grid').style.display    = 'grid';
+        document.getElementById('freq-triplets-grid').style.display = 'none';
+    }
 
 </script>
 {% endblock %}
