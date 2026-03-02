@@ -6418,7 +6418,15 @@ def get_all_official_draws():
     except Exception as e:
         print(f"Error fetching powerball_draws: {e}")
 
-    return all_draws
+    # ── Deduplicate by draw_date (same date may exist in both tables) ──
+    seen_dates = set()
+    unique_draws = []
+    for draw in all_draws:
+        if draw['draw_date'] not in seen_dates:
+            seen_dates.add(draw['draw_date'])
+            unique_draws.append(draw)
+
+    return unique_draws
 
 
 def check_pick_against_draws_cmn(white_balls, powerball, official_draws, min_matches=2):
