@@ -4558,14 +4558,59 @@ def positional_analysis_route():
 
 
 @app.route('/hot_cold_numbers')
-def hot_cold_numbers_route():
-    last_draw_date_str_for_cache = last_draw['Draw Date'] if not last_draw.empty and 'Draw Date' in last_draw else 'N/A'
-    hot_numbers_list, cold_numbers_list = get_cached_analysis('hot_cold_numbers', hot_cold_numbers, df, last_draw_date_str_for_cache)
+def hot_cold_numbers():
+    try:
+        df = get_draw_data()           # your existing data-fetch helper
+        if df is None or df.empty:
+            return render_template('hot_cold_numbers.html',
+                cy_hot=[], cy_cold=[], hot_3y=[], cold_3y=[],
+                hot_5y=[], cold_5y=[], current_year=datetime.now().year,
+                last_draw=last_draw.to_dict() if last_draw is not None else {})
 
-    return render_template('hot_cold_numbers.html',
-                           hot_numbers=hot_numbers_list,
-                           cold_numbers=cold_numbers_list)
+        # Normalise date column
+        df['draw_date'] = pd.to_datetime(df['draw_date'])
 
+        now = datetime.now()
+        current_year = now.year
+
+        def get_hot_cold(frame, top_n=15):
+            """Melt white balls, count frequency, return top/bottom N."""
+            white_cols = ['n1','n2','n3','n4','n5']   # adjust to your column names
+            melted = frame[white_cols].melt(value_name='Number').dropna()
+            melted['Number'] = melted['Number'].astype(int)
+            freq = (melted.groupby('Number').size()
+                          .reset_index(name='Frequency')
+                          .sort_values('Frequency', ascending=False))
+            hot  = freq.head(top_n).to_dict('records')
+            cold = freq.tail(top_n).sort_values('Frequency').to_dict('records') \
+                   if len(freq) >= top_n else freq.to_dict('records')
+            return hot, cold
+
+        # Current year
+        cy_df    = df[df['draw_date'].dt.year == current_year]
+        cy_hot, cy_cold = get_hot_cold(cy_df)
+
+        # Last 3 years
+        df_3y    = df[df['draw_date'] >= now - timedelta(days=365*3)]
+        hot_3y, cold_3y = get_hot_cold(df_3y)
+
+        # Last 5 years
+        df_5y    = df[df['draw_date'] >= now - timedelta(days=365*5)]
+        hot_5y, cold_5y = get_hot_cold(df_5y)
+
+        return render_template('hot_cold_numbers.html',
+            cy_hot=cy_hot,   cy_cold=cy_cold,
+            hot_3y=hot_3y,   cold_3y=cold_3y,
+            hot_5y=hot_5y,   cold_5y=cold_5y,
+            current_year=current_year,
+            last_draw=last_draw.to_dict() if last_draw is not None else {})
+
+    except Exception as e:
+        print(f"Error in hot_cold_numbers: {e}")
+        return render_template('hot_cold_numbers.html',
+            cy_hot=[], cy_cold=[], hot_3y=[], cold_3y=[],
+            hot_5y=[], cold_5y=[], current_year=datetime.now().year, last_draw={})
+        
 @app.route('/monthly_white_ball_analysis')
 def monthly_white_ball_analysis_route():
     if df.empty:
@@ -6896,6 +6941,61 @@ def api_frequency_ai_analysis():
     except Exception as e:
         print(f'Frequency AI analysis error: {e}')
         return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/hot-cold-ai-analysis', methods=['POST'])
+def hot_cold_ai_analysis():
+    try:
+        data     = request.get_json()
+        cy_hot   = data.get('cy_hot', [])
+        cy_cold  = data.get('cy_cold', [])
+        hot_3y   = data.get('hot_3y', [])
+        cold_3y  = data.get('cold_3y', [])
+        hot_5y   = data.get('hot_5y', [])
+        cold_5y  = data.get('cold_5y', [])
+        last_draw= data.get('last_draw', {})
+        year     = data.get('year', datetime.now().year)
+
+        def fmt(lst): return ', '.join(str(x['Number']) for x in lst[:10]) if lst else 'N/A'
+
+        prompt = f"""You are an expert Powerball statistics analyst. Analyse hot and cold number patterns across three time windows.
+
+DATA SUMMARY:
+Current Year ({year}):
+  Hot  (Top 15): {fmt(cy_hot)}
+  Cold (Top 15): {fmt(cy_cold)}
+
+Last 3 Years:
+  Hot  (Top 15): {fmt(hot_3y)}
+  Cold (Top 15): {fmt(cold_3y)}
+
+Last 5 Years:
+  Hot  (Top 15): {fmt(hot_5y)}
+  Cold (Top 15): {fmt(cold_5y)}
+
+Latest Draw Numbers: {', '.join(str(v) for k,v in last_draw.items() if k in ['n1','n2','n3','n4','n5'] and v)}
+
+Please provide:
+1. 🔥 MOMENTUM LEADERS — Numbers consistently hot across multiple windows (strong ongoing pattern)
+2. 🧊 PERSISTENT COLD — Numbers consistently absent, and whether that overdue gap is noteworthy
+3. ⚡ TREND REVERSALS — Numbers warming up or cooling down (notable shifts between short and long windows)
+4. ⭐ LATEST DRAW CONTEXT — Were any latest draw numbers hot or cold? What does that suggest?
+5. 🎯 KEY TAKEAWAY — One concise strategic observation about the overall hot/cold landscape
+
+Keep insights analytical, specific with number references, and concise (max 350 words)."""
+
+        client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+        response = client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=500,
+            temperature=0.6
+        )
+        analysis = response.choices[0].message.content
+        return jsonify({'analysis': analysis})
+
+    except Exception as e:
+        print(f"Error in hot_cold_ai_analysis: {e}")
+        return jsonify({'analysis': f'AI analysis unavailable: {str(e)}'}), 500
 
 # Initialize core data on app startup
 initialize_core_data()
