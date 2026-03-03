@@ -4513,9 +4513,32 @@ def white_ball_gap_analysis_route():
 @app.route('/frequency_analysis')
 def frequency_analysis_route():
     white_ball_freq_list, powerball_freq_list = get_cached_analysis('freq_analysis', frequency_analysis, df)
+
+    # ── Compute stats to pass to template ────────────────
+    wb_sorted_freq = sorted(white_ball_freq_list, key=lambda x: x['Frequency'], reverse=True)
+    pb_sorted_freq = sorted(powerball_freq_list,  key=lambda x: x['Frequency'], reverse=True)
+
+    total_draws = max((d['Frequency'] for d in white_ball_freq_list), default=0)
+    # A rough total draws count = sum of all wb frequencies / 5 (5 balls per draw)
+    total_draws_count = round(sum(d['Frequency'] for d in white_ball_freq_list) / 5)
+
+    wb_avg = round(sum(d['Frequency'] for d in white_ball_freq_list) / len(white_ball_freq_list)) if white_ball_freq_list else 0
+
+    stats = {
+        'total_draws':     total_draws_count,
+        'most_drawn_wb':   wb_sorted_freq[0]  if wb_sorted_freq  else {'Number': '-', 'Frequency': 0},
+        'least_drawn_wb':  wb_sorted_freq[-1] if wb_sorted_freq  else {'Number': '-', 'Frequency': 0},
+        'most_drawn_pb':   pb_sorted_freq[0]  if pb_sorted_freq  else {'Number': '-', 'Frequency': 0},
+        'least_drawn_pb':  pb_sorted_freq[-1] if pb_sorted_freq  else {'Number': '-', 'Frequency': 0},
+        'avg_freq_wb':     wb_avg,
+    }
+
     return render_template('frequency_analysis.html',
                            white_ball_freq=white_ball_freq_list,
-                           powerball_freq=powerball_freq_list)
+                           powerball_freq=powerball_freq_list,
+                           stats=stats)
+
+
 @app.route('/positional_analysis')
 def positional_analysis_route():
     if df.empty:
@@ -6676,10 +6699,6 @@ def analyze_consecutive_trends_ai():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-
-
-
 @app.route('/generate_smart_picks_route', methods=['POST'])
 def generate_smart_picks_route():
     if df.empty:
@@ -6769,10 +6788,6 @@ def generate_smart_picks_route():
         traceback.print_exc()
         return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
         
-
-
-
-
 @app.route('/save_generated_pick', methods=['POST'])
 def save_generated_pick_route():
     try:
@@ -6806,7 +6821,81 @@ def save_generated_pick_route():
         flash(f"An error occurred while saving generated numbers: {e}", 'error')
     return redirect(url_for('index'))
 
+@app.route('/api/frequency-ai-analysis', methods=['POST'])
+def api_frequency_ai_analysis():
+    """Calls Groq to generate a narrative analysis of white ball and powerball frequencies."""
+    try:
+        data             = request.get_json()
+        wb_freq          = data.get('white_ball_freq', [])
+        pb_freq          = data.get('powerball_freq', [])
 
+        if not wb_freq or not pb_freq:
+            return jsonify({'error': 'Missing frequency data'}), 400
+
+        GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+        if not GROQ_API_KEY:
+            return jsonify({'error': 'AI analysis unavailable (no API key configured)'}), 503
+
+        # ── Build compact summary for prompt ─────────────
+        wb_sorted = sorted(wb_freq, key=lambda x: x['Frequency'], reverse=True)
+        pb_sorted = sorted(pb_freq, key=lambda x: x['Frequency'], reverse=True)
+
+        wb_avg = round(sum(d['Frequency'] for d in wb_freq) / len(wb_freq))
+        pb_avg = round(sum(d['Frequency'] for d in pb_freq) / len(pb_freq))
+
+        top5_wb    = [(d['Number'], d['Frequency']) for d in wb_sorted[:5]]
+        bottom5_wb = [(d['Number'], d['Frequency']) for d in wb_sorted[-5:]]
+        top5_pb    = [(d['Number'], d['Frequency']) for d in pb_sorted[:5]]
+        bottom5_pb = [(d['Number'], d['Frequency']) for d in pb_sorted[-5:]]
+
+        # Numbers significantly above/below average
+        hot_wb  = [d['Number'] for d in wb_freq if d['Frequency'] > wb_avg * 1.15]
+        cold_wb = [d['Number'] for d in wb_freq if d['Frequency'] < wb_avg * 0.85]
+
+        prompt = (
+            "You are a Powerball lottery data analyst. Use ONLY the data below — do not use outside knowledge.\n\n"
+            f"WHITE BALL DATA (1-69):\n"
+            f"- Average frequency: {wb_avg} draws\n"
+            f"- Top 5 most drawn:   {top5_wb}\n"
+            f"- Bottom 5 least drawn: {bottom5_wb}\n"
+            f"- Numbers >15% above average: {hot_wb}\n"
+            f"- Numbers >15% below average: {cold_wb}\n\n"
+            f"POWERBALL DATA (1-26):\n"
+            f"- Average frequency: {pb_avg} draws\n"
+            f"- Top 5 most drawn:   {top5_pb}\n"
+            f"- Bottom 5 least drawn: {bottom5_pb}\n\n"
+            "TASK: Write a clear, engaging 4-6 sentence analysis covering:\n"
+            "1. Which white ball numbers stand out as dominant and why that gap is noteworthy\n"
+            "2. Which numbers are notably underperforming\n"
+            "3. Any interesting Powerball trends\n"
+            "4. A brief responsible-gambling note reminding players that past frequency does not predict future draws\n"
+            "Keep language sharp and data-driven. Do not invent numbers."
+        )
+
+        response = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {GROQ_API_KEY}',
+                'Content-Type':  'application/json'
+            },
+            json={
+                'model':       'llama-3.1-8b-instant',
+                'messages':    [{'role': 'user', 'content': prompt}],
+                'max_tokens':  350,
+                'temperature': 0.4
+            },
+            timeout=15
+        )
+
+        if response.status_code == 200:
+            summary = response.json()['choices'][0]['message']['content'].strip()
+            return jsonify({'summary': summary})
+
+        return jsonify({'error': f'Groq returned status {response.status_code}'}), 502
+
+    except Exception as e:
+        print(f'Frequency AI analysis error: {e}')
+        return jsonify({'error': 'Internal server error'}), 500
 
 # Initialize core data on app startup
 initialize_core_data()
