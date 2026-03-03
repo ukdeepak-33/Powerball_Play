@@ -1,18 +1,18 @@
 import pandas as pd
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-from groq import Groq
-from collections import defaultdict
-from datetime import datetime, timedelta
+import random
 from itertools import combinations
 import math
 import os
 import re
-import random
+from collections import defaultdict
+from datetime import datetime, timedelta
 import requests
 import json
 import numpy as np
 import traceback
 import warnings
+from groq import Groq
 
 warnings.filterwarnings('ignore', category=UserWarning, module='sklearn') # Ignore specific KMeans warning
 
