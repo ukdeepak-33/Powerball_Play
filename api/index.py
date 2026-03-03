@@ -4536,9 +4536,9 @@ def frequency_analysis_route():
     return render_template('frequency_analysis.html',
                            white_ball_freq=white_ball_freq_list,
                            powerball_freq=powerball_freq_list,
-                           stats=stats)
-
-
+                           last_draw=last_draw.to_dict())
+   
+                           
 @app.route('/positional_analysis')
 def positional_analysis_route():
     if df.empty:
