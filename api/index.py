@@ -1,12 +1,13 @@
 import pandas as pd
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-import random
+from groq import Groq
+from collections import defaultdict
+from datetime import datetime, timedelta
 from itertools import combinations
 import math
 import os
 import re
-from collections import defaultdict
-from datetime import datetime, timedelta
+import random
 import requests
 import json
 import numpy as np
@@ -4558,24 +4559,21 @@ def positional_analysis_route():
 
 
 @app.route('/hot_cold_numbers', endpoint='hot_cold_numbers_route')
-def hot_cold_numbers():
+def hot_cold_numbers_route_handler():
     try:
-        df = get_draw_data()           # your existing data-fetch helper
-        if df is None or df.empty:
+        if df.empty:
             return render_template('hot_cold_numbers.html',
                 cy_hot=[], cy_cold=[], hot_3y=[], cold_3y=[],
                 hot_5y=[], cold_5y=[], current_year=datetime.now().year,
-                last_draw=last_draw.to_dict() if last_draw is not None else {})
-
-        # Normalise date column
-        df['draw_date'] = pd.to_datetime(df['draw_date'])
+                last_draw=last_draw.to_dict() if not last_draw.empty else {})
 
         now = datetime.now()
         current_year = now.year
+        white_cols = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']
 
         def get_hot_cold(frame, top_n=15):
-            """Melt white balls, count frequency, return top/bottom N."""
-            white_cols = ['n1','n2','n3','n4','n5']   # adjust to your column names
+            if frame.empty:
+                return [], []
             melted = frame[white_cols].melt(value_name='Number').dropna()
             melted['Number'] = melted['Number'].astype(int)
             freq = (melted.groupby('Number').size()
@@ -4586,16 +4584,13 @@ def hot_cold_numbers():
                    if len(freq) >= top_n else freq.to_dict('records')
             return hot, cold
 
-        # Current year
-        cy_df    = df[df['draw_date'].dt.year == current_year]
+        cy_df = df[df['Draw Date_dt'].dt.year == current_year]
         cy_hot, cy_cold = get_hot_cold(cy_df)
 
-        # Last 3 years
-        df_3y    = df[df['draw_date'] >= now - timedelta(days=365*3)]
+        df_3y = df[df['Draw Date_dt'] >= now - timedelta(days=365*3)]
         hot_3y, cold_3y = get_hot_cold(df_3y)
 
-        # Last 5 years
-        df_5y    = df[df['draw_date'] >= now - timedelta(days=365*5)]
+        df_5y = df[df['Draw Date_dt'] >= now - timedelta(days=365*5)]
         hot_5y, cold_5y = get_hot_cold(df_5y)
 
         return render_template('hot_cold_numbers.html',
@@ -4603,10 +4598,11 @@ def hot_cold_numbers():
             hot_3y=hot_3y,   cold_3y=cold_3y,
             hot_5y=hot_5y,   cold_5y=cold_5y,
             current_year=current_year,
-            last_draw=last_draw.to_dict() if last_draw is not None else {})
+            last_draw=last_draw.to_dict() if not last_draw.empty else {})
 
     except Exception as e:
-        print(f"Error in hot_cold_numbers: {e}")
+        print(f"Error in hot_cold_numbers_route_handler: {e}")
+        traceback.print_exc()
         return render_template('hot_cold_numbers.html',
             cy_hot=[], cy_cold=[], hot_3y=[], cold_3y=[],
             hot_5y=[], cold_5y=[], current_year=datetime.now().year, last_draw={})
