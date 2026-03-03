@@ -1,150 +1,520 @@
 {% extends "base.html" %}
 
 {% block title %}Hot & Cold Numbers{% endblock %}
-
-{% block page_heading %}Hot & Cold Numbers (Last 1 Year){% endblock %}
+{% block page_heading %}🔥 Hot & Cold Numbers{% endblock %}
 
 {% block content %}
-<div class="space-y-8">
-    <div class="card p-6 bg-white rounded-lg shadow-lg">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Hot Numbers (Most Frequently Drawn)</h2>
-        <p class="text-gray-700 mb-4">These are the white ball numbers that have been drawn most often in the last year.</p>
-        {% if hot_numbers %}
-            <div class="relative h-80 w-full">
-                <canvas id="hotNumbersChart"></canvas>
-            </div>
-            <div class="mt-4 flex flex-wrap justify-center gap-2">
-                {% for number in hot_numbers %}
-                    <span class="ball bg-green-200 text-green-800 border-green-400 font-semibold text-lg">{{ number.Number }}</span>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
-                No hot numbers data available for the last year.
-            </div>
-        {% endif %}
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --fire-core:    #ff6a00;
+    --fire-mid:     #ff9a3c;
+    --fire-glow:    #ffcf77;
+    --ice-core:     #00c6ff;
+    --ice-mid:      #5de0ff;
+    --ice-glow:     #b8f4ff;
+    --gold:         #ffd700;
+    --gold-glow:    rgba(255,215,0,0.35);
+    --dark-bg:      #0d0f14;
+    --panel-bg:     #13161e;
+    --panel-border: #1f2435;
+    --text-primary: #eef0f6;
+    --text-muted:   #7a819a;
+  }
+
+  .hc-page * { font-family: 'DM Sans', sans-serif; }
+
+  /* ── Tabs ── */
+  .period-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .period-tab {
+    padding: 8px 22px; border-radius: 30px; font-weight: 600; font-size: 0.82rem;
+    letter-spacing: 0.04em; cursor: pointer; border: 1.5px solid var(--panel-border);
+    background: var(--panel-bg); color: var(--text-muted);
+    transition: all .25s ease;
+  }
+  .period-tab:hover { color: var(--text-primary); border-color: #3a3f55; }
+  .period-tab.active-fire  { background: linear-gradient(135deg,#7a1f00,#c94400); border-color: var(--fire-core); color: #fff; box-shadow: 0 0 14px rgba(255,106,0,.35); }
+  .period-tab.active-ice   { background: linear-gradient(135deg,#003d5c,#005f8a); border-color: var(--ice-core); color: #fff; box-shadow: 0 0 14px rgba(0,198,255,.35); }
+  .period-tab.active-combo { background: linear-gradient(135deg,#3b1a5a,#1a3b5a); border-color: #9b59b6; color: #fff; box-shadow: 0 0 14px rgba(155,89,182,.35); }
+
+  /* ── Panels ── */
+  .hc-panel {
+    background: var(--panel-bg); border: 1px solid var(--panel-border);
+    border-radius: 16px; overflow: hidden;
+  }
+  .panel-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 18px 22px; border-bottom: 1px solid var(--panel-border);
+  }
+  .panel-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; letter-spacing: 0.06em; }
+  .fire-header { background: linear-gradient(90deg, rgba(255,106,0,.12), transparent); }
+  .ice-header  { background: linear-gradient(90deg, rgba(0,198,255,.10), transparent); }
+  .fire-title  { color: var(--fire-mid); }
+  .ice-title   { color: var(--ice-mid); }
+
+  /* ── Number Rows ── */
+  .num-row {
+    display: grid;
+    grid-template-columns: 36px 52px 1fr 52px;
+    align-items: center; gap: 10px;
+    padding: 9px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    transition: background .15s;
+  }
+  .num-row:last-child { border-bottom: none; }
+  .num-row:hover { background: rgba(255,255,255,0.03); }
+
+  /* Gold highlight for latest draw */
+  .num-row.latest-draw {
+    background: linear-gradient(90deg, rgba(255,215,0,.08), rgba(255,215,0,.03)) !important;
+    border-left: 3px solid var(--gold);
+  }
+
+  /* rank badge */
+  .rank-badge {
+    font-family: 'Bebas Neue', sans-serif; font-size: 1rem;
+    color: var(--text-muted); text-align: center;
+  }
+  .rank-badge.top3 { color: var(--gold); font-size: 1.1rem; }
+
+  /* number circle */
+  .num-badge {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.95rem; flex-shrink: 0;
+  }
+  .fire-badge {
+    background: linear-gradient(135deg, #7a1f00, #c94400);
+    border: 1.5px solid var(--fire-core); color: #fff;
+  }
+  .ice-badge {
+    background: linear-gradient(135deg, #003d5c, #005f8a);
+    border: 1.5px solid var(--ice-core); color: #fff;
+  }
+  .latest-draw .fire-badge,
+  .latest-draw .ice-badge {
+    background: linear-gradient(135deg, #7a5500, #c98800);
+    border-color: var(--gold);
+  }
+
+  /* bar */
+  .bar-track {
+    flex: 1; height: 10px; background: rgba(255,255,255,0.06);
+    border-radius: 99px; overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%; border-radius: 99px;
+    transition: width .6s cubic-bezier(.4,0,.2,1);
+  }
+  .fire-fill { background: linear-gradient(90deg, #c94400, var(--fire-core), var(--fire-glow)); }
+  .ice-fill  { background: linear-gradient(90deg, #005f8a, var(--ice-core), var(--ice-glow)); }
+  .latest-draw .fire-fill,
+  .latest-draw .ice-fill { background: linear-gradient(90deg, #a07800, var(--gold)); }
+
+  .freq-label {
+    font-size: 0.78rem; font-weight: 600; color: var(--text-muted);
+    text-align: right; white-space: nowrap;
+  }
+  .latest-draw .freq-label { color: var(--gold); }
+
+  /* ── Gold Draw Banner ── */
+  .latest-draw-banner {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 18px; font-size: 0.78rem; font-weight: 600;
+    color: var(--gold); background: rgba(255,215,0,.06);
+    border-bottom: 1px solid rgba(255,215,0,.15);
+  }
+
+  /* ── Crossover ── */
+  .crossover-card {
+    background: linear-gradient(135deg, rgba(155,89,182,.08), rgba(0,198,255,.06));
+    border: 1px solid rgba(155,89,182,.25); border-radius: 16px; padding: 20px 24px;
+  }
+  .crossover-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 42px; height: 42px; border-radius: 50%;
+    font-weight: 700; font-size: 0.95rem;
+    background: linear-gradient(135deg, #3b1a5a, #1a3b5a);
+    border: 2px solid #9b59b6; color: #fff;
+  }
+
+  /* ── Stat Chips ── */
+  .stats-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+  .stat-chip {
+    padding: 6px 14px; border-radius: 30px; font-size: 0.78rem; font-weight: 600; border: 1px solid;
+  }
+  .fire-chip { background: rgba(255,106,0,.1); border-color: rgba(255,106,0,.35); color: var(--fire-mid); }
+  .ice-chip  { background: rgba(0,198,255,.08); border-color: rgba(0,198,255,.30); color: var(--ice-mid); }
+  .gold-chip { background: rgba(255,215,0,.08); border-color: rgba(255,215,0,.30); color: var(--gold); }
+
+  /* ── AI Panel ── */
+  .ai-panel {
+    background: linear-gradient(135deg, rgba(155,89,182,.07), rgba(0,198,255,.05));
+    border: 1px solid rgba(155,89,182,.22); border-radius: 16px;
+  }
+  .ai-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 16px 22px; border-bottom: 1px solid rgba(155,89,182,.18);
+    background: linear-gradient(90deg, rgba(155,89,182,.08), transparent);
+  }
+  .ai-body { padding: 20px 22px; }
+  .ai-text { color: var(--text-primary); font-size: 0.9rem; line-height: 1.75; white-space: pre-wrap; }
+  .pulse-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: #9b59b6;
+    animation: pulse-ai 1.4s ease-in-out infinite; display: inline-block;
+  }
+  @keyframes pulse-ai {
+    0%,100% { opacity:.3; transform:scale(1); }
+    50%      { opacity:1;  transform:scale(1.4); }
+  }
+
+  .period-content { display: none; }
+  .period-content.active { display: block; }
+  .mini-chart { height: 180px; position: relative; }
+  .fire-glow-text { text-shadow: 0 0 12px rgba(255,106,0,.6); }
+  .ice-glow-text  { text-shadow: 0 0 12px rgba(0,198,255,.6); }
+</style>
+
+<div class="hc-page space-y-6" style="color:var(--text-primary);min-height:100vh;background:var(--dark-bg);padding:8px;">
+
+  <!-- ── HEADER ── -->
+  <div class="hc-panel p-6" style="background:linear-gradient(135deg,#0d0f14,#131825);border-color:#1f2435;">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h1 style="font-family:'Bebas Neue',sans-serif;font-size:2.2rem;letter-spacing:0.06em;line-height:1;margin-bottom:6px;">
+          <span class="fire-glow-text" style="color:var(--fire-mid);">🔥 HOT</span>
+          <span style="color:var(--text-muted);font-size:1.4rem;"> vs </span>
+          <span class="ice-glow-text" style="color:var(--ice-mid);">🧊 COLD</span>
+          <span style="color:var(--text-primary);font-size:1.4rem;"> NUMBER ANALYSIS</span>
+        </h1>
+        <p style="color:var(--text-muted);font-size:0.85rem;">White ball frequency patterns · Current Year · 3 Years · 5 Years · Top 15 each</p>
+      </div>
+      {% if last_draw %}
+      <div style="text-align:right;">
+        <div style="font-size:0.7rem;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;">Latest Draw</div>
+        <div style="font-size:0.8rem;color:var(--gold);font-weight:600;">{{ last_draw.get('draw_date','') }}</div>
+        <div class="flex gap-1 mt-1 justify-end flex-wrap">
+          {% for n in [last_draw.get('n1'),last_draw.get('n2'),last_draw.get('n3'),last_draw.get('n4'),last_draw.get('n5')] %}
+            {% if n %}<span style="background:linear-gradient(135deg,#7a5500,#c98800);border:1.5px solid var(--gold);color:#fff;border-radius:50%;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;">{{ n }}</span>{% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── TABS + AI BUTTON ── -->
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <div class="period-tabs">
+      <button class="period-tab active-fire" onclick="switchPeriod('cy',this)">📅 Current Year</button>
+      <button class="period-tab" onclick="switchPeriod('3y',this)">📆 Last 3 Years</button>
+      <button class="period-tab" onclick="switchPeriod('5y',this)">🗓️ Last 5 Years</button>
+      <button class="period-tab" onclick="switchPeriod('cross',this)">🔀 Pattern Crossover</button>
+    </div>
+    <button id="aiTriggerBtn" onclick="loadAIAnalysis()"
+      style="padding:8px 20px;border-radius:30px;font-size:0.82rem;font-weight:600;
+             background:linear-gradient(135deg,#3b1a5a,#1a3b5a);border:1.5px solid #9b59b6;
+             color:#d1b3ff;cursor:pointer;transition:all .25s;">
+      ✨ AI Pattern Insights
+    </button>
+  </div>
+
+  {# ─────────────────── MACRO for a hot/cold list ─────────────────── #}
+  {% macro render_list(items, badge_class, fill_class, title_icon, title_text, period_label, max_hot_freq, draw_nums) %}
+  <div class="hc-panel">
+    <div class="panel-header {{ 'fire-header' if 'fire' in badge_class else 'ice-header' }}">
+      <span style="font-size:1.5rem;">{{ title_icon }}</span>
+      <span class="panel-title {{ 'fire-title' if 'fire' in badge_class else 'ice-title' }}">{{ title_text }}</span>
+      <span style="font-size:0.75rem;color:var(--text-muted);margin-left:auto;">Top 15 · {{ period_label }}</span>
+    </div>
+    {% if last_draw %}
+    <div class="latest-draw-banner">⭐ Gold-highlighted numbers appeared in the latest draw ({{ last_draw.get('draw_date','') }})</div>
+    {% endif %}
+    {% if items %}
+      {% for item in items %}
+        {% set is_latest = item.Number|string in draw_nums %}
+        <div class="num-row {{ 'latest-draw' if is_latest else '' }}">
+          <span class="rank-badge {{ 'top3' if loop.index <= 3 else '' }}">#{{ loop.index }}</span>
+          <span class="num-badge {{ badge_class }}">{{ item.Number }}</span>
+          <div class="bar-track">
+            <div class="bar-fill {{ fill_class }}" style="width:{{ [((item.Frequency / (max_hot_freq if max_hot_freq > 0 else 1)) * 100)|round(1), 6]|max }}%"></div>
+          </div>
+          <span class="freq-label">{{ item.Frequency }}x</span>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div style="padding:24px;color:var(--text-muted);text-align:center;font-size:0.85rem;">No data available for this period.</div>
+    {% endif %}
+  </div>
+  {% endmacro %}
+
+  {# Build draw_nums once for use in all periods #}
+  {% set draw_nums = [] %}
+  {% if last_draw %}
+    {% set draw_nums = [last_draw.get('n1')|string, last_draw.get('n2')|string, last_draw.get('n3')|string, last_draw.get('n4')|string, last_draw.get('n5')|string] %}
+  {% endif %}
+
+  <!-- ══ CURRENT YEAR ══ -->
+  <div id="period-cy" class="period-content active">
+    <div class="stats-row" style="margin-bottom:12px;">
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--text-muted);letter-spacing:0.08em;line-height:2;">{{ current_year }}</span>
+      {% if cy_hot %}<span class="stat-chip fire-chip">🔥 {{ cy_hot|length }} hot tracked</span>{% endif %}
+      {% if cy_cold %}<span class="stat-chip ice-chip">🧊 {{ cy_cold|length }} cold tracked</span>{% endif %}
+      <span class="stat-chip gold-chip">⭐ Gold = in latest draw</span>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {{ render_list(cy_hot,  'fire-badge', 'fire-fill', '🔥', 'HOT NUMBERS',  current_year, cy_hot[0].Frequency if cy_hot else 1, draw_nums) }}
+      {{ render_list(cy_cold, 'ice-badge',  'ice-fill',  '🧊', 'COLD NUMBERS', current_year, cy_hot[0].Frequency if cy_hot else 1, draw_nums) }}
+    </div>
+    <div class="hc-panel mt-6 p-4">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--text-muted);letter-spacing:0.06em;margin-bottom:12px;">FREQUENCY OVERVIEW · {{ current_year }}</div>
+      <div class="mini-chart"><canvas id="chartCY"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ══ LAST 3 YEARS ══ -->
+  <div id="period-3y" class="period-content">
+    <div class="stats-row" style="margin-bottom:12px;">
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--text-muted);letter-spacing:0.08em;line-height:2;">LAST 3 YEARS</span>
+      {% if hot_3y %}<span class="stat-chip fire-chip">🔥 {{ hot_3y|length }} hot tracked</span>{% endif %}
+      {% if cold_3y %}<span class="stat-chip ice-chip">🧊 {{ cold_3y|length }} cold tracked</span>{% endif %}
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {{ render_list(hot_3y,  'fire-badge', 'fire-fill', '🔥', 'HOT NUMBERS',  'Last 3 Years', hot_3y[0].Frequency if hot_3y else 1, draw_nums) }}
+      {{ render_list(cold_3y, 'ice-badge',  'ice-fill',  '🧊', 'COLD NUMBERS', 'Last 3 Years', hot_3y[0].Frequency if hot_3y else 1, draw_nums) }}
+    </div>
+    <div class="hc-panel mt-6 p-4">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--text-muted);letter-spacing:0.06em;margin-bottom:12px;">FREQUENCY OVERVIEW · LAST 3 YEARS</div>
+      <div class="mini-chart"><canvas id="chart3Y"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ══ LAST 5 YEARS ══ -->
+  <div id="period-5y" class="period-content">
+    <div class="stats-row" style="margin-bottom:12px;">
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--text-muted);letter-spacing:0.08em;line-height:2;">LAST 5 YEARS</span>
+      {% if hot_5y %}<span class="stat-chip fire-chip">🔥 {{ hot_5y|length }} hot tracked</span>{% endif %}
+      {% if cold_5y %}<span class="stat-chip ice-chip">🧊 {{ cold_5y|length }} cold tracked</span>{% endif %}
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {{ render_list(hot_5y,  'fire-badge', 'fire-fill', '🔥', 'HOT NUMBERS',  'Last 5 Years', hot_5y[0].Frequency if hot_5y else 1, draw_nums) }}
+      {{ render_list(cold_5y, 'ice-badge',  'ice-fill',  '🧊', 'COLD NUMBERS', 'Last 5 Years', hot_5y[0].Frequency if hot_5y else 1, draw_nums) }}
+    </div>
+    <div class="hc-panel mt-6 p-4">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--text-muted);letter-spacing:0.06em;margin-bottom:12px;">FREQUENCY OVERVIEW · LAST 5 YEARS</div>
+      <div class="mini-chart"><canvas id="chart5Y"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ══ PATTERN CROSSOVER ══ -->
+  <div id="period-cross" class="period-content">
+    <div class="crossover-card mb-6">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;letter-spacing:0.06em;color:#c39bd3;margin-bottom:6px;">🔀 PATTERN CROSSOVER ANALYSIS</div>
+      <p style="color:var(--text-muted);font-size:0.85rem;">Numbers consistent across all windows show strong momentum. Numbers that flip reveal trend reversals worth watching.</p>
     </div>
 
-    <div class="card p-6 bg-white rounded-lg shadow-lg">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Cold Numbers (Least Frequently Drawn)</h2>
-        <p class="text-700 mb-4">These are the white ball numbers that have been drawn least often in the last year.</p>
-        {% if cold_numbers %}
-            <div class="relative h-80 w-full">
-                <canvas id="coldNumbersChart"></canvas>
-            </div>
-            <div class="mt-4 flex flex-wrap justify-center gap-2">
-                {% for number in cold_numbers %}
-                    <span class="ball bg-red-200 text-red-800 border-red-400 font-semibold text-lg">{{ number.Number }}</span>
-                {% endfor %}
-            </div>
+    {% set cy_hot_nums   = cy_hot   | map(attribute='Number') | list if cy_hot   else [] %}
+    {% set cy_cold_nums  = cy_cold  | map(attribute='Number') | list if cy_cold  else [] %}
+    {% set hot3_nums     = hot_3y   | map(attribute='Number') | list if hot_3y   else [] %}
+    {% set cold3_nums    = cold_3y  | map(attribute='Number') | list if cold_3y  else [] %}
+    {% set hot5_nums     = hot_5y   | map(attribute='Number') | list if hot_5y   else [] %}
+    {% set cold5_nums    = cold_5y  | map(attribute='Number') | list if cold_5y  else [] %}
+
+    <!-- Always Hot -->
+    <div class="hc-panel mb-6">
+      <div class="panel-header" style="background:linear-gradient(90deg,rgba(255,106,0,.1),rgba(155,89,182,.08));">
+        <span style="font-size:1.3rem;">🔥🔥🔥</span>
+        <span class="panel-title" style="color:#ffad60;">CONSISTENTLY HOT · ALL 3 WINDOWS</span>
+      </div>
+      <div style="padding:16px 18px;">
+        {% set always_hot = [] %}
+        {% for n in cy_hot_nums %}{% if n in hot3_nums and n in hot5_nums %}{% set _ = always_hot.append(n) %}{% endif %}{% endfor %}
+        {% if always_hot %}
+          <div class="flex flex-wrap gap-3">
+            {% for n in always_hot %}
+              <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                <span class="crossover-badge" style="background:linear-gradient(135deg,#7a2e00,#c94400);border-color:var(--fire-core);">{{ n }}</span>
+                <span style="font-size:0.65rem;color:var(--fire-mid);font-weight:600;">ALWAYS HOT</span>
+              </div>
+            {% endfor %}
+          </div>
         {% else %}
-            <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
-                No cold numbers data available for the last year.
-            </div>
+          <p style="color:var(--text-muted);font-size:0.85rem;">No numbers appear in the hot list across all three windows.</p>
         {% endif %}
+      </div>
     </div>
+
+    <!-- Always Cold -->
+    <div class="hc-panel mb-6">
+      <div class="panel-header" style="background:linear-gradient(90deg,rgba(0,198,255,.08),rgba(155,89,182,.06));">
+        <span style="font-size:1.3rem;">🧊🧊🧊</span>
+        <span class="panel-title" style="color:#7ad5ff;">CONSISTENTLY COLD · ALL 3 WINDOWS</span>
+      </div>
+      <div style="padding:16px 18px;">
+        {% set always_cold = [] %}
+        {% for n in cy_cold_nums %}{% if n in cold3_nums and n in cold5_nums %}{% set _ = always_cold.append(n) %}{% endif %}{% endfor %}
+        {% if always_cold %}
+          <div class="flex flex-wrap gap-3">
+            {% for n in always_cold %}
+              <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                <span class="crossover-badge" style="background:linear-gradient(135deg,#003d5c,#005f8a);border-color:var(--ice-core);">{{ n }}</span>
+                <span style="font-size:0.65rem;color:var(--ice-mid);font-weight:600;">ALWAYS COLD</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p style="color:var(--text-muted);font-size:0.85rem;">No numbers appear in the cold list across all three windows.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Trend Reversals -->
+    <div class="hc-panel">
+      <div class="panel-header" style="background:linear-gradient(90deg,rgba(155,89,182,.1),transparent);">
+        <span style="font-size:1.3rem;">⚡</span>
+        <span class="panel-title" style="color:#c39bd3;">TREND REVERSALS</span>
+      </div>
+      <div style="padding:16px 18px;">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <div style="font-size:0.8rem;font-weight:700;color:var(--fire-mid);margin-bottom:8px;letter-spacing:0.04em;">🌡️ WARMING UP (was Cold → now Hot)</div>
+            <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;">Hot this year, but in 5-year cold list — recently heating up.</p>
+            {% set warming = [] %}
+            {% for n in cy_hot_nums %}{% if n in cold5_nums %}{% set _ = warming.append(n) %}{% endif %}{% endfor %}
+            {% if warming %}
+              <div class="flex flex-wrap gap-2">
+                {% for n in warming %}
+                  <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+                    <span class="crossover-badge" style="background:linear-gradient(135deg,#3d2800,#8a5a00);border-color:#c98800;">{{ n }}</span>
+                    <span style="font-size:0.6rem;color:#c98800;font-weight:600;">WARMING</span>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}<p style="color:var(--text-muted);font-size:0.8rem;">None found.</p>{% endif %}
+          </div>
+          <div>
+            <div style="font-size:0.8rem;font-weight:700;color:var(--ice-mid);margin-bottom:8px;letter-spacing:0.04em;">❄️ COOLING DOWN (was Hot → now Cold)</div>
+            <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;">Cold this year, but in 5-year hot list — losing momentum.</p>
+            {% set cooling = [] %}
+            {% for n in cy_cold_nums %}{% if n in hot5_nums %}{% set _ = cooling.append(n) %}{% endif %}{% endfor %}
+            {% if cooling %}
+              <div class="flex flex-wrap gap-2">
+                {% for n in cooling %}
+                  <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
+                    <span class="crossover-badge" style="background:linear-gradient(135deg,#00293d,#004c70);border-color:#0088bb;">{{ n }}</span>
+                    <span style="font-size:0.6rem;color:#5dc8e8;font-weight:600;">COOLING</span>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}<p style="color:var(--text-muted);font-size:0.8rem;">None found.</p>{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ AI PANEL ══ -->
+  <div id="aiPanel" class="ai-panel" style="display:none;">
+    <div class="ai-header">
+      <span style="font-size:1.2rem;">✨</span>
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:0.06em;color:#c39bd3;">AI PATTERN INSIGHTS</span>
+      <span style="font-size:0.72rem;color:var(--text-muted);margin-left:8px;">Powered by Groq</span>
+    </div>
+    <div class="ai-body">
+      <div id="aiContent">
+        <div style="display:flex;align-items:center;gap:8px;color:var(--text-muted);font-size:0.85rem;">
+          <span class="pulse-dot"></span>
+          <span class="pulse-dot" style="animation-delay:.2s"></span>
+          <span class="pulse-dot" style="animation-delay:.4s"></span>
+          <span style="margin-left:6px;">Analysing patterns across all time windows…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const hotNumbersData = {{ hot_numbers | tojson }};
-        const coldNumbersData = {{ cold_numbers | tojson }};
+const cyHot    = {{ cy_hot    | tojson | default('[]') }};
+const cyCold   = {{ cy_cold   | tojson | default('[]') }};
+const hot3y    = {{ hot_3y    | tojson | default('[]') }};
+const cold3y   = {{ cold_3y   | tojson | default('[]') }};
+const hot5y    = {{ hot_5y    | tojson | default('[]') }};
+const cold5y   = {{ cold_5y   | tojson | default('[]') }};
+const lastDraw = {{ last_draw | tojson | default('{}') }};
+const currentYear = "{{ current_year }}";
 
-        // Hot Numbers Chart
-        const hotLabels = hotNumbersData.map(d => d.Number);
-        const hotFrequencies = hotNumbersData.map(d => d.Frequency);
-        const hotCtx = document.getElementById('hotNumbersChart');
-        if (hotCtx) {
-            new Chart(hotCtx, {
-                type: 'bar',
-                data: {
-                    labels: hotLabels,
-                    datasets: [{
-                        label: 'Frequency',
-                        data: hotFrequencies,
-                        backgroundColor: 'rgba(34, 197, 94, 0.6)', // Tailwind green-500
-                        borderColor: 'rgba(34, 197, 94, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Number of Draws'
-                            }
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Hot Number'
-                            }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false
-                        }
-                    }
-                }
-            });
-        }
+const tabClasses = { cy:'active-fire', '3y':'active-ice', '5y':'active-fire', cross:'active-combo' };
 
-        // Cold Numbers Chart
-        const coldLabels = coldNumbersData.map(d => d.Number);
-        const coldFrequencies = coldNumbersData.map(d => d.Frequency);
-        const coldCtx = document.getElementById('coldNumbersChart');
-        if (coldCtx) {
-            new Chart(coldCtx, {
-                type: 'bar',
-                data: {
-                    labels: coldLabels,
-                    datasets: [{
-                        label: 'Frequency',
-                        data: coldFrequencies,
-                        backgroundColor: 'rgba(239, 68, 68, 0.6)', // Tailwind red-500
-                        borderColor: 'rgba(239, 68, 68, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Number of Draws'
-                            }
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Cold Number'
-                            }
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            mode: 'index',
-                            intersect: false
-                        }
-                    }
-                }
-            });
+function switchPeriod(id, btn) {
+  document.querySelectorAll('.period-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.period-tab').forEach(el => el.classList.remove('active-fire','active-ice','active-combo'));
+  document.getElementById('period-' + id).classList.add('active');
+  btn.classList.add(tabClasses[id] || 'active-fire');
+  const chartMap = { cy:['chartCY',cyHot,cyCold,currentYear], '3y':['chart3Y',hot3y,cold3y,'Last 3 Years'], '5y':['chart5Y',hot5y,cold5y,'Last 5 Years'] };
+  if (chartMap[id]) renderChart(...chartMap[id]);
+}
+
+const chartInstances = {};
+function renderChart(canvasId, hotData, coldData, label) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+
+  const drawNums = lastDraw ? [lastDraw.n1,lastDraw.n2,lastDraw.n3,lastDraw.n4,lastDraw.n5].map(String) : [];
+
+  const hotColors  = hotData.map(d  => drawNums.includes(String(d.Number))  ? 'rgba(255,215,0,0.85)' : 'rgba(255,106,0,0.75)');
+  const coldColors = coldData.map(d => drawNums.includes(String(d.Number)) ? 'rgba(255,215,0,0.85)' : 'rgba(0,198,255,0.65)');
+
+  chartInstances[canvasId] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: [...hotData.map(d=>'🔥'+d.Number), ...coldData.map(d=>'🧊'+d.Number)],
+      datasets: [
+        { label:'🔥 Hot',  data:[...hotData.map(d=>d.Frequency), ...coldData.map(()=>null)],  backgroundColor:hotColors,  borderColor:hotColors.map(c=>c.replace('0.75','1').replace('0.85','1')),  borderWidth:1, borderRadius:4 },
+        { label:'🧊 Cold', data:[...hotData.map(()=>null), ...coldData.map(d=>d.Frequency)],  backgroundColor:coldColors, borderColor:coldColors.map(c=>c.replace('0.65','1').replace('0.85','1')), borderWidth:1, borderRadius:4 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins: {
+        legend:{ labels:{ color:'#7a819a', font:{ family:'DM Sans', size:11 } } },
+        tooltip:{ backgroundColor:'#13161e', borderColor:'#1f2435', borderWidth:1, titleColor:'#eef0f6', bodyColor:'#7a819a',
+          callbacks:{ label: ctx=>`  ${ctx.dataset.label}: ${ctx.raw}x draws` }
         }
+      },
+      scales: {
+        x:{ ticks:{ color:'#7a819a', font:{size:10} }, grid:{ color:'rgba(255,255,255,0.04)' } },
+        y:{ beginAtZero:true, ticks:{ color:'#7a819a', font:{size:10} }, grid:{ color:'rgba(255,255,255,0.06)' } }
+      }
+    }
+  });
+}
+
+let aiLoaded = false;
+async function loadAIAnalysis() {
+  if (aiLoaded) { document.getElementById('aiPanel').style.display='block'; return; }
+  document.getElementById('aiPanel').style.display = 'block';
+  const btn = document.getElementById('aiTriggerBtn');
+  btn.disabled = true; btn.textContent = '⏳ Analysing…';
+  try {
+    const res = await fetch('/api/hot-cold-ai-analysis', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ cy_hot:cyHot, cy_cold:cyCold, hot_3y:hot3y, cold_3y:cold3y, hot_5y:hot5y, cold_5y:cold5y, last_draw:lastDraw, year:currentYear })
     });
+    const data = await res.json();
+    document.getElementById('aiContent').innerHTML = `<p class="ai-text">${(data.analysis||'No insights available.').replace(/\n/g,'<br>')}</p>`;
+    aiLoaded = true;
+  } catch(e) {
+    document.getElementById('aiContent').innerHTML = `<p style="color:#ef4444;font-size:0.85rem;">⚠️ Could not load AI insights. Check /api/hot-cold-ai-analysis.</p>`;
+  }
+  btn.disabled = false; btn.textContent = '✨ AI Pattern Insights';
+}
+
+document.addEventListener('DOMContentLoaded', () => renderChart('chartCY', cyHot, cyCold, currentYear));
 </script>
+
 {% endblock %}
