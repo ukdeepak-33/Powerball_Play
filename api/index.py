@@ -6993,5 +6993,52 @@ Keep insights analytical, specific with number references, and concise (max 350 
         print(f"Error in hot_cold_ai_analysis: {e}")
         return jsonify({'analysis': f'AI analysis unavailable: {str(e)}'}), 500
 
-# Initialize core data on app startup
+@app.route('/api/trigger-simulation', methods=['POST'])
+def trigger_simulation_manually():
+    """
+    Manual trigger for the draw-day simulation.
+    Protected by a simple secret token so only you can call it.
+    POST /api/trigger-simulation
+    Body: { "token": "your_secret_token" }
+    """
+    try:
+        data  = request.get_json()
+        token = data.get('token', '')
+        expected = os.environ.get('SCHEDULER_TOKEN', 'dev-trigger-secret')
+
+        if token != expected:
+            return jsonify({'success': False, 'error': 'Unauthorised'}), 401
+
+        from scheduler import run_draw_day_simulation
+        run_draw_day_simulation()
+        return jsonify({'success': True, 'message': 'Simulation triggered successfully.'})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/scheduler-status')
+def scheduler_status():
+    """Returns next scheduled run times."""
+    try:
+        from scheduler import _scheduler  # only works if init_scheduler stored it globally
+        jobs = []
+        for job in _scheduler.get_jobs():
+            jobs.append({
+                'id': job.id,
+                'name': job.name,
+                'next_run': str(job.next_run_time)
+            })
+        return jsonify({'success': True, 'jobs': jobs})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 initialize_core_data()
+
+# ── Start the draw-day scheduler ──────────────────────────────
+try:
+    from scheduler import init_scheduler
+    _scheduler = init_scheduler(app)
+except Exception as _sched_err:
+    print(f"[SCHEDULER] Warning: could not start scheduler — {_sched_err}")
+    
