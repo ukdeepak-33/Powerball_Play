@@ -4557,7 +4557,7 @@ def positional_analysis_route():
 
 
 
-@app.route('/hot_cold_numbers')
+@app.route('/hot_cold_numbers', endpoint='hot_cold_numbers_route')
 def hot_cold_numbers():
     try:
         df = get_draw_data()           # your existing data-fetch helper
