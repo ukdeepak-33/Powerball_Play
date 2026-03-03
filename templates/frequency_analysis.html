@@ -5,6 +5,483 @@
 {% block page_heading %}Number Frequency Analysis{% endblock %}
 
 {% block content %}
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;700;800&display=swap');
+
+  .freq-card {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  }
+
+  .stat-card {
+    background: linear-gradient(135deg, #1e293b, #0f172a);
+    border: 1px solid rgba(99,102,241,0.2);
+    border-radius: 12px;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(99,102,241,0.15);
+  }
+
+  .sort-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    padding: 6px 16px;
+    border-radius: 6px;
+    border: 1px solid rgba(99,102,241,0.3);
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .sort-btn.active {
+    background: #6366f1;
+    border-color: #6366f1;
+    color: #fff;
+  }
+  .sort-btn:hover:not(.active) {
+    border-color: #6366f1;
+    color: #c7d2fe;
+  }
+
+  .badge-hot {
+    background: linear-gradient(135deg, #ef4444, #f97316);
+    color: white;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    padding: 3px 10px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .badge-cold {
+    background: linear-gradient(135deg, #3b82f6, #06b6d4);
+    color: white;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    padding: 3px 10px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .section-label {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 1.2rem;
+    color: #e2e8f0;
+    letter-spacing: -0.02em;
+  }
+
+  .ai-panel {
+    background: linear-gradient(135deg, #0f172a 0%, #1a1040 100%);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(139,92,246,0.1);
+  }
+
+  .ai-btn {
+    background: linear-gradient(135deg, #7c3aed, #6366f1);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 24px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ai-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(124,58,237,0.4);
+  }
+  .ai-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .ai-output {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.85rem;
+    line-height: 1.7;
+    color: #c4b5fd;
+    white-space: pre-wrap;
+  }
+
+  .stat-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 1.6rem;
+    font-weight: 500;
+    line-height: 1;
+  }
+  .stat-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-top: 4px;
+  }
+
+  .number-pill {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-radius: 6px;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    line-height: 1;
+  }
+  .pill-num { font-weight: 500; }
+  .pill-freq { font-size: 0.65rem; opacity: 0.7; }
+
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+  }
+  .spinner.active { display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .avg-line-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: #f59e0b;
+  }
+</style>
+
+{% set wb = white_ball_freq %}
+{% set pb = powerball_freq %}
+
+<!-- ── Stats row ─────────────────────────────────────── -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <div class="stat-card p-4">
+    <div class="stat-value text-indigo-400">{{ stats.total_draws }}</div>
+    <div class="stat-label">Total Draws</div>
+  </div>
+  <div class="stat-card p-4">
+    <div class="stat-value text-blue-400">#{{ stats.most_drawn_wb.Number }}</div>
+    <div class="stat-label">Most Drawn White Ball</div>
+    <div class="text-xs text-slate-500 mt-1" style="font-family:'DM Mono',monospace">{{ stats.most_drawn_wb.Frequency }}× drawn</div>
+  </div>
+  <div class="stat-card p-4">
+    <div class="stat-value text-cyan-400">#{{ stats.least_drawn_wb.Number }}</div>
+    <div class="stat-label">Least Drawn White Ball</div>
+    <div class="text-xs text-slate-500 mt-1" style="font-family:'DM Mono',monospace">{{ stats.least_drawn_wb.Frequency }}× drawn</div>
+  </div>
+  <div class="stat-card p-4">
+    <div class="stat-value text-violet-400">{{ stats.avg_freq_wb }}</div>
+    <div class="stat-label">Avg White Ball Freq</div>
+  </div>
+</div>
+
+<!-- ── White Ball Chart ─────────────────────────────── -->
+<div class="freq-card p-6 mb-6">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+    <div>
+      <div class="section-label">White Ball Frequency</div>
+      <p class="text-slate-500 text-sm mt-1" style="font-family:'DM Mono',monospace">Numbers 1–69 · All historical draws</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button class="sort-btn active" id="wbSortNum" onclick="sortChart('wb','number')">1 → 69</button>
+      <button class="sort-btn" id="wbSortFreq" onclick="sortChart('wb','freq')">High → Low</button>
+    </div>
+  </div>
+
+  <div class="relative" style="height:320px;">
+    <canvas id="whiteBallFrequencyChart"></canvas>
+  </div>
+
+  <!-- Top 5 / Bottom 5 pills -->
+  <div class="mt-5 flex flex-col sm:flex-row gap-4">
+    <div>
+      <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2" style="font-family:'Syne',sans-serif">🔥 Top 5</span>
+      <div class="flex flex-wrap gap-2" id="wbTop5"></div>
+    </div>
+    <div class="sm:ml-auto">
+      <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2" style="font-family:'Syne',sans-serif">🧊 Bottom 5</span>
+      <div class="flex flex-wrap gap-2" id="wbBottom5"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Powerball Chart ──────────────────────────────── -->
+<div class="freq-card p-6 mb-6">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+    <div>
+      <div class="section-label">Powerball Frequency</div>
+      <p class="text-slate-500 text-sm mt-1" style="font-family:'DM Mono',monospace">Numbers 1–26 · All historical draws</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="stat-card px-3 py-2 text-center">
+        <div class="text-red-400 font-bold" style="font-family:'DM Mono',monospace;font-size:1.1rem">#{{ stats.most_drawn_pb.Number }}</div>
+        <div class="stat-label">Top PB</div>
+      </div>
+      <div class="flex items-center gap-2 ml-2">
+        <button class="sort-btn active" id="pbSortNum" onclick="sortChart('pb','number')">1 → 26</button>
+        <button class="sort-btn" id="pbSortFreq" onclick="sortChart('pb','freq')">High → Low</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="relative" style="height:240px;">
+    <canvas id="powerballFrequencyChart"></canvas>
+  </div>
+
+  <div class="mt-5 flex flex-col sm:flex-row gap-4">
+    <div>
+      <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2" style="font-family:'Syne',sans-serif">🔥 Top 5</span>
+      <div class="flex flex-wrap gap-2" id="pbTop5"></div>
+    </div>
+    <div class="sm:ml-auto">
+      <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-2" style="font-family:'Syne',sans-serif">🧊 Bottom 5</span>
+      <div class="flex flex-wrap gap-2" id="pbBottom5"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── AI Analysis Panel ────────────────────────────── -->
+<div class="ai-panel p-6">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+    <div>
+      <div class="section-label" style="color:#c4b5fd">✦ AI Frequency Analysis</div>
+      <p class="text-slate-500 text-sm mt-1" style="font-family:'DM Mono',monospace">Groq AI reads the frequency data and surfaces key patterns</p>
+    </div>
+    <button class="ai-btn" id="aiBtn" onclick="runAIAnalysis()">
+      <span class="spinner" id="aiSpinner"></span>
+      <span id="aiBtnText">✦ Generate Insights</span>
+    </button>
+  </div>
+  <div id="aiOutput" class="hidden mt-4 p-4 rounded-xl" style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2)">
+    <p class="ai-output" id="aiText"></p>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const wbRaw = {{ white_ball_freq | tojson }};
+  const pbRaw = {{ powerball_freq | tojson }};
+
+  // ── Sort helpers ──────────────────────────────────────
+  const sortedByNum  = arr => [...arr].sort((a, b) => a.Number - b.Number);
+  const sortedByFreq = arr => [...arr].sort((a, b) => b.Frequency - a.Frequency);
+
+  // ── Colour bands ──────────────────────────────────────
+  function colorBands(data, baseRgb, topRgb, botRgb) {
+    const freqs  = data.map(d => d.Frequency);
+    const sorted = [...freqs].sort((a, b) => b - a);
+    const top5   = new Set(sorted.slice(0, 5));
+    const bot5   = new Set(sorted.slice(-5));
+    return data.map(d => {
+      if (top5.has(d.Frequency)) return topRgb;
+      if (bot5.has(d.Frequency)) return botRgb;
+      return baseRgb;
+    });
+  }
+
+  // ── Average annotation plugin ─────────────────────────
+  function avgLinePlugin(avg, label) {
+    return {
+      id: 'avgLine_' + label,
+      afterDraw(chart) {
+        const { ctx, chartArea: { left, right }, scales: { y } } = chart;
+        const yPos = y.getPixelForValue(avg);
+        ctx.save();
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(left, yPos);
+        ctx.lineTo(right, yPos);
+        ctx.stroke();
+        ctx.fillStyle = '#f59e0b';
+        ctx.font = '600 10px DM Mono, monospace';
+        ctx.fillText(`avg ${avg}`, right - 56, yPos - 5);
+        ctx.restore();
+      }
+    };
+  }
+
+  // ── Shared chart options ──────────────────────────────
+  function chartOptions(xLabel) {
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 400 },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#64748b', font: { family: 'DM Mono', size: 11 } },
+          title: { display: true, text: 'Draws', color: '#475569', font: { family: 'DM Mono', size: 11 } }
+        },
+        x: {
+          grid: { display: false },
+          ticks: { color: '#64748b', font: { family: 'DM Mono', size: 10 } },
+          title: { display: true, text: xLabel, color: '#475569', font: { family: 'DM Mono', size: 11 } }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e293b',
+          borderColor: 'rgba(99,102,241,0.3)',
+          borderWidth: 1,
+          titleColor: '#e2e8f0',
+          bodyColor: '#94a3b8',
+          titleFont: { family: 'Syne', size: 13 },
+          bodyFont: { family: 'DM Mono', size: 12 },
+          callbacks: {
+            title: items => `Number ${items[0].label}`,
+            label: item => ` Drawn ${item.raw} times`
+          }
+        }
+      }
+    };
+  }
+
+  // ── Compute averages ──────────────────────────────────
+  const wbAvg = Math.round(wbRaw.reduce((s, d) => s + d.Frequency, 0) / wbRaw.length);
+  const pbAvg = Math.round(pbRaw.reduce((s, d) => s + d.Frequency, 0) / pbRaw.length);
+
+  // ── State ─────────────────────────────────────────────
+  let wbData = sortedByNum(wbRaw);
+  let pbData = sortedByNum(pbRaw);
+  let wbChart, pbChart;
+
+  function buildWbChart(data) {
+    const colors = colorBands(data, 'rgba(99,102,241,0.65)', 'rgba(239,68,68,0.8)', 'rgba(59,130,246,0.7)');
+    const ctx = document.getElementById('whiteBallFrequencyChart');
+    if (wbChart) wbChart.destroy();
+    wbChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: data.map(d => d.Number),
+        datasets: [{ label: 'Frequency', data: data.map(d => d.Frequency), backgroundColor: colors, borderWidth: 0, borderRadius: 3 }]
+      },
+      options: chartOptions('White Ball Number'),
+      plugins: [avgLinePlugin(wbAvg, 'wb')]
+    });
+  }
+
+  function buildPbChart(data) {
+    const colors = colorBands(data, 'rgba(239,68,68,0.65)', 'rgba(239,68,68,0.9)', 'rgba(59,130,246,0.7)');
+    const ctx = document.getElementById('powerballFrequencyChart');
+    if (pbChart) pbChart.destroy();
+    pbChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: data.map(d => d.Number),
+        datasets: [{ label: 'Frequency', data: data.map(d => d.Frequency), backgroundColor: colors, borderWidth: 0, borderRadius: 3 }]
+      },
+      options: chartOptions('Powerball Number'),
+      plugins: [avgLinePlugin(pbAvg, 'pb')]
+    });
+  }
+
+  // ── Pills ─────────────────────────────────────────────
+  function renderPills(containerId, data, isHot, isWhite) {
+    const el = document.getElementById(containerId);
+    el.innerHTML = '';
+    data.forEach(d => {
+      const div = document.createElement('div');
+      div.className = 'number-pill ' + (isHot
+        ? 'bg-red-900 bg-opacity-40 text-red-300 border border-red-800'
+        : 'bg-blue-900 bg-opacity-40 text-blue-300 border border-blue-800');
+      div.innerHTML = `<span class="pill-num">${d.Number}</span><span class="pill-freq">${d.Frequency}×</span>`;
+      el.appendChild(div);
+    });
+  }
+
+  function refreshPills() {
+    const wbSorted = sortedByFreq(wbRaw);
+    const pbSorted = sortedByFreq(pbRaw);
+    renderPills('wbTop5',    wbSorted.slice(0, 5),  true,  true);
+    renderPills('wbBottom5', wbSorted.slice(-5).reverse(), false, true);
+    renderPills('pbTop5',    pbSorted.slice(0, 5),  true,  false);
+    renderPills('pbBottom5', pbSorted.slice(-5).reverse(), false, false);
+  }
+
+  // ── Sort toggle ───────────────────────────────────────
+  window.sortChart = function(type, mode) {
+    if (type === 'wb') {
+      wbData = mode === 'freq' ? sortedByFreq(wbRaw) : sortedByNum(wbRaw);
+      buildWbChart(wbData);
+      document.getElementById('wbSortNum').classList.toggle('active', mode === 'number');
+      document.getElementById('wbSortFreq').classList.toggle('active', mode === 'freq');
+    } else {
+      pbData = mode === 'freq' ? sortedByFreq(pbRaw) : sortedByNum(pbRaw);
+      buildPbChart(pbData);
+      document.getElementById('pbSortNum').classList.toggle('active', mode === 'number');
+      document.getElementById('pbSortFreq').classList.toggle('active', mode === 'freq');
+    }
+  };
+
+  // ── AI Analysis ───────────────────────────────────────
+  window.runAIAnalysis = async function () {
+    const btn     = document.getElementById('aiBtn');
+    const spinner = document.getElementById('aiSpinner');
+    const btnText = document.getElementById('aiBtnText');
+    const output  = document.getElementById('aiOutput');
+    const aiText  = document.getElementById('aiText');
+
+    btn.disabled   = true;
+    spinner.classList.add('active');
+    btnText.textContent = 'Analysing…';
+    output.classList.add('hidden');
+    aiText.textContent = '';
+
+    try {
+      const res = await fetch('/api/frequency-ai-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ white_ball_freq: wbRaw, powerball_freq: pbRaw })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      aiText.textContent = data.summary;
+      output.classList.remove('hidden');
+    } catch (err) {
+      aiText.textContent = '⚠ Could not load AI analysis. Please try again.';
+      output.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+      spinner.classList.remove('active');
+      btnText.textContent = '✦ Generate Insights';
+    }
+  };
+
+  // ── Init ──────────────────────────────────────────────
+  buildWbChart(wbData);
+  buildPbChart(pbData);
+  refreshPills();
+});
+</script>
+
+{% endblock %}{% extends "base.html" %}
+
+{% block title %}Frequency Analysis{% endblock %}
+
+{% block page_heading %}Number Frequency Analysis{% endblock %}
+
+{% block content %}
 <div class="space-y-8">
     <div class="card p-6 bg-white rounded-lg shadow-lg">
         <h2 class="text-2xl font-bold mb-4 text-gray-800">White Ball Frequency (1-69)</h2>
