@@ -12,6 +12,7 @@ import json
 import numpy as np
 import traceback
 import warnings
+from groq import Groq
 
 warnings.filterwarnings('ignore', category=UserWarning, module='sklearn') # Ignore specific KMeans warning
 
