@@ -1,5 +1,849 @@
 {% extends "base.html" %}
 
+{% block title %}Draw Simulator — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
+
+{% block content %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg:        #0b0e17;
+    --surface:   #131826;
+    --surface2:  #1a2035;
+    --border:    rgba(255,255,255,0.07);
+    --neon:      #00e5ff;
+    --neon2:     #ff6b35;
+    --gold:      #ffd700;
+    --red:       #ff3b5c;
+    --green:     #00e676;
+    --muted:     rgba(255,255,255,0.45);
+    --text:      rgba(255,255,255,0.90);
+  }
+
+  #sim-page * { box-sizing: border-box; }
+
+  #sim-page {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    color: var(--text);
+    padding: 0 0 80px;
+  }
+
+  /* ── Hero ── */
+  .sim-hero {
+    position: relative;
+    padding: 60px 24px 48px;
+    text-align: center;
+    overflow: hidden;
+  }
+  .sim-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 70% 60% at 50% 0%, rgba(0,229,255,0.09) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 40% at 80% 50%, rgba(255,107,53,0.06) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .sim-hero-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--neon);
+    margin-bottom: 14px;
+    opacity: 0.8;
+  }
+  .sim-hero h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(48px, 7vw, 88px);
+    letter-spacing: 2px;
+    line-height: 1;
+    margin: 0 0 16px;
+    background: linear-gradient(135deg, #fff 30%, var(--neon) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .sim-hero p {
+    font-size: 15px;
+    color: var(--muted);
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.7;
+  }
+
+  /* ── Layout ── */
+  .sim-wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  /* ── Card ── */
+  .sim-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    position: relative;
+    overflow: hidden;
+  }
+  .sim-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--neon), transparent);
+    opacity: 0.4;
+  }
+  .sim-card-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px;
+    letter-spacing: 1px;
+    margin: 0 0 6px;
+    color: #fff;
+  }
+  .sim-card-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 0 28px;
+  }
+
+  /* ── Form ── */
+  .sim-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+  @media (max-width: 640px) { .sim-form-grid { grid-template-columns: 1fr; } }
+
+  .sim-field label {
+    display: block;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--neon);
+    margin-bottom: 8px;
+  }
+  .sim-field input,
+  .sim-field select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid rgba(0,229,255,0.2);
+    border-radius: 10px;
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    -webkit-appearance: none;
+  }
+  .sim-field input:focus,
+  .sim-field select:focus {
+    border-color: var(--neon);
+    box-shadow: 0 0 0 3px rgba(0,229,255,0.12);
+  }
+  .sim-field select option { background: #1a2035; }
+  .sim-field .hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 5px;
+  }
+
+  /* ── Run Button ── */
+  .sim-run-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 16px 32px;
+    background: linear-gradient(135deg, var(--neon) 0%, #0097a7 100%);
+    color: #000;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 2px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    box-shadow: 0 0 30px rgba(0,229,255,0.25);
+  }
+  .sim-run-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 0 50px rgba(0,229,255,0.4);
+  }
+  .sim-run-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-icon { font-size: 20px; }
+
+  /* ── Live Draw ── */
+  #liveDrawSection { display: none; }
+  #liveDrawSection.visible { display: block; }
+
+  .live-stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    min-height: 90px;
+    padding: 16px 0;
+  }
+
+  .anim-ball {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    background: radial-gradient(circle at 35% 35%, #fff 0%, #c0d8e8 40%, #7ab0d4 100%);
+    color: #0b1929;
+    box-shadow:
+      0 0 0 3px rgba(255,255,255,0.15),
+      0 8px 24px rgba(0,0,0,0.5),
+      inset 0 2px 4px rgba(255,255,255,0.6);
+    opacity: 0;
+    transform: scale(0.3) translateY(20px);
+    transition: opacity 0.5s cubic-bezier(.34,1.56,.64,1), transform 0.5s cubic-bezier(.34,1.56,.64,1);
+  }
+  .anim-ball.pb {
+    background: radial-gradient(circle at 35% 35%, #ff8a80 0%, #ef5350 40%, #b71c1c 100%);
+    color: #fff;
+    box-shadow:
+      0 0 0 3px rgba(255,59,92,0.3),
+      0 8px 24px rgba(255,59,92,0.4),
+      inset 0 2px 4px rgba(255,150,150,0.4);
+  }
+  .anim-ball.shown {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+
+  .live-separator {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    color: rgba(255,255,255,0.2);
+    padding: 0 4px;
+  }
+
+  #liveDrawMessage {
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--neon);
+    margin-top: 12px;
+    min-height: 20px;
+  }
+
+  .live-pulse {
+    display: inline-block;
+    width: 8px; height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    margin-right: 8px;
+    animation: livePulse 1s infinite;
+    vertical-align: middle;
+  }
+  @keyframes livePulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.3; transform: scale(0.6); }
+  }
+
+  /* ── Loading ── */
+  #batchSimulationLoading { display: none; }
+  #batchSimulationLoading.visible { display: block; }
+
+  .loading-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 0;
+  }
+  .loading-ring {
+    width: 56px; height: 56px;
+    border: 3px solid rgba(0,229,255,0.15);
+    border-top-color: var(--neon);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 1px;
+    color: var(--neon);
+  }
+  .loading-sub { font-size: 12px; color: var(--muted); }
+
+  /* ── Results ── */
+  #simulationResultsSection { display: none; }
+  #simulationResultsSection.visible { display: block; }
+
+  .results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .results-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: rgba(0,229,255,0.1);
+    border: 1px solid rgba(0,229,255,0.3);
+    color: var(--neon);
+    padding: 6px 14px;
+    border-radius: 20px;
+    letter-spacing: 1px;
+  }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+  @media (max-width: 700px) { .charts-grid { grid-template-columns: 1fr; } }
+
+  .chart-panel {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .chart-panel-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin: 0 0 16px;
+  }
+  .chart-panel-title.wb { color: var(--neon); }
+  .chart-panel-title.pb { color: var(--red); }
+  .chart-wrap { height: 220px; position: relative; }
+
+  /* ── Hot Numbers ── */
+  .hot-section {
+    border-top: 1px solid var(--border);
+    padding-top: 28px;
+  }
+  .hot-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .hot-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 1px;
+    color: #fff;
+  }
+  .hot-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 600px) { .hot-grid { grid-template-columns: 1fr; } }
+
+  .hot-group-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .hot-balls-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+
+  /* Hot ball styles */
+  .hot-ball {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 19px;
+    background: radial-gradient(circle at 35% 35%, #fff 0%, #c0d8e8 40%, #7ab0d4 100%);
+    color: #0b1929;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    animation: hotGlow 2s ease-in-out infinite;
+  }
+  .hot-ball.pb-hot {
+    background: radial-gradient(circle at 35% 35%, #ff8a80 0%, #ef5350 40%, #b71c1c 100%);
+    color: #fff;
+    animation: hotGlowRed 2s ease-in-out infinite;
+  }
+
+  @keyframes hotGlow {
+    0%, 100% { box-shadow: 0 4px 16px rgba(0,0,0,0.4), 0 0 0 rgba(0,229,255,0); }
+    50% { box-shadow: 0 4px 20px rgba(0,0,0,0.5), 0 0 18px rgba(0,229,255,0.5); }
+  }
+  @keyframes hotGlowRed {
+    0%, 100% { box-shadow: 0 4px 16px rgba(0,0,0,0.4), 0 0 0 rgba(255,59,92,0); }
+    50% { box-shadow: 0 4px 20px rgba(0,0,0,0.5), 0 0 18px rgba(255,59,92,0.6); }
+  }
+
+  /* ── Flash messages ── */
+  .sim-flash {
+    padding: 14px 18px;
+    border-radius: 10px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    border-left: 3px solid;
+  }
+  .sim-flash.error { background: rgba(255,59,92,0.1); border-color: var(--red); color: #ff8aaa; }
+  .sim-flash.info  { background: rgba(0,229,255,0.08); border-color: var(--neon); color: var(--neon); }
+  .sim-flash.success { background: rgba(0,230,118,0.08); border-color: var(--green); color: var(--green); }
+
+  /* ── Stat chips ── */
+  .stat-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .stat-chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .stat-chip strong {
+    display: block;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    color: var(--neon);
+    line-height: 1.1;
+  }
+</style>
+
+<div id="sim-page">
+
+  {# Flash messages #}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div style="max-width:1100px;margin:0 auto;padding:24px 24px 0">
+        {% for category, message in messages %}
+          <div class="sim-flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- Hero -->
+  <div class="sim-hero">
+    <p class="sim-hero-eyebrow">⚡ Monte Carlo Engine</p>
+    <h1>Draw Simulator</h1>
+    <p>Run hundreds of hypothetical Powerball draws and discover which numbers dominate the simulation.</p>
+  </div>
+
+  <div class="sim-wrap">
+
+    <!-- Config Card -->
+    <div class="sim-card">
+      <p class="sim-card-title">Configure Simulation</p>
+      <p class="sim-card-sub">Set your parameters and launch the draw engine.</p>
+
+      <form id="simulationForm">
+        <div class="sim-form-grid">
+          <div class="sim-field">
+            <label for="num_draws">Number of Draws</label>
+            <input type="number" id="num_draws" name="num_draws"
+                   min="100" max="1000"
+                   value="{{ num_simulations if num_simulations else 100 }}" required>
+            <p class="hint">Between 100 and 1,000 simulated draws</p>
+          </div>
+          <div class="sim-field">
+            <label for="odd_even_choice">Odd / Even Split</label>
+            <select id="odd_even_choice" name="odd_even_choice">
+              <option value="Any">Any Split (Random)</option>
+              <option value="All Even" {% if selected_odd_even_choice == 'All Even' %}selected{% endif %}>All Even (5–0)</option>
+              <option value="All Odd"  {% if selected_odd_even_choice == 'All Odd'  %}selected{% endif %}>All Odd (0–5)</option>
+              <option value="3 Even / 2 Odd" {% if selected_odd_even_choice == '3 Even / 2 Odd' %}selected{% endif %}>3 Even / 2 Odd</option>
+              <option value="2 Even / 3 Odd" {% if selected_odd_even_choice == '2 Even / 3 Odd' %}selected{% endif %}>2 Even / 3 Odd</option>
+              <option value="1 Even / 4 Odd" {% if selected_odd_even_choice == '1 Even / 4 Odd' %}selected{% endif %}>1 Even / 4 Odd</option>
+              <option value="4 Even / 1 Odd" {% if selected_odd_even_choice == '4 Even / 1 Odd' %}selected{% endif %}>4 Even / 1 Odd</option>
+            </select>
+            <p class="hint">Filter white ball distributions</p>
+          </div>
+        </div>
+
+        <button type="submit" id="runSimulationBtn" class="sim-run-btn">
+          <span class="btn-icon">▶</span>
+          LAUNCH SIMULATION
+        </button>
+      </form>
+    </div>
+
+    <!-- Live Draw -->
+    <div class="sim-card" id="liveDrawSection">
+      <p class="sim-card-title">
+        <span class="live-pulse"></span>Live Draw
+      </p>
+      <p class="sim-card-sub">One draw animating in real time before the batch runs.</p>
+      <div class="live-stage" id="liveDrawAnimation"></div>
+      <p id="liveDrawMessage"></p>
+    </div>
+
+    <!-- Loading -->
+    <div class="sim-card" id="batchSimulationLoading">
+      <div class="loading-inner">
+        <div class="loading-ring"></div>
+        <p class="loading-text">Running <span id="loadingSimCount"></span> simulations…</p>
+        <p class="loading-sub">Crunching numbers — results appear below when complete.</p>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="sim-card" id="simulationResultsSection">
+      <div class="results-header">
+        <p class="sim-card-title" style="margin:0">Simulation Results</p>
+        <span class="results-badge"><span id="simCountDisplay">0</span> DRAWS</span>
+      </div>
+
+      <div class="stat-row" id="statRow" style="display:none">
+        <div class="stat-chip"><strong id="statTopWB">—</strong>Top White Ball</div>
+        <div class="stat-chip"><strong id="statTopPB">—</strong>Top Powerball</div>
+        <div class="stat-chip"><strong id="statSpread">—</strong>Number Spread</div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-panel">
+          <p class="chart-panel-title wb">⬤ White Balls (1–69)</p>
+          <div class="chart-wrap"><canvas id="whiteBallFrequencyChart"></canvas></div>
+        </div>
+        <div class="chart-panel">
+          <p class="chart-panel-title pb">⬤ Powerball (1–26)</p>
+          <div class="chart-wrap"><canvas id="powerballFrequencyChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Hot Numbers -->
+      <div class="hot-section">
+        <div class="hot-header">
+          <span style="font-size:22px">🔥</span>
+          <p class="hot-title">Hottest Numbers This Simulation</p>
+        </div>
+        <div class="hot-grid">
+          <div>
+            <p class="hot-group-label">Top White Balls</p>
+            <div class="hot-balls-wrap" id="hotWhiteBallsContainer"></div>
+          </div>
+          <div>
+            <p class="hot-group-label">Top Powerballs</p>
+            <div class="hot-balls-wrap" id="hotPowerballsContainer"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /sim-wrap -->
+</div><!-- /sim-page -->
+
+<div id="dynamicFlashContainer" style="position:fixed;bottom:24px;right:24px;z-index:999;display:flex;flex-direction:column;gap:8px;max-width:340px"></div>
+{% endblock %}
+
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const simulationForm    = document.getElementById('simulationForm');
+  const runSimBtn         = document.getElementById('runSimulationBtn');
+  const numDrawsInput     = document.getElementById('num_draws');
+  const oddEvenSelect     = document.getElementById('odd_even_choice');
+
+  const liveDrawSection   = document.getElementById('liveDrawSection');
+  const liveDrawAnim      = document.getElementById('liveDrawAnimation');
+  const liveDrawMsg       = document.getElementById('liveDrawMessage');
+
+  const loadingSection    = document.getElementById('batchSimulationLoading');
+  const loadingSimCount   = document.getElementById('loadingSimCount');
+
+  const resultsSection    = document.getElementById('simulationResultsSection');
+  const simCountDisplay   = document.getElementById('simCountDisplay');
+  const statRow           = document.getElementById('statRow');
+
+  let whiteBallChart, powerballChart;
+
+  /* ── Initialise odd/even select from server ── */
+  const initialOE = "{{ selected_odd_even_choice }}";
+  if (initialOE) oddEvenSelect.value = initialOE;
+
+  /* ── Form submit ── */
+  simulationForm.addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    // Reset UI
+    liveDrawSection.classList.remove('visible');
+    liveDrawAnim.innerHTML = '';
+    liveDrawMsg.textContent = '';
+    resultsSection.classList.remove('visible');
+    loadingSection.classList.remove('visible');
+
+    const numDraws    = numDrawsInput.value;
+    const oddEvenVal  = oddEvenSelect.value;
+
+    loadingSimCount.textContent = numDraws;
+    runSimBtn.disabled = true;
+    runSimBtn.innerHTML = '<span class="btn-icon">⏳</span> RUNNING…';
+
+    // Step 1 — Live draw animation
+    try {
+      const res  = await fetch('/api/generate_single_draw');
+      const data = await res.json();
+      if (data.success) {
+        liveDrawSection.classList.add('visible');
+        await animateLiveDraw(data.white_balls, data.powerball);
+      }
+    } catch (err) {
+      console.error('Live draw fetch error:', err);
+    }
+
+    // Step 2 — Batch simulation
+    loadingSection.classList.add('visible');
+    try {
+      const fd = new FormData();
+      fd.append('num_draws', numDraws);
+      fd.append('odd_even_choice', oddEvenVal);
+
+      const res    = await fetch('/simulate_multiple_draws', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: fd
+      });
+      const result = await res.json();
+
+      if (result.error) {
+        showToast(result.error, 'error');
+      } else if (result.simulated_white_ball_freq?.length) {
+        const wbData = result.simulated_white_ball_freq;
+        const pbData = result.simulated_powerball_freq;
+        const n      = result.num_simulations;
+
+        simCountDisplay.textContent = n;
+        renderCharts(wbData, pbData);
+        displayHotNumbers(wbData, pbData);
+        populateStats(wbData, pbData);
+
+        resultsSection.classList.add('visible');
+        resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        showToast('No simulation data returned. Try again.', 'error');
+      }
+    } catch (err) {
+      console.error('Batch simulation error:', err);
+      showToast('Simulation failed. Please try again.', 'error');
+    } finally {
+      loadingSection.classList.remove('visible');
+      runSimBtn.disabled = false;
+      runSimBtn.innerHTML = '<span class="btn-icon">▶</span> LAUNCH SIMULATION';
+    }
+  });
+
+  /* ── Live draw animation ── */
+  async function animateLiveDraw(whiteBalls, powerball) {
+    liveDrawAnim.innerHTML = '';
+    liveDrawMsg.textContent = 'Drawing…';
+
+    for (let i = 0; i < whiteBalls.length; i++) {
+      await sleep(i === 0 ? 400 : 800);
+      addAnimBall(whiteBalls[i], false);
+    }
+
+    // Separator
+    await sleep(600);
+    const sep = document.createElement('span');
+    sep.className = 'live-separator';
+    sep.textContent = '|';
+    liveDrawAnim.appendChild(sep);
+
+    await sleep(600);
+    addAnimBall(powerball, true);
+
+    liveDrawMsg.textContent = '✓ Draw complete';
+  }
+
+  function addAnimBall(num, isPB) {
+    const ball = document.createElement('span');
+    ball.className = 'anim-ball' + (isPB ? ' pb' : '');
+    ball.textContent = num;
+    liveDrawAnim.appendChild(ball);
+    requestAnimationFrame(() => requestAnimationFrame(() => ball.classList.add('shown')));
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  /* ── Charts ── */
+  function renderCharts(wbData, pbData) {
+    if (whiteBallChart)  whiteBallChart.destroy();
+    if (powerballChart)  powerballChart.destroy();
+
+    const baseOpts = (xLabel, color) => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 600, easing: 'easeOutQuart' },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 9 } },
+          title: { display: true, text: xLabel, color: 'rgba(255,255,255,0.3)', font: { size: 10 } }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 9 } },
+          beginAtZero: true,
+          title: { display: true, text: 'Frequency', color: 'rgba(255,255,255,0.3)', font: { size: 10 } }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#131826',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleColor: '#fff',
+          bodyColor: 'rgba(255,255,255,0.6)'
+        }
+      }
+    });
+
+    whiteBallChart = new Chart(
+      document.getElementById('whiteBallFrequencyChart'),
+      {
+        type: 'bar',
+        data: {
+          labels: wbData.map(d => d.Number),
+          datasets: [{
+            data: wbData.map(d => d.Frequency),
+            backgroundColor: wbData.map((d, i) => {
+              const max = Math.max(...wbData.map(x => x.Frequency));
+              const alpha = 0.3 + 0.7 * (d.Frequency / max);
+              return `rgba(0,229,255,${alpha})`;
+            }),
+            borderColor: 'rgba(0,229,255,0.6)',
+            borderWidth: 1,
+            borderRadius: 4
+          }]
+        },
+        options: baseOpts('White Ball Number', 'rgba(0,229,255,0.7)')
+      }
+    );
+
+    powerballChart = new Chart(
+      document.getElementById('powerballFrequencyChart'),
+      {
+        type: 'bar',
+        data: {
+          labels: pbData.map(d => d.Number),
+          datasets: [{
+            data: pbData.map(d => d.Frequency),
+            backgroundColor: pbData.map(d => {
+              const max = Math.max(...pbData.map(x => x.Frequency));
+              const alpha = 0.3 + 0.7 * (d.Frequency / max);
+              return `rgba(255,59,92,${alpha})`;
+            }),
+            borderColor: 'rgba(255,59,92,0.6)',
+            borderWidth: 1,
+            borderRadius: 4
+          }]
+        },
+        options: baseOpts('Powerball Number', 'rgba(255,59,92,0.7)')
+      }
+    );
+  }
+
+  /* ── Hot Numbers ── */
+  function displayHotNumbers(wbData, pbData) {
+    const wbSorted = [...wbData].sort((a, b) => b.Frequency - a.Frequency || a.Number - b.Number);
+    const pbSorted = [...pbData].sort((a, b) => b.Frequency - a.Frequency || a.Number - b.Number);
+
+    const wbContainer = document.getElementById('hotWhiteBallsContainer');
+    const pbContainer = document.getElementById('hotPowerballsContainer');
+
+    wbContainer.innerHTML = '';
+    pbContainer.innerHTML = '';
+
+    const topWB = wbSorted.slice(0, 5);
+    const topPB = pbSorted.slice(0, 3);
+
+    if (topWB.length && topWB[0].Frequency > 0) {
+      topWB.forEach(d => {
+        const b = document.createElement('span');
+        b.className = 'hot-ball';
+        b.textContent = d.Number;
+        wbContainer.appendChild(b);
+      });
+    } else {
+      wbContainer.innerHTML = '<span style="color:var(--muted);font-size:13px">No hot numbers detected</span>';
+    }
+
+    if (topPB.length && topPB[0].Frequency > 0) {
+      topPB.forEach(d => {
+        const b = document.createElement('span');
+        b.className = 'hot-ball pb-hot';
+        b.textContent = d.Number;
+        pbContainer.appendChild(b);
+      });
+    } else {
+      pbContainer.innerHTML = '<span style="color:var(--muted);font-size:13px">No hot powerballs detected</span>';
+    }
+  }
+
+  /* ── Stats ── */
+  function populateStats(wbData, pbData) {
+    const topWB  = [...wbData].sort((a, b) => b.Frequency - a.Frequency)[0];
+    const topPB  = [...pbData].sort((a, b) => b.Frequency - a.Frequency)[0];
+    const spread = wbData.filter(d => d.Frequency > 0).length;
+
+    document.getElementById('statTopWB').textContent = topWB ? `#${topWB.Number}` : '—';
+    document.getElementById('statTopPB').textContent = topPB ? `#${topPB.Number}` : '—';
+    document.getElementById('statSpread').textContent = `${spread}/69`;
+    statRow.style.display = 'flex';
+  }
+
+  /* ── Toast notifications ── */
+  function showToast(message, type = 'info') {
+    const container = document.getElementById('dynamicFlashContainer');
+    const toast = document.createElement('div');
+    toast.className = `sim-flash ${type}`;
+    toast.style.cssText = 'animation: fadeIn 0.3s ease; background:var(--surface);';
+    toast.innerHTML = `<p style="margin:0;font-size:13px">${message}</p>`;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+  }
+});
+</script>
+{% endblock %}{% extends "base.html" %}
+
 {% block title %}Simulate Multiple Powerball Draws{% endblock %}
 
 {% block page_heading %}Simulate Multiple Powerball Draws{% endblock %}
