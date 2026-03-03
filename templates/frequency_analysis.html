@@ -223,6 +223,14 @@
 document.addEventListener('DOMContentLoaded', function () {
   const wbRaw = {{ white_ball_freq | tojson }};
   const pbRaw = {{ powerball_freq | tojson }};
+  const lastDraw  = {{ last_draw | tojson }};
+  const latestWb  = (lastDraw && lastDraw['Number 1'] !== 'N/A')
+  ? [lastDraw['Number 1'], lastDraw['Number 2'], lastDraw['Number 3'],
+     lastDraw['Number 4'], lastDraw['Number 5']].map(Number)
+  : [];
+  const latestPb    = (lastDraw && lastDraw['Powerball'] !== 'N/A') ? Number(lastDraw['Powerball']) : null;
+  const latestDate  = (lastDraw && lastDraw['Draw Date']) ? lastDraw['Draw Date'] : '';
+  const latestWbSet = new Set(latestWb);
 
   const byNum  = arr => [...arr].sort((a, b) => a.Number - b.Number);
   const byFreq = arr => [...arr].sort((a, b) => b.Frequency - a.Frequency);
@@ -243,13 +251,17 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('statTopPb').textContent       = '#' + pbSorted[0].Number;
 
   // ── Colour bands ──────────────────────────────────────
-  function colorBands(data, base, top, bot) {
-    const freqs = [...data].map(d => d.Frequency).sort((a, b) => b - a);
-    const top5  = new Set(freqs.slice(0, 5));
-    const bot5  = new Set(freqs.slice(-5));
-    return data.map(d => top5.has(d.Frequency) ? top : bot5.has(d.Frequency) ? bot : base);
-  }
-
+  function colorBands(data, base, top, bot, latestSet) {
+  const freqs = [...data].map(d => d.Frequency).sort((a, b) => b - a);
+  const top5  = new Set(freqs.slice(0, 5));
+  const bot5  = new Set(freqs.slice(-5));
+  return data.map(d => {
+    if (latestSet && latestSet.has(d.Number)) return 'rgba(234,179,8,0.85)'; // ⚡ gold
+    if (top5.has(d.Frequency)) return top;
+    if (bot5.has(d.Frequency)) return bot;
+    return base;
+  });
+}
   // ── Avg reference line plugin ─────────────────────────
   function avgLinePlugin(avg, id) {
     return {
@@ -312,7 +324,7 @@ document.addEventListener('DOMContentLoaded', function () {
   let wbChart, pbChart;
 
   function buildWb(data) {
-    const colors = colorBands(data, 'rgba(99,102,241,0.65)', 'rgba(239,68,68,0.8)', 'rgba(59,130,246,0.7)');
+    const colors = colorBands(data, 'rgba(99,102,241,0.65)', 'rgba(239,68,68,0.8)', 'rgba(59,130,246,0.7)', latestWbSet);
     if (wbChart) wbChart.destroy();
     wbChart = new Chart(document.getElementById('whiteBallFrequencyChart'), {
       type: 'bar',
@@ -326,7 +338,8 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function buildPb(data) {
-    const colors = colorBands(data, 'rgba(239,68,68,0.65)', 'rgba(239,68,68,0.9)', 'rgba(59,130,246,0.7)');
+    const latestPbSet = latestPb !== null ? new Set([latestPb]) : new Set();
+    const colors = colorBands(data, 'rgba(239,68,68,0.65)', 'rgba(239,68,68,0.9)', 'rgba(59,130,246,0.7)', latestPbSet);
     if (pbChart) pbChart.destroy();
     pbChart = new Chart(document.getElementById('powerballFrequencyChart'), {
       type: 'bar',
