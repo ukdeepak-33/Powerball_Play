@@ -1,191 +1,649 @@
 {% extends "base.html" %}
 
-{% block title %}Monthly Number Trends{% endblock %}
-
-{% block page_heading %}Monthly Number Trends & Streaks{% endblock %}
+{% block title %}Monthly Trends — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
-<div class="space-y-8">
-    {# Section 1: Monthly White Balls and Powerballs Drawn & Not Picked (Last 6 Months, including current) #}
-    <div class="card p-6 bg-white rounded-lg shadow-lg">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Monthly Number Analysis (Last 6 Months)</h2>
-        {% if monthly_data %}
-            {% for month_info in monthly_data %}
-                <div class="mb-6 pb-4 border-b border-gray-200 last:border-b-0">
-                    <h3 class="text-xl font-semibold mb-3 text-blue-700">
-                        {{ month_info.month }} 
-                        {% if month_info.is_current_month %}
-                            <span class="text-base text-gray-500 font-normal">(Current Month)</span>
-                        {% endif %}
-                    </h3>
-                    
-                    {# White Balls Drawn for the Month #}
-                    <p class="font-medium text-gray-700 mb-2">White Balls Drawn:</p>
-                    {% if month_info.drawn_white_balls_with_counts %}
-                        <div class="flex flex-wrap items-center mb-4">
-                            {% for ball_info in month_info.drawn_white_balls_with_counts %}
-                                <div class="ball-sm flex flex-col justify-center items-center mr-1 mb-1">
-                                    <span class="text-sm font-bold">{{ ball_info.number }}</span>
-                                    <span class="text-xs text-gray-600">({{ ball_info.count }})</span>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="text-gray-500 text-sm">No white balls drawn this month.</p>
-                    {% endif %}
-
-                    {# White Balls Not Picked for the Month #}
-                    <p class="font-medium text-gray-700 mb-2 mt-4">White Balls Not Picked:</p>
-                    {% if month_info.not_picked_white_balls %}
-                        <div class="flex flex-wrap items-center mb-4">
-                            {% for number in month_info.not_picked_white_balls %}
-                                <div class="ball-sm not-picked-ball flex items-center justify-center mr-1 mb-1">
-                                    <span class="text-sm font-bold">{{ number }}</span>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="text-gray-500 text-sm">All white balls were picked this month!</p>
-                    {% endif %}
-
-                    {# Top Powerballs for the Month #}
-                    <p class="font-medium text-gray-700 mb-2 mt-4">Top {{ month_info.top_powerballs|length }} Powerballs:</p>
-                    {% if month_info.top_powerballs %}
-                        <div class="flex flex-wrap items-center">
-                            {% for ball_info in month_info.top_powerballs %}
-                                <div class="ball-sm powerball-sm flex flex-col justify-center items-center mr-1 mb-1">
-                                    <span class="text-sm font-bold text-white">{{ ball_info.number }}</span>
-                                    <span class="text-xs text-red-100">({{ ball_info.count }})</span>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="text-gray-500 text-sm">No Powerball data for this month.</p>
-                    {% endif %}
-
-                    {# Powerballs Not Picked for the Month #}
-                    <p class="font-medium text-gray-700 mb-2 mt-4">Powerballs Not Picked:</p>
-                    {% if month_info.not_picked_powerballs %}
-                        <div class="flex flex-wrap items-center">
-                            {% for number in month_info.not_picked_powerballs %}
-                                <div class="ball-sm not-picked-powerball flex items-center justify-center mr-1 mb-1">
-                                    <span class="text-sm font-bold">{{ number }}</span>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="text-gray-500 text-sm">All Powerballs were picked this month!</p>
-                    {% endif %}
-
-                </div>
-            {% endfor %}
-        {% else %}
-            <p class="text-gray-500">No monthly analysis data available. Please ensure historical data is loaded.</p>
-        {% endif %}
-    </div>
-
-    {# Section 2: Consecutive Monthly Streaks #}
-    <div class="card p-6 bg-white rounded-lg shadow-lg">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Consecutive Monthly Streaks</h2>
-        <p class="text-gray-700 mb-4">Numbers appearing in consecutive completed months:</p>
-
-        {% if streak_numbers and (streak_numbers['5_month_streaks'] or streak_numbers['4_month_streaks'] or streak_numbers['3_month_streaks']) %}
-            {# 5-Month Streaks #}
-            <div class="mb-4">
-                <h3 class="text-xl font-semibold mb-2 text-green-700">5-Month Streaks:</h3>
-                {% if streak_numbers['5_month_streaks'] %}
-                    <div class="flex flex-wrap items-center">
-                        {% for number in streak_numbers['5_month_streaks'] %}
-                            <span class="ball-sm flex items-center justify-center mr-1 mb-1
-                                {% if number <= 26 %}powerball-sm{% endif %}"> {# Apply powerball style if it's a PB #}
-                                {{ number }}
-                            </span>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <p class="text-gray-500 text-sm">No numbers on a 5-month streak.</p>
-                {% endif %}
-            </div>
-
-            {# 4-Month Streaks #}
-            <div class="mb-4">
-                <h3 class="text-xl font-semibold mb-2 text-yellow-700">4-Month Streaks:</h3>
-                {% if streak_numbers['4_month_streaks'] %}
-                    <div class="flex flex-wrap items-center">
-                        {% for number in streak_numbers['4_month_streaks'] %}
-                            <span class="ball-sm flex items-center justify-center mr-1 mb-1
-                                {% if number <= 26 %}powerball-sm{% endif %}">
-                                {{ number }}
-                            </span>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <p class="text-gray-500 text-sm">No numbers on a 4-month streak.</p>
-                {% endif %}
-            </div>
-
-            {# 3-Month Streaks #}
-            <div class="mb-4">
-                <h3 class="text-xl font-semibold mb-2 text-orange-700">3-Month Streaks:</h3>
-                {% if streak_numbers['3_month_streaks'] %}
-                    <div class="flex flex-wrap items-center">
-                        {% for number in streak_numbers['3_month_streaks'] %}
-                            <span class="ball-sm flex items-center justify-center mr-1 mb-1
-                                {% if number <= 26 %}powerball-sm{% endif %}">
-                                {{ number }}
-                            </span>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <p class="text-gray-500 text-sm">No numbers on a 3-month streak.</p>
-                {% endif %}
-            </div>
-        {% else %}
-            <p class="text-gray-500">No streak data available for white balls or Powerballs.</p>
-        {% endif %}
-    </div>
-</div>
-
-{# Add the small ball styles directly here if they are specific to this page #}
 <style>
-    .ball-sm {
-        display: inline-flex;
-        justify-content: center;
-        align-items: center;
-        width: 40px; /* Slightly larger for better readability with count */
-        height: 40px; /* Consistent with width */
-        background-color: #f0f0f0;
-        border-radius: 50%;
-        border: 1px solid #ccc;
-        font-weight: bold;
-        color: #333;
-        margin: 2px;
-        font-size: 0.9em; /* Adjusted for both number and count */
-        flex-shrink: 0;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        text-align: center; /* Ensure text is centered */
-        flex-direction: column; /* Stack number and count vertically */
-        padding-top: 2px; /* Small padding adjustment */
-    }
-    .powerball-sm {
-        background-color: #ef4444; /* Red color for powerball */
-        color: white;
-        border-color: #dc2626;
-    }
-    .not-picked-ball {
-        background-color: #e0e7ff; /* Light blue for not picked white balls */
-        color: #4338ca; /* Darker blue text */
-        border-color: #a5b4fc;
-    }
-    .not-picked-powerball {
-        background-color: #ffe4e6; /* Light red for not picked powerballs */
-        color: #b91c1c; /* Darker red text */
-        border-color: #fda4af;
-    }
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root {
+    --bg:       #0a0c12;
+    --s1:       #111420;
+    --s2:       #181c2e;
+    --s3:       #1f2438;
+    --border:   rgba(255,255,255,0.07);
+    --text:     rgba(255,255,255,0.87);
+    --muted:    rgba(255,255,255,0.38);
+    --blue:     #4f8ef7;
+    --indigo:   #818cf8;
+    --cyan:     #22d3ee;
+    --amber:    #fbbf24;
+    --orange:   #fb923c;
+    --flame:    #f97316;
+    --red:      #f43f5e;
+    --green:    #34d399;
+    --wb-bg:    linear-gradient(145deg, #e8edf5 0%, #c8d4e8 50%, #a0b4d0 100%);
+    --pb-bg:    linear-gradient(145deg, #ff8a80 0%, #ef5350 50%, #b71c1c 100%);
+  }
+
+  #mo-page * { box-sizing: border-box; }
+  #mo-page {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    color: var(--text);
+    padding-bottom: 80px;
+  }
+
+  /* ── Hero ── */
+  .mo-hero {
+    position: relative;
+    padding: 60px 24px 48px;
+    text-align: center;
+    overflow: hidden;
+  }
+  .mo-hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 70% 55% at 50% 0%, rgba(79,142,247,0.09) 0%, transparent 65%),
+      radial-gradient(ellipse 35% 40% at 85% 40%, rgba(129,140,248,0.06) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .mo-hero-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--blue);
+    margin-bottom: 14px;
+    opacity: 0.85;
+  }
+  .mo-hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(40px, 6vw, 76px);
+    font-weight: 800;
+    line-height: 1.05;
+    margin: 0 0 14px;
+    background: linear-gradient(135deg, #fff 20%, var(--blue) 60%, var(--indigo) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .mo-hero p {
+    font-size: 15px;
+    color: var(--muted);
+    max-width: 480px;
+    margin: 0 auto;
+    line-height: 1.7;
+  }
+
+  /* ── Layout ── */
+  .mo-wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  /* ── Section headers ── */
+  .mo-section-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .mo-section-icon {
+    width: 42px; height: 42px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .icon-blue   { background: rgba(79,142,247,0.15); }
+  .icon-flame  { background: rgba(249,115,22,0.15); }
+
+  .mo-section-text h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 2px;
+    color: #fff;
+  }
+  .mo-section-text p {
+    font-size: 12px;
+    color: var(--muted);
+    margin: 0;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Timeline container ── */
+  .timeline {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 22px;
+    top: 20px;
+    bottom: 20px;
+    width: 2px;
+    background: linear-gradient(to bottom,
+      rgba(79,142,247,0.6) 0%,
+      rgba(79,142,247,0.2) 60%,
+      rgba(79,142,247,0.05) 100%
+    );
+  }
+
+  /* ── Month card ── */
+  .month-card {
+    position: relative;
+    padding: 0 0 28px 60px;
+    opacity: 0;
+    transform: translateX(-12px);
+    animation: slideIn 0.4s forwards;
+  }
+  .month-card:last-child { padding-bottom: 0; }
+
+  @keyframes slideIn {
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Timeline dot */
+  .month-dot {
+    position: absolute;
+    left: 14px;
+    top: 18px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 2px solid var(--blue);
+    background: var(--bg);
+    z-index: 1;
+    transition: transform 0.2s;
+  }
+  .month-card.current .month-dot {
+    background: var(--blue);
+    box-shadow: 0 0 12px rgba(79,142,247,0.6);
+  }
+
+  /* Card inner */
+  .month-inner {
+    background: var(--s1);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px 24px;
+    transition: border-color 0.2s;
+  }
+  .month-card.current .month-inner {
+    border-color: rgba(79,142,247,0.25);
+    background: var(--s2);
+  }
+  .month-inner:hover { border-color: rgba(255,255,255,0.12); }
+
+  /* Month title */
+  .month-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+  .month-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .current-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    background: rgba(79,142,247,0.15);
+    border: 1px solid rgba(79,142,247,0.35);
+    color: var(--blue);
+    padding: 3px 9px;
+    border-radius: 20px;
+  }
+
+  /* Sub-sections inside card */
+  .month-subsections {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 700px) { .month-subsections { grid-template-columns: 1fr; } }
+
+  .month-sub {
+    background: var(--s3);
+    border-radius: 10px;
+    padding: 14px 16px;
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+  .month-sub-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .label-wb    { color: var(--cyan); }
+  .label-wb-np { color: rgba(34,211,238,0.45); }
+  .label-pb    { color: var(--red); }
+  .label-pb-np { color: rgba(244,63,94,0.45); }
+
+  .balls-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: flex-end;
+  }
+
+  /* Ball styles */
+  .b {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+    position: relative;
+    transition: transform 0.15s;
+  }
+  .b:hover { transform: scale(1.1); }
+
+  .b-wb {
+    background: var(--wb-bg);
+    color: #1a2540;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.4), inset 0 1px 2px rgba(255,255,255,0.6);
+  }
+  .b-pb {
+    background: var(--pb-bg);
+    color: #fff;
+    box-shadow: 0 3px 10px rgba(244,63,94,0.3), inset 0 1px 2px rgba(255,150,150,0.3);
+  }
+  .b-np-wb {
+    background: rgba(34,211,238,0.08);
+    color: var(--cyan);
+    border: 1px dashed rgba(34,211,238,0.35);
+    box-shadow: none;
+  }
+  .b-np-pb {
+    background: rgba(244,63,94,0.08);
+    color: var(--red);
+    border: 1px dashed rgba(244,63,94,0.35);
+    box-shadow: none;
+  }
+
+  /* Count badge below ball */
+  .b-count {
+    font-size: 8px;
+    opacity: 0.65;
+    line-height: 1;
+    margin-top: 1px;
+  }
+
+  .empty-note {
+    font-size: 12px;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  /* ── Streak section ── */
+  .streak-outer {
+    background: var(--s1);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 32px;
+    position: relative;
+    overflow: hidden;
+  }
+  .streak-outer::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--flame), transparent);
+    opacity: 0.45;
+  }
+
+  .streak-tiers {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .streak-tier {
+    display: flex;
+    align-items: flex-start;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+
+  .streak-tier-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 72px;
+    padding: 10px 8px;
+    border-radius: 12px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .tier-5 { background: rgba(249,115,22,0.15); border: 1px solid rgba(249,115,22,0.35); }
+  .tier-4 { background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.3); }
+  .tier-3 { background: rgba(129,140,248,0.12); border: 1px solid rgba(129,140,248,0.3); }
+
+  .tier-emoji { font-size: 22px; line-height: 1; margin-bottom: 4px; }
+  .tier-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .tier-5 .tier-label { color: var(--flame); }
+  .tier-4 .tier-label { color: var(--amber); }
+  .tier-3 .tier-label { color: var(--indigo); }
+
+  .streak-balls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding-top: 6px;
+  }
+
+  .sb {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    flex-shrink: 0;
+    transition: transform 0.15s;
+    position: relative;
+  }
+  .sb:hover { transform: scale(1.12); }
+
+  .sb-5 {
+    background: var(--wb-bg);
+    color: #1a2540;
+    box-shadow:
+      0 0 0 3px rgba(249,115,22,0.5),
+      0 4px 14px rgba(249,115,22,0.3),
+      inset 0 1px 2px rgba(255,255,255,0.6);
+    animation: flamePulse 2s ease-in-out infinite;
+  }
+  .sb-4 {
+    background: var(--wb-bg);
+    color: #1a2540;
+    box-shadow:
+      0 0 0 3px rgba(251,191,36,0.45),
+      0 4px 12px rgba(251,191,36,0.25),
+      inset 0 1px 2px rgba(255,255,255,0.6);
+  }
+  .sb-3 {
+    background: var(--wb-bg);
+    color: #1a2540;
+    box-shadow:
+      0 0 0 2px rgba(129,140,248,0.4),
+      0 4px 10px rgba(129,140,248,0.2),
+      inset 0 1px 2px rgba(255,255,255,0.6);
+  }
+  /* PB variants */
+  .sb-pb-5 {
+    background: var(--pb-bg);
+    color: #fff;
+    box-shadow:
+      0 0 0 3px rgba(249,115,22,0.6),
+      0 4px 14px rgba(249,115,22,0.4);
+    animation: flamePulse 2s ease-in-out infinite;
+  }
+  .sb-pb-4 {
+    background: var(--pb-bg);
+    color: #fff;
+    box-shadow:
+      0 0 0 3px rgba(251,191,36,0.5),
+      0 4px 12px rgba(251,191,36,0.3);
+  }
+  .sb-pb-3 {
+    background: var(--pb-bg);
+    color: #fff;
+    box-shadow:
+      0 0 0 2px rgba(129,140,248,0.45),
+      0 4px 10px rgba(129,140,248,0.25);
+  }
+
+  @keyframes flamePulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(249,115,22,0.5), 0 4px 14px rgba(249,115,22,0.3), inset 0 1px 2px rgba(255,255,255,0.6); }
+    50%       { box-shadow: 0 0 0 5px rgba(249,115,22,0.3), 0 4px 24px rgba(249,115,22,0.5), inset 0 1px 2px rgba(255,255,255,0.6); }
+  }
+
+  .no-streak {
+    font-size: 13px;
+    color: var(--muted);
+    font-style: italic;
+    padding: 6px 0;
+  }
+
+  /* staggered month card animations */
+  .month-card:nth-child(1) { animation-delay: 0.05s; }
+  .month-card:nth-child(2) { animation-delay: 0.12s; }
+  .month-card:nth-child(3) { animation-delay: 0.19s; }
+  .month-card:nth-child(4) { animation-delay: 0.26s; }
+  .month-card:nth-child(5) { animation-delay: 0.33s; }
+  .month-card:nth-child(6) { animation-delay: 0.40s; }
+
+  @media (max-width: 640px) {
+    .timeline::before { left: 16px; }
+    .month-card { padding-left: 44px; }
+    .month-dot   { left: 8px; }
+    .streak-outer { padding: 20px 16px; }
+  }
 </style>
+
+<div id="mo-page">
+
+  <!-- Hero -->
+  <div class="mo-hero">
+    <p class="mo-hero-eyebrow">📅 6-Month Rolling Window</p>
+    <h1>Monthly Trends</h1>
+    <p>Which numbers dominated each month, which were absent, and which are on a consecutive streak.</p>
+  </div>
+
+  <div class="mo-wrap">
+
+    <!-- ── Section 1: Monthly Analysis ── -->
+    <div>
+      <div class="mo-section-head">
+        <div class="mo-section-icon icon-blue">📊</div>
+        <div class="mo-section-text">
+          <h2>Monthly Number Analysis</h2>
+          <p>Last 6 months — drawn, not picked, top powerballs</p>
+        </div>
+      </div>
+
+      {% if monthly_data %}
+      <div class="timeline">
+        {% for month_info in monthly_data %}
+        <div class="month-card {% if month_info.is_current_month %}current{% endif %}">
+          <div class="month-dot"></div>
+          <div class="month-inner">
+
+            <!-- Month header -->
+            <div class="month-title">
+              <span class="month-name">{{ month_info.month }}</span>
+              {% if month_info.is_current_month %}
+                <span class="current-badge">Current Month</span>
+              {% endif %}
+            </div>
+
+            <div class="month-subsections">
+
+              <!-- White Balls Drawn -->
+              <div class="month-sub">
+                <p class="month-sub-label label-wb">⬤ White Balls Drawn</p>
+                <div class="balls-row">
+                  {% if month_info.drawn_white_balls_with_counts %}
+                    {% for ball in month_info.drawn_white_balls_with_counts %}
+                      <div class="b b-wb">
+                        {{ ball.number }}
+                        <span class="b-count">×{{ ball.count }}</span>
+                      </div>
+                    {% endfor %}
+                  {% else %}
+                    <span class="empty-note">None this month</span>
+                  {% endif %}
+                </div>
+              </div>
+
+              <!-- White Balls Not Picked -->
+              <div class="month-sub">
+                <p class="month-sub-label label-wb-np">○ White Balls Not Picked</p>
+                <div class="balls-row">
+                  {% if month_info.not_picked_white_balls %}
+                    {% for number in month_info.not_picked_white_balls %}
+                      <div class="b b-np-wb">{{ number }}</div>
+                    {% endfor %}
+                  {% else %}
+                    <span class="empty-note">All picked! 🎯</span>
+                  {% endif %}
+                </div>
+              </div>
+
+              <!-- Top Powerballs -->
+              <div class="month-sub">
+                <p class="month-sub-label label-pb">⬤ Top {{ month_info.top_powerballs|length }} Powerballs</p>
+                <div class="balls-row">
+                  {% if month_info.top_powerballs %}
+                    {% for ball in month_info.top_powerballs %}
+                      <div class="b b-pb">
+                        {{ ball.number }}
+                        <span class="b-count" style="color:rgba(255,200,200,0.7)">×{{ ball.count }}</span>
+                      </div>
+                    {% endfor %}
+                  {% else %}
+                    <span class="empty-note">No data</span>
+                  {% endif %}
+                </div>
+              </div>
+
+              <!-- Powerballs Not Picked -->
+              <div class="month-sub">
+                <p class="month-sub-label label-pb-np">○ Powerballs Not Picked</p>
+                <div class="balls-row">
+                  {% if month_info.not_picked_powerballs %}
+                    {% for number in month_info.not_picked_powerballs %}
+                      <div class="b b-np-pb">{{ number }}</div>
+                    {% endfor %}
+                  {% else %}
+                    <span class="empty-note">All picked! 🎯</span>
+                  {% endif %}
+                </div>
+              </div>
+
+            </div><!-- /month-subsections -->
+          </div><!-- /month-inner -->
+        </div><!-- /month-card -->
+        {% endfor %}
+      </div><!-- /timeline -->
+
+      {% else %}
+        <p style="color:var(--muted);font-size:14px;padding:24px 0">No monthly analysis data available.</p>
+      {% endif %}
+    </div>
+
+    <!-- ── Section 2: Consecutive Streaks ── -->
+    <div>
+      <div class="mo-section-head">
+        <div class="mo-section-icon icon-flame">🔥</div>
+        <div class="mo-section-text">
+          <h2>Consecutive Monthly Streaks</h2>
+          <p>Numbers appearing in consecutive completed months</p>
+        </div>
+      </div>
+
+      <div class="streak-outer">
+        {% if streak_numbers and (streak_numbers['5_month_streaks'] or streak_numbers['4_month_streaks'] or streak_numbers['3_month_streaks']) %}
+        <div class="streak-tiers">
+
+          <!-- 5-Month -->
+          <div class="streak-tier">
+            <div class="streak-tier-badge tier-5">
+              <span class="tier-emoji">🔥</span>
+              <span class="tier-label">5 Months</span>
+            </div>
+            <div class="streak-balls">
+              {% if streak_numbers['5_month_streaks'] %}
+                {% for number in streak_numbers['5_month_streaks'] %}
+                  <span class="sb {% if number <= 26 %}sb-pb-5{% else %}sb-5{% endif %}">{{ number }}</span>
+                {% endfor %}
+              {% else %}
+                <span class="no-streak">No 5-month streaks currently.</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- 4-Month -->
+          <div class="streak-tier">
+            <div class="streak-tier-badge tier-4">
+              <span class="tier-emoji">✨</span>
+              <span class="tier-label">4 Months</span>
+            </div>
+            <div class="streak-balls">
+              {% if streak_numbers['4_month_streaks'] %}
+                {% for number in streak_numbers['4_month_streaks'] %}
+                  <span class="sb {% if number <= 26 %}sb-pb-4{% else %}sb-4{% endif %}">{{ number }}</span>
+                {% endfor %}
+              {% else %}
+                <span class="no-streak">No 4-month streaks currently.</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- 3-Month -->
+          <div class="streak-tier">
+            <div class="streak-tier-badge tier-3">
+              <span class="tier-emoji">📈</span>
+              <span class="tier-label">3 Months</span>
+            </div>
+            <div class="streak-balls">
+              {% if streak_numbers['3_month_streaks'] %}
+                {% for number in streak_numbers['3_month_streaks'] %}
+                  <span class="sb {% if number <= 26 %}sb-pb-3{% else %}sb-3{% endif %}">{{ number }}</span>
+                {% endfor %}
+              {% else %}
+                <span class="no-streak">No 3-month streaks currently.</span>
+              {% endif %}
+            </div>
+          </div>
+
+        </div><!-- /streak-tiers -->
+        {% else %}
+          <p style="color:var(--muted);font-size:14px">No streak data available.</p>
+        {% endif %}
+      </div><!-- /streak-outer -->
+    </div>
+
+  </div><!-- /mo-wrap -->
+</div><!-- /mo-page -->
+
 {% endblock %}
 
 {% block scripts %}
-    {# All numbers are numerically sorted (ascending) by default from the backend. #}
-    {# Client-side dynamic sorting is a more complex feature that could be added later if needed. #}
+{{ super() }}
 {% endblock %}
