@@ -4642,7 +4642,9 @@ def sum_of_main_balls_route():
                            sum_freq_json=sum_freq_json,
                            min_sum=min_sum,
                            max_sum=max_sum,
-                           avg_sum=avg_sum)
+                           avg_sum=avg_sum,
+                           last_draw=last_draw.to_dict() if not last_draw.empty else {}   # ← add this line if missing
+    )
 
 @app.route('/find_results_by_sum', methods=['GET', 'POST'])
 def find_results_by_sum_route():
@@ -7032,6 +7034,111 @@ def scheduler_status():
         return jsonify({'success': True, 'jobs': jobs})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+# ── Paste this route anywhere with your other API endpoints in index.py ──────
+
+@app.route('/api/sum-ai-analysis', methods=['POST'])
+def sum_ai_analysis():
+    try:
+        payload     = request.get_json()
+        last_draw   = payload.get('last_draw', {})
+        min_sum     = payload.get('min_sum', 0)
+        max_sum     = payload.get('max_sum', 0)
+        avg_sum     = payload.get('avg_sum', 0)
+        sum_freq    = payload.get('sum_freq', [])
+        recent_sums = payload.get('recent_sums', [])
+
+        # ── Build last draw context ────────────────────────────
+        draw_date = last_draw.get('Draw Date', 'Unknown')
+        numbers   = [last_draw.get(f'Number {i}', '?') for i in range(1, 6)]
+        powerball = last_draw.get('Powerball', '?')
+        draw_sum  = sum(int(n) for n in numbers if str(n).isdigit())
+
+        # Zone classification
+        if draw_sum < 100:
+            zone = "Low Zone (< 100)"
+        elif draw_sum < 160:
+            zone = "Mid-Low Zone (100–159)"
+        elif draw_sum < 220:
+            zone = "Mid-High Zone (160–219)"
+        else:
+            zone = "High Zone (220+)"
+
+        # Percentile rank of this sum in historical distribution
+        total_draws  = sum(d['count'] for d in sum_freq) if sum_freq else 1
+        below_count  = sum(d['count'] for d in sum_freq if d['sum'] < draw_sum)
+        percentile   = round((below_count / total_draws) * 100, 1) if total_draws else 0
+
+        # How many draws had this exact sum historically
+        exact_matches = next((d['count'] for d in sum_freq if d['sum'] == draw_sum), 0)
+        exact_pct     = round((exact_matches / total_draws) * 100, 2) if total_draws else 0
+
+        # Recent trend: last 10 sums vs all-time average
+        recent_avg = round(sum(recent_sums) / len(recent_sums), 1) if recent_sums else avg_sum
+        trend_dir  = "above" if recent_avg > avg_sum else "below"
+        trend_diff = abs(round(recent_avg - avg_sum, 1))
+
+        # Most frequent sum overall
+        top_sum_entry = max(sum_freq, key=lambda d: d['count']) if sum_freq else {}
+        top_sum       = top_sum_entry.get('sum', '?')
+        top_sum_count = top_sum_entry.get('count', '?')
+
+        # ── Build prompt ───────────────────────────────────────
+        prompt = f"""You are an expert Powerball statistics analyst. Analyse the following draw data and provide a sharp, insightful commentary.
+
+LAST OFFICIAL DRAW:
+- Date: {draw_date}
+- White Balls: {', '.join(str(n) for n in numbers)}
+- Powerball: {powerball}
+- Sum of White Balls: {draw_sum}
+- Zone: {zone}
+- Historical percentile: {percentile}th (higher than {percentile}% of all draws)
+- Times this exact sum appeared historically: {exact_matches} draws ({exact_pct}% of all draws)
+
+HISTORICAL CONTEXT:
+- All-time minimum sum: {min_sum}
+- All-time average sum: {avg_sum}
+- All-time maximum sum: {max_sum}
+- Most frequent sum ever: {top_sum} (appeared {top_sum_count} times)
+- Last 10 draws average sum: {recent_avg} ({trend_dir} the all-time average by {trend_diff} points)
+- Recent sums (newest first): {', '.join(str(s) for s in recent_sums)}
+
+Write a 4–6 sentence analysis covering:
+1. How notable or rare this draw's sum is historically
+2. What zone it falls in and what that means statistically
+3. Whether recent draws are trending high, low, or mean-reverting
+4. One actionable insight for someone picking numbers for the next draw
+
+Be analytical, specific, and reference the actual numbers. Avoid generic statements."""
+
+        # ── Call Groq ──────────────────────────────────────────
+        groq_api_key = os.environ.get('GROQ_API_KEY', '')
+        response = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {groq_api_key}',
+                'Content-Type': 'application/json'
+            },
+            json={
+                'model': 'llama-3.1-8b-instant',
+                'messages': [{'role': 'user', 'content': prompt}],
+                'max_tokens': 400,
+                'temperature': 0.7
+            },
+            timeout=30
+        )
+
+        result = response.json()
+
+        if 'error' in result:
+            return jsonify({'error': result['error'].get('message', 'Groq API error')}), 500
+
+        analysis = result['choices'][0]['message']['content'].strip()
+        return jsonify({'analysis': analysis})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 initialize_core_data()
 
