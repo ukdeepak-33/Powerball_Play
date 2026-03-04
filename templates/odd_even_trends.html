@@ -1,47 +1,704 @@
 {% extends "base.html" %}
 
-{% block title %}Odd/Even Split Trends{% endblock %}
-
-{% block page_heading %}Odd/Even Split Trends (Last 6 Months){% endblock %}
+{% block title %}Odd/Even Trends — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
-<div class="card p-6 bg-white rounded-lg shadow-lg">
-    <h2 class="text-2xl font-bold mb-4 text-gray-800">Recent Odd/Even Splits by Draw Date</h2>
-    <p class="text-gray-700 mb-4">This table shows the odd/even distribution of white balls for each draw over the last six months. "Odd/Even Split" refers to the count of odd vs. even white balls (e.g., 3 Odd / 2 Even). It also includes the sum of the white balls and any numbers from your predefined 'Group A' that appeared in the draw.</p>
-  
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Fira+Code:wght@400;500&display=swap');
+
+  :root {
+    --bg:      #09090f;
+    --s1:      #0f0f1a;
+    --s2:      #151523;
+    --s3:      #1b1b2e;
+    --border:  rgba(255,255,255,0.07);
+    --text:    rgba(255,255,255,0.88);
+    --muted:   rgba(255,255,255,0.38);
+    --odd:     #a78bfa;    /* violet — odd */
+    --odd2:    #7c3aed;
+    --even:    #34d399;    /* emerald — even */
+    --even2:   #059669;
+    --gold:    #fbbf24;
+    --red:     #f43f5e;
+  }
+
+  #oe-page * { box-sizing: border-box; }
+  #oe-page {
+    font-family: 'Sora', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    color: var(--text);
+    padding-bottom: 80px;
+  }
+
+  /* ── Hero ── */
+  .oe-hero {
+    position: relative;
+    padding: 56px 24px 44px;
+    text-align: center;
+    overflow: hidden;
+  }
+  .oe-hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 55% 50% at 25% 50%, rgba(167,139,250,0.07) 0%, transparent 65%),
+      radial-gradient(ellipse 55% 50% at 75% 50%, rgba(52,211,153,0.07) 0%, transparent 65%);
+    pointer-events: none;
+  }
+  /* decorative split line */
+  .oe-hero::after {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0;
+    left: 50%; width: 1px;
+    background: linear-gradient(to bottom,
+      transparent 0%,
+      rgba(167,139,250,0.2) 30%,
+      rgba(52,211,153,0.2) 70%,
+      transparent 100%
+    );
+    pointer-events: none;
+  }
+
+  .oe-hero-eyebrow {
+    font-family: 'Fira Code', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    opacity: 0.75;
+    background: linear-gradient(90deg, var(--odd), var(--even));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .oe-hero h1 {
+    font-size: clamp(40px, 6vw, 76px);
+    font-weight: 800;
+    line-height: 1.05;
+    margin: 0 0 14px;
+    background: linear-gradient(135deg, var(--odd) 0%, #fff 50%, var(--even) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .oe-hero p {
+    font-size: 14px;
+    color: var(--muted);
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.75;
+  }
+
+  /* ── Layout ── */
+  .oe-wrap {
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* ── Card ── */
+  .oe-card {
+    background: var(--s1);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 28px 32px;
+    position: relative;
+    overflow: hidden;
+  }
+  .oe-card-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 4px;
+  }
+  .oe-card-sub {
+    font-family: 'Fira Code', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+    margin: 0 0 24px;
+  }
+
+  /* ── Legend pills ── */
+  .duality-legend {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+  }
+  .legend-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Fira Code', monospace;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .legend-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+  }
+  .dot-odd  { background: var(--odd); }
+  .dot-even { background: var(--even); }
+
+  /* ── Summary stat chips ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  @media (max-width: 680px) { .stats-row { grid-template-columns: 1fr 1fr; } }
+
+  .stat-chip {
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+  .sc-label {
+    font-family: 'Fira Code', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .sc-value {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+  .sc-note {
+    font-family: 'Fira Code', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ── Chart ── */
+  .chart-wrap { height: 200px; position: relative; }
+
+  /* ── Table ── */
+  .oe-table-wrap { overflow-x: auto; border-radius: 10px; }
+
+  table.oe-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 600px;
+  }
+  table.oe-table thead th {
+    background: var(--s2);
+    padding: 12px 16px;
+    font-family: 'Fira Code', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.oe-table tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  table.oe-table tbody tr:hover { background: var(--s2); }
+  table.oe-table tbody tr:last-child { border-bottom: none; }
+  table.oe-table td {
+    padding: 12px 16px;
+    font-size: 13px;
+    vertical-align: middle;
+  }
+
+  /* Date cell */
+  .td-date {
+    font-family: 'Fira Code', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* Split visual bar */
+  .split-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 180px;
+  }
+  .split-label {
+    font-family: 'Fira Code', monospace;
+    font-size: 11px;
+    color: var(--text);
+    letter-spacing: 0.5px;
+  }
+  .split-bar {
+    display: flex;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    width: 120px;
+    background: var(--s3);
+  }
+  .split-odd-seg  { background: var(--odd);  transition: width 0.6s ease; }
+  .split-even-seg { background: var(--even); transition: width 0.6s ease; }
+
+  /* Split category badge */
+  .split-badge {
+    display: inline-block;
+    font-family: 'Fira Code', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  .badge-5o { background: rgba(167,139,250,0.2); color: var(--odd);  border: 1px solid rgba(167,139,250,0.4); }
+  .badge-4o { background: rgba(167,139,250,0.14); color: var(--odd); border: 1px solid rgba(167,139,250,0.3); }
+  .badge-3o { background: rgba(200,180,252,0.1); color: #c4b5fd;     border: 1px solid rgba(196,181,253,0.25); }
+  .badge-3e { background: rgba(52,211,153,0.1);  color: var(--even); border: 1px solid rgba(52,211,153,0.25); }
+  .badge-4e { background: rgba(52,211,153,0.14); color: var(--even); border: 1px solid rgba(52,211,153,0.3); }
+  .badge-5e { background: rgba(52,211,153,0.2);  color: var(--even); border: 1px solid rgba(52,211,153,0.4); }
+
+  /* Sum badge */
+  .sum-badge {
+    font-family: 'Fira Code', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gold);
+  }
+
+  /* Group A badges */
+  .ga-wrap { display: flex; flex-wrap: wrap; gap: 4px; }
+  .ga-badge {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Fira Code', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    background: rgba(251,191,36,0.12);
+    border: 1px solid rgba(251,191,36,0.35);
+    color: var(--gold);
+  }
+  .ga-none {
+    font-family: 'Fira Code', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* ── AI Panel ── */
+  .ai-top-bar {
+    background: linear-gradient(135deg, rgba(167,139,250,0.06) 0%, rgba(52,211,153,0.06) 100%);
+    border: 1px solid rgba(167,139,250,0.15);
+    border-radius: 14px;
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .ai-top-left { display: flex; flex-direction: column; gap: 3px; }
+  .ai-eyebrow {
+    font-family: 'Fira Code', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, var(--odd), var(--even));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    opacity: 0.85;
+  }
+  .ai-top-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
+  }
+  .ai-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, var(--odd2) 0%, var(--even2) 100%);
+    color: #fff;
+    font-family: 'Fira Code', monospace;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 22px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    box-shadow: 0 0 24px rgba(124,58,237,0.25);
+    white-space: nowrap;
+  }
+  .ai-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 0 40px rgba(124,58,237,0.45);
+  }
+  .ai-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+  .ai-thinking {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 0 4px;
+    font-family: 'Fira Code', monospace;
+    font-size: 12px;
+    color: rgba(167,139,250,0.7);
+    letter-spacing: 1px;
+  }
+  .ai-thinking.visible { display: flex; }
+  .ai-dots span {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--odd);
+    margin: 0 2px;
+    animation: dotBounce 1.2s infinite;
+  }
+  .ai-dots span:nth-child(2) { animation-delay: 0.2s; background: #c4b5fd; }
+  .ai-dots span:nth-child(3) { animation-delay: 0.4s; background: var(--even); }
+  @keyframes dotBounce {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+
+  .ai-output {
+    display: none;
+    margin-top: 18px;
+    border-top: 1px solid rgba(167,139,250,0.12);
+    padding-top: 18px;
+  }
+  .ai-output.visible { display: block; }
+  .ai-narrative {
+    background: var(--s2);
+    border: 1px solid rgba(167,139,250,0.12);
+    border-left: 3px solid;
+    border-image: linear-gradient(to bottom, var(--odd), var(--even)) 1;
+    border-radius: 0 10px 10px 0;
+    padding: 18px 20px;
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--text);
+    white-space: pre-wrap;
+  }
+  .ai-error {
+    margin-top: 14px;
+    background: rgba(244,63,94,0.08);
+    border: 1px solid rgba(244,63,94,0.25);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #ff8aaa;
+    display: none;
+  }
+</style>
+
+<div id="oe-page">
+
+  <!-- Hero -->
+  <div class="oe-hero">
+    <p class="oe-hero-eyebrow">◑ Duality Analysis · Last 6 Months</p>
+    <h1>Odd / Even Trends</h1>
+    <p>How white ball draws split between odd and even numbers — and what the rolling pattern reveals about the next draw.</p>
+  </div>
+
+  <div class="oe-wrap">
+
     {% if odd_even_trends %}
-        <div class="overflow-x-auto">
-            <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
-                <thead class="bg-gray-100">
-                    <tr>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Draw Date</th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Odd/Even Split</th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">WB Sum</th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Group A Numbers</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for trend in odd_even_trends %}
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ trend.draw_date }}</td>
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ trend.split_category }}</td>
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ trend.wb_sum }}</td>
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
-                            {% if trend.group_a_numbers %}
-                                {{ trend.group_a_numbers | join(', ') }}
-                            {% else %}
-                                None
-                            {% endif %}
-                        </td>
-                    </tr>
+
+    <!-- Legend -->
+    <div class="duality-legend">
+      <div class="legend-pill"><span class="legend-dot dot-odd"></span><span style="color:var(--odd)">Odd</span></div>
+      <div class="legend-pill" style="color:var(--muted);font-size:10px">5 white balls per draw</div>
+      <div class="legend-pill"><span class="legend-dot dot-even"></span><span style="color:var(--even)">Even</span></div>
+    </div>
+
+    <!-- Summary stats + chart card -->
+    <div class="oe-card">
+      <p class="oe-card-title">Pattern Overview</p>
+      <p class="oe-card-sub">Aggregated from {{ odd_even_trends|length }} draws in the last 6 months</p>
+
+      <div class="stats-row" id="statsRow">
+        <div class="stat-chip">
+          <p class="sc-label">Most Common Split</p>
+          <p class="sc-value" id="scTopSplit" style="color:var(--odd)">—</p>
+          <p class="sc-note" id="scTopNote">—</p>
+        </div>
+        <div class="stat-chip">
+          <p class="sc-label">Odd-Heavy Draws</p>
+          <p class="sc-value" id="scOddHeavy" style="color:var(--odd)">—</p>
+          <p class="sc-note">3+ odd balls</p>
+        </div>
+        <div class="stat-chip">
+          <p class="sc-label">Even-Heavy Draws</p>
+          <p class="sc-value" id="scEvenHeavy" style="color:var(--even)">—</p>
+          <p class="sc-note">3+ even balls</p>
+        </div>
+        <div class="stat-chip">
+          <p class="sc-label">Avg WB Sum</p>
+          <p class="sc-value" id="scAvgSum" style="color:var(--gold)">—</p>
+          <p class="sc-note">Last 6 months</p>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <canvas id="splitDistChart"></canvas>
+      </div>
+    </div>
+
+    <!-- AI Panel -->
+    <div class="oe-card">
+      <div class="ai-top-bar">
+        <div class="ai-top-left">
+          <span class="ai-eyebrow">✦ Groq AI · llama-3.1-8b-instant</span>
+          <p class="ai-top-title">Odd/Even Pattern Analysis</p>
+        </div>
+        <button class="ai-btn" id="aiBtn">
+          <span>◈</span> Analyse Trends
+        </button>
+      </div>
+
+      <div class="ai-thinking" id="aiThinking">
+        <div class="ai-dots"><span></span><span></span><span></span></div>
+        Reading split patterns…
+      </div>
+      <div class="ai-output" id="aiOutput">
+        <div class="ai-narrative" id="aiNarrative"></div>
+      </div>
+      <div class="ai-error" id="aiError"></div>
+    </div>
+
+    <!-- Main table card -->
+    <div class="oe-card">
+      <p class="oe-card-title">Draw-by-Draw Breakdown</p>
+      <p class="oe-card-sub">Last 6 months — each draw's split, sum, and Group A appearances</p>
+
+      <div class="oe-table-wrap">
+        <table class="oe-table">
+          <thead>
+            <tr>
+              <th>Draw Date</th>
+              <th>Odd / Even Split</th>
+              <th>WB Sum</th>
+              <th>Group A Numbers</th>
+            </tr>
+          </thead>
+          <tbody id="oeTableBody">
+            {% for trend in odd_even_trends %}
+            <tr>
+              <td class="td-date">{{ trend.draw_date }}</td>
+              <td>
+                <div class="split-wrap">
+                  <div class="split-bar">
+                    <div class="split-odd-seg"  style="width:{{ (trend.split_category.split(' Odd')[0] | int / 5 * 100) if ' Odd' in trend.split_category else 0 }}%"></div>
+                    <div class="split-even-seg" style="width:{{ (trend.split_category.split('/ ')[1].split(' Even')[0] | int / 5 * 100) if '/ ' in trend.split_category and ' Even' in trend.split_category else 0 }}%"></div>
+                  </div>
+                  <span class="split-badge
+                    {% set sc = trend.split_category %}
+                    {% if '5 Odd' in sc %}badge-5o
+                    {% elif '4 Odd' in sc %}badge-4o
+                    {% elif '3 Odd' in sc %}badge-3o
+                    {% elif '3 Even' in sc %}badge-3e
+                    {% elif '4 Even' in sc %}badge-4e
+                    {% elif '5 Even' in sc %}badge-5e
+                    {% else %}badge-3o{% endif %}
+                  ">{{ trend.split_category }}</span>
+                </div>
+              </td>
+              <td><span class="sum-badge">{{ trend.wb_sum }}</span></td>
+              <td>
+                {% if trend.group_a_numbers %}
+                  <div class="ga-wrap">
+                    {% for n in trend.group_a_numbers %}
+                      <span class="ga-badge">{{ n }}</span>
                     {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                  </div>
+                {% else %}
+                  <span class="ga-none">— none</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     {% else %}
-        <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
-            No odd/even split trend data available for the last 6 months.
-        </div>
+      <div class="oe-card" style="text-align:center;padding:48px">
+        <p style="font-size:32px;margin-bottom:12px">◑</p>
+        <p style="color:var(--muted);font-size:14px">No odd/even trend data available for the last 6 months.</p>
+      </div>
     {% endif %}
-</div>
+
+  </div><!-- /oe-wrap -->
+</div><!-- /oe-page -->
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+  const trends = {{ odd_even_trends | tojson }};
+  if (!trends || !trends.length) return;
+
+  // ── Build split frequency map ──────────────────────────────
+  const splitCount = {};
+  let oddHeavy = 0, evenHeavy = 0, sumTotal = 0;
+
+  trends.forEach(t => {
+    splitCount[t.split_category] = (splitCount[t.split_category] || 0) + 1;
+
+    const sc = t.split_category || '';
+    const oddNum = parseInt(sc.split(' Odd')[0]) || 0;
+    if (oddNum >= 3) oddHeavy++;
+    if ((5 - oddNum) >= 3) evenHeavy++;
+
+    sumTotal += (parseInt(t.wb_sum) || 0);
+  });
+
+  const avgSum = Math.round(sumTotal / trends.length);
+
+  // Top split
+  const topSplit = Object.entries(splitCount).sort((a, b) => b[1] - a[1])[0];
+
+  // Populate stat chips
+  document.getElementById('scTopSplit').textContent  = topSplit[0];
+  document.getElementById('scTopNote').textContent   = `${topSplit[1]} of ${trends.length} draws`;
+  document.getElementById('scOddHeavy').textContent  = oddHeavy;
+  document.getElementById('scEvenHeavy').textContent = evenHeavy;
+  document.getElementById('scAvgSum').textContent    = avgSum;
+
+  // ── Chart: split distribution ─────────────────────────────
+  const orderedSplits = [
+    '5 Odd / 0 Even', '4 Odd / 1 Even', '3 Odd / 2 Even',
+    '2 Odd / 3 Even', '1 Odd / 4 Even', '0 Odd / 5 Even'
+  ];
+
+  const chartLabels = orderedSplits.filter(s => splitCount[s] !== undefined || true);
+  const chartData   = chartLabels.map(s => splitCount[s] || 0);
+
+  // Color gradient: violet → mixed → emerald
+  const barColors = [
+    'rgba(167,139,250,0.85)',
+    'rgba(167,139,250,0.65)',
+    'rgba(190,175,250,0.55)',
+    'rgba(100,220,180,0.55)',
+    'rgba(52,211,153,0.65)',
+    'rgba(52,211,153,0.85)',
+  ];
+
+  const ctx = document.getElementById('splitDistChart');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: chartLabels,
+      datasets: [{
+        data: chartData,
+        backgroundColor: barColors,
+        borderColor: barColors.map(c => c.replace('0.85','1').replace('0.65','1').replace('0.55','1')),
+        borderWidth: 1,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 700, easing: 'easeOutQuart' },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.03)' },
+          ticks: { color: 'rgba(255,255,255,0.4)', font: { family: 'Fira Code', size: 10 } }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 10 }, stepSize: 1 },
+          beginAtZero: true,
+          title: { display: true, text: 'Number of Draws', color: 'rgba(255,255,255,0.3)', font: { size: 10 } }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f0f1a',
+          borderColor: 'rgba(167,139,250,0.3)',
+          borderWidth: 1,
+          titleColor: '#a78bfa',
+          bodyColor: 'rgba(255,255,255,0.7)',
+          padding: 12,
+          callbacks: {
+            label: item => ` ${item.raw} draw${item.raw !== 1 ? 's' : ''}`
+          }
+        }
+      }
+    }
+  });
+
+  // ── AI Analysis ───────────────────────────────────────────
+  document.getElementById('aiBtn').addEventListener('click', async function () {
+    const btn      = this;
+    const thinking = document.getElementById('aiThinking');
+    const output   = document.getElementById('aiOutput');
+    const narrative= document.getElementById('aiNarrative');
+    const errorEl  = document.getElementById('aiError');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Thinking…';
+    thinking.classList.add('visible');
+    output.classList.remove('visible');
+    errorEl.style.display = 'none';
+    narrative.textContent = '';
+
+    try {
+      const res  = await fetch('/api/odd-even-ai-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trends:      trends,
+          split_count: splitCount,
+          odd_heavy:   oddHeavy,
+          even_heavy:  evenHeavy,
+          avg_sum:     avgSum,
+          total_draws: trends.length
+        })
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        errorEl.textContent = 'AI analysis unavailable: ' + data.error;
+        errorEl.style.display = 'block';
+      } else {
+        narrative.textContent = data.analysis;
+        output.classList.add('visible');
+      }
+    } catch (err) {
+      errorEl.textContent = 'Request failed. Please try again.';
+      errorEl.style.display = 'block';
+    } finally {
+      thinking.classList.remove('visible');
+      btn.disabled = false;
+      btn.innerHTML = '<span>◈</span> Analyse Trends';
+    }
+  });
+
+});
+</script>
 {% endblock %}
