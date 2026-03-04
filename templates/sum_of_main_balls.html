@@ -1,313 +1,974 @@
 {% extends "base.html" %}
 
-{% block title %}Sum of Main Balls Analysis{% endblock %}
-
-{% block page_heading %}Sum of Main Balls Analysis{% endblock %}
+{% block title %}Sum Analysis — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
-<div class="space-y-8">
-    <div class="card p-6 bg-white rounded-lg shadow-lg">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Summary of White Ball Sums</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center">
-            <div class="bg-gray-100 p-4 rounded-lg">
-                <p class="text-sm font-semibold text-gray-600">Minimum Sum:</p>
-                <p class="text-2xl font-bold text-gray-900">{{ min_sum }}</p>
-            </div>
-            <div class="bg-gray-100 p-4 rounded-lg">
-                <p class="text-sm font-semibold text-gray-600">Maximum Sum:</p>
-                <p class="text-2xl font-bold text-gray-900">{{ max_sum }}</p>
-            </div>
-            <div class="bg-gray-100 p-4 rounded-lg">
-                <p class="text-sm font-semibold text-gray-600">Average Sum:</p>
-                <p class="text-2xl font-bold text-gray-900">{{ avg_sum }}</p>
-            </div>
-        </div>
-    </div>
-
-    <div class="card p-6 bg-white rounded-lg shadow-lg">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Distribution of White Ball Sums</h2>
-        <p class="text-gray-700 mb-4">Click on a bar to view historical draws for that specific sum.</p>
-        <div class="relative h-96 w-full">
-            <canvas id="sumFrequencyChart"></canvas>
-        </div>
-    </div>
-
-    <div class="card p-6 bg-white rounded-lg shadow-lg">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Historical Sum Data</h2>
-        <div id="filter-status" class="bg-blue-100 text-blue-700 p-3 rounded-md mb-4 hidden">
-            Displaying draws with sum: <span id="current-filtered-sum" class="font-bold"></span>
-            <button id="clear-filter-btn" class="ml-4 text-sm bg-blue-200 text-blue-800 px-3 py-1 rounded-full hover:bg-blue-300 transition duration-150">Show All Results</button>
-        </div>
-        
-        <div class="overflow-x-auto mb-4">
-            <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
-                <thead class="bg-gray-100">
-                    <tr>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150" data-sort-by="Draw Date" data-sort-dir="desc" id="draw-date-header">
-                            Draw Date
-                            <span class="sort-icon ml-1"></span>
-                        </th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">
-                            Numbers
-                        </th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">
-                            Powerball
-                        </th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150" data-sort-by="Sum" data-sort-dir="asc" id="sum-header">
-                            Sum
-                            <span class="sort-icon ml-1"></span>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody id="historical-sum-table-body">
-                    {# Data will be rendered here by JavaScript #}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
 <style>
-    /* Styles for sort icons */
-    .sort-icon {
-        display: inline-block;
-        width: 0;
-        height: 0;
-        vertical-align: middle;
-        margin-left: 0.25rem;
-    }
-    .sort-icon.asc {
-        border-left: 5px solid transparent;
-        border-right: 5px solid transparent;
-        border-bottom: 5px solid #6b7280; /* Gray-500 */
-    }
-    .sort-icon.desc {
-        border-left: 5px solid transparent;
-        border-right: 5px solid transparent;
-        border-top: 5px solid #6b7280; /* Gray-500 */
-    }
-    /* Small ball styling for table numbers (consistent with other pages) */
-    .ball-sm {
-        display: inline-flex;
-        justify-content: center;
-        align-items: center;
-        width: 30px; /* Smaller size */
-        height: 30px; /* Smaller size */
-        background-color: #f0f0f0;
-        border-radius: 50%;
-        border: 1px solid #ccc;
-        font-weight: bold;
-        color: #333;
-        margin: 2px;
-        font-size: 0.8em; /* Smaller font */
-        flex-shrink: 0;
-    }
-    .powerball-sm {
-        background-color: #ef4444; /* Red color for powerball */
-        color: white;
-        border-color: #dc2626;
-    }
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root {
+    --bg:        #08090f;
+    --surface:   #0f1120;
+    --surface2:  #161929;
+    --surface3:  #1c2135;
+    --border:    rgba(255,255,255,0.06);
+    --gold:      #f0b429;
+    --gold2:     #ffd97d;
+    --gold-dim:  rgba(240,180,41,0.12);
+    --teal:      #00c9b1;
+    --red:       #ff4f6d;
+    --muted:     rgba(255,255,255,0.4);
+    --text:      rgba(255,255,255,0.88);
+  }
+
+  #sum-page * { box-sizing: border-box; }
+  #sum-page {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    color: var(--text);
+    padding-bottom: 80px;
+  }
+
+  /* ── Hero ── */
+  .sum-hero {
+    position: relative;
+    padding: 56px 24px 44px;
+    text-align: center;
+    overflow: hidden;
+  }
+  .sum-hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 0%, rgba(240,180,41,0.08) 0%, transparent 65%),
+      radial-gradient(ellipse 40% 50% at 10% 60%, rgba(0,201,177,0.05) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  /* decorative sigma background */
+  .sum-hero::after {
+    content: 'Σ';
+    position: absolute;
+    top: -10px; right: 5%;
+    font-family: 'Playfair Display', serif;
+    font-size: 260px;
+    color: rgba(240,180,41,0.04);
+    pointer-events: none;
+    line-height: 1;
+    user-select: none;
+  }
+  .sum-hero-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 14px;
+    opacity: 0.85;
+  }
+  .sum-hero h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(42px, 6vw, 78px);
+    font-weight: 900;
+    line-height: 1.05;
+    margin: 0 0 16px;
+    background: linear-gradient(135deg, var(--gold2) 0%, var(--gold) 50%, #c87d00 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .sum-hero p {
+    font-size: 15px;
+    color: var(--muted);
+    max-width: 500px;
+    margin: 0 auto;
+    line-height: 1.7;
+  }
+
+  /* ── Layout ── */
+  .sum-wrap {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  /* ── Card ── */
+  .sum-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 32px;
+    position: relative;
+    overflow: hidden;
+  }
+  .sum-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    opacity: 0.35;
+  }
+
+  .sum-card-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 4px;
+  }
+  .sum-card-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 0 26px;
+  }
+
+  /* ── Stat Cards ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  @media (max-width: 640px) { .stats-grid { grid-template-columns: 1fr; } }
+
+  .stat-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px 20px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .stat-card:hover { border-color: rgba(240,180,41,0.3); transform: translateY(-2px); }
+  .stat-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 0 0 14px 14px;
+  }
+  .stat-card.min::after  { background: linear-gradient(90deg, var(--teal), transparent); }
+  .stat-card.max::after  { background: linear-gradient(90deg, var(--red), transparent); }
+  .stat-card.avg::after  { background: linear-gradient(90deg, var(--gold), transparent); }
+
+  .stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .stat-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 52px;
+    font-weight: 900;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .stat-card.min .stat-value { color: var(--teal); }
+  .stat-card.max .stat-value { color: var(--red); }
+  .stat-card.avg .stat-value { color: var(--gold); }
+  .stat-note {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* ── Chart Section ── */
+  .chart-hint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--gold);
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+    opacity: 0.8;
+  }
+  .chart-hint::before {
+    content: '↓';
+    font-size: 14px;
+  }
+
+  /* Zone markers below chart */
+  .zone-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 18px;
+    justify-content: center;
+  }
+  .zone-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+    border: 1px solid;
+    cursor: default;
+  }
+
+  /* ── Active Filter Banner ── */
+  #filter-status {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    background: var(--gold-dim);
+    border: 1px solid rgba(240,180,41,0.3);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: var(--gold2);
+  }
+  #filter-status.active { display: flex; }
+  #filter-status strong { font-family: 'Playfair Display', serif; font-size: 18px; }
+
+  .clear-btn {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: rgba(240,180,41,0.15);
+    border: 1px solid rgba(240,180,41,0.4);
+    color: var(--gold);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+  }
+  .clear-btn:hover { background: rgba(240,180,41,0.25); }
+
+  /* ── Table ── */
+  .table-scroll { overflow-x: auto; border-radius: 10px; }
+
+  table.sum-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 560px;
+  }
+  table.sum-table thead th {
+    background: var(--surface2);
+    padding: 13px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    user-select: none;
+  }
+  table.sum-table thead th.sortable { cursor: pointer; }
+  table.sum-table thead th.sortable:hover { color: var(--gold); }
+  table.sum-table thead th.sort-active { color: var(--gold); }
+
+  .sort-arrow {
+    display: inline-block;
+    margin-left: 5px;
+    opacity: 0.5;
+    font-size: 10px;
+  }
+  th.sort-active .sort-arrow { opacity: 1; color: var(--gold); }
+
+  table.sum-table tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  table.sum-table tbody tr:hover { background: var(--surface2); }
+  table.sum-table tbody tr:last-child { border-bottom: none; }
+
+  table.sum-table td {
+    padding: 11px 16px;
+    font-size: 13px;
+    color: var(--text);
+    vertical-align: middle;
+  }
+
+  /* date cell */
+  .date-cell {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* balls in table */
+  .balls-wrap { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  .tb {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.9) 0%, rgba(200,220,240,0.8) 40%, rgba(140,170,210,0.9) 100%);
+    color: #0b1929;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4), inset 0 1px 2px rgba(255,255,255,0.5);
+    flex-shrink: 0;
+  }
+  .tb.pb {
+    background: radial-gradient(circle at 35% 35%, #ff8a80 0%, #ef5350 45%, #b71c1c 100%);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(255,59,92,0.35), inset 0 1px 2px rgba(255,150,150,0.3);
+  }
+
+  /* sum badge in table */
+  .sum-badge {
+    display: inline-block;
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 8px;
+    background: var(--gold-dim);
+    color: var(--gold);
+    border: 1px solid rgba(240,180,41,0.25);
+  }
+  .sum-badge.zone-a { background: rgba(0,201,177,0.1); color: var(--teal); border-color: rgba(0,201,177,0.3); }
+  .sum-badge.zone-bc { background: rgba(240,180,41,0.1); color: var(--gold); border-color: rgba(240,180,41,0.3); }
+  .sum-badge.zone-de { background: rgba(94,207,109,0.1); color: #5ecf6d; border-color: rgba(94,207,109,0.3); }
+  .sum-badge.zone-fg { background: rgba(255,79,109,0.1); color: var(--red); border-color: rgba(255,79,109,0.3); }
+
+  /* results count */
+  .table-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .table-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+  .table-count strong { color: var(--gold); }
+
+  /* chart container */
+  .chart-outer { height: 320px; position: relative; }
+
+  /* ── AI Panel ── */
+  .ai-card::before {
+    background: linear-gradient(90deg, transparent, #a78bfa, transparent);
+  }
+
+  .ai-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .ai-title-wrap { display: flex; flex-direction: column; gap: 4px; }
+  .ai-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #a78bfa;
+    opacity: 0.8;
+  }
+  .ai-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
+  }
+
+  /* Last draw mini-card inside AI panel */
+  .last-draw-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(167,139,250,0.08);
+    border: 1px solid rgba(167,139,250,0.2);
+    border-radius: 12px;
+    padding: 12px 16px;
+    flex-wrap: wrap;
+  }
+  .ldc-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(167,139,250,0.7);
+    white-space: nowrap;
+  }
+  .ldc-date {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+    white-space: nowrap;
+  }
+  .ldc-balls { display: flex; gap: 5px; flex-wrap: wrap; }
+  .ldc-sum {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: #a78bfa;
+    margin-left: 6px;
+    white-space: nowrap;
+  }
+
+  /* Analyse button */
+  .ai-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #7c3aed, #a78bfa);
+    color: #fff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 10px;
+    padding: 13px 24px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    box-shadow: 0 0 24px rgba(124,58,237,0.3);
+    white-space: nowrap;
+  }
+  .ai-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 0 40px rgba(124,58,237,0.5);
+  }
+  .ai-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .ai-btn-icon { font-size: 16px; }
+
+  /* Thinking indicator */
+  .ai-thinking {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 0 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: rgba(167,139,250,0.7);
+    letter-spacing: 1px;
+  }
+  .ai-thinking.visible { display: flex; }
+  .ai-dots span {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #a78bfa;
+    margin: 0 2px;
+    animation: dotBounce 1.2s infinite;
+  }
+  .ai-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .ai-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dotBounce {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+
+  /* AI output */
+  .ai-output {
+    display: none;
+    margin-top: 20px;
+    border-top: 1px solid rgba(167,139,250,0.15);
+    padding-top: 20px;
+  }
+  .ai-output.visible { display: block; }
+
+  .ai-section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #a78bfa;
+    margin-bottom: 14px;
+    opacity: 0.7;
+  }
+
+  /* Individual insight cards */
+  .ai-insights-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .ai-insight-card {
+    background: var(--surface2);
+    border: 1px solid rgba(167,139,250,0.15);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .ai-insight-icon { font-size: 20px; margin-bottom: 8px; }
+  .ai-insight-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(167,139,250,0.7);
+    margin-bottom: 6px;
+  }
+  .ai-insight-body {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.65;
+  }
+
+  /* Full narrative */
+  .ai-narrative {
+    background: var(--surface2);
+    border: 1px solid rgba(167,139,250,0.15);
+    border-left: 3px solid #a78bfa;
+    border-radius: 12px;
+    padding: 20px;
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--text);
+    white-space: pre-wrap;
+  }
+
+  .ai-error {
+    background: rgba(255,79,109,0.08);
+    border: 1px solid rgba(255,79,109,0.25);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 13px;
+    color: #ff8aaa;
+    margin-top: 16px;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .sum-card { padding: 22px 16px; }
+    .ai-header { flex-direction: column; align-items: flex-start; }
+  }
 </style>
 
+<div id="sum-page">
+
+  <!-- Hero -->
+  <div class="sum-hero">
+    <p class="sum-hero-eyebrow">∑ Statistical Analysis</p>
+    <h1>Sum of White Balls</h1>
+    <p>Every draw produces five white balls whose values sum to a number. Where does the distribution fall — and what does history reveal?</p>
+  </div>
+
+  <div class="sum-wrap">
+
+    <!-- Stats Row -->
+    <div class="stats-grid">
+      <div class="stat-card min">
+        <p class="stat-label">Minimum Sum</p>
+        <p class="stat-value">{{ min_sum }}</p>
+        <p class="stat-note">Lowest ever recorded</p>
+      </div>
+      <div class="stat-card avg">
+        <p class="stat-label">Average Sum</p>
+        <p class="stat-value">{{ avg_sum }}</p>
+        <p class="stat-note">Historical mean across all draws</p>
+      </div>
+      <div class="stat-card max">
+        <p class="stat-label">Maximum Sum</p>
+        <p class="stat-value">{{ max_sum }}</p>
+        <p class="stat-note">Highest ever recorded</p>
+      </div>
+    </div>
+
+    <!-- Chart Card -->
+    <div class="sum-card">
+      <p class="sum-card-title">Sum Distribution</p>
+      <p class="sum-card-sub">Frequency of each sum total across all historical draws.</p>
+      <p class="chart-hint">Click any bar to filter the table below by that sum</p>
+      <div class="chart-outer">
+        <canvas id="sumFrequencyChart"></canvas>
+      </div>
+      <div class="zone-legend" id="zoneLegend"></div>
+    </div>
+
+    <!-- AI Analysis Card -->
+    <div class="sum-card ai-card">
+      <div class="ai-header">
+        <div class="ai-title-wrap">
+          <span class="ai-eyebrow">✦ Groq AI · llama-3.1-8b-instant</span>
+          <p class="ai-title">Sum Intelligence Report</p>
+        </div>
+        <button class="ai-btn" id="aiAnalyseBtn">
+          <span class="ai-btn-icon">◈</span>
+          Analyse Last Draw
+        </button>
+      </div>
+
+      <!-- Last draw preview -->
+      <div class="last-draw-chip" id="lastDrawChip">
+        <span class="ldc-label">Last Draw</span>
+        <span class="ldc-date" id="ldcDate">—</span>
+        <div class="ldc-balls" id="ldcBalls"></div>
+        <span class="ldc-sum" id="ldcSum">—</span>
+      </div>
+
+      <!-- Thinking -->
+      <div class="ai-thinking" id="aiThinking">
+        <div class="ai-dots"><span></span><span></span><span></span></div>
+        Analysing draw pattern…
+      </div>
+
+      <!-- Output -->
+      <div class="ai-output" id="aiOutput">
+        <p class="ai-section-label">Analysis</p>
+        <div class="ai-narrative" id="aiNarrative"></div>
+      </div>
+
+      <div class="ai-error" id="aiError" style="display:none"></div>
+    </div>
+
+    <!-- Table Card -->
+    <div class="sum-card">
+      <p class="sum-card-title">Historical Draws</p>
+      <p class="sum-card-sub">Full draw history with sum values. Click column headers to sort.</p>
+
+      <!-- Active filter banner -->
+      <div id="filter-status">
+        <span>Filtered to sum</span>
+        <strong id="current-filtered-sum"></strong>
+        <button class="clear-btn" id="clear-filter-btn">✕ Clear Filter</button>
+      </div>
+
+      <!-- Table meta -->
+      <div class="table-meta">
+        <p class="table-count">Showing <strong id="rowCount">0</strong> draws</p>
+      </div>
+
+      <div class="table-scroll">
+        <table class="sum-table">
+          <thead>
+            <tr>
+              <th class="sortable" id="draw-date-header" data-sort-by="Draw Date" data-sort-dir="desc">
+                Draw Date <span class="sort-arrow" id="arrow-date">↓</span>
+              </th>
+              <th>Numbers</th>
+              <th>Powerball</th>
+              <th class="sortable" id="sum-header" data-sort-by="Sum" data-sort-dir="asc">
+                Sum <span class="sort-arrow" id="arrow-sum">↕</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="historical-sum-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /sum-wrap -->
+</div><!-- /sum-page -->
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const sumFreqData = {{ sum_freq_json | safe }};
-        // Parse the JSON data passed from Flask. This contains all historical draws with their sums.
-        const allDrawsWithSum = {{ sums_data | tojson }}; 
+document.addEventListener('DOMContentLoaded', function () {
 
-        let currentFilteredData = [...allDrawsWithSum]; // Initially, all data is "filtered" (i.e., shown)
-        let currentSortBy = 'Draw Date'; // Default initial sort for the table
-        let currentSortDir = 'desc';    // Default initial direction for draw date
-        let currentFilterSum = null;    // Stores the currently active sum filter
+  // ── Data from Flask ────────────────────────────────────────
+  const sumFreqData    = {{ sum_freq_json | safe }};
+  const allDraws       = {{ sums_data | tojson }};
 
-        const historicalSumTableBody = document.getElementById('historical-sum-table-body');
-        const drawDateHeader = document.getElementById('draw-date-header');
-        const sumHeader = document.getElementById('sum-header');
-        const filterStatusDiv = document.getElementById('filter-status');
-        const currentFilteredSumSpan = document.getElementById('current-filtered-sum');
-        const clearFilterBtn = document.getElementById('clear-filter-btn');
+  // ── State ─────────────────────────────────────────────────
+  let sortBy     = 'Draw Date';
+  let sortDir    = 'desc';
+  let filterSum  = null;
 
-        // Function to render the historical sums table
-        function renderHistoricalSumTable(data) {
-            historicalSumTableBody.innerHTML = ''; // Clear existing rows
-            if (!data || data.length === 0) {
-                const noDataRow = document.createElement('tr');
-                noDataRow.innerHTML = `<td colspan="4" class="px-4 py-2 text-center text-gray-600">No matching draws found.</td>`;
-                historicalSumTableBody.appendChild(noDataRow);
-                return;
-            }
+  // ── DOM refs ──────────────────────────────────────────────
+  const tbody         = document.getElementById('historical-sum-table-body');
+  const filterBanner  = document.getElementById('filter-status');
+  const filteredLabel = document.getElementById('current-filtered-sum');
+  const clearBtn      = document.getElementById('clear-filter-btn');
+  const rowCountEl    = document.getElementById('rowCount');
+  const dateHeader    = document.getElementById('draw-date-header');
+  const sumHeaderEl   = document.getElementById('sum-header');
 
-            data.forEach(draw => {
-                const row = document.createElement('tr');
-                row.className = 'hover:bg-gray-50';
-                // Construct white ball spans dynamically
-                const whiteBallsHtml = `
-                    <span class="ball-sm">${draw['Number 1']}</span>
-                    <span class="ball-sm">${draw['Number 2']}</span>
-                    <span class="ball-sm">${draw['Number 3']}</span>
-                    <span class="ball-sm">${draw['Number 4']}</span>
-                    <span class="ball-sm">${draw['Number 5']}</span>
-                `;
-                row.innerHTML = `
-                    <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${draw['Draw Date']}</td>
-                    <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900 flex flex-wrap -m-1">${whiteBallsHtml}</td>
-                    <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900"><span class="ball-sm powerball-sm">${draw.Powerball}</span></td>
-                    <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${draw.Sum}</td>
-                `;
-                historicalSumTableBody.appendChild(row);
-            });
-        }
+  // ── Zone color helper ─────────────────────────────────────
+  function zoneClass(sum) {
+    if (sum < 100)        return 'zone-a';
+    if (sum < 160)        return 'zone-bc';
+    if (sum < 220)        return 'zone-de';
+    return 'zone-fg';
+  }
+  function zoneColor(sum) {
+    if (sum < 100)  return 'rgba(0,201,177,';
+    if (sum < 160)  return 'rgba(240,180,41,';
+    if (sum < 220)  return 'rgba(94,207,109,';
+    return 'rgba(255,79,109,';
+  }
 
-        // Function to update sort icons in headers
-        function updateSortIcons() {
-            // Reset all icons
-            document.querySelectorAll('#draw-date-header .sort-icon, #sum-header .sort-icon').forEach(icon => {
-                icon.classList.remove('asc', 'desc');
-            });
+  // ── Render table ──────────────────────────────────────────
+  function renderTable(data) {
+    tbody.innerHTML = '';
+    rowCountEl.textContent = data.length;
 
-            // Update icon for the currently sorted column
-            const currentHeader = document.getElementById(currentSortBy === 'Draw Date' ? 'draw-date-header' : 'sum-header');
-            if (currentHeader) {
-                const icon = currentHeader.querySelector('.sort-icon');
-                if (icon) {
-                    icon.classList.add(currentSortDir);
-                }
-            }
-        }
+    if (!data.length) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">No draws match this filter.</td></tr>`;
+      return;
+    }
 
-        // Function to filter and sort data, then re-render table
-        function filterAndSortTable(targetSum = null) {
-            currentFilterSum = targetSum; // Update the current filter state
+    const frag = document.createDocumentFragment();
+    data.forEach(draw => {
+      const tr = document.createElement('tr');
 
-            // Filter data
-            let dataToRender = allDrawsWithSum;
-            if (currentFilterSum !== null) {
-                dataToRender = allDrawsWithSum.filter(draw => draw.Sum === currentFilterSum);
-                filterStatusDiv.classList.remove('hidden');
-                currentFilteredSumSpan.textContent = currentFilterSum;
-            } else {
-                filterStatusDiv.classList.add('hidden');
-                currentFilteredSumSpan.textContent = '';
-            }
-            
-            // Sort data
-            dataToRender.sort((a, b) => {
-                let valA, valB;
+      const ballsHtml = [1,2,3,4,5]
+        .map(i => `<span class="tb">${draw['Number ' + i]}</span>`)
+        .join('');
 
-                if (currentSortBy === 'Draw Date') {
-                    // Convert date strings to Date objects for proper comparison
-                    valA = new Date(a['Draw Date']);
-                    valB = new Date(b['Draw Date']);
-                } else if (currentSortBy === 'Sum') {
-                    valA = a.Sum;
-                    valB = b.Sum;
-                }
+      const zc = zoneClass(draw.Sum);
 
-                if (valA < valB) {
-                    return currentSortDir === 'asc' ? -1 : 1;
-                }
-                if (valA > valB) {
-                    return currentSortDir === 'asc' ? 1 : -1;
-                }
-                return 0;
-            });
-
-            currentFilteredData = dataToRender; // Update the data that's currently displayed
-            renderHistoricalSumTable(currentFilteredData);
-            updateSortIcons();
-        }
-
-        // Event Listeners for table headers
-        drawDateHeader.addEventListener('click', function() {
-            if (currentSortBy === 'Draw Date') {
-                currentSortDir = (currentSortDir === 'asc' ? 'desc' : 'asc');
-            } else {
-                currentSortBy = 'Draw Date';
-                currentSortDir = 'desc'; // Default to descending for dates (newest first)
-            }
-            filterAndSortTable(currentFilterSum); // Re-filter and sort with existing filter
-        });
-
-        sumHeader.addEventListener('click', function() {
-            if (currentSortBy === 'Sum') {
-                currentSortDir = (currentSortDir === 'asc' ? 'desc' : 'asc');
-            } else {
-                currentSortBy = 'Sum';
-                currentSortDir = 'asc'; // Default to ascending for sums
-            }
-            filterAndSortTable(currentFilterSum); // Re-filter and sort with existing filter
-        });
-
-        // Event listener for clear filter button
-        clearFilterBtn.addEventListener('click', function() {
-            filterAndSortTable(null); // Clear the filter
-            currentSortBy = 'Draw Date'; // Reset sort to default
-            currentSortDir = 'desc';
-            updateSortIcons();
-        });
-
-
-        // --- Chart.js for Sum Frequency ---
-        if (sumFreqData && sumFreqData.length > 0) {
-            const labels = sumFreqData.map(d => d.sum);
-            const data = sumFreqData.map(d => d.count);
-
-            const ctx = document.getElementById('sumFrequencyChart');
-            if (ctx) {
-                new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Frequency',
-                            data: data,
-                            backgroundColor: 'rgba(75, 192, 192, 0.6)', // Teal-like color
-                            borderColor: 'rgba(75, 192, 192, 1)',
-                            borderWidth: 1
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                title: {
-                                    display: true,
-                                    text: 'Number of Draws'
-                                }
-                            }
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Sum of White Balls'
-                            }
-                        },
-                        plugins: {
-                            legend: {
-                                display: false
-                            },
-                            tooltip: {
-                                mode: 'index',
-                                intersect: false
-                            }
-                        },
-                        // Add onClick event handler for chart bars
-                        onClick: (event, elements) => {
-                            if (elements.length > 0) {
-                                const clickedIndex = elements[0].index;
-                                const selectedSum = labels[clickedIndex];
-                                filterAndSortTable(selectedSum); // Filter table by selected sum
-                            }
-                        }
-                    }
-                });
-            }
-        }
-        
-        // Initial render of the historical sum table with default sort (Draw Date Desc)
-        filterAndSortTable(null); // Call with null to show all data initially
+      tr.innerHTML = `
+        <td class="date-cell">${draw['Draw Date']}</td>
+        <td><div class="balls-wrap">${ballsHtml}</div></td>
+        <td><span class="tb pb">${draw.Powerball}</span></td>
+        <td><span class="sum-badge ${zc}">${draw.Sum}</span></td>
+      `;
+      frag.appendChild(tr);
     });
+    tbody.appendChild(frag);
+  }
+
+  // ── Sort + filter pipeline ────────────────────────────────
+  function refresh(newFilter) {
+    if (newFilter !== undefined) filterSum = newFilter;
+
+    // Filter
+    let data = filterSum !== null
+      ? allDraws.filter(d => d.Sum === filterSum)
+      : [...allDraws];
+
+    // Sort
+    data.sort((a, b) => {
+      let va = sortBy === 'Draw Date' ? new Date(a['Draw Date']) : a.Sum;
+      let vb = sortBy === 'Draw Date' ? new Date(b['Draw Date']) : b.Sum;
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ?  1 : -1;
+      return 0;
+    });
+
+    // Banner
+    if (filterSum !== null) {
+      filterBanner.classList.add('active');
+      filteredLabel.textContent = filterSum;
+    } else {
+      filterBanner.classList.remove('active');
+    }
+
+    // Sort arrows
+    document.getElementById('arrow-date').textContent =
+      sortBy === 'Draw Date' ? (sortDir === 'desc' ? '↓' : '↑') : '↕';
+    document.getElementById('arrow-sum').textContent =
+      sortBy === 'Sum' ? (sortDir === 'desc' ? '↓' : '↑') : '↕';
+
+    dateHeader.classList.toggle('sort-active', sortBy === 'Draw Date');
+    sumHeaderEl.classList.toggle('sort-active', sortBy === 'Sum');
+
+    renderTable(data);
+  }
+
+  // ── Header click handlers ─────────────────────────────────
+  dateHeader.addEventListener('click', () => {
+    if (sortBy === 'Draw Date') sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    else { sortBy = 'Draw Date'; sortDir = 'desc'; }
+    refresh();
+  });
+  sumHeaderEl.addEventListener('click', () => {
+    if (sortBy === 'Sum') sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    else { sortBy = 'Sum'; sortDir = 'asc'; }
+    refresh();
+  });
+
+  clearBtn.addEventListener('click', () => {
+    sortBy = 'Draw Date'; sortDir = 'desc';
+    refresh(null);
+  });
+
+  // ── Chart ─────────────────────────────────────────────────
+  if (sumFreqData && sumFreqData.length > 0) {
+    const labels = sumFreqData.map(d => d.sum);
+    const counts = sumFreqData.map(d => d.count);
+    const maxCount = Math.max(...counts);
+
+    // Dynamic bar colors by sum zone with brightness by frequency
+    const bgColors = labels.map((sum, i) => {
+      const base = zoneColor(sum);
+      const alpha = 0.25 + 0.65 * (counts[i] / maxCount);
+      return base + alpha + ')';
+    });
+    const borderColors = labels.map(sum => zoneColor(sum) + '0.9)');
+
+    const ctx = document.getElementById('sumFrequencyChart');
+    const chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          data: counts,
+          backgroundColor: bgColors,
+          borderColor: borderColors,
+          borderWidth: 1,
+          borderRadius: 3,
+          hoverBackgroundColor: labels.map(sum => zoneColor(sum) + '0.95)'),
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 500 },
+        scales: {
+          x: {
+            grid: { color: 'rgba(255,255,255,0.03)' },
+            ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 9 }, maxTicksLimit: 20 },
+            title: { display: true, text: 'Sum of White Balls', color: 'rgba(255,255,255,0.3)', font: { size: 11 } }
+          },
+          y: {
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 10 } },
+            beginAtZero: true,
+            title: { display: true, text: 'Number of Draws', color: 'rgba(255,255,255,0.3)', font: { size: 11 } }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#0f1120',
+            borderColor: 'rgba(240,180,41,0.3)',
+            borderWidth: 1,
+            titleColor: '#f0b429',
+            bodyColor: 'rgba(255,255,255,0.7)',
+            padding: 12,
+            callbacks: {
+              title: items => `Sum: ${items[0].label}`,
+              label: item => `${item.raw} draws  (click to filter)`
+            }
+          }
+        },
+        onClick: (event, elements) => {
+          if (elements.length > 0) {
+            const sum = labels[elements[0].index];
+            sortBy = 'Draw Date'; sortDir = 'desc';
+            refresh(sum);
+            // Scroll to table
+            document.querySelector('.sum-table').scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        },
+        onHover: (event, elements) => {
+          event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+        }
+      }
+    });
+
+    // ── Zone legend ───────────────────────────────────────
+    const zones = [
+      { label: '< 100  Low Zone',    cls: 'zone-a',  col: 'rgba(0,201,177,0.7)'  },
+      { label: '100–159  Mid-Low',   cls: 'zone-bc', col: 'rgba(240,180,41,0.7)' },
+      { label: '160–219  Mid-High',  cls: 'zone-de', col: 'rgba(94,207,109,0.7)' },
+      { label: '220+  High Zone',    cls: 'zone-fg', col: 'rgba(255,79,109,0.7)' },
+    ];
+    const legendEl = document.getElementById('zoneLegend');
+    zones.forEach(z => {
+      const pill = document.createElement('span');
+      pill.className = 'zone-pill';
+      pill.textContent = z.label;
+      pill.style.borderColor = z.col;
+      pill.style.color = z.col;
+      pill.style.background = z.col.replace('0.7)', '0.08)');
+      legendEl.appendChild(pill);
+    });
+  }
+
+  // ── Initial render ────────────────────────────────────────
+  refresh(null);
+
+  // ── AI Panel ──────────────────────────────────────────────
+  const lastDraw = {{ last_draw | tojson }};
+
+  // Populate last draw chip
+  (function populateChip() {
+    if (!lastDraw || !lastDraw['Draw Date']) return;
+
+    document.getElementById('ldcDate').textContent = lastDraw['Draw Date'];
+
+    const ballsWrap = document.getElementById('ldcBalls');
+    [1,2,3,4,5].forEach(i => {
+      const b = document.createElement('span');
+      b.className = 'tb';
+      b.style.cssText = 'width:28px;height:28px;font-size:10px';
+      b.textContent = lastDraw['Number ' + i];
+      ballsWrap.appendChild(b);
+    });
+    const pb = document.createElement('span');
+    pb.className = 'tb pb';
+    pb.style.cssText = 'width:28px;height:28px;font-size:10px';
+    pb.textContent = lastDraw['Powerball'];
+    ballsWrap.appendChild(pb);
+
+    // Calculate sum for display
+    const drawSum = [1,2,3,4,5].reduce((acc, i) => acc + (parseInt(lastDraw['Number ' + i]) || 0), 0);
+    const sumEl = document.getElementById('ldcSum');
+    sumEl.textContent = 'Σ ' + drawSum;
+  })();
+
+  document.getElementById('aiAnalyseBtn').addEventListener('click', async function () {
+    const btn       = this;
+    const thinking  = document.getElementById('aiThinking');
+    const output    = document.getElementById('aiOutput');
+    const narrative = document.getElementById('aiNarrative');
+    const errorEl   = document.getElementById('aiError');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="ai-btn-icon">⏳</span> Thinking…';
+    thinking.classList.add('visible');
+    output.classList.remove('visible');
+    errorEl.style.display = 'none';
+    narrative.textContent = '';
+
+    try {
+      const res  = await fetch('/api/sum-ai-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          last_draw:  lastDraw,
+          min_sum:    {{ min_sum }},
+          max_sum:    {{ max_sum }},
+          avg_sum:    {{ avg_sum }},
+          sum_freq:   sumFreqData,
+          recent_sums: allDraws.slice(0, 10).map(d => d.Sum)
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.error) {
+        errorEl.textContent = 'AI analysis unavailable: ' + data.error;
+        errorEl.style.display = 'block';
+      } else {
+        narrative.textContent = data.analysis;
+        output.classList.add('visible');
+      }
+    } catch (err) {
+      errorEl.textContent = 'Request failed. Please try again.';
+      errorEl.style.display = 'block';
+    } finally {
+      thinking.classList.remove('visible');
+      btn.disabled = false;
+      btn.innerHTML = '<span class="ai-btn-icon">◈</span> Analyse Last Draw';
+    }
+  });
+});
 </script>
 {% endblock %}
