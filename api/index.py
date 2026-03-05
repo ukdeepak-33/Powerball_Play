@@ -7678,6 +7678,177 @@ Be specific — reference actual pair numbers and counts throughout."""
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+# ── Paste into index.py with your other API routes ───────────────────────────
+
+@app.route('/api/age-distribution-ai-analysis', methods=['POST'])
+def age_distribution_ai_analysis():
+    try:
+        payload        = request.get_json()
+        top_wb         = payload.get('top_overdue_wb', [])
+        top_pb         = payload.get('top_overdue_pb', [])
+        max_wb_age     = payload.get('max_wb_age', 0)
+        max_pb_age     = payload.get('max_pb_age', 0)
+        total_wb       = payload.get('total_wb', 69)
+        total_pb       = payload.get('total_pb', 26)
+
+        if not top_wb and not top_pb:
+            return jsonify({'error': 'No age data provided'}), 400
+
+        total_draws = len(df) if not df.empty else 1
+        wb_cols     = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']
+
+        # ── Compute avg gap between appearances for top overdue WB ──
+        def avg_gap(number, is_pb=False):
+            """Compute average number of draws between appearances."""
+            if df.empty:
+                return None
+            appearances = []
+            if is_pb:
+                if 'Powerball' in df.columns:
+                    appearances = df.index[df['Powerball'] == number].tolist()
+            else:
+                for col in wb_cols:
+                    if col in df.columns:
+                        appearances += df.index[df[col] == number].tolist()
+                appearances = sorted(set(appearances))
+            if len(appearances) < 2:
+                return None
+            gaps = [appearances[i+1] - appearances[i] for i in range(len(appearances)-1)]
+            return round(sum(gaps) / len(gaps), 1)
+
+        # Enrich top WB with avg gap
+        wb_enriched = []
+        for b in top_wb[:8]:
+            gap = avg_gap(b['number'], is_pb=False)
+            wb_enriched.append({
+                'number':         b['number'],
+                'age':            b['age'],
+                'last_drawn':     b.get('last_drawn_date', 'N/A'),
+                'avg_annual_freq':b.get('avg_annual_freq', 0),
+                'avg_gap':        gap,
+                'overdue_by':     round(b['age'] - gap, 1) if gap else None,
+            })
+
+        pb_enriched = []
+        for b in top_pb[:5]:
+            gap = avg_gap(b['number'], is_pb=True)
+            pb_enriched.append({
+                'number':         b['number'],
+                'age':            b['age'],
+                'last_drawn':     b.get('last_drawn_date', 'N/A'),
+                'avg_annual_freq':b.get('avg_annual_freq', 0),
+                'avg_gap':        gap,
+                'overdue_by':     round(b['age'] - gap, 1) if gap else None,
+            })
+
+        # ── Build suggestions ──────────────────────────────────
+        # Best WB pick: most overdue AND avg_gap confirms it's overdue
+        wb_suggestions = sorted(
+            [b for b in wb_enriched if b['overdue_by'] and b['overdue_by'] > 0],
+            key=lambda b: -(b['overdue_by'] or 0)
+        )
+        # Top 3 WB picks
+        top3_wb = wb_suggestions[:3] if wb_suggestions else wb_enriched[:3]
+
+        # Best PB pick
+        pb_suggestion = sorted(
+            [b for b in pb_enriched if b['overdue_by'] and b['overdue_by'] > 0],
+            key=lambda b: -(b['overdue_by'] or 0)
+        )
+        top1_pb = pb_suggestion[0] if pb_suggestion else (pb_enriched[0] if pb_enriched else None)
+
+        suggestions = []
+        for b in top3_wb:
+            suggestions.append({
+                'label':   f"🌑 WB #{b['number']} — Dormant",
+                'numbers': [b['number']],
+                'age':     b['age'],
+                'type':    'wb',
+            })
+        if top1_pb:
+            suggestions.append({
+                'label':   f"🔴 PB #{top1_pb['number']} — Dormant",
+                'numbers': [top1_pb['number']],
+                'age':     top1_pb['age'],
+                'type':    'pb',
+            })
+
+        # ── Build AI prompt ────────────────────────────────────
+        def fmt_wb(b):
+            gap_str = f", avg gap={b['avg_gap']} draws, overdue by {b['overdue_by']} draws" if b['avg_gap'] else ""
+            return f"  #{b['number']}: {b['age']} draws dormant, last={b['last_drawn']}, avg freq/yr={b['avg_annual_freq']}{gap_str}"
+
+        def fmt_pb(b):
+            gap_str = f", avg gap={b['avg_gap']} draws, overdue by {b['overdue_by']} draws" if b['avg_gap'] else ""
+            return f"  #{b['number']}: {b['age']} draws dormant, last={b['last_drawn']}, avg freq/yr={b['avg_annual_freq']}{gap_str}"
+
+        prompt = f"""You are an expert Powerball statistical analyst specialising in number dormancy and recurrence patterns.
+
+═══ DORMANCY OVERVIEW ═══
+Total draws analysed: {total_draws}
+Longest white ball dormancy: {max_wb_age} draws
+Longest Powerball dormancy:  {max_pb_age} draws
+
+═══ TOP 8 MOST OVERDUE WHITE BALLS ═══
+{chr(10).join(fmt_wb(b) for b in wb_enriched)}
+
+═══ TOP 5 MOST OVERDUE POWERBALLS ═══
+{chr(10).join(fmt_pb(b) for b in pb_enriched)}
+
+═══ SUGGESTED WAKE-UP PICKS ═══
+Top WB candidates: {[b['number'] for b in top3_wb]}
+Top PB candidate:  {top1_pb['number'] if top1_pb else 'N/A'}
+
+Write a structured analysis with EXACTLY these sections:
+
+DORMANCY LEADERS
+Name the 2-3 most statistically overdue white balls. For each, compare current dormancy to their average gap and state how overdue they are in concrete terms (e.g. "X is 23 draws past its average return cycle").
+
+POWERBALL WATCH
+Name the most overdue Powerball and explain its significance relative to its historical frequency.
+
+WAKE-UP RECOMMENDATIONS
+Recommend the top 3 white balls and 1 Powerball to consider for the next draw. For each, give a one-sentence rationale grounded in the dormancy gap data.
+
+PATTERN NOTE
+One sentence on whether these dormant numbers show any common decade clustering (e.g. "Four of the top 5 overdue numbers fall in the 20-39 range").
+
+CONFIDENCE NOTE
+One sentence reminder that dormancy patterns do not predict future draws in a random system.
+
+Be specific — reference actual numbers, ages, and gaps throughout."""
+
+        groq_api_key = os.environ.get('GROQ_API_KEY', '')
+        response = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {groq_api_key}',
+                'Content-Type': 'application/json'
+            },
+            json={
+                'model':       'llama-3.1-8b-instant',
+                'messages':    [{'role': 'user', 'content': prompt}],
+                'max_tokens':  580,
+                'temperature': 0.6
+            },
+            timeout=30
+        )
+
+        result = response.json()
+        if 'error' in result:
+            return jsonify({'error': result['error'].get('message', 'Groq API error')}), 500
+
+        analysis = result['choices'][0]['message']['content'].strip()
+
+        return jsonify({
+            'analysis':    analysis,
+            'suggestions': suggestions,
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 initialize_core_data()
 
 # ── Start the draw-day scheduler ──────────────────────────────
