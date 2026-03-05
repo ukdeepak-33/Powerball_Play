@@ -416,6 +416,114 @@
   .flash-error   { background: rgba(244,63,94,0.1);  border: 1px solid rgba(244,63,94,0.3);  color: #ff8aaa; }
   .flash-info    { background: rgba(56,189,248,0.1);  border: 1px solid rgba(56,189,248,0.3);  color: #7dd3fc; }
   .flash-success { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); color: #6ee7b7; }
+
+  /* ── AI Panel ── */
+  .ai-panel-card {
+    border-color: rgba(45,212,191,0.15);
+  }
+  .ai-panel-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--teal), var(--emerald), transparent);
+    opacity: 0.4;
+  }
+  .ai-panel-header {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap; gap: 14px;
+  }
+  .ai-panel-eyebrow {
+    font-family: 'Fira Code', monospace;
+    font-size: 10px; letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--teal); opacity: 0.8; margin-bottom: 3px;
+  }
+  .ai-panel-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 19px; font-weight: 700; color: #fff; margin: 0;
+  }
+  .ai-run-btn {
+    display: flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, var(--teal2), var(--teal));
+    color: #fff;
+    font-family: 'Fira Code', monospace; font-size: 11px;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    border: none; border-radius: 10px; padding: 12px 22px;
+    cursor: pointer; white-space: nowrap;
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    box-shadow: 0 0 20px rgba(45,212,191,0.2);
+  }
+  .ai-run-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 36px rgba(45,212,191,0.4); }
+  .ai-run-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .ai-thinking {
+    display: none; align-items: center; gap: 10px;
+    padding: 14px 0 4px;
+    font-family: 'Fira Code', monospace; font-size: 12px;
+    color: rgba(45,212,191,0.7); letter-spacing: 1px;
+  }
+  .ai-thinking.visible { display: flex; }
+  .ai-dots span {
+    display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--teal); margin: 0 2px;
+    animation: dotB 1.2s infinite;
+  }
+  .ai-dots span:nth-child(2) { animation-delay: 0.2s; background: var(--emerald); }
+  .ai-dots span:nth-child(3) { animation-delay: 0.4s; background: var(--q1); }
+  @keyframes dotB { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1);opacity:1} }
+
+  .ai-output { display: none; margin-top: 20px; border-top: 1px solid rgba(45,212,191,0.1); padding-top: 20px; }
+  .ai-output.visible { display: block; }
+
+  /* Insight chips grid */
+  .insight-chips {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin-bottom: 20px;
+  }
+  .ins-chip {
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px;
+  }
+  .ins-chip-label {
+    font-family: 'Fira Code', monospace; font-size: 9px;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 6px;
+  }
+  .ins-chip-value { font-size: 13px; font-weight: 600; color: #fff; line-height: 1.4; }
+
+  /* Ball tags */
+  .ball-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+  .ball-tag {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: 'Fira Code', monospace; font-size: 10px; font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, #e8edf5 0%, #b8c8e0 50%, #8aaac8 100%);
+    color: #0d1829;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    flex-shrink: 0;
+  }
+
+  /* Low/High bar */
+  .lh-bar-wrap { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin-top: 6px; }
+  .lh-low  { background: var(--teal); transition: width 0.8s ease; }
+  .lh-high { background: var(--q4);  transition: width 0.8s ease; }
+
+  .ai-narrative {
+    background: var(--s2);
+    border: 1px solid rgba(45,212,191,0.1);
+    border-left: 3px solid var(--teal);
+    border-radius: 0 10px 10px 0;
+    padding: 18px 20px; font-size: 14px; line-height: 1.85;
+    color: var(--text); white-space: pre-wrap;
+  }
+  .ai-error {
+    margin-top: 14px; background: rgba(244,63,94,0.08);
+    border: 1px solid rgba(244,63,94,0.25); border-radius: 10px;
+    padding: 12px 16px; font-size: 13px; color: #ff8aaa;
+  }
+
 </style>
 
 <div id="ywb-page">
@@ -484,6 +592,27 @@
           Loading signal…
         </div>
       </div>
+    </div>
+
+
+    <!-- AI Analysis Panel -->
+    <div class="ywb-card ai-panel-card">
+      <div class="ai-panel-header">
+        <div>
+          <p class="ai-panel-eyebrow">✦ Groq AI · 6-Part Signal Analysis</p>
+          <p class="ai-panel-title">White Ball Trend Intelligence</p>
+        </div>
+        <button class="ai-run-btn" id="aiRunBtn">◈ Run Full Analysis</button>
+      </div>
+      <div class="ai-thinking" id="aiThinking">
+        <div class="ai-dots"><span></span><span></span><span></span></div>
+        Computing 6 analyses…
+      </div>
+      <div class="ai-output" id="aiOutput">
+        <div class="insight-chips" id="insightChips"></div>
+        <div class="ai-narrative" id="aiNarrative"></div>
+      </div>
+      <div class="ai-error" id="aiError" style="display:none"></div>
     </div>
 
     <!-- Table card -->
@@ -796,6 +925,121 @@ document.addEventListener('DOMContentLoaded', function () {
       tbody.appendChild(frag);
     }
   }
+
+
+  // ── AI Analysis ───────────────────────────────────────────
+  document.getElementById('aiRunBtn').addEventListener('click', async function () {
+    const btn      = this;
+    const thinking = document.getElementById('aiThinking');
+    const output   = document.getElementById('aiOutput');
+    const narrative= document.getElementById('aiNarrative');
+    const errorEl  = document.getElementById('aiError');
+    const chips    = document.getElementById('insightChips');
+
+    if (!cachedLabels.length) {
+      errorEl.textContent = 'Please wait for data to load first.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Analysing…';
+    thinking.classList.add('visible');
+    output.classList.remove('visible');
+    errorEl.style.display = 'none';
+    narrative.textContent = '';
+    chips.innerHTML = '';
+
+    try {
+      const res = await fetch('/api/white-ball-trends-ai-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          period_type:   selectedPeriod,
+          all_data:      cachedData,
+          period_labels: cachedLabels,
+        })
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        errorEl.textContent = 'AI analysis unavailable: ' + data.error;
+        errorEl.style.display = 'block';
+      } else {
+        // Build insight chips from returned insights
+        const ins = data.insights || {};
+
+        // Chip 1: Top Risers
+        if (ins.top_risers && ins.top_risers.length) {
+          const c = document.createElement('div'); c.className = 'ins-chip';
+          const balls = ins.top_risers.slice(0,3).map(r=>`<span class="ball-tag">${r[0]}</span>`).join('');
+          c.innerHTML = `<p class="ins-chip-label">📈 Rising Balls</p><div class="ins-chip-value"><div class="ball-tags">${balls}</div></div>`;
+          chips.appendChild(c);
+        }
+
+        // Chip 2: Top Fallers
+        if (ins.top_fallers && ins.top_fallers.length) {
+          const c = document.createElement('div'); c.className = 'ins-chip';
+          const balls = ins.top_fallers.slice(0,3).map(r=>`<span class="ball-tag">${r[0]}</span>`).join('');
+          c.innerHTML = `<p class="ins-chip-label">📉 Falling Balls</p><div class="ins-chip-value"><div class="ball-tags">${balls}</div></div>`;
+          chips.appendChild(c);
+        }
+
+        // Chip 3: Momentum
+        if (ins.top_momentum && ins.top_momentum.length) {
+          const c = document.createElement('div'); c.className = 'ins-chip';
+          const balls = ins.top_momentum.slice(0,3).map(r=>`<span class="ball-tag" title="${r[1]}%">${r[0]}</span>`).join('');
+          c.innerHTML = `<p class="ins-chip-label">⚡ Momentum</p><div class="ins-chip-value"><div class="ball-tags">${balls}</div></div>`;
+          chips.appendChild(c);
+        }
+
+        // Chip 4: Hot decade
+        if (ins.hottest_decade) {
+          const c = document.createElement('div'); c.className = 'ins-chip';
+          c.innerHTML = `<p class="ins-chip-label">🔥 Hot Decade</p><div class="ins-chip-value" style="color:var(--teal)">${ins.hottest_decade}</div>`;
+          chips.appendChild(c);
+        }
+
+        // Chip 5: Low vs High bar
+        if (ins.low_pct !== undefined) {
+          const c = document.createElement('div'); c.className = 'ins-chip';
+          const dom = ins.recent_low_pct >= 50 ? `<span style="color:var(--teal)">1–34 dominant</span>` : `<span style="color:var(--q4)">35–69 dominant</span>`;
+          c.innerHTML = `
+            <p class="ins-chip-label">◑ Low vs High</p>
+            <div class="ins-chip-value">
+              ${dom}
+              <div class="lh-bar-wrap" style="margin-top:8px">
+                <div class="lh-low"  style="width:${ins.recent_low_pct}%"></div>
+                <div class="lh-high" style="width:${ins.recent_high_pct}%"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-family:'Fira Code',monospace;font-size:9px;color:var(--muted);margin-top:4px">
+                <span style="color:var(--teal)">1–34: ${ins.recent_low_pct}%</span>
+                <span style="color:var(--q4)">35–69: ${ins.recent_high_pct}%</span>
+              </div>
+            </div>`;
+          chips.appendChild(c);
+        }
+
+        // Chip 6: Seasonal bias (if any)
+        if (ins.seasonal_bias && ins.seasonal_bias.length) {
+          const c = document.createElement('div'); c.className = 'ins-chip';
+          const top = ins.seasonal_bias[0];
+          c.innerHTML = `<p class="ins-chip-label">📅 Seasonal Peak</p><div class="ins-chip-value">Ball #${top.ball} peaks in <span style="color:var(--teal)">${top.peak_period}</span> (${top.ratio}×)</div>`;
+          chips.appendChild(c);
+        }
+
+        narrative.textContent = data.analysis;
+        output.classList.add('visible');
+      }
+    } catch (err) {
+      errorEl.textContent = 'Request failed. Please try again.';
+      errorEl.style.display = 'block';
+    } finally {
+      thinking.classList.remove('visible');
+      btn.disabled = false;
+      btn.innerHTML = '◈ Run Full Analysis';
+    }
+  });
 
   // ── Init ──────────────────────────────────────────────────
   updateLegend();
