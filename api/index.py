@@ -6707,9 +6707,6 @@ def analyze_consecutive_suggestions():
         return jsonify({"error": "Internal server error"}), 500
 
 
-
-
-
 @app.route('/api/analyze-consecutive-trends', methods=['POST'])
 def analyze_consecutive_trends_ai():
     try:
@@ -7135,6 +7132,237 @@ Be analytical, specific, and reference the actual numbers. Avoid generic stateme
 
         analysis = result['choices'][0]['message']['content'].strip()
         return jsonify({'analysis': analysis})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ── Replace /api/odd-even-ai-analysis in index.py ────────────────────────────
+
+@app.route('/api/odd-even-ai-analysis', methods=['POST'])
+def odd_even_ai_analysis():
+    try:
+        from itertools import combinations
+
+        payload     = request.get_json()
+        trends      = payload.get('trends', [])
+        split_count = payload.get('split_count', {})
+        odd_heavy   = payload.get('odd_heavy', 0)
+        even_heavy  = payload.get('even_heavy', 0)
+        avg_sum     = payload.get('avg_sum', 0)
+        total_draws = payload.get('total_draws', 0)
+
+        if not trends:
+            return jsonify({'error': 'No trend data provided'}), 400
+
+        # ── Odd/Even context ───────────────────────────────────
+        sorted_splits  = sorted(split_count.items(), key=lambda x: -x[1])
+        top_split      = sorted_splits[0] if sorted_splits else ('N/A', 0)
+        recent_splits  = [t['split_category'] for t in trends[:5]]
+        odd_pct        = round((odd_heavy  / total_draws) * 100, 1) if total_draws else 0
+        even_pct       = round((even_heavy / total_draws) * 100, 1) if total_draws else 0
+
+        last_majority = 'odd' if (' Odd' in trends[0]['split_category'] and
+            int(trends[0]['split_category'].split(' Odd')[0]) >= 3) else 'even'
+        streak = 1
+        for t in trends[1:6]:
+            sc    = t['split_category']
+            odd_n = int(sc.split(' Odd')[0]) if ' Odd' in sc else 0
+            if ('odd' if odd_n >= 3 else 'even') == last_majority:
+                streak += 1
+            else:
+                break
+
+        # ── Group A setup ──────────────────────────────────────
+        group_a_list  = sorted(group_a) if group_a else []
+        wb_cols       = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']
+        total_all     = len(df) if not df.empty else 1
+
+        if df.empty or not group_a_list:
+            return jsonify({'error': 'No historical data or Group A list available'}), 400
+
+        # ── Step 1: Build seen-combo sets per draw ─────────────
+        # For each draw, record which Group A numbers appeared
+        seen_3 = set()   # frozensets of size 3 that already appeared
+        seen_4 = set()
+        seen_5 = set()
+        ga_freq = {n: 0 for n in group_a_list}
+        ga_combo_dist = {3: 0, 4: 0, 5: 0}
+
+        for _, row in df.iterrows():
+            row_nums = set()
+            for col in wb_cols:
+                if col in df.columns:
+                    val = row[col]
+                    if val is not None:
+                        row_nums.add(int(val))
+
+            ga_in_draw = [n for n in group_a_list if n in row_nums]
+
+            # Individual frequency
+            for n in ga_in_draw:
+                ga_freq[n] = ga_freq.get(n, 0) + 1
+
+            # Combo distribution count
+            cnt = len(ga_in_draw)
+            if cnt in ga_combo_dist:
+                ga_combo_dist[cnt] += 1
+
+            # Record ALL seen combos of size 3, 4, 5
+            if len(ga_in_draw) >= 3:
+                for combo in combinations(sorted(ga_in_draw), 3):
+                    seen_3.add(frozenset(combo))
+            if len(ga_in_draw) >= 4:
+                for combo in combinations(sorted(ga_in_draw), 4):
+                    seen_4.add(frozenset(combo))
+            if len(ga_in_draw) >= 5:
+                for combo in combinations(sorted(ga_in_draw), 5):
+                    seen_5.add(frozenset(combo))
+
+        # ── Step 2: Rank individual Group A numbers ────────────
+        ga_freq_sorted = sorted(ga_freq.items(), key=lambda x: -x[1])
+
+        # Score function: sum of individual frequencies of members
+        def combo_score(nums):
+            return sum(ga_freq.get(n, 0) for n in nums)
+
+        # ── Step 3: Find best UNSEEN combos ───────────────────
+        # Generate all possible combos from group_a_list, filter seen, rank by score
+
+        # --- 3-number unseen combos ---
+        all_3 = list(combinations(group_a_list, 3))
+        unseen_3 = [c for c in all_3 if frozenset(c) not in seen_3]
+        unseen_3_ranked = sorted(unseen_3, key=lambda c: -combo_score(c))
+        best_3 = list(unseen_3_ranked[0]) if unseen_3_ranked else []
+        top3_candidates = [list(c) for c in unseen_3_ranked[:5]]
+
+        # --- 4-number unseen combos ---
+        all_4 = list(combinations(group_a_list, 4))
+        unseen_4 = [c for c in all_4 if frozenset(c) not in seen_4]
+        unseen_4_ranked = sorted(unseen_4, key=lambda c: -combo_score(c))
+        best_4 = list(unseen_4_ranked[0]) if unseen_4_ranked else []
+        top4_candidates = [list(c) for c in unseen_4_ranked[:5]]
+
+        # --- 5-number unseen combos ---
+        all_5 = list(combinations(group_a_list, 5))
+        unseen_5 = [c for c in all_5 if frozenset(c) not in seen_5]
+        unseen_5_ranked = sorted(unseen_5, key=lambda c: -combo_score(c))
+        best_5 = list(unseen_5_ranked[0]) if unseen_5_ranked else []
+        top5_candidates = [list(c) for c in unseen_5_ranked[:5]]
+
+        # Stats about unseen pool
+        total_3_possible = len(all_3)
+        total_4_possible = len(all_4)
+        total_5_possible = len(all_5)
+        unseen_3_count   = len(unseen_3)
+        unseen_4_count   = len(unseen_4)
+        unseen_5_count   = len(unseen_5)
+
+        # Group A hit rate last 6 months
+        ga_hits_6m = sum(1 for t in trends if t.get('group_a_numbers'))
+        ga_rate_6m = round((ga_hits_6m / total_draws) * 100, 1) if total_draws else 0
+
+        # ── Step 4: Build AI prompt ────────────────────────────
+        def fmt_combo(nums):
+            score = combo_score(nums)
+            details = ', '.join(
+                f"#{n}({ga_freq.get(n,0)}x)" for n in sorted(nums)
+            )
+            return f"[{details}] — combined freq score: {score}"
+
+        prompt = f"""You are an expert Powerball statistical analyst. Analyse Group A patterns and recommend the strongest NEVER-BEFORE-SEEN combinations.
+
+═══ ODD/EVEN CONTEXT ({total_draws} draws, last 6 months) ═══
+Most common split: {top_split[0]} ({top_split[1]} draws)
+Odd-heavy: {odd_heavy} draws ({odd_pct}%) | Even-heavy: {even_heavy} draws ({even_pct}%)
+Average WB sum: {avg_sum}
+Current streak: {streak} consecutive {last_majority}-heavy draws
+
+═══ GROUP A OVERVIEW ═══
+Group A numbers: {group_a_list}
+Hit rate last 6 months: {ga_hits_6m}/{total_draws} draws ({ga_rate_6m}%)
+
+Top 10 most frequent Group A numbers (all-time):
+{chr(10).join(f"  #{n}: {cnt} appearances ({round(cnt/total_all*100,1)}%)" for n, cnt in ga_freq_sorted[:10])}
+
+Draws with exactly 3 Group A: {ga_combo_dist[3]} ({round(ga_combo_dist[3]/total_all*100,1)}%)
+Draws with exactly 4 Group A: {ga_combo_dist[4]} ({round(ga_combo_dist[4]/total_all*100,1)}%)
+Draws with exactly 5 Group A: {ga_combo_dist[5]} ({round(ga_combo_dist[5]/total_all*100,1)}%)
+
+═══ UNSEEN COMBO POOL ═══
+Of {total_3_possible} possible 3-number Group A combos → {unseen_3_count} have NEVER appeared ({round(unseen_3_count/total_3_possible*100,1)}% unseen)
+Of {total_4_possible} possible 4-number Group A combos → {unseen_4_count} have NEVER appeared ({round(unseen_4_count/total_4_possible*100,1)}% unseen)
+Of {total_5_possible} possible 5-number Group A combos → {unseen_5_count} have NEVER appeared ({round(unseen_5_count/total_5_possible*100,1)}% unseen)
+
+═══ TOP UNSEEN CANDIDATES (ranked by member frequency) ═══
+
+Best unseen 3-number combos:
+{chr(10).join(f"  {i+1}. {fmt_combo(c)}" for i, c in enumerate(top3_candidates))}
+
+Best unseen 4-number combos:
+{chr(10).join(f"  {i+1}. {fmt_combo(c)}" for i, c in enumerate(top4_candidates))}
+
+Best unseen 5-number combos:
+{chr(10).join(f"  {i+1}. {fmt_combo(c)}" for i, c in enumerate(top5_candidates))}
+
+Write a structured analysis with EXACTLY these sections:
+
+ODD/EVEN OUTLOOK
+One sentence on the current split trend and what it implies for the next draw.
+
+GROUP A FREQUENCY LEADERS
+Name the top 3 most frequent Group A numbers and their significance.
+
+RECOMMENDED 3-NUMBER COMBO (NEVER SEEN)
+State the combo (numbers in brackets), its combined frequency score, and why these numbers together make sense statistically.
+
+RECOMMENDED 4-NUMBER COMBO (NEVER SEEN)
+State the combo, score, and reasoning.
+
+RECOMMENDED 5-NUMBER COMBO (NEVER SEEN)
+State the combo, score, and reasoning.
+
+CONFIDENCE NOTE
+One sentence reminding that lottery draws are random and these are statistical patterns only.
+
+Be specific — reference actual frequencies and percentages. Format each section header on its own line followed by the analysis."""
+
+        # ── Call Groq ──────────────────────────────────────────
+        groq_api_key = os.environ.get('GROQ_API_KEY', '')
+        response = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {groq_api_key}',
+                'Content-Type': 'application/json'
+            },
+            json={
+                'model':       'llama-3.1-8b-instant',
+                'messages':    [{'role': 'user', 'content': prompt}],
+                'max_tokens':  650,
+                'temperature': 0.55
+            },
+            timeout=30
+        )
+
+        result = response.json()
+        if 'error' in result:
+            return jsonify({'error': result['error'].get('message', 'Groq API error')}), 500
+
+        analysis = result['choices'][0]['message']['content'].strip()
+
+        return jsonify({
+            'analysis': analysis,
+            'combos': {
+                'best_3': sorted(best_3),
+                'best_4': sorted(best_4),
+                'best_5': sorted(best_5),
+            },
+            'unseen_counts': {
+                'c3': unseen_3_count,
+                'c4': unseen_4_count,
+                'c5': unseen_5_count,
+            }
+        })
 
     except Exception as e:
         traceback.print_exc()
