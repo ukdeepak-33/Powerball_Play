@@ -7375,7 +7375,127 @@ Be specific — reference actual frequencies and percentages. Format each sectio
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+# ── Paste into index.py with your other API routes ───────────────────────────
 
+@app.route('/api/grouped-patterns-ai-analysis', methods=['POST'])
+def grouped_patterns_ai_analysis():
+    try:
+        payload         = request.get_json()
+        total_patterns  = payload.get('total_patterns', 0)
+        total_pairs     = payload.get('total_pairs', 0)
+        total_triplets  = payload.get('total_triplets', 0)
+        top_pairs       = payload.get('top_pairs', [])
+        top_triplets    = payload.get('top_triplets', [])
+        range_breakdown = payload.get('range_breakdown', [])
+        top_range       = payload.get('top_range', '—')
+
+        # ── Format helper ──────────────────────────────────────
+        def fmt_pattern(p):
+            nums = p.get('pattern', [])
+            cnt  = p.get('count', 0)
+            yr   = p.get('year', '?')
+            rng  = p.get('range', '?')
+            return f"{nums} in {rng} ({yr}) — {cnt}x"
+
+        # ── Hottest decades ────────────────────────────────────
+        range_totals = sorted(
+            range_breakdown,
+            key=lambda r: r['pairs'] + r['triplets'],
+            reverse=True
+        )
+
+        prompt = f"""You are an expert Powerball statistical analyst specialising in number grouping and decade patterns.
+
+═══ OVERVIEW ═══
+Total recorded patterns: {total_patterns} ({total_pairs} pairs, {total_triplets} triplets)
+Hottest decade overall: {top_range}
+
+═══ DECADE BREAKDOWN (pairs + triplets count) ═══
+{chr(10).join(f"  {r['range']}: pairs={r['pairs']}, triplets={r['triplets']}, total={r['pairs']+r['triplets']}" for r in range_breakdown)}
+
+═══ TOP 10 MOST FREQUENT PAIRS ═══
+{chr(10).join(f"  {i+1}. {fmt_pattern(p)}" for i, p in enumerate(top_pairs))}
+
+═══ TOP 10 MOST FREQUENT TRIPLETS ═══
+{chr(10).join(f"  {i+1}. {fmt_pattern(t)}" for i, t in enumerate(top_triplets))}
+
+Provide a structured analysis with EXACTLY these sections:
+
+DECADE DOMINANCE
+Which decades (number ranges) produce the most patterns and why this matters statistically. Name the top 2 ranges.
+
+HOTTEST PAIR
+Name the single most frequent pair, its count, and what it suggests about number clustering in that decade.
+
+HOTTEST TRIPLET
+Name the single most frequent triplet, its count, and what it suggests.
+
+STRATEGIC INSIGHT
+Based on the decade distribution, suggest which 1-2 decades a player should weight their number selections toward, and why.
+
+CONFIDENCE NOTE
+One sentence on the limits of pattern-based analysis in a random draw.
+
+Also return 3 highlight facts as JSON embedded in your response in this exact format at the very end:
+HIGHLIGHTS_JSON:[{{"icon":"🔥","label":"Hottest Decade","value":"<range> with <N> total patterns"}},{{"icon":"⚡","label":"Top Pair","value":"<nums> — <N>x"}},{{"icon":"🎯","label":"Top Triplet","value":"<nums> — <N>x"}}]
+
+Be specific and reference actual numbers. Format each section header on its own line."""
+
+        groq_api_key = os.environ.get('GROQ_API_KEY', '')
+        response = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {groq_api_key}',
+                'Content-Type': 'application/json'
+            },
+            json={
+                'model':       'llama-3.1-8b-instant',
+                'messages':    [{'role': 'user', 'content': prompt}],
+                'max_tokens':  600,
+                'temperature': 0.6
+            },
+            timeout=30
+        )
+
+        result = response.json()
+        if 'error' in result:
+            return jsonify({'error': result['error'].get('message', 'Groq API error')}), 500
+
+        raw = result['choices'][0]['message']['content'].strip()
+
+        # ── Extract highlights JSON from response ──────────────
+        highlights = []
+        import re, json as _json
+        match = re.search(r'HIGHLIGHTS_JSON:(\[.*?\])', raw, re.DOTALL)
+        if match:
+            try:
+                highlights = _json.loads(match.group(1))
+                raw = raw[:match.start()].strip()
+            except Exception:
+                pass
+
+        # Fallback highlights from data
+        if not highlights:
+            best_range = range_totals[0] if range_totals else {}
+            best_pair  = top_pairs[0]    if top_pairs    else {}
+            best_trip  = top_triplets[0] if top_triplets else {}
+            highlights = [
+                {'icon': '🔥', 'label': 'Hottest Decade',
+                 'value': f"{best_range.get('range','—')} — {best_range.get('pairs',0)+best_range.get('triplets',0)} patterns"},
+                {'icon': '⚡', 'label': 'Top Pair',
+                 'value': f"{best_pair.get('pattern','—')} × {best_pair.get('count','—')}"},
+                {'icon': '🎯', 'label': 'Top Triplet',
+                 'value': f"{best_trip.get('pattern','—')} × {best_trip.get('count','—')}"},
+            ]
+
+        return jsonify({
+            'analysis':   raw,
+            'highlights': highlights,
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 initialize_core_data()
 
