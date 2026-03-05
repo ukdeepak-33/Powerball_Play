@@ -1,152 +1,777 @@
 {% extends "base.html" %}
 
-{% block title %}Co-occurrence Analysis{% endblock %}
-
-{% block page_heading %}Co-occurrence Analysis (White Balls){% endblock %}
+{% block title %}Co-occurrence Analysis — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
-<div class="card p-6 bg-white rounded-lg shadow-lg">
-    <h2 class="text-2xl font-bold mb-4 text-gray-800">White Ball Co-occurrence Matrix</h2>
-    <p class="text-gray-700 mb-4">This heatmap shows how frequently pairs of white balls have appeared together in historical draws. Darker squares indicate more frequent co-occurrence.</p>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;600;700;800&family=Share+Tech+Mono&family=DM+Sans:wght@300;400;500&display=swap');
 
-    <div id="coOccurrenceChart" class="w-full overflow-x-auto"></div>
+  :root {
+    --bg:      #060810;
+    --s1:      #0b0e1a;
+    --s2:      #101425;
+    --s3:      #161b30;
+    --border:  rgba(255,255,255,0.07);
+    --text:    rgba(255,255,255,0.87);
+    --muted:   rgba(255,255,255,0.36);
+    --cyan:    #00e5ff;
+    --cyan2:   #00b8d4;
+    --violet:  #7c3aed;
+    --hot:     #ff6b35;
+    --hot2:    #ff3b5c;
+    --warm:    #fbbf24;
+    --cool:    #22d3ee;
+    --cold:    #1e3a5f;
+  }
 
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var coOccurrenceData = {{ co_occurrence_data | tojson }};
-            var maxCoOccurrence = {{ max_co_occurrence | tojson }};
+  #co-page * { box-sizing: border-box; }
+  #co-page {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    color: var(--text);
+    padding-bottom: 80px;
+  }
 
-            console.log("[D3 Debug] co_occurrence_analysis.html - coOccurrenceData:", coOccurrenceData);
-            console.log("[D3 Debug] co_occurrence_analysis.html - maxCoOccurrence:", maxCoOccurrence);
+  /* ── Hero ── */
+  .co-hero {
+    position: relative;
+    padding: 56px 24px 44px;
+    text-align: center;
+    overflow: hidden;
+  }
+  .co-hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 50% 60% at 20% 50%, rgba(0,229,255,0.06) 0%, transparent 65%),
+      radial-gradient(ellipse 50% 60% at 80% 50%, rgba(124,58,237,0.06) 0%, transparent 65%),
+      radial-gradient(ellipse 40% 40% at 50% 0%,  rgba(0,229,255,0.04) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  /* Connection lines decoration */
+  .co-hero::after {
+    content: '⬡ ─ ─ ● ─ ─ ⬡ ─ ─ ● ─ ─ ⬡';
+    position: absolute;
+    bottom: 12px; left: 0; right: 0;
+    text-align: center;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: rgba(0,229,255,0.15);
+    letter-spacing: 4px;
+    pointer-events: none;
+  }
+  .co-eyebrow {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--cyan);
+    margin-bottom: 14px;
+    opacity: 0.8;
+  }
+  .co-hero h1 {
+    font-family: 'Exo 2', sans-serif;
+    font-size: clamp(38px, 5.5vw, 72px);
+    font-weight: 800;
+    line-height: 1.05;
+    margin: 0 0 14px;
+    background: linear-gradient(135deg, var(--cyan) 0%, #fff 45%, var(--hot) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .co-hero p {
+    font-size: 14px;
+    color: var(--muted);
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.75;
+  }
 
-            if (!coOccurrenceData || coOccurrenceData.length === 0) {
-                d3.select("#coOccurrenceChart").append("p").text("No co-occurrence data available to display.");
-                return;
-            }
+  /* ── Layout ── */
+  .co-wrap {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
 
-            // Define margins and dimensions
-            const margin = { top: 50, right: 30, bottom: 50, left: 50 };
-            const containerWidth = document.getElementById('coOccurrenceChart').clientWidth;
-            const width = Math.max(700, containerWidth - margin.left - margin.right); // Ensure a minimum width for readability
-            const height = width; // Make it square for a matrix
+  /* ── Card ── */
+  .co-card {
+    background: var(--s1);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 28px 30px;
+    position: relative;
+    overflow: hidden;
+  }
+  .co-card-title {
+    font-family: 'Exo 2', sans-serif;
+    font-size: 19px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 4px;
+  }
+  .co-card-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin: 0 0 22px;
+    letter-spacing: 0.5px;
+  }
 
-            // Append SVG to the chart container
-            const svg = d3.select("#coOccurrenceChart")
-                .append("svg")
-                .attr("width", width + margin.left + margin.right)
-                .attr("height", height + margin.top + margin.bottom)
-                .append("g")
-                .attr("transform", `translate(${margin.left},${margin.top})`);
+  /* ── Stat chips ── */
+  .co-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 0;
+  }
+  @media (max-width: 680px) { .co-stats { grid-template-columns: 1fr 1fr; } }
 
-            // Get all unique numbers for X and Y axes
-            // Assumes numbers range from 1 to 69 for white balls
-            const allNumbers = Array.from({ length: 69 }, (_, i) => i + 1);
+  .co-chip {
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+  .co-chip-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .co-chip-value {
+    font-family: 'Exo 2', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+  }
+  .co-chip-note {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
 
-            // Create X and Y scales
-            const x = d3.scaleBand()
-                .range([0, width])
-                .domain(allNumbers)
-                .padding(0.05);
+  /* ── Heatmap container ── */
+  .heatmap-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), var(--hot), transparent);
+    opacity: 0.4;
+  }
 
-            const y = d3.scaleBand()
-                .range([height, 0])
-                .domain(allNumbers)
-                .padding(0.05);
+  #coOccurrenceChart {
+    width: 100%;
+    overflow-x: auto;
+  }
+  #coOccurrenceChart svg text {
+    fill: rgba(255,255,255,0.45);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+  }
 
-            // Append X and Y axes
-            svg.append("g")
-                .attr("transform", `translate(0,${height})`)
-                .call(d3.axisBottom(x).tickSizeOuter(0))
-                .selectAll("text")
-                .attr("transform", "rotate(-45)")
-                .style("text-anchor", "end");
+  /* D3 tooltip */
+  .co-tooltip {
+    position: fixed;
+    background: var(--s2);
+    border: 1px solid rgba(0,229,255,0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 9999;
+    line-height: 1.6;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 16px rgba(0,229,255,0.1);
+  }
+  .co-tooltip .tt-pair { color: var(--cyan); font-size: 14px; font-weight: 600; }
+  .co-tooltip .tt-count { color: var(--hot); }
 
-            svg.append("g")
-                .call(d3.axisLeft(y).tickSizeOuter(0));
+  /* Heat legend */
+  .heat-legend {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .hl-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+  .hl-gradient {
+    width: 160px; height: 10px;
+    border-radius: 5px;
+    background: linear-gradient(90deg, var(--cold), #1565c0, #0288d1, #00acc1, #ffd54f, #ff8f00, var(--hot2));
+  }
 
-            // Color scale
-            // Use a sequential color scheme that goes from light to dark (e.g., yellow to red)
-            const color = d3.scaleSequential(d3.interpolateYlOrRd)
-                            .domain([0, maxCoOccurrence || 1]); // Handle maxCoOccurrence being 0 for single data point or empty
+  /* ── Leaderboard ── */
+  .lb-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 700px) { .lb-grid { grid-template-columns: 1fr; } }
 
-            // Create a tooltip div
-            const tooltip = d3.select("body").append("div")
-                .attr("class", "tooltip")
-                .style("position", "absolute")
-                .style("background", "rgba(0, 0, 0, 0.7)")
-                .style("color", "white")
-                .style("padding", "8px")
-                .style("border-radius", "4px")
-                .style("pointer-events", "none")
-                .style("opacity", 0);
+  .lb-section-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .lb-section-title.hot  { color: var(--hot); }
+  .lb-section-title.cool { color: var(--cyan); }
 
-            // Add the squares
-            svg.selectAll()
-                .data(coOccurrenceData, d => `${d.x}:${d.y}`)
-                .enter()
-                .append("rect")
-                .attr("x", d => x(d.x))
-                .attr("y", d => y(d.y))
-                .attr("width", x.bandwidth())
-                .attr("height", y.bandwidth())
-                .style("fill", d => color(d.count))
-                // Add tooltip events
-                .on("mouseover", function(event, d) {
-                    tooltip.transition()
-                        .duration(200)
-                        .style("opacity", .9);
-                    tooltip.html(`Pair: ${d.x}, ${d.y}<br>Occurrences: ${d.count}`)
-                        .style("left", (event.pageX + 10) + "px")
-                        .style("top", (event.pageY - 28) + "px");
-                })
-                .on("mouseout", function(event, d) {
-                    tooltip.transition()
-                        .duration(500)
-                        .style("opacity", 0);
-                });
+  .lb-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--s2);
+    border: 1px solid var(--border);
+    margin-bottom: 8px;
+    transition: border-color 0.15s;
+  }
+  .lb-row:hover { border-color: rgba(0,229,255,0.2); }
+  .lb-rank {
+    font-family: 'Exo 2', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    min-width: 22px;
+    text-align: center;
+  }
+  .lb-rank.gold   { color: #fbbf24; }
+  .lb-rank.silver { color: #94a3b8; }
+  .lb-rank.bronze { color: #b45309; }
 
-            // Add axis labels
-            svg.append("text")
-                .attr("class", "x label")
-                .attr("text-anchor", "middle")
-                .attr("x", width / 2)
-                .attr("y", height + margin.bottom - 10)
-                .text("Ball Number (X)");
+  .lb-balls { display: flex; gap: 5px; }
+  .lb-ball {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, #e8edf5 0%, #b8c8e0 50%, #8aaac8 100%);
+    color: #0d1829;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4), inset 0 1px 2px rgba(255,255,255,0.5);
+    flex-shrink: 0;
+  }
 
-            svg.append("text")
-                .attr("class", "y label")
-                .attr("text-anchor", "middle")
-                .attr("y", -margin.left + 15)
-                .attr("x", -height / 2)
-                .attr("transform", "rotate(-90)")
-                .text("Ball Number (Y)");
+  .lb-bar-wrap {
+    flex: 1;
+    height: 6px;
+    background: var(--s3);
+    border-radius: 3px;
+  }
+  .lb-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.8s ease;
+  }
+  .lb-bar.hot-bar  { background: linear-gradient(90deg, var(--hot2), var(--hot)); }
+  .lb-bar.cool-bar { background: linear-gradient(90deg, var(--cyan2), var(--cyan)); }
 
-            // Add a title to the chart
-            svg.append("text")
-                .attr("x", (width / 2))             
-                .attr("y", 0 - (margin.top / 2) + 10)
-                .attr("text-anchor", "middle")  
-                .style("font-size", "18px") 
-                .style("font-weight", "bold")
-                .text("White Ball Pair Co-occurrence Frequency");
+  .lb-count {
+    font-family: 'Exo 2', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    min-width: 28px;
+    text-align: right;
+  }
 
-            // Add a simple style for the tooltip for demonstration (can be moved to a CSS file)
-            const style = document.createElement('style');
-            style.innerHTML = `
-                .tooltip {
-                    background: rgba(0, 0, 0, 0.7);
-                    color: white;
-                    padding: 8px;
-                    border-radius: 4px;
-                    pointer-events: none;
-                    font-size: 14px;
-                    line-height: 1.4;
-                    z-index: 1000; /* Ensure it's above other elements */
-                }
+  /* ── AI Panel ── */
+  .ai-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--violet), var(--cyan), transparent);
+    opacity: 0.4;
+  }
+
+  .ai-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 0;
+  }
+  .ai-eyebrow {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--cyan);
+    opacity: 0.8;
+    margin-bottom: 3px;
+  }
+  .ai-panel-title {
+    font-family: 'Exo 2', sans-serif;
+    font-size: 19px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
+  }
+  .ai-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, var(--violet), var(--cyan2));
+    color: #fff;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 22px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    box-shadow: 0 0 24px rgba(124,58,237,0.25);
+    white-space: nowrap;
+  }
+  .ai-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 40px rgba(0,229,255,0.3); }
+  .ai-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+  .ai-thinking {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 0 4px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: rgba(0,229,255,0.7);
+    letter-spacing: 1px;
+  }
+  .ai-thinking.visible { display: flex; }
+  .ai-dots span {
+    display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--cyan); margin: 0 2px;
+    animation: dotBounce 1.2s infinite;
+  }
+  .ai-dots span:nth-child(2) { animation-delay: 0.2s; background: #fff; }
+  .ai-dots span:nth-child(3) { animation-delay: 0.4s; background: var(--hot); }
+  @keyframes dotBounce {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+
+  .ai-output {
+    display: none;
+    margin-top: 20px;
+    border-top: 1px solid rgba(0,229,255,0.1);
+    padding-top: 20px;
+  }
+  .ai-output.visible { display: block; }
+
+  /* Next draw suggestion cards */
+  .next-draw-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .nd-card {
+    background: var(--s2);
+    border: 1px solid rgba(0,229,255,0.15);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+  .nd-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--cyan);
+    opacity: 0.7;
+    margin-bottom: 10px;
+  }
+  .nd-balls {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .nd-ball {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, #e8edf5 0%, #b8c8e0 50%, #8aaac8 100%);
+    color: #0d1829;
+    box-shadow: 0 0 0 2px rgba(0,229,255,0.4), 0 3px 10px rgba(0,0,0,0.4);
+    flex-shrink: 0;
+  }
+  .nd-score {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .nd-score strong { color: var(--cyan); }
+
+  .ai-narrative {
+    background: var(--s2);
+    border: 1px solid rgba(0,229,255,0.1);
+    border-left: 3px solid var(--cyan);
+    border-radius: 0 10px 10px 0;
+    padding: 18px 20px;
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--text);
+    white-space: pre-wrap;
+  }
+  .ai-error {
+    margin-top: 14px;
+    background: rgba(244,63,94,0.08);
+    border: 1px solid rgba(244,63,94,0.25);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #ff8aaa;
+  }
+</style>
+
+<div id="co-page">
+
+  <!-- Hero -->
+  <div class="co-hero">
+    <p class="co-eyebrow">◉ Connection Frequency Matrix</p>
+    <h1>Co-occurrence Analysis</h1>
+    <p>How often each pair of white balls has appeared together across all historical Powerball draws. The hotter the cell, the stronger the connection.</p>
+  </div>
+
+  <div class="co-wrap">
+
+    <!-- Stat chips -->
+    <div class="co-card">
+      <p class="co-card-title">Matrix Overview</p>
+      <p class="co-card-sub">Aggregated pair frequencies across all draws</p>
+      <div class="co-stats">
+        <div class="co-chip">
+          <p class="co-chip-label">Total Pairs Tracked</p>
+          <p class="co-chip-value" id="statTotalPairs" style="color:var(--cyan)">—</p>
+          <p class="co-chip-note">unique combinations</p>
+        </div>
+        <div class="co-chip">
+          <p class="co-chip-label">Max Co-occurrence</p>
+          <p class="co-chip-value" id="statMax" style="color:var(--hot)">{{ max_co_occurrence }}</p>
+          <p class="co-chip-note">highest pair count</p>
+        </div>
+        <div class="co-chip">
+          <p class="co-chip-label">Hottest Pair</p>
+          <p class="co-chip-value" id="statHottestPair" style="color:var(--hot);font-size:18px">—</p>
+          <p class="co-chip-note">most co-occurred</p>
+        </div>
+        <div class="co-chip">
+          <p class="co-chip-label">Avg Co-occurrence</p>
+          <p class="co-chip-value" id="statAvg" style="color:var(--warm)">—</p>
+          <p class="co-chip-note">per tracked pair</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Heatmap -->
+    <div class="co-card heatmap-card">
+      <p class="co-card-title">Co-occurrence Heatmap</p>
+      <p class="co-card-sub">Hover any cell to see exact pair frequency · Darker = more frequent</p>
+      <div id="coOccurrenceChart"></div>
+      <div class="heat-legend">
+        <span class="hl-label">RARE</span>
+        <div class="hl-gradient"></div>
+        <span class="hl-label">FREQUENT</span>
+      </div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="co-card">
+      <p class="co-card-title">Pair Leaderboard</p>
+      <p class="co-card-sub">Top 15 hottest and 15 coolest pairs by co-occurrence count</p>
+      <div class="lb-grid">
+        <div>
+          <p class="lb-section-title hot">🔥 Hottest Pairs</p>
+          <div id="hotLeaderboard"></div>
+        </div>
+        <div>
+          <p class="lb-section-title cool">❄️ Rarest Pairs</p>
+          <div id="coolLeaderboard"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Panel -->
+    <div class="co-card ai-card">
+      <div class="ai-header">
+        <div>
+          <p class="ai-eyebrow">✦ Groq AI · Co-occurrence Intelligence</p>
+          <p class="ai-panel-title">Next Draw Pair Suggestions</p>
+        </div>
+        <button class="ai-btn" id="aiBtn">◈ Suggest Next Draw Pairs</button>
+      </div>
+      <div class="ai-thinking" id="aiThinking">
+        <div class="ai-dots"><span></span><span></span><span></span></div>
+        Scanning connection matrix…
+      </div>
+      <div class="ai-output" id="aiOutput">
+        <div class="next-draw-grid" id="nextDrawGrid"></div>
+        <div class="ai-narrative" id="aiNarrative"></div>
+      </div>
+      <div class="ai-error" id="aiError" style="display:none"></div>
+    </div>
+
+  </div><!-- /co-wrap -->
+</div><!-- /co-page -->
+
+<!-- Tooltip -->
+<div class="co-tooltip" id="coTooltip"></div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+  const coData   = {{ co_occurrence_data | tojson }};
+  const maxCoOcc = {{ max_co_occurrence | tojson }};
+
+  if (!coData || !coData.length) {
+    document.getElementById('coOccurrenceChart').innerHTML =
+      '<p style="color:var(--muted);padding:32px;text-align:center">No co-occurrence data available.</p>';
+    return;
+  }
+
+  // ── Stats ─────────────────────────────────────────────────
+  const totalCount = coData.reduce((s, d) => s + d.count, 0);
+  const avgCount   = Math.round(totalCount / coData.length);
+  const sorted     = [...coData].sort((a,b) => b.count - a.count);
+  const hottest    = sorted[0];
+
+  document.getElementById('statTotalPairs').textContent  = coData.length;
+  document.getElementById('statHottestPair').textContent = `${hottest.x} & ${hottest.y}`;
+  document.getElementById('statAvg').textContent         = avgCount;
+
+  // ── Leaderboard ───────────────────────────────────────────
+  function buildLeaderboard(containerId, data, isHot) {
+    const wrap = document.getElementById(containerId);
+    const maxC = data[0]?.count || 1;
+    data.forEach((d, i) => {
+      const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+      const barW = Math.round((d.count / maxC) * 100);
+      const row  = document.createElement('div');
+      row.className = 'lb-row';
+      row.innerHTML = `
+        <span class="lb-rank ${rankClass}">${i+1}</span>
+        <div class="lb-balls">
+          <span class="lb-ball">${d.x}</span>
+          <span class="lb-ball">${d.y}</span>
+        </div>
+        <div class="lb-bar-wrap">
+          <div class="lb-bar ${isHot ? 'hot-bar' : 'cool-bar'}" style="width:${barW}%"></div>
+        </div>
+        <span class="lb-count">${d.count}</span>
+      `;
+      wrap.appendChild(row);
+    });
+  }
+
+  buildLeaderboard('hotLeaderboard',  sorted.slice(0,15),          true);
+  buildLeaderboard('coolLeaderboard', [...sorted].reverse().slice(0,15), false);
+
+  // ── D3 Heatmap ────────────────────────────────────────────
+  const allNumbers = Array.from({length: 69}, (_, i) => i + 1);
+  const tooltip    = document.getElementById('coTooltip');
+
+  const container  = document.getElementById('coOccurrenceChart');
+  const margin     = { top: 30, right: 20, bottom: 60, left: 60 };
+  const contW      = Math.max(container.clientWidth, 400);
+  const size       = Math.min(contW - margin.left - margin.right, 900);
+
+  const svg = d3.select('#coOccurrenceChart')
+    .append('svg')
+    .attr('width',  size + margin.left + margin.right)
+    .attr('height', size + margin.top  + margin.bottom)
+    .append('g')
+    .attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const x = d3.scaleBand().range([0, size]).domain(allNumbers).padding(0.02);
+  const y = d3.scaleBand().range([size, 0]).domain(allNumbers).padding(0.02);
+
+  // Axes — show every 5th tick to avoid crowding
+  const tickFilter = v => v % 5 === 0 || v === 1;
+
+  svg.append('g')
+    .attr('transform', `translate(0,${size})`)
+    .call(d3.axisBottom(x).tickValues(allNumbers.filter(tickFilter)).tickSizeOuter(0))
+    .selectAll('text')
+    .attr('transform','rotate(-45)')
+    .style('text-anchor','end')
+    .style('fill','rgba(255,255,255,0.4)')
+    .style('font-family','Share Tech Mono, monospace')
+    .style('font-size','9px');
+
+  svg.append('g')
+    .call(d3.axisLeft(y).tickValues(allNumbers.filter(tickFilter)).tickSizeOuter(0))
+    .selectAll('text')
+    .style('fill','rgba(255,255,255,0.4)')
+    .style('font-family','Share Tech Mono, monospace')
+    .style('font-size','9px');
+
+  // Remove axis lines
+  svg.selectAll('.domain').style('stroke','rgba(255,255,255,0.1)');
+  svg.selectAll('.tick line').style('stroke','rgba(255,255,255,0.08)');
+
+  // Color scale — dark navy → cyan → hot orange/red
+  const colorScale = d3.scaleSequential()
+    .domain([0, maxCoOcc || 1])
+    .interpolator(d3.interpolateRgbBasis([
+      '#0d1b2a', '#1565c0', '#0288d1', '#00acc1',
+      '#ffd54f', '#ff8f00', '#ff3b5c'
+    ]));
+
+  // Draw cells
+  svg.selectAll('rect.cell')
+    .data(coData)
+    .enter()
+    .append('rect')
+    .attr('class','cell')
+    .attr('x', d => x(d.x))
+    .attr('y', d => y(d.y))
+    .attr('width',  x.bandwidth())
+    .attr('height', y.bandwidth())
+    .attr('rx', 1)
+    .style('fill', d => colorScale(d.count))
+    .style('opacity', 0.92)
+    .on('mouseover', function(event, d) {
+      d3.select(this).style('opacity', 1).style('stroke','rgba(0,229,255,0.8)').style('stroke-width','1.5px');
+      tooltip.style.opacity = '1';
+      tooltip.innerHTML = `
+        <div class="tt-pair">${d.x} ↔ ${d.y}</div>
+        <div>Co-occurrences: <span class="tt-count">${d.count}</span></div>
+        <div style="color:var(--muted);font-size:10px">of ${maxCoOcc} max</div>
+      `;
+    })
+    .on('mousemove', function(event) {
+      tooltip.style.left = (event.clientX + 14) + 'px';
+      tooltip.style.top  = (event.clientY - 40) + 'px';
+    })
+    .on('mouseout', function() {
+      d3.select(this).style('opacity', 0.92).style('stroke','none');
+      tooltip.style.opacity = '0';
+    });
+
+  // Axis labels
+  svg.append('text')
+    .attr('x', size / 2).attr('y', size + margin.bottom - 4)
+    .attr('text-anchor','middle')
+    .style('fill','rgba(255,255,255,0.25)')
+    .style('font-family','Share Tech Mono, monospace')
+    .style('font-size','10px')
+    .style('letter-spacing','2px')
+    .text('WHITE BALL NUMBER (X)');
+
+  svg.append('text')
+    .attr('transform','rotate(-90)')
+    .attr('x', -size / 2).attr('y', -margin.left + 14)
+    .attr('text-anchor','middle')
+    .style('fill','rgba(255,255,255,0.25)')
+    .style('font-family','Share Tech Mono, monospace')
+    .style('font-size','10px')
+    .style('letter-spacing','2px')
+    .text('WHITE BALL NUMBER (Y)');
+
+  // ── AI Analysis ───────────────────────────────────────────
+  document.getElementById('aiBtn').addEventListener('click', async function () {
+    const btn      = this;
+    const thinking = document.getElementById('aiThinking');
+    const output   = document.getElementById('aiOutput');
+    const narrative= document.getElementById('aiNarrative');
+    const errorEl  = document.getElementById('aiError');
+    const ndGrid   = document.getElementById('nextDrawGrid');
+
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Scanning…';
+    thinking.classList.add('visible');
+    output.classList.remove('visible');
+    errorEl.style.display = 'none';
+    narrative.textContent = '';
+    ndGrid.innerHTML = '';
+
+    try {
+      const res  = await fetch('/api/co-occurrence-ai-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          top_pairs:    sorted.slice(0, 20),
+          bottom_pairs: [...sorted].reverse().slice(0, 10),
+          max_count:    maxCoOcc,
+          avg_count:    avgCount,
+          total_pairs:  coData.length,
+        })
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        errorEl.textContent = 'AI analysis unavailable: ' + data.error;
+        errorEl.style.display = 'block';
+      } else {
+        // Render next draw suggestion cards
+        if (data.suggestions && data.suggestions.length) {
+          data.suggestions.forEach(s => {
+            const card = document.createElement('div');
+            card.className = 'nd-card';
+            const ballsHtml = s.pair.map(n =>
+              `<span class="nd-ball">${n}</span>`
+            ).join('');
+            card.innerHTML = `
+              <p class="nd-label">${s.label}</p>
+              <div class="nd-balls">${ballsHtml}</div>
+              <p class="nd-score">score <strong>${s.score}</strong></p>
             `;
-            document.head.appendChild(style);
-        });
-    </script>
-</div>
+            ndGrid.appendChild(card);
+          });
+        }
+        narrative.textContent = data.analysis;
+        output.classList.add('visible');
+      }
+    } catch (err) {
+      errorEl.textContent = 'Request failed. Please try again.';
+      errorEl.style.display = 'block';
+    } finally {
+      thinking.classList.remove('visible');
+      btn.disabled = false;
+      btn.innerHTML = '◈ Suggest Next Draw Pairs';
+    }
+  });
+
+});
+</script>
 {% endblock %}
