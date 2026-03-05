@@ -7497,6 +7497,187 @@ Be specific and reference actual numbers. Format each section header on its own 
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+# ── Paste into index.py with your other API routes ───────────────────────────
+
+@app.route('/api/co-occurrence-ai-analysis', methods=['POST'])
+def co_occurrence_ai_analysis():
+    try:
+        from itertools import combinations
+
+        payload      = request.get_json()
+        top_pairs    = payload.get('top_pairs', [])
+        bottom_pairs = payload.get('bottom_pairs', [])
+        max_count    = payload.get('max_count', 0)
+        avg_count    = payload.get('avg_count', 0)
+        total_pairs  = payload.get('total_pairs', 0)
+
+        if not top_pairs:
+            return jsonify({'error': 'No pair data provided'}), 400
+
+        # ── Build seen pairs set from full historical df ───────
+        wb_cols = ['Number 1', 'Number 2', 'Number 3', 'Number 4', 'Number 5']
+        seen_pairs = set()   # frozensets of pairs already co-occurred
+        pair_freq  = {}      # {frozenset(a,b): count}
+
+        if not df.empty:
+            for _, row in df.iterrows():
+                nums = []
+                for col in wb_cols:
+                    if col in df.columns:
+                        try: nums.append(int(row[col]))
+                        except: pass
+                for pair in combinations(sorted(nums), 2):
+                    key = frozenset(pair)
+                    seen_pairs.add(key)
+                    pair_freq[key] = pair_freq.get(key, 0) + 1
+
+        # ── Find high-frequency pairs that haven't appeared recently ──
+        # "recently" = last 30 draws
+        recent_pairs = set()
+        if not df.empty:
+            recent_df = df.head(30)
+            for _, row in recent_df.iterrows():
+                nums = []
+                for col in wb_cols:
+                    if col in df.columns:
+                        try: nums.append(int(row[col]))
+                        except: pass
+                for pair in combinations(sorted(nums), 2):
+                    recent_pairs.add(frozenset(pair))
+
+        # High frequency but NOT seen in last 30 draws = "due"
+        due_pairs = [
+            {'pair': sorted(list(k)), 'count': v, 'label': 'Due Pair'}
+            for k, v in sorted(pair_freq.items(), key=lambda x: -x[1])
+            if k not in recent_pairs
+        ][:10]
+
+        # ── Build next draw suggestions ────────────────────────
+        # Suggestion 1: Hottest overall pair
+        s1 = top_pairs[0] if top_pairs else None
+
+        # Suggestion 2: Best "due" pair (high freq, not recent)
+        s2 = due_pairs[0] if due_pairs else (top_pairs[1] if len(top_pairs) > 1 else None)
+
+        # Suggestion 3: High-freq pair from different number range than s1
+        def decade(n): return (n // 10) * 10
+        s3 = None
+        if s1:
+            s1_decades = {decade(s1['x']), decade(s1['y'])}
+            for p in top_pairs[2:15]:
+                p_decades = {decade(p['x']), decade(p['y'])}
+                if not p_decades.intersection(s1_decades):
+                    s3 = p
+                    break
+        if not s3 and len(top_pairs) > 2:
+            s3 = top_pairs[2]
+
+        suggestions = []
+        if s1:
+            suggestions.append({
+                'pair':  [s1['x'], s1['y']],
+                'score': s1['count'],
+                'label': '🔥 Hottest Pair'
+            })
+        if s2:
+            pair = s2.get('pair') or [s2.get('x'), s2.get('y')]
+            suggestions.append({
+                'pair':  pair,
+                'score': s2.get('count', 0),
+                'label': '⏰ Due Pair'
+            })
+        if s3:
+            suggestions.append({
+                'pair':  [s3['x'], s3['y']],
+                'score': s3['count'],
+                'label': '🎯 Diversified Pick'
+            })
+
+        # ── Format top pairs for prompt ────────────────────────
+        def fmt_pair(p):
+            x = p.get('x') or (p.get('pair') or [0,0])[0]
+            y = p.get('y') or (p.get('pair') or [0,0])[1]
+            c = p.get('count', 0)
+            return f"  [{x}, {y}] — {c} times"
+
+        total_draws = len(df) if not df.empty else 1
+        due_str = '\n'.join(
+            f"  {d['pair']} — {d['count']} times (not seen in last 30 draws)"
+            for d in due_pairs[:5]
+        ) or '  No due pairs found'
+
+        prompt = f"""You are an expert Powerball statistical analyst specialising in number pair co-occurrence patterns.
+
+═══ CO-OCCURRENCE MATRIX SUMMARY ═══
+Total unique pairs tracked: {total_pairs}
+Maximum co-occurrence count: {max_count}
+Average co-occurrence count: {avg_count}
+Total historical draws analysed: {total_draws}
+
+═══ TOP 15 HOTTEST PAIRS (most frequent) ═══
+{chr(10).join(fmt_pair(p) for p in top_pairs[:15])}
+
+═══ TOP 5 RAREST PAIRS (least frequent) ═══
+{chr(10).join(fmt_pair(p) for p in bottom_pairs[:5])}
+
+═══ "DUE" PAIRS (high historical freq, absent from last 30 draws) ═══
+{due_str}
+
+═══ SUGGESTED NEXT DRAW PAIRS ═══
+1. Hottest Overall: {suggestions[0]['pair'] if len(suggestions)>0 else 'N/A'} (score: {suggestions[0]['score'] if len(suggestions)>0 else 0})
+2. Due Pair:        {suggestions[1]['pair'] if len(suggestions)>1 else 'N/A'} (score: {suggestions[1]['score'] if len(suggestions)>1 else 0})
+3. Diversified:     {suggestions[2]['pair'] if len(suggestions)>2 else 'N/A'} (score: {suggestions[2]['score'] if len(suggestions)>2 else 0})
+
+Write a structured analysis with EXACTLY these sections:
+
+CONNECTION LEADERS
+Name the top 3 hottest pairs with their counts and what their strong connection implies statistically.
+
+DUE PAIRS INSIGHT
+Explain what "due pairs" means in this context and highlight the most interesting due pair and why it's worth watching.
+
+NEXT DRAW PAIR RECOMMENDATIONS
+Discuss each of the 3 suggested pairs above — why each was selected (hottest, due, diversified) and what using these pairs together might look like in a 5-number selection.
+
+STRATEGY NOTE
+One concrete sentence on how to use co-occurrence data when selecting 5 white balls (e.g., anchor on the hottest pair, fill remaining 3 from different decades).
+
+CONFIDENCE NOTE
+One sentence reminder that lottery draws are statistically independent events.
+
+Be specific — reference actual pair numbers and counts throughout."""
+
+        groq_api_key = os.environ.get('GROQ_API_KEY', '')
+        response = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {groq_api_key}',
+                'Content-Type': 'application/json'
+            },
+            json={
+                'model':       'llama-3.1-8b-instant',
+                'messages':    [{'role': 'user', 'content': prompt}],
+                'max_tokens':  600,
+                'temperature': 0.6
+            },
+            timeout=30
+        )
+
+        result = response.json()
+        if 'error' in result:
+            return jsonify({'error': result['error'].get('message', 'Groq API error')}), 500
+
+        analysis = result['choices'][0]['message']['content'].strip()
+
+        return jsonify({
+            'analysis':    analysis,
+            'suggestions': suggestions,
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 initialize_core_data()
 
 # ── Start the draw-day scheduler ──────────────────────────────
