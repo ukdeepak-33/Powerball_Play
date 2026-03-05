@@ -8165,6 +8165,216 @@ Be specific — always reference actual ball numbers, percentages, and counts.""
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+# ── Paste into index.py with your other API routes ───────────────────────────
+
+@app.route('/api/pb-frequency-year-ai', methods=['POST'])
+def pb_frequency_year_ai():
+    try:
+        payload     = request.get_json()
+        years       = payload.get('years', [])
+        pb_summary  = payload.get('pb_summary', [])   # [{pb, total, by_year:[{year,freq}]}]
+        grand_total = payload.get('grand_total', 0)
+        global_max  = payload.get('global_max', 0)
+
+        if not pb_summary or not years:
+            return jsonify({'error': 'No data provided'}), 400
+
+        # ── Compute stats ──────────────────────────────────────
+        # Sort by total
+        sorted_by_total = sorted(pb_summary, key=lambda x: -x['total'])
+        top5   = sorted_by_total[:5]
+        bottom5= sorted_by_total[-5:]
+
+        # Linear slope per PB
+        def slope(by_year):
+            n = len(by_year)
+            if n < 2: return 0
+            x_mean = (n - 1) / 2
+            y_mean = sum(d['freq'] for d in by_year) / n
+            num = sum((i - x_mean) * (by_year[i]['freq'] - y_mean) for i in range(n))
+            den = sum((i - x_mean) ** 2 for i in range(n))
+            return round(num / den, 3) if den else 0
+
+        slopes = {row['pb']: slope(row['by_year']) for row in pb_summary}
+        risers  = sorted(slopes.items(), key=lambda x: -x[1])[:5]
+        fallers = sorted(slopes.items(), key=lambda x:  x[1])[:5]
+
+        # Year dominance — which PB was top each year
+        yearly_winners = {}
+        for yr in years:
+            yr_freqs = [(row['pb'], next((d['freq'] for d in row['by_year'] if d['year'] == yr), 0))
+                        for row in pb_summary]
+            yr_freqs.sort(key=lambda x: -x[1])
+            yearly_winners[yr] = yr_freqs[0] if yr_freqs else (0, 0)
+
+        # Consistency: std dev across years
+        def std_dev(by_year):
+            freqs = [d['freq'] for d in by_year]
+            mean  = sum(freqs) / len(freqs) if freqs else 0
+            var   = sum((v - mean) ** 2 for v in freqs) / len(freqs) if freqs else 0
+            return round(var ** 0.5, 2)
+
+        stdevs = {row['pb']: std_dev(row['by_year']) for row in pb_summary}
+        most_volatile   = sorted(stdevs.items(), key=lambda x: -x[1])[:3]
+        most_consistent = sorted(stdevs.items(), key=lambda x:  x[1])[:3]
+
+        # Low/High range split: PBs 1-13 vs 14-26
+        low_total  = sum(r['total'] for r in pb_summary if r['pb'] <= 13)
+        high_total = sum(r['total'] for r in pb_summary if r['pb'] > 13)
+        total_all  = low_total + high_total
+        low_pct    = round(low_total  / total_all * 100, 1) if total_all else 0
+        high_pct   = round(high_total / total_all * 100, 1) if total_all else 0
+
+        # Recent 3 years low/high split
+        recent_years = years[-3:] if len(years) >= 3 else years
+        rl = sum(next((d['freq'] for d in r['by_year'] if d['year'] in recent_years), 0)
+                 for r in pb_summary if r['pb'] <= 13)
+        rh = sum(next((d['freq'] for d in r['by_year'] if d['year'] in recent_years), 0)
+                 for r in pb_summary if r['pb'] > 13)
+        # Fix: sum across all recent years
+        rl = sum(
+            sum(d['freq'] for d in r['by_year'] if d['year'] in recent_years)
+            for r in pb_summary if r['pb'] <= 13
+        )
+        rh = sum(
+            sum(d['freq'] for d in r['by_year'] if d['year'] in recent_years)
+            for r in pb_summary if r['pb'] > 13
+        )
+        rt = rl + rh
+        recent_low_pct  = round(rl / rt * 100, 1) if rt else 0
+        recent_high_pct = round(rh / rt * 100, 1) if rt else 0
+
+        # Momentum: last 3 years avg vs previous 3
+        def momentum(by_year):
+            freqs = [d['freq'] for d in by_year]
+            if len(freqs) < 6: return 0
+            recent   = sum(freqs[-3:]) / 3
+            previous = sum(freqs[-6:-3]) / 3
+            if previous == 0: return 100 if recent > 0 else 0
+            return round((recent - previous) / previous * 100, 1)
+
+        mom = {row['pb']: momentum(row['by_year']) for row in pb_summary}
+        top_momentum = sorted(mom.items(), key=lambda x: -x[1])[:3]
+
+        # ── Build insights for chips ───────────────────────────
+        insights = [
+            {
+                'label': '🔥 All-Time Hottest',
+                'balls': [r['pb'] for r in top5[:3]],
+                'value': '',
+            },
+            {
+                'label': '❄️ All-Time Coldest',
+                'balls': [r['pb'] for r in bottom5[:3]],
+                'value': '',
+            },
+            {
+                'label': '📈 Rising PBs',
+                'balls': [b for b, s in risers[:3]],
+                'value': '',
+            },
+            {
+                'label': '📉 Falling PBs',
+                'balls': [b for b, s in fallers[:3]],
+                'value': '',
+            },
+            {
+                'label': '⚡ Top Momentum',
+                'balls': [b for b, m in top_momentum],
+                'value': '',
+            },
+            {
+                'label': '◑ Low vs High Split',
+                'balls': [],
+                'value': f'1–13: {recent_low_pct}% · 14–26: {recent_high_pct}% (recent)',
+            },
+        ]
+
+        # ── Build prompt ───────────────────────────────────────
+        prompt = f"""You are an expert Powerball analyst. Analyse annual Powerball frequency patterns across {len(years)} years ({years[0]}–{years[-1]}).
+
+═══ OVERVIEW ═══
+Total Powerballs drawn: {grand_total}
+Years analysed: {', '.join(str(y) for y in years)}
+Average per PB per year: {round(grand_total / 26 / len(years), 1)}
+
+═══ ALL-TIME TOP 5 ═══
+{chr(10).join(f"  PB {r['pb']}: {r['total']} total draws" for r in top5)}
+
+═══ ALL-TIME BOTTOM 5 ═══
+{chr(10).join(f"  PB {r['pb']}: {r['total']} total draws" for r in bottom5)}
+
+═══ TREND SLOPES (draws/year) ═══
+Top 5 rising:  {', '.join(f"PB {b} ({s:+.2f})" for b, s in risers)}
+Top 5 falling: {', '.join(f"PB {b} ({s:+.2f})" for b, s in fallers)}
+
+═══ YEARLY WINNERS ═══
+{chr(10).join(f"  {yr}: PB {w[0]} ({w[1]} times)" for yr, w in yearly_winners.items())}
+
+═══ VOLATILITY ═══
+Most volatile:   {', '.join(f"PB {b} (σ={v})" for b, v in most_volatile)}
+Most consistent: {', '.join(f"PB {b} (σ={v})" for b, v in most_consistent)}
+
+═══ MOMENTUM (recent 3yr vs prior 3yr) ═══
+{', '.join(f"PB {b}: {m:+.1f}%" for b, m in top_momentum)}
+
+═══ LOW/HIGH RANGE SPLIT (1–13 vs 14–26) ═══
+All-time:  Low={low_pct}%, High={high_pct}%
+Recent {len(recent_years)}yr: Low={recent_low_pct}%, High={recent_high_pct}%
+Dominant range recently: {'1–13 (LOW)' if recent_low_pct >= 50 else '14–26 (HIGH)'}
+
+Write EXACTLY these 5 sections, each header on its own line:
+
+DOMINANT NUMBERS
+Name the top 3 all-time Powerballs with their totals. Are they clustered in any range (low 1–13 or high 14–26)?
+
+RISING & FALLING TRENDS
+Name the top 2 rising and top 2 falling Powerballs. What does the trend slope mean practically — how many extra/fewer appearances per year?
+
+YEAR-BY-YEAR WINNERS
+Identify any PB that won multiple years in a row. Does any number show a dominant streak? Name specific years.
+
+VOLATILITY INSIGHT
+Contrast the most volatile vs most consistent Powerball. Which strategy benefits from each — chasing hot streaks vs steady frequency plays?
+
+LOW vs HIGH RANGE DOMINANCE
+Analyse the 1–13 vs 14–26 split all-time and recently. Has the dominant range shifted? Give a concrete recommendation on which range to weight for the next draw.
+
+End with one NEXT DRAW PICK — a single Powerball recommendation backed by momentum, trend, and range dominance data combined. State the number and one sentence justification.
+
+Always reference specific PB numbers and counts."""
+
+        groq_api_key = os.environ.get('GROQ_API_KEY', '')
+        response = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {groq_api_key}',
+                'Content-Type': 'application/json'
+            },
+            json={
+                'model':       'llama-3.1-8b-instant',
+                'messages':    [{'role': 'user', 'content': prompt}],
+                'max_tokens':  700,
+                'temperature': 0.6
+            },
+            timeout=35
+        )
+
+        result = response.json()
+        if 'error' in result:
+            return jsonify({'error': result['error'].get('message', 'Groq API error')}), 500
+
+        analysis = result['choices'][0]['message']['content'].strip()
+
+        return jsonify({
+            'analysis': analysis,
+            'insights': insights,
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 initialize_core_data()
 
 # ── Start the draw-day scheduler ──────────────────────────────
