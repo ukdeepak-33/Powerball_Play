@@ -7162,13 +7162,20 @@ def odd_even_ai_analysis():
         odd_pct        = round((odd_heavy  / total_draws) * 100, 1) if total_draws else 0
         even_pct       = round((even_heavy / total_draws) * 100, 1) if total_draws else 0
 
-        last_majority = 'odd' if (' Odd' in trends[0]['split_category'] and
-            int(trends[0]['split_category'].split(' Odd')[0]) >= 3) else 'even'
+        # ── Helper: safely extract odd count from split_category ──
+        def odd_count(sc):
+            sc = sc or ''
+            if 'All Odd'  in sc: return 5
+            if 'All Even' in sc: return 0
+            try:
+                return int(sc.split(' Odd')[0].strip()) if ' Odd' in sc else 0
+            except (ValueError, IndexError):
+                return 0
+
+        last_majority = 'odd' if odd_count(trends[0]['split_category']) >= 3 else 'even'
         streak = 1
         for t in trends[1:6]:
-            sc    = t['split_category']
-            odd_n = int(sc.split(' Odd')[0]) if ' Odd' in sc else 0
-            if ('odd' if odd_n >= 3 else 'even') == last_majority:
+            if ('odd' if odd_count(t['split_category']) >= 3 else 'even') == last_majority:
                 streak += 1
             else:
                 break
@@ -7367,6 +7374,8 @@ Be specific — reference actual frequencies and percentages. Format each sectio
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
 
 initialize_core_data()
 
