@@ -1,43 +1,931 @@
 {% extends "base.html" %}
 
-{% block title %}Powerball Frequency by Year{% endblock %}
-
-{% block page_heading %}Powerball Frequency by Year (Last 9 Years){% endblock %}
+{% block title %}Powerball Frequency by Year — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
-<div class="card p-6 bg-white rounded-lg shadow-lg">
-    <h2 class="text-2xl font-bold mb-4 text-gray-800">Powerball Occurrences by Year</h2>
-    <p class="text-gray-700 mb-4">This table shows how many times each Powerball number (1-26) has been drawn in each of the last nine years.</p>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap');
 
-    {% if yearly_pb_freq_data %}
-        <div class="overflow-x-auto">
-            <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
-                <thead class="bg-gray-100">
-                    <tr>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">PB</th>
-                        {% for year in years %}
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-center text-sm font-semibold text-gray-600 uppercase tracking-wider">{{ year }}</th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row_data in yearly_pb_freq_data %}
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900 font-bold">{{ row_data.Powerball }}</td>
-                        {% for year in years %}
-                        <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900 text-center">
-                            {{ row_data['Year_' + year|string] }}
-                        </td>
-                        {% endfor %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+  :root {
+    --bg:      #0a0608;
+    --s1:      #120a0c;
+    --s2:      #1a0e10;
+    --s3:      #221318;
+    --border:  rgba(255,255,255,0.07);
+    --text:    rgba(255,255,255,0.87);
+    --muted:   rgba(255,255,255,0.36);
+    --red:     #f43f5e;
+    --red2:    #be123c;
+    --rose:    #fb7185;
+    --crimson: #e11d48;
+    --orange:  #f97316;
+    --amber:   #f59e0b;
+    --gold:    #fbbf24;
+    --cool:    #38bdf8;
+  }
+
+  #pb-yr-page * { box-sizing: border-box; }
+  #pb-yr-page {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    color: var(--text);
+    padding-bottom: 80px;
+  }
+
+  /* ── Hero ── */
+  .pbyr-hero {
+    position: relative;
+    padding: 56px 24px 44px;
+    text-align: center;
+    overflow: hidden;
+  }
+  .pbyr-hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 55% 55% at 50% 0%,  rgba(244,63,94,0.1) 0%, transparent 65%),
+      radial-gradient(ellipse 30% 40% at 15% 60%, rgba(225,29,72,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 30% 40% at 85% 60%, rgba(249,115,22,0.05) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .pbyr-hero::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--red), var(--orange), var(--red), transparent);
+    opacity: 0.4;
+  }
+  .pbyr-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 14px;
+    opacity: 0.85;
+  }
+  .pbyr-hero h1 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: clamp(42px, 6vw, 80px);
+    font-weight: 700;
+    line-height: 1.02;
+    margin: 0 0 14px;
+    background: linear-gradient(135deg, var(--rose) 0%, #fff 45%, var(--orange) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 1px;
+  }
+  .pbyr-hero p {
+    font-size: 14px;
+    color: var(--muted);
+    max-width: 500px;
+    margin: 0 auto;
+    line-height: 1.75;
+  }
+
+  /* ── Layout ── */
+  .pbyr-wrap {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  /* ── Card ── */
+  .pbyr-card {
+    background: var(--s1);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 26px 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  .pbyr-card-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 4px;
+    letter-spacing: 0.5px;
+  }
+  .pbyr-card-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin: 0 0 20px;
+  }
+
+  /* ── Overview stat chips ── */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 680px) { .stat-grid { grid-template-columns: 1fr 1fr; } }
+
+  .st-chip {
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+  .st-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .st-value {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+  }
+  .st-note {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ── Chart ── */
+  .chart-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .chart-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .pb-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .pb-sel-btn {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid rgba(244,63,94,0.25);
+    background: var(--s2);
+    color: var(--muted);
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .pb-sel-btn:hover {
+    border-color: var(--red);
+    color: var(--rose);
+    background: rgba(244,63,94,0.08);
+  }
+  .pb-sel-btn.active {
+    background: radial-gradient(circle at 35% 35%, #ff8a80 0%, #ef5350 50%, #b71c1c 100%);
+    color: #fff;
+    border-color: var(--red);
+    box-shadow: 0 0 0 2px rgba(244,63,94,0.4), 0 0 12px rgba(244,63,94,0.3);
+  }
+
+  .chart-canvas-wrap {
+    position: relative; height: 260px;
+  }
+
+  /* ── Leaderboard ── */
+  .lb-year-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .lb-year-tab {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .lb-year-tab:hover:not(.active) { border-color: rgba(244,63,94,0.3); color: var(--text); }
+  .lb-year-tab.active {
+    background: rgba(244,63,94,0.12);
+    border-color: rgba(244,63,94,0.4);
+    color: var(--rose);
+  }
+
+  .lb-list { display: flex; flex-direction: column; gap: 7px; }
+  .lb-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    transition: border-color 0.15s;
+  }
+  .lb-row:hover { border-color: rgba(244,63,94,0.2); }
+
+  .lb-rank {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--muted);
+    min-width: 22px;
+    text-align: center;
+  }
+  .lb-rank.r1 { color: var(--gold); }
+  .lb-rank.r2 { color: #94a3b8; }
+  .lb-rank.r3 { color: #b45309; }
+
+  .lb-pb-ball {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, #ff8a80 0%, #ef5350 50%, #b71c1c 100%);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(244,63,94,0.3);
+    flex-shrink: 0;
+  }
+
+  .lb-bar-wrap { flex: 1; height: 6px; background: var(--s3); border-radius: 3px; }
+  .lb-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--red2), var(--rose));
+    transition: width 0.8s ease;
+  }
+  .lb-count {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    min-width: 28px;
+    text-align: right;
+  }
+
+  /* ── Heatmap Table ── */
+  .heat-controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .heat-toggle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .heat-toggle.on {
+    background: rgba(244,63,94,0.1);
+    border-color: rgba(244,63,94,0.35);
+    color: var(--rose);
+  }
+
+  .tbl-scroll { overflow-x: auto; border-radius: 10px; }
+
+  table.pbyr-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 500px;
+  }
+  table.pbyr-table thead th {
+    background: var(--s2);
+    padding: 10px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.pbyr-table thead th:first-child { text-align: left; }
+
+  table.pbyr-table tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    transition: background 0.12s;
+  }
+  table.pbyr-table tbody tr:hover { background: rgba(244,63,94,0.04); }
+  table.pbyr-table tbody tr:last-child { border-bottom: none; }
+  table.pbyr-table td {
+    padding: 9px 12px;
+    text-align: center;
+    vertical-align: middle;
+    font-size: 13px;
+  }
+  table.pbyr-table td:first-child { text-align: left; }
+
+  /* PB ball in table */
+  .tbl-pb-ball {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, #ff8a80 0%, #ef5350 50%, #b71c1c 100%);
+    color: #fff;
+    box-shadow: 0 1px 6px rgba(244,63,94,0.25);
+  }
+
+  /* Heat cell */
+  .heat-cell {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 5px;
+    padding: 4px 8px;
+    display: inline-block;
+    min-width: 28px;
+    text-align: center;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  /* Trend indicator */
+  .trend-chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-left: 4px;
+  }
+  .trend-up   { background: rgba(16,185,129,0.15); color: #34d399; }
+  .trend-down { background: rgba(244,63,94,0.15);  color: var(--rose); }
+  .trend-flat { background: rgba(255,255,255,0.06); color: var(--muted); }
+
+  /* ── AI Panel ── */
+  .ai-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--red), var(--orange), transparent);
+    opacity: 0.4;
+  }
+  .ai-header {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap; gap: 14px;
+  }
+  .ai-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--rose); opacity: 0.8; margin-bottom: 3px;
+  }
+  .ai-panel-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 20px; font-weight: 700; color: #fff; margin: 0;
+  }
+  .ai-btn {
+    display: flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, var(--red2), var(--red));
+    color: #fff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+    border: none; border-radius: 10px; padding: 12px 22px;
+    cursor: pointer; white-space: nowrap;
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    box-shadow: 0 0 20px rgba(244,63,94,0.2);
+  }
+  .ai-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 36px rgba(244,63,94,0.45); }
+  .ai-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .ai-thinking {
+    display: none; align-items: center; gap: 10px;
+    padding: 14px 0 4px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: rgba(244,63,94,0.7); letter-spacing: 1px;
+  }
+  .ai-thinking.visible { display: flex; }
+  .ai-dots span {
+    display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--red); margin: 0 2px;
+    animation: dotB 1.2s infinite;
+  }
+  .ai-dots span:nth-child(2) { animation-delay: 0.2s; background: var(--orange); }
+  .ai-dots span:nth-child(3) { animation-delay: 0.4s; background: var(--gold); }
+  @keyframes dotB { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1);opacity:1} }
+
+  .ai-output {
+    display: none; margin-top: 20px;
+    border-top: 1px solid rgba(244,63,94,0.1);
+    padding-top: 20px;
+  }
+  .ai-output.visible { display: block; }
+
+  .ai-insight-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin-bottom: 20px;
+  }
+  .ai-ins {
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px;
+  }
+  .ai-ins-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+  }
+  .ai-ins-value { font-size: 13px; font-weight: 500; color: #fff; line-height: 1.5; }
+
+  /* PB ball tag */
+  .pb-tag {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, #ff8a80 0%, #ef5350 50%, #b71c1c 100%);
+    color: #fff;
+    box-shadow: 0 1px 4px rgba(244,63,94,0.3);
+    flex-shrink: 0;
+  }
+  .pb-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+
+  .ai-narrative {
+    background: var(--s2);
+    border: 1px solid rgba(244,63,94,0.1);
+    border-left: 3px solid var(--red);
+    border-radius: 0 10px 10px 0;
+    padding: 18px 20px; font-size: 14px; line-height: 1.85;
+    color: var(--text); white-space: pre-wrap;
+  }
+  .ai-error {
+    margin-top: 14px; background: rgba(244,63,94,0.08);
+    border: 1px solid rgba(244,63,94,0.25);
+    border-radius: 10px; padding: 12px 16px;
+    font-size: 13px; color: #ff8aaa;
+  }
+
+  /* Heat legend */
+  .heat-legend {
+    display: flex; align-items: center;
+    gap: 10px; flex-wrap: wrap;
+    margin-left: auto;
+  }
+  .hl-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--muted); letter-spacing: 0.5px;
+  }
+  .hl-strip {
+    width: 100px; height: 8px; border-radius: 4px;
+    background: linear-gradient(90deg, rgba(244,63,94,0.1), rgba(244,63,94,0.9));
+  }
+</style>
+
+<div id="pb-yr-page">
+
+  <!-- Hero -->
+  <div class="pbyr-hero">
+    <p class="pbyr-eyebrow">🔴 Annual Powerball Intelligence</p>
+    <h1>Powerball Frequency<br>by Year</h1>
+    <p>How often each Powerball (1–26) has appeared across the last {{ years|length }} years — with heat mapping, trend detection, and AI analysis.</p>
+  </div>
+
+  <div class="pbyr-wrap">
+
+  {% if yearly_pb_freq_data %}
+
+    <!-- ── Overview stats ── -->
+    <div class="pbyr-card">
+      <p class="pbyr-card-title">Overview</p>
+      <p class="pbyr-card-sub">{{ years|length }} years of Powerball frequency data · Numbers 1–26</p>
+      <div class="stat-grid">
+        <div class="st-chip">
+          <p class="st-label">Total Powerballs</p>
+          <p class="st-value" id="stTotal" style="color:var(--rose)">—</p>
+          <p class="st-note">across all years</p>
         </div>
-    {% else %}
-        <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
-            No Powerball frequency data available for the last 9 years.
+        <div class="st-chip">
+          <p class="st-label">Hottest PB</p>
+          <p class="st-value" id="stHottestPb" style="color:var(--red);font-size:22px">—</p>
+          <p class="st-note" id="stHottestNote">all-time</p>
         </div>
-    {% endif %}
-</div>
+        <div class="st-chip">
+          <p class="st-label">Coldest PB</p>
+          <p class="st-value" id="stColdest" style="color:var(--cool);font-size:22px">—</p>
+          <p class="st-note" id="stColdestNote">all-time</p>
+        </div>
+        <div class="st-chip">
+          <p class="st-label">Avg Per Year</p>
+          <p class="st-value" id="stAvg" style="color:var(--amber)">—</p>
+          <p class="st-note">per PB number</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Chart: select a PB ── -->
+    <div class="pbyr-card">
+      <p class="pbyr-card-title">Year-by-Year Trend</p>
+      <p class="pbyr-card-sub">Click a Powerball to view its annual frequency chart</p>
+      <div class="chart-controls">
+        <span class="chart-label">Select PB →</span>
+        <div class="pb-selector" id="pbSelector"></div>
+      </div>
+      <div class="chart-canvas-wrap">
+        <canvas id="pbYearChart"></canvas>
+      </div>
+    </div>
+
+    <!-- ── Leaderboard ── -->
+    <div class="pbyr-card">
+      <p class="pbyr-card-title">Year Leaderboard</p>
+      <p class="pbyr-card-sub">Top Powerballs for each year — click a year to see its ranking</p>
+      <div class="lb-year-tabs" id="lbYearTabs">
+        {% for year in years %}
+        <button class="lb-year-tab{% if loop.first %} active{% endif %}" data-year="{{ year }}">{{ year }}</button>
+        {% endfor %}
+      </div>
+      <div class="lb-list" id="lbList"></div>
+    </div>
+
+    <!-- ── AI Panel ── -->
+    <div class="pbyr-card ai-card">
+      <div class="ai-header">
+        <div>
+          <p class="ai-eyebrow">✦ Groq AI · Powerball Intelligence</p>
+          <p class="ai-panel-title">Annual Pattern Analysis</p>
+        </div>
+        <button class="ai-btn" id="aiBtn">◈ Analyse Patterns</button>
+      </div>
+      <div class="ai-thinking" id="aiThinking">
+        <div class="ai-dots"><span></span><span></span><span></span></div>
+        Scanning annual patterns…
+      </div>
+      <div class="ai-output" id="aiOutput">
+        <div class="ai-insight-grid" id="aiInsights"></div>
+        <div class="ai-narrative" id="aiNarrative"></div>
+      </div>
+      <div class="ai-error" id="aiError" style="display:none"></div>
+    </div>
+
+    <!-- ── Heatmap Table ── -->
+    <div class="pbyr-card">
+      <div class="heat-controls">
+        <p class="pbyr-card-title" style="margin:0">Frequency Heatmap</p>
+        <button class="heat-toggle on" id="heatToggle">🌡 Heat On</button>
+        <div class="heat-legend">
+          <span class="hl-label">Low</span>
+          <div class="hl-strip"></div>
+          <span class="hl-label">High</span>
+        </div>
+      </div>
+      <p class="pbyr-card-sub">Powerball × Year frequency — brighter cells = more appearances</p>
+      <div class="tbl-scroll">
+        <table class="pbyr-table" id="pbyrTable">
+          <thead>
+            <tr id="tblHeader">
+              <th>PB</th>
+              {% for year in years %}
+              <th>{{ year }}</th>
+              {% endfor %}
+              <th>Total</th>
+              <th>Trend</th>
+            </tr>
+          </thead>
+          <tbody id="tblBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  {% else %}
+    <div class="pbyr-card" style="text-align:center;padding:60px">
+      <p style="font-size:36px;margin-bottom:12px">🔴</p>
+      <p style="color:var(--muted);font-size:14px">No Powerball frequency data available for the last 9 years.</p>
+    </div>
+  {% endif %}
+
+  </div><!-- /pbyr-wrap -->
+</div><!-- /pb-yr-page -->
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+  const rawData = {{ yearly_pb_freq_data | tojson }};
+  const years   = {{ years | tojson }};
+
+  if (!rawData || !rawData.length || !years || !years.length) return;
+
+  // ── Build lookup: {pb: {year: freq}} ──────────────────────
+  const lookup = {};
+  rawData.forEach(row => {
+    const pb = row.Powerball;
+    lookup[pb] = {};
+    years.forEach(yr => { lookup[pb][yr] = row[`Year_${yr}`] || 0; });
+  });
+
+  const allPBs = rawData.map(r => r.Powerball).sort((a,b) => a-b);
+
+  // ── Overview stats ────────────────────────────────────────
+  const totals = {};
+  allPBs.forEach(pb => {
+    totals[pb] = years.reduce((s, yr) => s + (lookup[pb][yr] || 0), 0);
+  });
+
+  const grandTotal  = Object.values(totals).reduce((s,v) => s+v, 0);
+  const hottestPb   = Object.entries(totals).sort((a,b) => b[1]-a[1])[0];
+  const coldestPb   = Object.entries(totals).sort((a,b) => a[1]-b[1])[0];
+  const avgPerYear  = Math.round(grandTotal / allPBs.length / years.length);
+
+  document.getElementById('stTotal').textContent      = grandTotal;
+  document.getElementById('stHottestPb').textContent  = `PB ${hottestPb[0]}`;
+  document.getElementById('stHottestNote').textContent = `${hottestPb[1]} times`;
+  document.getElementById('stColdest').textContent    = `PB ${coldestPb[0]}`;
+  document.getElementById('stColdestNote').textContent = `${coldestPb[1]} times`;
+  document.getElementById('stAvg').textContent        = avgPerYear;
+
+  // ── PB Selector ───────────────────────────────────────────
+  let selectedPb  = allPBs[0];
+  let pbChart     = null;
+  const selector  = document.getElementById('pbSelector');
+
+  allPBs.forEach(pb => {
+    const btn = document.createElement('button');
+    btn.className = 'pb-sel-btn' + (pb === selectedPb ? ' active' : '');
+    btn.textContent = pb;
+    btn.dataset.pb = pb;
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.pb-sel-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedPb = pb;
+      renderChart();
+    });
+    selector.appendChild(btn);
+  });
+
+  // ── Chart ─────────────────────────────────────────────────
+  function renderChart() {
+    const freqs  = years.map(yr => lookup[selectedPb]?.[yr] || 0);
+    const maxF   = Math.max(...freqs, 1);
+    const colors = freqs.map(v => {
+      const t = v / maxF;
+      return `rgba(${Math.round(190 + 54*t)}, ${Math.round(63 - 20*t)}, ${Math.round(94 - 30*t)}, ${0.5 + 0.45*t})`;
+    });
+
+    if (pbChart) { pbChart.destroy(); pbChart = null; }
+
+    pbChart = new Chart(
+      document.getElementById('pbYearChart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: years.map(String),
+        datasets: [{
+          label: `PB ${selectedPb}`,
+          data: freqs,
+          backgroundColor: colors,
+          borderColor: colors.map(c => c.replace(/[\d.]+\)$/, '1)')),
+          borderWidth: 1,
+          borderRadius: 6,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        animation: { duration: 400 },
+        scales: {
+          x: {
+            grid: { color: 'rgba(255,255,255,0.03)' },
+            ticks: { color: 'rgba(255,255,255,0.4)', font: { family: 'JetBrains Mono', size: 10 } }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            ticks: { color: 'rgba(255,255,255,0.4)', precision: 0 },
+            title: { display: true, text: 'Times Drawn', color: 'rgba(255,255,255,0.25)', font: { size: 10 } }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1a0e10',
+            borderColor: 'rgba(244,63,94,0.3)', borderWidth: 1,
+            titleColor: 'rgba(255,255,255,0.7)', bodyColor: 'rgba(255,255,255,0.55)',
+            padding: 12, titleFont: { family: 'JetBrains Mono', size: 11 },
+            callbacks: { label: ctx => ` ${ctx.raw} times` }
+          }
+        }
+      }
+    });
+  }
+  renderChart();
+
+  // ── Leaderboard ───────────────────────────────────────────
+  let activeYear = years[0];
+
+  function renderLeaderboard(year) {
+    const list = document.getElementById('lbList');
+    list.innerHTML = '';
+    const ranked = allPBs
+      .map(pb => ({ pb, count: lookup[pb]?.[year] || 0 }))
+      .sort((a,b) => b.count - a.count)
+      .slice(0, 10);
+
+    const maxC = ranked[0]?.count || 1;
+    ranked.forEach((item, i) => {
+      const barW = Math.round((item.count / maxC) * 100);
+      const rankClass = i === 0 ? 'r1' : i === 1 ? 'r2' : i === 2 ? 'r3' : '';
+      const row = document.createElement('div');
+      row.className = 'lb-row';
+      row.innerHTML = `
+        <span class="lb-rank ${rankClass}">${i+1}</span>
+        <span class="lb-pb-ball">${item.pb}</span>
+        <div class="lb-bar-wrap"><div class="lb-bar-fill" style="width:${barW}%"></div></div>
+        <span class="lb-count">${item.count}</span>
+      `;
+      list.appendChild(row);
+    });
+  }
+
+  document.querySelectorAll('.lb-year-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.lb-year-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      activeYear = parseInt(tab.dataset.year);
+      renderLeaderboard(activeYear);
+    });
+  });
+  renderLeaderboard(activeYear);
+
+  // ── Heatmap Table ─────────────────────────────────────────
+  let heatOn = true;
+  const globalMax = Math.max(...allPBs.flatMap(pb => years.map(yr => lookup[pb]?.[yr] || 0)));
+
+  function heatColor(val) {
+    if (!heatOn || val === 0) return '';
+    const t = val / globalMax;
+    const a = 0.08 + t * 0.55;
+    return `background:rgba(244,63,94,${a.toFixed(2)});color:rgba(255,255,255,${(0.45 + t*0.5).toFixed(2)})`;
+  }
+
+  function trendChip(pb) {
+    const freqs = years.map(yr => lookup[pb]?.[yr] || 0);
+    const n = freqs.length;
+    if (n < 2) return '<span class="trend-chip trend-flat">—</span>';
+    // Compare last 3 vs first 3
+    const recent = freqs.slice(-3).reduce((s,v)=>s+v,0) / 3;
+    const early  = freqs.slice(0, 3).reduce((s,v)=>s+v,0) / 3;
+    const diff   = recent - early;
+    if (diff >  0.5) return `<span class="trend-chip trend-up">↑ ${diff.toFixed(1)}</span>`;
+    if (diff < -0.5) return `<span class="trend-chip trend-down">↓ ${Math.abs(diff).toFixed(1)}</span>`;
+    return '<span class="trend-chip trend-flat">→</span>';
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById('tblBody');
+    tbody.innerHTML = '';
+    const frag = document.createDocumentFragment();
+
+    allPBs.forEach(pb => {
+      const tr = document.createElement('tr');
+
+      // PB ball cell
+      const tdBall = document.createElement('td');
+      tdBall.innerHTML = `<span class="tbl-pb-ball">${pb}</span>`;
+      tr.appendChild(tdBall);
+
+      // Year cells
+      let rowTotal = 0;
+      years.forEach(yr => {
+        const val = lookup[pb]?.[yr] || 0;
+        rowTotal += val;
+        const td = document.createElement('td');
+        const style = heatColor(val);
+        td.innerHTML = val > 0
+          ? `<span class="heat-cell" style="${style}">${val}</span>`
+          : `<span style="color:rgba(255,255,255,0.15);font-family:'JetBrains Mono',monospace;font-size:11px">—</span>`;
+        tr.appendChild(td);
+      });
+
+      // Total
+      const tdTot = document.createElement('td');
+      tdTot.innerHTML = `<span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--rose)">${rowTotal}</span>`;
+      tr.appendChild(tdTot);
+
+      // Trend
+      const tdTrend = document.createElement('td');
+      tdTrend.innerHTML = trendChip(pb);
+      tr.appendChild(tdTrend);
+
+      frag.appendChild(tr);
+    });
+    tbody.appendChild(frag);
+  }
+  renderTable();
+
+  document.getElementById('heatToggle').addEventListener('click', function () {
+    heatOn = !heatOn;
+    this.textContent = heatOn ? '🌡 Heat On' : '🌡 Heat Off';
+    this.classList.toggle('on', heatOn);
+    renderTable();
+  });
+
+  // ── AI Analysis ───────────────────────────────────────────
+  document.getElementById('aiBtn').addEventListener('click', async function () {
+    const btn      = this;
+    const thinking = document.getElementById('aiThinking');
+    const output   = document.getElementById('aiOutput');
+    const narrative= document.getElementById('aiNarrative');
+    const errorEl  = document.getElementById('aiError');
+    const insWrap  = document.getElementById('aiInsights');
+
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Thinking…';
+    thinking.classList.add('visible');
+    output.classList.remove('visible');
+    errorEl.style.display = 'none';
+    narrative.textContent = '';
+    insWrap.innerHTML = '';
+
+    // Build per-PB totals and trends
+    const pbSummary = allPBs.map(pb => ({
+      pb,
+      total:  totals[pb],
+      by_year: years.map(yr => ({ year: yr, freq: lookup[pb]?.[yr] || 0 })),
+    }));
+
+    try {
+      const res = await fetch('/api/pb-frequency-year-ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          years,
+          pb_summary: pbSummary,
+          grand_total: grandTotal,
+          global_max: globalMax,
+        })
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        errorEl.textContent = 'AI unavailable: ' + data.error;
+        errorEl.style.display = 'block';
+      } else {
+        // Render insight chips
+        (data.insights || []).forEach(ins => {
+          const card = document.createElement('div');
+          card.className = 'ai-ins';
+          const ballsHtml = (ins.balls || []).map(b =>
+            `<span class="pb-tag">${b}</span>`
+          ).join('');
+          card.innerHTML = `
+            <p class="ai-ins-label">${ins.label}</p>
+            <div class="ai-ins-value">
+              ${ballsHtml ? `<div class="pb-tags">${ballsHtml}</div>` : ins.value}
+            </div>`;
+          insWrap.appendChild(card);
+        });
+        narrative.textContent = data.analysis;
+        output.classList.add('visible');
+      }
+    } catch (err) {
+      errorEl.textContent = 'Request failed. Please try again.';
+      errorEl.style.display = 'block';
+    } finally {
+      thinking.classList.remove('visible');
+      btn.disabled = false;
+      btn.innerHTML = '◈ Analyse Patterns';
+    }
+  });
+
+});
+</script>
 {% endblock %}
