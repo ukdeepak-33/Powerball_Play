@@ -384,6 +384,70 @@
     padding-top: 18px;
   }
   .ai-output.visible { display: block; }
+
+  /* Combo cards shown before narrative */
+  .combo-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 640px) { .combo-grid { grid-template-columns: 1fr; } }
+
+  .combo-card {
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+  .combo-card-label {
+    font-family: 'Fira Code', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .combo-never {
+    font-family: 'Fira Code', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    display: inline-block;
+    background: rgba(255,255,255,0.05);
+    color: var(--muted);
+  }
+  .combo-card.c3 { border-color: rgba(167,139,250,0.25); }
+  .combo-card.c3 .combo-card-label { color: var(--odd); }
+  .combo-card.c4 { border-color: rgba(251,191,36,0.25); }
+  .combo-card.c4 .combo-card-label { color: var(--gold); }
+  .combo-card.c5 { border-color: rgba(52,211,153,0.25); }
+  .combo-card.c5 .combo-card-label { color: var(--even); }
+
+  .combo-balls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+  }
+  .cb {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Fira Code', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, #e8edf5 0%, #b8c8e0 50%, #8aaac8 100%);
+    color: #0d1829;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 2px rgba(255,255,255,0.5);
+    flex-shrink: 0;
+  }
+  .combo-card.c3 .cb { box-shadow: 0 0 0 2px rgba(167,139,250,0.5), 0 2px 8px rgba(0,0,0,0.4); }
+  .combo-card.c4 .cb { box-shadow: 0 0 0 2px rgba(251,191,36,0.45), 0 2px 8px rgba(0,0,0,0.4); }
+  .combo-card.c5 .cb { box-shadow: 0 0 0 2px rgba(52,211,153,0.45), 0 2px 8px rgba(0,0,0,0.4); }
+
   .ai-narrative {
     background: var(--s2);
     border: 1px solid rgba(167,139,250,0.12);
@@ -478,6 +542,25 @@
         Reading split patterns…
       </div>
       <div class="ai-output" id="aiOutput">
+        <!-- Combo suggestion cards -->
+        <div class="combo-grid" id="comboGrid" style="display:none">
+          <div class="combo-card c3">
+            <p class="combo-card-label">Best 3-Number Combo</p>
+            <p class="combo-never" id="never3"></p>
+            <div class="combo-balls" id="combo3"></div>
+          </div>
+          <div class="combo-card c4">
+            <p class="combo-card-label">Best 4-Number Combo</p>
+            <p class="combo-never" id="never4"></p>
+            <div class="combo-balls" id="combo4"></div>
+          </div>
+          <div class="combo-card c5">
+            <p class="combo-card-label">Best 5-Number Combo</p>
+            <p class="combo-never" id="never5"></p>
+            <div class="combo-balls" id="combo5"></div>
+          </div>
+        </div>
+        <!-- AI narrative -->
         <div class="ai-narrative" id="aiNarrative"></div>
       </div>
       <div class="ai-error" id="aiError"></div>
@@ -652,6 +735,19 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
 
+  // ── Combo ball renderer ───────────────────────────────────
+  function renderComboBalls(containerId, numbers) {
+    const wrap = document.getElementById(containerId);
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    numbers.forEach(n => {
+      const b = document.createElement('span');
+      b.className = 'cb';
+      b.textContent = n;
+      wrap.appendChild(b);
+    });
+  }
+
   // ── AI Analysis ───────────────────────────────────────────
   document.getElementById('aiBtn').addEventListener('click', async function () {
     const btn      = this;
@@ -686,6 +782,20 @@ document.addEventListener('DOMContentLoaded', function () {
         errorEl.textContent = 'AI analysis unavailable: ' + data.error;
         errorEl.style.display = 'block';
       } else {
+        // Render combo cards if returned
+        if (data.combos) {
+          const grid = document.getElementById('comboGrid');
+          grid.style.display = 'grid';
+          renderComboBalls('combo3', data.combos.best_3);
+          renderComboBalls('combo4', data.combos.best_4);
+          renderComboBalls('combo5', data.combos.best_5);
+          // Show unseen pool counts
+          if (data.unseen_counts) {
+            document.getElementById('never3').textContent = `✦ never drawn — ${data.unseen_counts.c3} unseen combos`;
+            document.getElementById('never4').textContent = `✦ never drawn — ${data.unseen_counts.c4} unseen combos`;
+            document.getElementById('never5').textContent = `✦ never drawn — ${data.unseen_counts.c5} unseen combos`;
+          }
+        }
         narrative.textContent = data.analysis;
         output.classList.add('visible');
       }
