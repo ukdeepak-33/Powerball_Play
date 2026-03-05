@@ -1,256 +1,998 @@
 {% extends "base.html" %}
 
-{% block title %}Number Age Distribution & Yearly Trends{% endblock %}
-
-{% block page_heading %}Draws Since Last Appearance & Yearly Trends{% endblock %}
+{% block title %}Number Age Distribution — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
-<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    {# White Ball Age Distribution and Yearly Trends Section #}
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <button class="w-full flex justify-between items-center text-2xl font-bold text-gray-800 focus:outline-none py-2" data-toggle="whiteBallSection">
-            <span>White Ball Analysis</span>
-            <svg class="w-6 h-6 transform transition-transform duration-200" viewBox="0 0 24 24" fill="currentColor" data-arrow="whiteBallSection">
-                <path fill-rule="evenodd" d="M12.53 16.28a.75.75 0 0 1-1.06 0l-7.5-7.5a.75.75 0 0 1 1.06-1.06L12 14.69l6.97-6.97a.75.75 0 1 1 1.06 1.06l-7.5 7.5Z" clip-rule="evenodd" />
-            </svg>
-        </button>
-        <div id="whiteBallSection" class="mt-4 space-y-6">
-            <h3 class="text-xl font-semibold text-gray-800">Detailed White Ball Ages</h3>
-            {% if detailed_white_ball_ages %}
-            <div class="mb-4 flex flex-col sm:flex-row sm:justify-between sm:items-center">
-                <button id="sortByWhiteBallAgeBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-full focus:outline-none focus:shadow-outline transition duration-200 ease-in-out mb-2 sm:mb-0">
-                    Sort by Current Age (Longest First)
-                </button>
-                <span class="text-sm text-gray-600 text-right">
-                    Current Age (Draws Missed) indicates how many draws have occurred since the number last appeared.
-                </span>
-            </div>
-            <div class="overflow-x-auto shadow-md rounded-lg">
-                <table class="min-w-full divide-y divide-gray-200" id="whiteBallAgesTable">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Number</th>
-                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" data-sort="age">Current Age (Draws Missed) <span class="ml-1 text-gray-400">↑↓</span></th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Drawn Date</th>
-                            {% for year in wb_trend_years %}
-                                <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Freq {{ year }}</th>
-                            {% endfor %}
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        {# White ball data will be rendered by JavaScript #}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <p class="text-gray-500">No detailed white ball age data available.</p>
-            {% endif %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;800&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg:      #06070f;
+    --s1:      #0b0d1c;
+    --s2:      #101328;
+    --s3:      #161932;
+    --border:  rgba(255,255,255,0.07);
+    --text:    rgba(255,255,255,0.87);
+    --muted:   rgba(255,255,255,0.36);
+    --blue:    #3b82f6;
+    --indigo:  #6366f1;
+    --violet:  #8b5cf6;
+    --red:     #ef4444;
+    --orange:  #f97316;
+    --amber:   #f59e0b;
+    --cyan:    #06b6d4;
+    --green:   #10b981;
+    --pb-red:  #f43f5e;
+  }
+
+  #age-page * { box-sizing: border-box; }
+  #age-page {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    color: var(--text);
+    padding-bottom: 80px;
+  }
+
+  /* ── Star field background ── */
+  #age-page::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 15% 20%, rgba(255,255,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 35% 60%, rgba(255,255,255,0.2) 0%, transparent 100%),
+      radial-gradient(1px 1px at 55% 10%, rgba(255,255,255,0.25) 0%, transparent 100%),
+      radial-gradient(1px 1px at 75% 45%, rgba(255,255,255,0.15) 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 75%, rgba(255,255,255,0.2) 0%, transparent 100%),
+      radial-gradient(1px 1px at 10% 85%, rgba(255,255,255,0.15) 0%, transparent 100%),
+      radial-gradient(1.5px 1.5px at 48% 35%, rgba(255,255,255,0.35) 0%, transparent 100%),
+      radial-gradient(1px 1px at 62% 80%, rgba(255,255,255,0.2) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #age-page > * { position: relative; z-index: 1; }
+
+  /* ── Hero ── */
+  .age-hero {
+    position: relative;
+    padding: 56px 24px 48px;
+    text-align: center;
+    overflow: hidden;
+  }
+  .age-hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 60% 55% at 50% 0%, rgba(99,102,241,0.1) 0%, transparent 65%),
+      radial-gradient(ellipse 35% 40% at 20% 60%, rgba(59,130,246,0.07) 0%, transparent 60%),
+      radial-gradient(ellipse 35% 40% at 80% 60%, rgba(239,68,68,0.07) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .age-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--indigo);
+    margin-bottom: 14px;
+    opacity: 0.85;
+  }
+  .age-hero h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(32px, 5vw, 66px);
+    font-weight: 800;
+    line-height: 1.08;
+    margin: 0 0 14px;
+    background: linear-gradient(135deg, var(--blue) 0%, #fff 45%, var(--orange) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .age-hero p {
+    font-size: 14px;
+    color: var(--muted);
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.75;
+  }
+
+  /* ── Layout ── */
+  .age-wrap {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* ── Card ── */
+  .age-card {
+    background: var(--s1);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 28px 30px;
+    position: relative;
+    overflow: hidden;
+  }
+  .age-card-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 4px;
+    letter-spacing: 1px;
+  }
+  .age-card-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin: 0 0 22px;
+  }
+
+  /* ── Sleeping Giants ── */
+  .giants-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 800px) { .giants-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 500px) { .giants-grid { grid-template-columns: repeat(2, 1fr); } }
+
+  .giant-card {
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 12px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .giant-card:hover { transform: translateY(-3px); }
+  .giant-card.wb-giant { border-color: rgba(99,102,241,0.2); }
+  .giant-card.pb-giant { border-color: rgba(244,63,94,0.2); }
+
+  /* Pulsing glow for most overdue */
+  .giant-card.most-overdue::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 14px;
+    background: radial-gradient(ellipse at 50% 30%, rgba(239,68,68,0.12) 0%, transparent 70%);
+    animation: dormantPulse 3s ease-in-out infinite;
+  }
+  @keyframes dormantPulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+
+  .giant-sphere {
+    width: 54px; height: 54px;
+    border-radius: 50%;
+    margin: 0 auto 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .giant-sphere.wb {
+    background: radial-gradient(circle at 35% 30%, #4a5568 0%, #1a202c 50%, #0d1117 100%);
+    color: rgba(255,255,255,0.7);
+    box-shadow: 0 0 20px rgba(99,102,241,0.3), inset 0 1px 2px rgba(255,255,255,0.1);
+  }
+  .giant-sphere.pb {
+    background: radial-gradient(circle at 35% 30%, #7f1d1d 0%, #450a0a 50%, #1a0505 100%);
+    color: rgba(255,150,150,0.8);
+    box-shadow: 0 0 20px rgba(244,63,94,0.3), inset 0 1px 2px rgba(255,100,100,0.1);
+  }
+  .giant-card.most-overdue .giant-sphere.wb {
+    box-shadow: 0 0 30px rgba(239,68,68,0.5), 0 0 60px rgba(239,68,68,0.2), inset 0 1px 2px rgba(255,255,255,0.1);
+    animation: spherePulse 3s ease-in-out infinite;
+  }
+  @keyframes spherePulse {
+    0%, 100% { box-shadow: 0 0 20px rgba(239,68,68,0.4), 0 0 40px rgba(239,68,68,0.15); }
+    50% { box-shadow: 0 0 40px rgba(239,68,68,0.7), 0 0 80px rgba(239,68,68,0.3); }
+  }
+
+  .giant-age {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .giant-age.cold  { color: var(--blue); }
+  .giant-age.warm  { color: var(--amber); }
+  .giant-age.hot   { color: var(--orange); }
+  .giant-age.lava  { color: var(--red); }
+
+  .giant-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .giant-date {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+  }
+
+  /* ── Tab switcher ── */
+  .tab-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .tab-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 10px 24px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tab-btn.active.wb { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.4); color: var(--indigo); }
+  .tab-btn.active.pb { background: rgba(244,63,94,0.15);  border-color: rgba(244,63,94,0.4);  color: var(--pb-red); }
+  .tab-btn:hover:not(.active) { border-color: rgba(255,255,255,0.15); color: var(--text); }
+
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* ── Table ── */
+  .age-table-scroll { overflow-x: auto; border-radius: 10px; }
+
+  table.age-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 600px;
+  }
+  table.age-table thead th {
+    background: var(--s2);
+    padding: 11px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+  table.age-table thead th:hover { color: var(--text); }
+  table.age-table thead th.sort-active { color: var(--indigo); }
+  table.age-table thead th.sort-active.pb-sort { color: var(--pb-red); }
+
+  table.age-table tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.15s;
+  }
+  table.age-table tbody tr:hover { background: var(--s2); }
+  table.age-table tbody tr:last-child { border-bottom: none; }
+  table.age-table td {
+    padding: 11px 14px;
+    font-size: 13px;
+    vertical-align: middle;
+  }
+
+  /* Number cell */
+  .td-ball {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+  .td-ball-sphere {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .sphere-wb {
+    background: radial-gradient(circle at 35% 35%, #e8edf5 0%, #b8c8e0 50%, #8aaac8 100%);
+    color: #0d1829;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 2px rgba(255,255,255,0.5);
+  }
+  .sphere-pb {
+    background: radial-gradient(circle at 35% 35%, #ff8a80 0%, #ef5350 50%, #b71c1c 100%);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(244,63,94,0.3), inset 0 1px 2px rgba(255,150,150,0.3);
+  }
+
+  /* Age cell */
+  .age-cell { display: flex; flex-direction: column; gap: 4px; min-width: 140px; }
+  .age-num {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .age-bar-track {
+    height: 5px;
+    background: var(--s3);
+    border-radius: 3px;
+    width: 100%;
+  }
+  .age-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.8s ease;
+  }
+
+  /* Date cell */
+  .td-date {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* Sparkline cell */
+  .sparkline-wrap {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 28px;
+    min-width: 80px;
+  }
+  .spark-bar {
+    flex: 1;
+    border-radius: 2px 2px 0 0;
+    min-height: 3px;
+    transition: height 0.4s ease;
+    position: relative;
+  }
+  .spark-bar:hover::after {
+    content: attr(data-val);
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--s1);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text);
+    white-space: nowrap;
+    z-index: 10;
+  }
+
+  /* Age color thresholds */
+  .age-cold   { color: var(--blue);   }
+  .age-warm   { color: var(--amber);  }
+  .age-hot    { color: var(--orange); }
+  .age-lava   { color: var(--red);    }
+  .bar-cold   { background: linear-gradient(90deg, var(--blue),   #3b82f6aa); }
+  .bar-warm   { background: linear-gradient(90deg, var(--amber),  #f59e0baa); }
+  .bar-hot    { background: linear-gradient(90deg, var(--orange), #f97316aa); }
+  .bar-lava   { background: linear-gradient(90deg, var(--red),    #ef4444aa); }
+
+  /* Sort controls row */
+  .table-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .row-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .row-count strong { color: var(--indigo); }
+  .row-count.pb-count strong { color: var(--pb-red); }
+
+  .age-legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .al-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+  }
+  .al-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* ── AI Panel ── */
+  .ai-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  .ai-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--orange);
+    opacity: 0.8;
+    margin-bottom: 3px;
+  }
+  .ai-panel-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
+    letter-spacing: 0.5px;
+  }
+  .ai-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #7c2d12, var(--orange));
+    color: #fff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 22px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    box-shadow: 0 0 24px rgba(249,115,22,0.2);
+    white-space: nowrap;
+  }
+  .ai-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 40px rgba(249,115,22,0.4); }
+  .ai-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+  .ai-thinking {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 0 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: rgba(249,115,22,0.7);
+    letter-spacing: 1px;
+  }
+  .ai-thinking.visible { display: flex; }
+  .ai-dots span {
+    display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--orange); margin: 0 2px;
+    animation: dotBounce 1.2s infinite;
+  }
+  .ai-dots span:nth-child(2) { animation-delay: 0.2s; background: var(--amber); }
+  .ai-dots span:nth-child(3) { animation-delay: 0.4s; background: var(--red); }
+  @keyframes dotBounce {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+
+  .ai-output {
+    display: none;
+    margin-top: 20px;
+    border-top: 1px solid rgba(249,115,22,0.12);
+    padding-top: 20px;
+  }
+  .ai-output.visible { display: block; }
+
+  /* Wakeup suggestion cards */
+  .wakeup-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .wakeup-card {
+    background: var(--s2);
+    border: 1px solid rgba(249,115,22,0.2);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+  .wakeup-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--orange);
+    opacity: 0.7;
+    margin-bottom: 10px;
+  }
+  .wakeup-balls {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .wakeup-ball {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .wakeup-ball.wb-ball {
+    background: radial-gradient(circle at 35% 35%, #e8edf5 0%, #b8c8e0 50%, #8aaac8 100%);
+    color: #0d1829;
+    box-shadow: 0 0 0 2px rgba(249,115,22,0.5), 0 3px 10px rgba(0,0,0,0.4);
+  }
+  .wakeup-ball.pb-ball {
+    background: radial-gradient(circle at 35% 35%, #ff8a80 0%, #ef5350 50%, #b71c1c 100%);
+    color: #fff;
+    box-shadow: 0 0 0 2px rgba(249,115,22,0.5), 0 3px 10px rgba(0,0,0,0.4);
+  }
+  .wakeup-age {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .wakeup-age strong { color: var(--orange); }
+
+  .ai-narrative {
+    background: var(--s2);
+    border: 1px solid rgba(249,115,22,0.12);
+    border-left: 3px solid var(--orange);
+    border-radius: 0 10px 10px 0;
+    padding: 18px 20px;
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--text);
+    white-space: pre-wrap;
+  }
+  .ai-error {
+    margin-top: 14px;
+    background: rgba(244,63,94,0.08);
+    border: 1px solid rgba(244,63,94,0.25);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #ff8aaa;
+  }
+</style>
+
+<div id="age-page">
+
+  <!-- Hero -->
+  <div class="age-hero">
+    <p class="age-eyebrow">☽ Dormancy Tracker · All-Time Historical</p>
+    <h1>Number Age<br>Distribution</h1>
+    <p>How long each white ball and Powerball has been dormant — and which sleeping giants are statistically overdue for a return.</p>
+  </div>
+
+  <div class="age-wrap">
+
+    <!-- ── Sleeping Giants ── -->
+    {% if detailed_white_ball_ages or detailed_powerball_ages %}
+    <div class="age-card">
+      <p class="age-card-title">Sleeping Giants</p>
+      <p class="age-card-sub">Most overdue numbers right now — draws missed since last appearance</p>
+
+      {% if detailed_white_ball_ages %}
+      <p style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--indigo);margin-bottom:12px;opacity:0.8">⬤ White Balls</p>
+      <div class="giants-grid" id="wbGiants"></div>
+      {% endif %}
+
+      {% if detailed_powerball_ages %}
+      <p style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--pb-red);margin:20px 0 12px;opacity:0.8">⬤ Powerballs</p>
+      <div class="giants-grid" id="pbGiants"></div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- ── AI Panel ── -->
+    <div class="age-card" style="border-color:rgba(249,115,22,0.15)">
+      <div class="ai-header">
+        <div>
+          <p class="ai-eyebrow">✦ Groq AI · Dormancy Intelligence</p>
+          <p class="ai-panel-title">Wake-Up Call Analysis</p>
         </div>
+        <button class="ai-btn" id="aiBtn">☀ Analyse Sleeping Giants</button>
+      </div>
+      <div class="ai-thinking" id="aiThinking">
+        <div class="ai-dots"><span></span><span></span><span></span></div>
+        Calculating dormancy cycles…
+      </div>
+      <div class="ai-output" id="aiOutput">
+        <div class="wakeup-grid" id="wakeupGrid"></div>
+        <div class="ai-narrative" id="aiNarrative"></div>
+      </div>
+      <div class="ai-error" id="aiError" style="display:none"></div>
     </div>
 
-    {# Powerball Age Distribution and Yearly Trends Section #}
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <button class="w-full flex justify-between items-center text-2xl font-bold text-gray-800 focus:outline-none py-2" data-toggle="powerBallSection">
-            <span>Powerball Analysis</span>
-            <svg class="w-6 h-6 transform transition-transform duration-200" viewBox="0 0 24 24" fill="currentColor" data-arrow="powerBallSection">
-                <path fill-rule="evenodd" d="M12.53 16.28a.75.75 0 0 1-1.06 0l-7.5-7.5a.75.75 0 0 1 1.06-1.06L12 14.69l6.97-6.97a.75.75 0 1 1 1.06 1.06l-7.5 7.5Z" clip-rule="evenodd" />
-            </svg>
-        </button>
-        <div id="powerBallSection" class="mt-4 space-y-6">
-            <h3 class="text-xl font-semibold text-gray-800">Detailed Powerball Ages</h3>
-            {% if detailed_powerball_ages %}
-            <div class="mb-4 flex flex-col sm:flex-row sm:justify-between sm:items-center">
-                <button id="sortByPowerballAgeBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-full focus:outline-none focus:shadow-outline transition duration-200 ease-in-out mb-2 sm:mb-0">
-                    Sort by Current Age (Longest First)
-                </button>
-                <span class="text-sm text-gray-600 text-right">
-                    Current Age (Draws Missed) indicates how many draws have occurred since the number last appeared.
-                </span>
-            </div>
-            <div class="overflow-x-auto shadow-md rounded-lg">
-                <table class="min-w-full divide-y divide-gray-200" id="powerballAgesTable">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Number</th>
-                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" data-sort="age">Current Age (Draws Missed) <span class="ml-1 text-gray-400">↑↓</span></th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Drawn Date</th>
-                            {% for year in pb_trend_years %}
-                                <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Freq {{ year }}</th>
-                            {% endfor %}
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        {# Powerball data will be rendered by JavaScript #}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <p class="text-gray-500">No detailed powerball age data available.</p>
-            {% endif %}
+    <!-- ── Tables ── -->
+    <div class="age-card">
+      <!-- Tab buttons -->
+      <div class="tab-row">
+        <button class="tab-btn wb active" data-tab="wb-tab">⬤ White Balls</button>
+        <button class="tab-btn pb" data-tab="pb-tab">⬤ Powerballs</button>
+      </div>
+
+      <!-- Age legend -->
+      <div class="age-legend" style="margin-bottom:18px">
+        <div class="al-item"><span class="al-dot" style="background:var(--blue)"></span><span style="color:var(--blue)">0–10</span> draws</div>
+        <div class="al-item"><span class="al-dot" style="background:var(--amber)"></span><span style="color:var(--amber)">11–25</span> draws</div>
+        <div class="al-item"><span class="al-dot" style="background:var(--orange)"></span><span style="color:var(--orange)">26–50</span> draws</div>
+        <div class="al-item"><span class="al-dot" style="background:var(--red)"></span><span style="color:var(--red)">50+</span> draws overdue</div>
+      </div>
+
+      <!-- White Balls Tab -->
+      <div class="tab-pane active" id="wb-tab">
+        {% if detailed_white_ball_ages %}
+        <div class="table-controls">
+          <p class="row-count">Showing <strong id="wbCount">{{ detailed_white_ball_ages | length }}</strong> white balls</p>
         </div>
-    </div>
-</div>
+        <div class="age-table-scroll">
+          <table class="age-table" id="wbTable">
+            <thead>
+              <tr>
+                <th data-col="wb-number">№ <span id="arr-wb-number">↕</span></th>
+                <th data-col="wb-age" class="sort-active">Age (Draws Missed) <span id="arr-wb-age">↓</span></th>
+                <th data-col="wb-date">Last Drawn</th>
+                {% for year in wb_trend_years %}
+                <th data-col="wb-yr-{{ year }}">{{ year }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody id="wbTableBody"></tbody>
+          </table>
+        </div>
+        {% else %}
+        <p style="color:var(--muted);font-size:13px;padding:24px 0">No white ball age data available.</p>
+        {% endif %}
+      </div>
+
+      <!-- Powerballs Tab -->
+      <div class="tab-pane" id="pb-tab">
+        {% if detailed_powerball_ages %}
+        <div class="table-controls">
+          <p class="row-count pb-count">Showing <strong id="pbCount">{{ detailed_powerball_ages | length }}</strong> powerballs</p>
+        </div>
+        <div class="age-table-scroll">
+          <table class="age-table" id="pbTable">
+            <thead>
+              <tr>
+                <th data-col="pb-number">№ <span id="arr-pb-number">↕</span></th>
+                <th data-col="pb-age" class="sort-active pb-sort">Age (Draws Missed) <span id="arr-pb-age">↓</span></th>
+                <th data-col="pb-date">Last Drawn</th>
+                {% for year in pb_trend_years %}
+                <th data-col="pb-yr-{{ year }}">{{ year }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody id="pbTableBody"></tbody>
+          </table>
+        </div>
+        {% else %}
+        <p style="color:var(--muted);font-size:13px;padding:24px 0">No powerball age data available.</p>
+        {% endif %}
+      </div>
+
+    </div><!-- /age-card -->
+  </div><!-- /age-wrap -->
+</div><!-- /age-page -->
+
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
-
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Data for tables
-        var detailedWhiteBallAges = [];
-        var detailedPowerballAges = [];
-        var yearlyWhiteBallTrends = {}; // Object: {number: [{period_label: "2020", frequency: 5}, ...]}
-        var yearlyPowerballTrends = []; // Array of objects: [{Powerball: 1, Year_2020: 5, ...}, ...]
-        var wbTrendYears = [];
-        var pbTrendYears = [];
+document.addEventListener('DOMContentLoaded', function () {
 
-        // Parse data from Jinja
-        {% if detailed_white_ball_ages %}
-            try { detailedWhiteBallAges = {{ detailed_white_ball_ages | tojson | safe }}; } catch (e) { console.error("Error parsing detailedWhiteBallAges JSON:", e); }
-        {% endif %}
-        {% if detailed_powerball_ages %}
-            try { detailedPowerballAges = {{ detailed_powerball_ages | tojson | safe }}; } catch (e) { console.error("Error parsing detailedPowerballAges JSON:", e); }
-        {% endif %}
-        {% if yearly_white_ball_trends %}
-            try { yearlyWhiteBallTrends = {{ yearly_white_ball_trends | tojson | safe }}; } catch (e) { console.error("Error parsing yearlyWhiteBallTrends JSON:", e); }
-        {% endif %}
-        {% if yearly_powerball_trends %}
-            try { yearlyPowerballTrends = {{ yearly_powerball_trends | tojson | safe }}; } catch (e) { console.error("Error parsing yearlyPowerballTrends JSON:", e); }
-        {% endif %}
-        {% if wb_trend_years %}
-            try { wbTrendYears = {{ wb_trend_years | tojson | safe }}; } catch (e) { console.error("Error parsing wb_trend_years JSON:", e); }
-        {% endif %}
-        {% if pb_trend_years %}
-            try { pbTrendYears = {{ pb_trend_years | tojson | safe }}; } catch (e) { console.error("Error parsing pb_trend_years JSON:", e); }
-        {% endif %}
+  // ── Data ──────────────────────────────────────────────────
+  const wbAges   = {{ detailed_white_ball_ages  | tojson | safe }};
+  const pbAges   = {{ detailed_powerball_ages   | tojson | safe }};
+  const wbTrends = {{ yearly_white_ball_trends  | tojson | safe }};
+  const pbTrends = {{ yearly_powerball_trends   | tojson | safe }};
+  const wbYears  = {{ wb_trend_years            | tojson | safe }};
+  const pbYears  = {{ pb_trend_years            | tojson | safe }};
 
-        // DOM elements
-        const whiteBallAgesTableBody = document.querySelector('#whiteBallAgesTable tbody');
-        const powerballAgesTableBody = document.querySelector('#powerballAgesTable tbody');
-        const sortByWhiteBallAgeBtn = document.getElementById('sortByWhiteBallAgeBtn');
-        const sortByPowerballAgeBtn = document.getElementById('sortByPowerballAgeBtn');
+  // ── Age helpers ───────────────────────────────────────────
+  const maxWbAge = Math.max(...(wbAges.map(b => b.age) || [1]));
+  const maxPbAge = Math.max(...(pbAges.map(b => b.age) || [1]));
 
-        let isWhiteBallSortedAscending = false; 
-        let isPowerballSortedAscending = false; 
+  function ageClass(age) {
+    if (age <= 10)  return 'cold';
+    if (age <= 25)  return 'warm';
+    if (age <= 50)  return 'hot';
+    return 'lava';
+  }
 
-        // Render functions
-        function renderWhiteBallTable(data) {
-            whiteBallAgesTableBody.innerHTML = ''; 
-            data.forEach(ball => {
-                const row = whiteBallAgesTableBody.insertRow();
-                row.className = 'hover:bg-gray-50';
-                
-                row.insertCell().textContent = ball.number;
-                row.cells[0].classList.add('px-6', 'py-4', 'whitespace-nowrap', 'text-sm', 'font-medium', 'text-gray-900', 'text-center');
-
-                const ageCell = row.insertCell();
-                ageCell.textContent = ball.age;
-                ageCell.classList.add('px-6', 'py-4', 'whitespace-nowrap', 'text-sm', 'text-gray-500', 'text-center');
-
-                row.insertCell().textContent = ball.last_drawn_date !== 'N/A' ? ball.last_drawn_date : 'Never Drawn';
-                row.cells[2].classList.add('px-6', 'py-4', 'whitespace-nowrap', 'text-sm', 'text-gray-500');
-
-                // Add yearly frequency cells
-                const wbFreqs = yearlyWhiteBallTrends[ball.number] || [];
-                wbTrendYears.forEach(year => {
-                    const freqData = wbFreqs.find(f => f.period_label === String(year));
-                    const freqCell = row.insertCell();
-                    freqCell.textContent = freqData ? freqData.frequency : '0';
-                    freqCell.classList.add('px-6', 'py-4', 'whitespace-nowrap', 'text-sm', 'text-gray-500', 'text-center');
-                });
-            });
-        }
-
-        function renderPowerballTable(data) {
-            powerballAgesTableBody.innerHTML = ''; 
-            data.forEach(ball => {
-                const row = powerballAgesTableBody.insertRow();
-                row.className = 'hover:bg-gray-50';
-                
-                row.insertCell().textContent = ball.number;
-                row.cells[0].classList.add('px-6', 'py-4', 'whitespace-nowrap', 'text-sm', 'font-medium', 'text-gray-900', 'text-center');
-
-                const ageCell = row.insertCell();
-                ageCell.textContent = ball.age;
-                ageCell.classList.add('px-6', 'py-4', 'whitespace-nowrap', 'text-sm', 'text-gray-500', 'text-center');
-
-                row.insertCell().textContent = ball.last_drawn_date !== 'N/A' ? ball.last_drawn_date : 'Never Drawn';
-                row.cells[2].classList.add('px-6', 'py-4', 'whitespace-nowrap', 'text-sm', 'text-gray-500');
-
-                // Add yearly frequency cells for Powerball
-                const pbFreqData = yearlyPowerballTrends.find(p => p.Powerball === ball.number);
-                pbTrendYears.forEach(year => {
-                    const freqCell = row.insertCell();
-                    freqCell.textContent = pbFreqData ? pbFreqData[`Year_${year}`] || '0' : '0';
-                    freqCell.classList.add('px-6', 'py-4', 'whitespace-nowrap', 'text-sm', 'text-gray-500', 'text-center');
-                });
-            });
-        }
-
-
-        // Initial render for both tables
-        renderWhiteBallTable(detailedWhiteBallAges);
-        renderPowerballTable(detailedPowerballAges);
-
-        // Sort event listeners
-        sortByWhiteBallAgeBtn.addEventListener('click', function() {
-            if (isWhiteBallSortedAscending) {
-                detailedWhiteBallAges.sort((a, b) => b.age - a.age); // Sort descending
-                sortByWhiteBallAgeBtn.textContent = 'Sort by Current Age (Shortest First)';
-                isWhiteBallSortedAscending = false;
-            } else {
-                detailedWhiteBallAges.sort((a, b) => a.age - b.age); // Sort ascending
-                sortByWhiteBallAgeBtn.textContent = 'Sort by Current Age (Longest First)';
-                isWhiteBallSortedAscending = true;
-            }
-            renderWhiteBallTable(detailedWhiteBallAges);
-        });
-
-        sortByPowerballAgeBtn.addEventListener('click', function() {
-            if (isPowerballSortedAscending) {
-                detailedPowerballAges.sort((a, b) => b.age - a.age); // Sort descending
-                sortByPowerballAgeBtn.textContent = 'Sort by Current Age (Shortest First)';
-                isPowerballSortedAscending = false;
-            } else {
-                detailedPowerballAges.sort((a, b) => a.age - b.age); // Sort ascending
-                sortByPowerballAgeBtn.textContent = 'Sort by Current Age (Longest First)';
-                isPowerballSortedAscending = true;
-            }
-            renderPowerballTable(detailedPowerballAges);
-        });
-
-        // Expand/Collapse functionality
-        document.querySelectorAll('[data-toggle]').forEach(button => {
-            button.addEventListener('click', function() {
-                const targetId = this.dataset.toggle;
-                const targetElement = document.getElementById(targetId);
-                const arrowIcon = this.querySelector('[data-arrow]');
-
-                if (targetElement) {
-                    const isHidden = targetElement.classList.contains('hidden');
-                    if (isHidden) {
-                        targetElement.classList.remove('hidden');
-                        targetElement.style.maxHeight = targetElement.scrollHeight + "px"; // Set max height for smooth transition
-                        arrowIcon.classList.remove('rotate-0');
-                        arrowIcon.classList.add('rotate-180');
-                    } else {
-                        targetElement.style.maxHeight = "0"; // Collapse by setting max-height to 0
-                        targetElement.classList.add('hidden'); // Hide after transition
-                        arrowIcon.classList.remove('rotate-180');
-                        arrowIcon.classList.add('rotate-0');
-                    }
-                }
-            });
-        });
-
-        // Initial collapse state (optional, can be changed to expand by default)
-        document.getElementById('whiteBallSection').classList.remove('hidden'); // White Ball section expanded by default
-        document.querySelector('[data-toggle="whiteBallSection"] [data-arrow]').classList.add('rotate-180'); // Point up for expanded
-
-        document.getElementById('powerBallSection').classList.add('hidden'); // Powerball section collapsed by default
-        document.querySelector('[data-toggle="powerBallSection"] [data-arrow]').classList.remove('rotate-180'); // Point down for collapsed
-
+  // ── Sleeping Giants ───────────────────────────────────────
+  function buildGiants(containerId, data, maxAge, type) {
+    const wrap = document.getElementById(containerId);
+    if (!wrap || !data.length) return;
+    const top5 = [...data].sort((a,b) => b.age - a.age).slice(0, 5);
+    top5.forEach((b, i) => {
+      const cls  = ageClass(b.age);
+      const card = document.createElement('div');
+      card.className = `giant-card ${type}-giant${i === 0 ? ' most-overdue' : ''}`;
+      card.innerHTML = `
+        <div class="giant-sphere ${type}">${b.number}</div>
+        <div class="giant-age ${cls}">${b.age}</div>
+        <div class="giant-label">draws missed</div>
+        <div class="giant-date">${b.last_drawn_date && b.last_drawn_date !== 'N/A' ? b.last_drawn_date : 'Never'}</div>
+      `;
+      wrap.appendChild(card);
     });
+  }
+
+  buildGiants('wbGiants', wbAges, maxWbAge, 'wb');
+  buildGiants('pbGiants', pbAges, maxPbAge, 'pb');
+
+  // ── Sparkline ─────────────────────────────────────────────
+  function buildSparkline(freqValues) {
+    const max = Math.max(...freqValues, 1);
+    const wrap = document.createElement('div');
+    wrap.className = 'sparkline-wrap';
+    freqValues.forEach((v, i) => {
+      const pct  = Math.max(Math.round((v / max) * 26), 3);
+      const hue  = Math.round(120 * (v / max)); // green=frequent, red=rare
+      const bar  = document.createElement('div');
+      bar.className  = 'spark-bar';
+      bar.style.cssText = `height:${pct}px;background:hsl(${hue},70%,55%);opacity:0.75`;
+      bar.dataset.val = v;
+      wrap.appendChild(bar);
+    });
+    return wrap;
+  }
+
+  // ── Table renderer ────────────────────────────────────────
+  function renderWbTable(data) {
+    const tbody = document.getElementById('wbTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    const frag = document.createDocumentFragment();
+
+    data.forEach(b => {
+      const cls  = ageClass(b.age);
+      const barW = Math.round((b.age / maxWbAge) * 100);
+      const tr   = document.createElement('tr');
+
+      // Number cell
+      const tdNum = document.createElement('td');
+      tdNum.innerHTML = `<div class="td-ball"><span class="td-ball-sphere sphere-wb">${b.number}</span></div>`;
+      tr.appendChild(tdNum);
+
+      // Age cell
+      const tdAge = document.createElement('td');
+      tdAge.innerHTML = `
+        <div class="age-cell">
+          <span class="age-num age-${cls}">${b.age}</span>
+          <div class="age-bar-track"><div class="age-bar-fill bar-${cls}" style="width:${barW}%"></div></div>
+        </div>`;
+      tr.appendChild(tdAge);
+
+      // Date cell
+      const tdDate = document.createElement('td');
+      tdDate.className = 'td-date';
+      tdDate.textContent = (b.last_drawn_date && b.last_drawn_date !== 'N/A') ? b.last_drawn_date : '—';
+      tr.appendChild(tdDate);
+
+      // Sparkline cells per year
+      const wbFreqs = wbTrends[b.number] || [];
+      const freqValues = wbYears.map(yr => {
+        const entry = wbFreqs.find(f => String(f.period_label) === String(yr));
+        return entry ? entry.frequency : 0;
+      });
+      const tdSpark = document.createElement('td');
+      tdSpark.colSpan = wbYears.length;
+      tdSpark.appendChild(buildSparkline(freqValues));
+      tr.appendChild(tdSpark);
+
+      frag.appendChild(tr);
+    });
+    tbody.appendChild(frag);
+  }
+
+  function renderPbTable(data) {
+    const tbody = document.getElementById('pbTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    const frag = document.createDocumentFragment();
+
+    data.forEach(b => {
+      const cls  = ageClass(b.age);
+      const barW = Math.round((b.age / maxPbAge) * 100);
+      const tr   = document.createElement('tr');
+
+      const tdNum = document.createElement('td');
+      tdNum.innerHTML = `<div class="td-ball"><span class="td-ball-sphere sphere-pb">${b.number}</span></div>`;
+      tr.appendChild(tdNum);
+
+      const tdAge = document.createElement('td');
+      tdAge.innerHTML = `
+        <div class="age-cell">
+          <span class="age-num age-${cls}">${b.age}</span>
+          <div class="age-bar-track"><div class="age-bar-fill bar-${cls}" style="width:${barW}%"></div></div>
+        </div>`;
+      tr.appendChild(tdAge);
+
+      const tdDate = document.createElement('td');
+      tdDate.className = 'td-date';
+      tdDate.textContent = (b.last_drawn_date && b.last_drawn_date !== 'N/A') ? b.last_drawn_date : '—';
+      tr.appendChild(tdDate);
+
+      // PB yearly freq
+      const pbRow = Array.isArray(pbTrends) ? pbTrends.find(p => p.Powerball === b.number) : null;
+      const freqValues = pbYears.map(yr => pbRow ? (pbRow[`Year_${yr}`] || 0) : 0);
+      const tdSpark = document.createElement('td');
+      tdSpark.colSpan = pbYears.length;
+      tdSpark.appendChild(buildSparkline(freqValues));
+      tr.appendChild(tdSpark);
+
+      frag.appendChild(tr);
+    });
+    tbody.appendChild(frag);
+  }
+
+  // Sort state
+  let wbSortCol = 'age', wbSortDir = 'desc';
+  let pbSortCol = 'age', pbSortDir = 'desc';
+  let wbData = [...wbAges];
+  let pbData = [...pbAges];
+
+  function sortAndRenderWb() {
+    wbData.sort((a, b) => {
+      const va = wbSortCol === 'number' ? a.number : a.age;
+      const vb = wbSortCol === 'number' ? b.number : b.age;
+      return wbSortDir === 'desc' ? vb - va : va - vb;
+    });
+    renderWbTable(wbData);
+    updateArrows('wb', wbSortCol, wbSortDir);
+  }
+
+  function sortAndRenderPb() {
+    pbData.sort((a, b) => {
+      const va = pbSortCol === 'number' ? a.number : a.age;
+      const vb = pbSortCol === 'number' ? b.number : b.age;
+      return pbSortDir === 'desc' ? vb - va : va - vb;
+    });
+    renderPbTable(pbData);
+    updateArrows('pb', pbSortCol, pbSortDir);
+  }
+
+  function updateArrows(prefix, col, dir) {
+    ['number','age'].forEach(c => {
+      const el = document.getElementById(`arr-${prefix}-${c}`);
+      if (el) el.textContent = (c === col) ? (dir === 'desc' ? '↓' : '↑') : '↕';
+    });
+  }
+
+  // Sort header listeners
+  document.querySelectorAll('#wbTable thead th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col.replace('wb-','');
+      if (!['number','age'].includes(col)) return;
+      if (wbSortCol === col) wbSortDir = wbSortDir === 'desc' ? 'asc' : 'desc';
+      else { wbSortCol = col; wbSortDir = 'desc'; }
+      sortAndRenderWb();
+    });
+  });
+  document.querySelectorAll('#pbTable thead th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col.replace('pb-','');
+      if (!['number','age'].includes(col)) return;
+      if (pbSortCol === col) pbSortDir = pbSortDir === 'desc' ? 'asc' : 'desc';
+      else { pbSortCol = col; pbSortDir = 'desc'; }
+      sortAndRenderPb();
+    });
+  });
+
+  // Initial render
+  sortAndRenderWb();
+  sortAndRenderPb();
+
+  // ── Tab switcher ──────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(target).classList.add('active');
+    });
+  });
+
+  // ── AI Analysis ───────────────────────────────────────────
+  document.getElementById('aiBtn').addEventListener('click', async function () {
+    const btn      = this;
+    const thinking = document.getElementById('aiThinking');
+    const output   = document.getElementById('aiOutput');
+    const narrative= document.getElementById('aiNarrative');
+    const errorEl  = document.getElementById('aiError');
+    const wakeGrid = document.getElementById('wakeupGrid');
+
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Calculating…';
+    thinking.classList.add('visible');
+    output.classList.remove('visible');
+    errorEl.style.display = 'none';
+    narrative.textContent = '';
+    wakeGrid.innerHTML = '';
+
+    // Build per-number avg frequency from trends
+    const wbAvgFreq = {};
+    wbAges.forEach(b => {
+      const freqs = (wbTrends[b.number] || []).map(f => f.frequency);
+      wbAvgFreq[b.number] = freqs.length ? Math.round(freqs.reduce((s,v)=>s+v,0)/freqs.length) : 0;
+    });
+    const pbAvgFreq = {};
+    pbAges.forEach(b => {
+      const pbRow = Array.isArray(pbTrends) ? pbTrends.find(p => p.Powerball === b.number) : null;
+      const freqs = pbRow ? pbYears.map(yr => pbRow[`Year_${yr}`] || 0) : [];
+      pbAvgFreq[b.number] = freqs.length ? Math.round(freqs.reduce((s,v)=>s+v,0)/freqs.length) : 0;
+    });
+
+    const topWb = [...wbAges].sort((a,b) => b.age - a.age).slice(0,10);
+    const topPb = [...pbAges].sort((a,b) => b.age - a.age).slice(0,5);
+
+    try {
+      const res  = await fetch('/api/age-distribution-ai-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          top_overdue_wb: topWb.map(b => ({...b, avg_annual_freq: wbAvgFreq[b.number]})),
+          top_overdue_pb: topPb.map(b => ({...b, avg_annual_freq: pbAvgFreq[b.number]})),
+          max_wb_age: maxWbAge,
+          max_pb_age: maxPbAge,
+          total_wb: wbAges.length,
+          total_pb: pbAges.length,
+        })
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        errorEl.textContent = 'AI analysis unavailable: ' + data.error;
+        errorEl.style.display = 'block';
+      } else {
+        // Render wakeup suggestion cards
+        if (data.suggestions && data.suggestions.length) {
+          data.suggestions.forEach(s => {
+            const card = document.createElement('div');
+            card.className = 'wakeup-card';
+            const ballsHtml = s.numbers.map(n =>
+              `<span class="wakeup-ball ${s.type === 'pb' ? 'pb-ball' : 'wb-ball'}">${n}</span>`
+            ).join('');
+            card.innerHTML = `
+              <p class="wakeup-label">${s.label}</p>
+              <div class="wakeup-balls">${ballsHtml}</div>
+              <p class="wakeup-age">dormant <strong>${s.age}</strong> draws</p>
+            `;
+            wakeGrid.appendChild(card);
+          });
+        }
+        narrative.textContent = data.analysis;
+        output.classList.add('visible');
+      }
+    } catch (err) {
+      errorEl.textContent = 'Request failed. Please try again.';
+      errorEl.style.display = 'block';
+    } finally {
+      thinking.classList.remove('visible');
+      btn.disabled = false;
+      btn.innerHTML = '☀ Analyse Sleeping Giants';
+    }
+  });
+
+});
 </script>
 {% endblock %}
