@@ -7849,6 +7849,322 @@ Be specific — reference actual numbers, ages, and gaps throughout."""
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+# ── Paste into index.py with your other API routes ───────────────────────────
+
+@app.route('/api/white-ball-trends-ai-analysis', methods=['POST'])
+def white_ball_trends_ai_analysis():
+    try:
+        import numpy as np
+        from collections import defaultdict
+
+        payload      = request.get_json()
+        period_type  = payload.get('period_type', 'year')
+        all_data     = payload.get('all_data', {})      # {ball_num: [{period_label, frequency}]}
+        period_labels= payload.get('period_labels', [])
+
+        if not all_data or not period_labels:
+            return jsonify({'error': 'No trend data provided'}), 400
+
+        # Convert keys to int (JSON keys are strings)
+        all_data = {int(k): v for k, v in all_data.items()}
+
+        # ── Helper: frequency series for a ball ───────────────
+        def get_series(ball_num):
+            entries = all_data.get(ball_num, [])
+            label_map = {e['period_label']: e['frequency'] for e in entries}
+            return [label_map.get(lbl, 0) for lbl in period_labels]
+
+        # ── ① Trend Direction Analysis ─────────────────────────
+        # Linear slope using simple regression over all periods
+        def calc_slope(series):
+            n = len(series)
+            if n < 2: return 0
+            x = list(range(n))
+            x_mean = sum(x) / n
+            y_mean = sum(series) / n
+            num = sum((x[i] - x_mean) * (series[i] - y_mean) for i in range(n))
+            den = sum((x[i] - x_mean) ** 2 for i in range(n))
+            return round(num / den, 4) if den else 0
+
+        slopes = {}
+        for ball in range(1, 70):
+            s = get_series(ball)
+            if sum(s) > 0:
+                slopes[ball] = calc_slope(s)
+
+        sorted_slopes = sorted(slopes.items(), key=lambda x: -x[1])
+        top_risers  = sorted_slopes[:5]
+        top_fallers = sorted_slopes[-5:][::-1]
+
+        # ── ② Seasonal Bias Detection ──────────────────────────
+        # Only meaningful for half_year/quarter
+        seasonal_bias = []
+        if period_type in ('half_year', 'quarter'):
+            # Group labels by suffix
+            suffix_groups = defaultdict(list)
+            for lbl in period_labels:
+                for sfx in ['H1','H2','Q1','Q2','Q3','Q4']:
+                    if lbl.endswith(sfx):
+                        suffix_groups[sfx].append(lbl)
+                        break
+
+            for ball in range(1, 70):
+                series_map = {e['period_label']: e['frequency']
+                              for e in all_data.get(ball, [])}
+                total = sum(series_map.values())
+                if total == 0:
+                    continue
+                # Average freq per suffix
+                sfx_avgs = {}
+                for sfx, labels in suffix_groups.items():
+                    vals = [series_map.get(l, 0) for l in labels]
+                    sfx_avgs[sfx] = sum(vals) / len(vals) if vals else 0
+
+                if not sfx_avgs:
+                    continue
+                best_sfx   = max(sfx_avgs, key=sfx_avgs.get)
+                best_avg   = sfx_avgs[best_sfx]
+                other_avg  = sum(v for k, v in sfx_avgs.items() if k != best_sfx) / max(len(sfx_avgs) - 1, 1)
+                if other_avg > 0:
+                    ratio = round(best_avg / other_avg, 2)
+                    if ratio >= 1.3:
+                        seasonal_bias.append({
+                            'ball': ball,
+                            'peak_period': best_sfx,
+                            'ratio': ratio,
+                            'avg_freq': round(best_avg, 1)
+                        })
+
+            seasonal_bias.sort(key=lambda x: -x['ratio'])
+
+        # ── ③ Volatility Profiling ─────────────────────────────
+        volatility = {}
+        consistency = {}
+        for ball in range(1, 70):
+            s = get_series(ball)
+            if sum(s) == 0:
+                continue
+            mean = sum(s) / len(s)
+            variance = sum((v - mean) ** 2 for v in s) / len(s)
+            std = variance ** 0.5
+            cv = round(std / mean, 3) if mean > 0 else 0  # Coefficient of variation
+            volatility[ball]   = cv
+            consistency[ball]  = round(mean, 2)
+
+        top_volatile   = sorted(volatility.items(),   key=lambda x: -x[1])[:5]
+        top_consistent = sorted(volatility.items(),   key=lambda x:  x[1])[:5]
+
+        # ── ④ Next Period Forecast (momentum) ─────────────────
+        # Compare last 3 periods vs previous 3 periods
+        momentum = {}
+        if len(period_labels) >= 6:
+            for ball in range(1, 70):
+                s = get_series(ball)
+                recent   = sum(s[-3:]) / 3
+                previous = sum(s[-6:-3]) / 3
+                if previous > 0:
+                    momentum[ball] = round((recent - previous) / previous * 100, 1)
+                elif recent > 0:
+                    momentum[ball] = 100.0
+                else:
+                    momentum[ball] = 0
+
+        top_momentum = sorted(momentum.items(), key=lambda x: -x[1])[:5] if momentum else []
+
+        # ── ⑤ Decade Shift Analysis ───────────────────────────
+        decades = {
+            '1-9':   range(1, 10),
+            '10-19': range(10, 20),
+            '20-29': range(20, 30),
+            '30-39': range(30, 40),
+            '40-49': range(40, 50),
+            '50-59': range(50, 60),
+            '60-69': range(60, 70),
+        }
+
+        # Split periods into early half vs recent half
+        mid = len(period_labels) // 2
+        early_labels  = period_labels[:mid]
+        recent_labels = period_labels[mid:]
+
+        decade_shift = {}
+        for dec_name, dec_range in decades.items():
+            early_total  = 0
+            recent_total = 0
+            for ball in dec_range:
+                series_map = {e['period_label']: e['frequency']
+                              for e in all_data.get(ball, [])}
+                early_total  += sum(series_map.get(l, 0) for l in early_labels)
+                recent_total += sum(series_map.get(l, 0) for l in recent_labels)
+            # Normalize by number of periods
+            early_avg  = round(early_total  / max(len(early_labels),  1), 1)
+            recent_avg = round(recent_total / max(len(recent_labels), 1), 1)
+            shift      = round(recent_avg - early_avg, 1)
+            decade_shift[dec_name] = {
+                'early_avg':  early_avg,
+                'recent_avg': recent_avg,
+                'shift':      shift,
+            }
+
+        hottest_recent_decade = max(decade_shift.items(), key=lambda x: x[1]['recent_avg'])
+        biggest_gainer        = max(decade_shift.items(), key=lambda x: x[1]['shift'])
+        biggest_loser         = min(decade_shift.items(), key=lambda x: x[1]['shift'])
+
+        # ── ⑥ Low/High Range Dominance (1-34 vs 35-69) ────────
+        low_range  = range(1, 35)
+        high_range = range(35, 70)
+
+        # Per-period total for low vs high
+        low_by_period  = {}
+        high_by_period = {}
+        for lbl in period_labels:
+            low_by_period[lbl]  = sum(
+                next((e['frequency'] for e in all_data.get(b, []) if e['period_label'] == lbl), 0)
+                for b in low_range
+            )
+            high_by_period[lbl] = sum(
+                next((e['frequency'] for e in all_data.get(b, []) if e['period_label'] == lbl), 0)
+                for b in high_range
+            )
+
+        # Overall totals
+        total_low  = sum(low_by_period.values())
+        total_high = sum(high_by_period.values())
+        total_all  = total_low + total_high
+        low_pct    = round(total_low  / total_all * 100, 1) if total_all else 0
+        high_pct   = round(total_high / total_all * 100, 1) if total_all else 0
+
+        # Recent trend (last 20% of periods)
+        recent_n   = max(int(len(period_labels) * 0.2), 1)
+        recent_lbls = period_labels[-recent_n:]
+        recent_low  = sum(low_by_period.get(l, 0) for l in recent_lbls)
+        recent_high = sum(high_by_period.get(l, 0) for l in recent_lbls)
+        recent_total_rh = recent_low + recent_high
+        recent_low_pct  = round(recent_low  / recent_total_rh * 100, 1) if recent_total_rh else 0
+        recent_high_pct = round(recent_high / recent_total_rh * 100, 1) if recent_total_rh else 0
+
+        # Dominant range right now
+        current_dominant = '1–34 (Low)' if recent_low_pct >= 50 else '35–69 (High)'
+        shift_direction  = 'shifting toward LOW' if recent_low_pct > low_pct else 'shifting toward HIGH'
+
+        # Periods where low dominated vs high dominated
+        low_dominant_periods  = sum(1 for l in period_labels if low_by_period.get(l,0) > high_by_period.get(l,0))
+        high_dominant_periods = len(period_labels) - low_dominant_periods
+
+        # ── Build AI prompt ────────────────────────────────────
+        seasonal_str = '\n'.join(
+            f"  Ball #{b['ball']}: peaks in {b['peak_period']} ({b['ratio']}x more than other periods, avg {b['avg_freq']} appearances)"
+            for b in seasonal_bias[:5]
+        ) if seasonal_bias else '  No strong seasonal bias detected for this period type'
+
+        prompt = f"""You are an expert Powerball statistical analyst. Provide a comprehensive 6-part trend analysis of white ball frequency data.
+
+═══ DATA CONTEXT ═══
+Period type: {period_type.replace('_','-')}
+Total periods analysed: {len(period_labels)}
+First period: {period_labels[0] if period_labels else 'N/A'}
+Latest period: {period_labels[-1] if period_labels else 'N/A'}
+
+═══ ① TREND DIRECTION ═══
+Top 5 RISING balls (positive slope, draws/period):
+{chr(10).join(f"  Ball #{b}: slope={s:+.4f}" for b, s in top_risers)}
+Top 5 FALLING balls (negative slope):
+{chr(10).join(f"  Ball #{b}: slope={s:+.4f}" for b, s in top_fallers)}
+
+═══ ② SEASONAL BIAS ═══
+{seasonal_str}
+
+═══ ③ VOLATILITY PROFILING ═══
+Most volatile (inconsistent) balls (coefficient of variation):
+{chr(10).join(f"  Ball #{b}: CV={v:.3f}" for b, v in top_volatile)}
+Most consistent balls (lowest CV):
+{chr(10).join(f"  Ball #{b}: CV={v:.3f}" for b, v in top_consistent)}
+
+═══ ④ NEXT PERIOD MOMENTUM ═══
+Top 5 balls by recent momentum (last 3 vs previous 3 periods, % change):
+{chr(10).join(f"  Ball #{b}: {m:+.1f}%" for b, m in top_momentum) if top_momentum else '  Insufficient data for momentum analysis'}
+
+═══ ⑤ DECADE SHIFT ANALYSIS ═══
+{chr(10).join(f"  {dec}: early_avg={v['early_avg']}, recent_avg={v['recent_avg']}, shift={v['shift']:+.1f}" for dec, v in decade_shift.items())}
+Hottest recent decade: {hottest_recent_decade[0]} (avg {hottest_recent_decade[1]['recent_avg']} per period)
+Biggest gainer: {biggest_gainer[0]} (+{biggest_gainer[1]['shift']})
+Biggest loser:  {biggest_loser[0]} ({biggest_loser[1]['shift']:+.1f})
+
+═══ ⑥ LOW/HIGH RANGE DOMINANCE (1–34 vs 35–69) ═══
+All-time: Low(1-34)={low_pct}%, High(35-69)={high_pct}%
+Recent ({recent_n} periods): Low={recent_low_pct}%, High={recent_high_pct}%
+Current dominant range: {current_dominant}
+Overall trend: {shift_direction}
+Periods where LOW dominated: {low_dominant_periods}/{len(period_labels)}
+Periods where HIGH dominated: {high_dominant_periods}/{len(period_labels)}
+
+Write EXACTLY these 6 numbered sections. Each section header must be on its own line:
+
+① TREND DIRECTION
+Name the top 2 rising and top 2 falling balls. Explain what a positive/negative slope means in practical draw terms. Are the risers concentrated in any decade?
+
+② SEASONAL BIAS
+{'Name the top 2 seasonally biased balls and explain the pattern. What might cause certain balls to peak in specific half/quarters?' if seasonal_bias else 'Note that no strong seasonal bias was detected for yearly data and explain what seasonal analysis would show with quarterly data.'}
+
+③ VOLATILITY PROFILING
+Contrast the most volatile ball vs the most consistent ball. Explain which type is preferable for different strategies (chasing spikes vs steady picks).
+
+④ NEXT PERIOD MOMENTUM
+Name the top 3 momentum balls and give a one-sentence rationale for each. Are any of these also in the rising trend list from ①?
+
+⑤ DECADE SHIFT
+Name the biggest gaining and biggest losing decade over time. Has the "hot zone" of Powerball white balls shifted toward lower or higher numbers in recent years?
+
+⑥ LOW vs HIGH RANGE DOMINANCE
+Analyse the 1–34 vs 35–69 split. State the all-time ratio, current trend direction, and give a concrete recommendation: should a player weight toward lower or higher numbers for the next draw based on recent dominance patterns?
+
+End with one STRATEGY SUMMARY sentence that combines insights from all 6 analyses into a single actionable recommendation for the next 5 white ball selection.
+
+Be specific — always reference actual ball numbers, percentages, and counts."""
+
+        groq_api_key = os.environ.get('GROQ_API_KEY', '')
+        response = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {groq_api_key}',
+                'Content-Type': 'application/json'
+            },
+            json={
+                'model':       'llama-3.1-8b-instant',
+                'messages':    [{'role': 'user', 'content': prompt}],
+                'max_tokens':  900,
+                'temperature': 0.6
+            },
+            timeout=40
+        )
+
+        result = response.json()
+        if 'error' in result:
+            return jsonify({'error': result['error'].get('message', 'Groq API error')}), 500
+
+        analysis = result['choices'][0]['message']['content'].strip()
+
+        return jsonify({
+            'analysis': analysis,
+            'insights': {
+                'top_risers':    [[b, s] for b, s in top_risers],
+                'top_fallers':   [[b, s] for b, s in top_fallers],
+                'top_momentum':  [[b, m] for b, m in top_momentum],
+                'low_pct':       low_pct,
+                'high_pct':      high_pct,
+                'recent_low_pct':  recent_low_pct,
+                'recent_high_pct': recent_high_pct,
+                'current_dominant': current_dominant,
+                'hottest_decade':   hottest_recent_decade[0],
+                'biggest_gainer':   biggest_gainer[0],
+                'seasonal_bias':    seasonal_bias[:3],
+            }
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 initialize_core_data()
 
 # ── Start the draw-day scheduler ──────────────────────────────
