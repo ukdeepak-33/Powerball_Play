@@ -1,270 +1,964 @@
 {% extends "base.html" %}
 
-{% block title %}Grouped Number Patterns Analysis{% endblock %}
-
-{% block page_heading %}Grouped Number Patterns Analysis{% endblock %}
+{% block title %}Grouped Pattern Analysis — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
-<div class="card p-6 bg-white rounded-lg shadow-lg mb-8">
-    <h2 class="text-2xl font-bold mb-4 text-gray-800">Overview of Grouped Patterns</h2>
-    <p class="text-gray-700 mb-4">
-        This analysis identifies how often specific pairs (two numbers) and triplets (three numbers) appear together
-        within predefined numerical ranges (e.g., 10s, 30s, 60s) for each year in the historical data.
-        This can reveal popular combinations within certain number "decades".
-    </p>
-    <p class="text-gray-700 mb-4">
-        The ranges are defined as: 1-9, 10-19, 20-29, 30-39, 40-49, 50-59, 60-69.
-    </p>
-    <p class="text-gray-700 font-semibold">
-        Use the filters below to narrow down the results, and click on the table headers (Year, Range, Type, Count) to sort the data!
-    </p>
-</div>
-
-<div class="card p-6 bg-white rounded-lg shadow-lg mb-8">
-    <h2 class="text-2xl font-bold mb-4 text-gray-800">Filter Options</h2>
-    <div class="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
-        <div class="flex items-center space-x-2">
-            <label for="filter-year" class="block text-gray-700 font-bold">Year:</label>
-            <select id="filter-year" class="shadow appearance-none border rounded-lg py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                <option value="all">All Years</option>
-                {# Years will be dynamically added by JavaScript #}
-            </select>
-        </div>
-        
-        <div class="flex items-center space-x-2">
-            <label for="filter-range" class="block text-gray-700 font-bold">Range:</label>
-            <select id="filter-range" class="shadow appearance-none border rounded-lg py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                <option value="all">All Ranges</option>
-                {# Ranges will be dynamically added by JavaScript #}
-            </select>
-        </div>
-
-        <button id="reset-filters" class="btn-primary bg-gray-500 hover:bg-gray-600 px-4 py-2 rounded-lg">Reset Filters</button>
-    </div>
-</div>
-
-
-<div class="card p-6 bg-white rounded-lg shadow-lg">
-    <h2 class="text-2xl font-bold mb-4 text-gray-800">Matching Patterns</h2>
-    {% if patterns_data %}
-        <div class="overflow-x-auto">
-            <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
-                <thead class="bg-gray-100">
-                    <tr>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150" data-sort-by="year" data-sort-dir="asc">
-                            Year
-                            <span class="sort-icon ml-1"></span>
-                        </th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150" data-sort-by="range" data-sort-dir="asc">
-                            Range
-                            <span class="sort-icon ml-1"></span>
-                        </th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150" data-sort-by="type" data-sort-dir="asc">
-                            Type
-                            <span class="sort-icon ml-1"></span>
-                        </th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">
-                            Pattern
-                        </th>
-                        <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-200 transition-colors duration-150" data-sort-by="count" data-sort-dir="desc">
-                            Count
-                            <span class="sort-icon ml-1"></span>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody id="patterns-table-body">
-                    {# Data will be rendered here by JavaScript #}
-                </tbody>
-            </table>
-        </div>
-    {% else %}
-        <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
-            No grouped pattern data available. Please ensure historical data is loaded.
-        </div>
-    {% endif %}
-</div>
-
 <style>
-    .ball-small {
-        display: inline-flex;
-        justify-content: center;
-        align-items: center;
-        width: 30px;
-        height: 30px;
-        background-color: #f0f0f0;
-        border-radius: 50%;
-        border: 2px solid #ccc;
-        font-weight: bold;
-        color: #333;
-        font-size: 0.9em;
-        box-shadow: inset 0 0 3px rgba(0,0,0,0.2);
-    }
-    /* Styles for sort icons */
-    .sort-icon {
-        display: inline-block;
-        width: 0;
-        height: 0;
-        vertical-align: middle;
-        margin-left: 0.25rem;
-    }
-    .sort-icon.asc {
-        border-left: 5px solid transparent;
-        border-right: 5px solid transparent;
-        border-bottom: 5px solid #6b7280; /* Gray-500 */
-    }
-    .sort-icon.desc {
-        border-left: 5px solid transparent;
-        border-right: 5px solid transparent;
-        border-top: 5px solid #6b7280; /* Gray-500 */
-    }
-    .btn-primary {
-        @apply bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:shadow-outline transition duration-200 ease-in-out;
-    }
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg:     #07080f;
+    --s1:     #0d0f1c;
+    --s2:     #131626;
+    --s3:     #191d30;
+    --border: rgba(255,255,255,0.07);
+    --text:   rgba(255,255,255,0.87);
+    --muted:  rgba(255,255,255,0.38);
+
+    /* Decade range colors */
+    --r1:  #f87171;  /* 1-9   red     */
+    --r10: #fb923c;  /* 10-19 orange  */
+    --r20: #facc15;  /* 20-29 yellow  */
+    --r30: #4ade80;  /* 30-39 green   */
+    --r40: #38bdf8;  /* 40-49 sky     */
+    --r50: #a78bfa;  /* 50-59 violet  */
+    --r60: #f472b6;  /* 60-69 pink    */
+
+    --pair:    #38bdf8;
+    --triplet: #a78bfa;
+    --ai:      #34d399;
+  }
+
+  #gp-page * { box-sizing: border-box; }
+  #gp-page {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    color: var(--text);
+    padding-bottom: 80px;
+  }
+
+  /* ── Hero ── */
+  .gp-hero {
+    position: relative;
+    padding: 56px 24px 44px;
+    text-align: center;
+    overflow: hidden;
+  }
+  .gp-hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 60% 55% at 30% 50%, rgba(56,189,248,0.06) 0%, transparent 65%),
+      radial-gradient(ellipse 60% 55% at 70% 50%, rgba(167,139,250,0.06) 0%, transparent 65%);
+    pointer-events: none;
+  }
+  /* Decade color strip */
+  .gp-hero::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg,
+      var(--r1) 0%, var(--r10) 16.6%, var(--r20) 33.2%,
+      var(--r30) 49.8%, var(--r40) 66.4%, var(--r50) 83%, var(--r60) 100%
+    );
+    opacity: 0.5;
+  }
+  .gp-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--pair);
+    margin-bottom: 14px;
+    opacity: 0.8;
+  }
+  .gp-hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(38px, 5.5vw, 72px);
+    font-weight: 800;
+    line-height: 1.05;
+    margin: 0 0 14px;
+    background: linear-gradient(135deg, #fff 20%, var(--pair) 60%, var(--triplet) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .gp-hero p {
+    font-size: 14px;
+    color: var(--muted);
+    max-width: 560px;
+    margin: 0 auto;
+    line-height: 1.75;
+  }
+
+  /* ── Layout ── */
+  .gp-wrap {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* ── Card ── */
+  .gp-card {
+    background: var(--s1);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 28px 30px;
+    position: relative;
+    overflow: hidden;
+  }
+  .gp-card-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 4px;
+  }
+  .gp-card-sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin: 0 0 22px;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Range color legend ── */
+  .range-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .rl-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid;
+    letter-spacing: 0.5px;
+    cursor: default;
+  }
+  .rl-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* ── Overview stat chips ── */
+  .overview-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 700px) { .overview-grid { grid-template-columns: 1fr 1fr; } }
+
+  .ov-chip {
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+  .ov-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .ov-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+  }
+  .ov-note {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ── Filters ── */
+  .filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+  }
+  .filter-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .filter-group label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .filter-group select {
+    background: var(--s2);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    padding: 9px 14px;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+  .filter-group select:focus { border-color: var(--pair); }
+  .filter-group select option { background: #131626; }
+
+  /* Type filter pills */
+  .type-pills {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+  }
+  .type-pill {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  .type-pill.pair    { border-color: rgba(56,189,248,0.4);  color: var(--pair);    background: rgba(56,189,248,0.08); }
+  .type-pill.triplet { border-color: rgba(167,139,250,0.4); color: var(--triplet); background: rgba(167,139,250,0.08); }
+  .type-pill.all     { border-color: var(--border); color: var(--muted); background: transparent; }
+  .type-pill.active.pair    { background: rgba(56,189,248,0.2);  color: #fff; }
+  .type-pill.active.triplet { background: rgba(167,139,250,0.2); color: #fff; }
+  .type-pill.active.all     { background: rgba(255,255,255,0.1); color: #fff; border-color: rgba(255,255,255,0.2); }
+
+  .reset-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .reset-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+
+  /* ── Chart ── */
+  .chart-wrap { height: 240px; position: relative; }
+
+  /* ── Table ── */
+  .gp-table-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .gp-count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+  .gp-count strong { color: var(--pair); }
+
+  .gp-table-scroll { overflow-x: auto; border-radius: 10px; }
+
+  table.gp-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 620px;
+  }
+  table.gp-table thead th {
+    background: var(--s2);
+    padding: 12px 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    user-select: none;
+  }
+  table.gp-table thead th.sortable { cursor: pointer; }
+  table.gp-table thead th.sortable:hover { color: var(--pair); }
+  table.gp-table thead th.sort-active { color: var(--pair); }
+
+  .th-arrow { margin-left: 5px; opacity: 0.5; font-size: 10px; }
+  th.sort-active .th-arrow { opacity: 1; color: var(--pair); }
+
+  table.gp-table tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  table.gp-table tbody tr:hover { background: var(--s2); }
+  table.gp-table tbody tr:last-child { border-bottom: none; }
+  table.gp-table td {
+    padding: 11px 16px;
+    font-size: 13px;
+    vertical-align: middle;
+  }
+
+  /* Year cell */
+  .td-year {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  /* Range badge */
+  .range-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 6px;
+    border: 1px solid;
+    white-space: nowrap;
+  }
+
+  /* Type badge */
+  .type-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  .tb-pair    { background: rgba(56,189,248,0.12);  color: var(--pair);    border: 1px solid rgba(56,189,248,0.3); }
+  .tb-triplet { background: rgba(167,139,250,0.12); color: var(--triplet); border: 1px solid rgba(167,139,250,0.3); }
+
+  /* Pattern balls */
+  .pattern-balls { display: flex; gap: 5px; flex-wrap: wrap; }
+  .pb-ball {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+    transition: transform 0.15s;
+  }
+  .pb-ball:hover { transform: scale(1.15); }
+
+  /* Count bar */
+  .count-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .count-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    min-width: 24px;
+    text-align: right;
+  }
+  .count-bar-wrap {
+    flex: 1;
+    height: 5px;
+    background: var(--s3);
+    border-radius: 3px;
+    min-width: 60px;
+  }
+  .count-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--pair), var(--triplet));
+    transition: width 0.6s ease;
+  }
+
+  /* ── AI Panel ── */
+  .ai-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 0;
+  }
+  .ai-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--ai);
+    opacity: 0.8;
+    margin-bottom: 3px;
+  }
+  .ai-panel-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
+  }
+  .ai-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #059669, #34d399);
+    color: #fff;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 22px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    box-shadow: 0 0 24px rgba(52,211,153,0.2);
+    white-space: nowrap;
+  }
+  .ai-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 40px rgba(52,211,153,0.4); }
+  .ai-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+  .ai-thinking {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 0 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: rgba(52,211,153,0.7);
+    letter-spacing: 1px;
+  }
+  .ai-thinking.visible { display: flex; }
+  .ai-dots span {
+    display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--ai); margin: 0 2px;
+    animation: dotBounce 1.2s infinite;
+  }
+  .ai-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .ai-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dotBounce {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+
+  .ai-output {
+    display: none;
+    margin-top: 20px;
+    border-top: 1px solid rgba(52,211,153,0.12);
+    padding-top: 20px;
+  }
+  .ai-output.visible { display: block; }
+
+  /* Insight highlight chips */
+  .ai-highlights {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .ai-hl-card {
+    background: var(--s2);
+    border: 1px solid rgba(52,211,153,0.15);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .ai-hl-icon { font-size: 18px; margin-bottom: 6px; }
+  .ai-hl-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--ai);
+    margin-bottom: 4px;
+    opacity: 0.7;
+  }
+  .ai-hl-value { font-size: 13px; color: var(--text); line-height: 1.5; }
+
+  .ai-narrative {
+    background: var(--s2);
+    border: 1px solid rgba(52,211,153,0.12);
+    border-left: 3px solid var(--ai);
+    border-radius: 0 10px 10px 0;
+    padding: 18px 20px;
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--text);
+    white-space: pre-wrap;
+  }
+  .ai-error {
+    margin-top: 14px;
+    background: rgba(244,63,94,0.08);
+    border: 1px solid rgba(244,63,94,0.25);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #ff8aaa;
+  }
 </style>
 
+<div id="gp-page">
+
+  <!-- Hero -->
+  <div class="gp-hero">
+    <p class="gp-eyebrow">⬡ Decade Pattern Recognition</p>
+    <h1>Grouped Patterns</h1>
+    <p>Pairs and triplets appearing together within each number decade — from 1–9 through 60–69 — across all historical draws.</p>
+  </div>
+
+  <div class="gp-wrap">
+
+  {% if patterns_data %}
+
+    <!-- Range Color Legend -->
+    <div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 2px">
+      {% set ranges = [('1-9','--r1'),('10-19','--r10'),('20-29','--r20'),('30-39','--r30'),('40-49','--r40'),('50-59','--r50'),('60-69','--r60')] %}
+      {% for label, cssvar in ranges %}
+      <div class="rl-pill" style="border-color:rgba(255,255,255,0.15);color:var({{ cssvar }});background:rgba(255,255,255,0.04)">
+        <span class="rl-dot" style="background:var({{ cssvar }})"></span>
+        {{ label }}
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Overview stats -->
+    <div class="gp-card">
+      <p class="gp-card-title">Pattern Overview</p>
+      <p class="gp-card-sub">Aggregated from all historical draws</p>
+      <div class="overview-grid">
+        <div class="ov-chip">
+          <p class="ov-label">Total Patterns</p>
+          <p class="ov-value" id="ovTotal" style="color:var(--pair)">—</p>
+          <p class="ov-note">pairs + triplets</p>
+        </div>
+        <div class="ov-chip">
+          <p class="ov-label">Unique Pairs</p>
+          <p class="ov-value" id="ovPairs" style="color:var(--pair)">—</p>
+          <p class="ov-note">2-number combos</p>
+        </div>
+        <div class="ov-chip">
+          <p class="ov-label">Unique Triplets</p>
+          <p class="ov-value" id="ovTriplets" style="color:var(--triplet)">—</p>
+          <p class="ov-note">3-number combos</p>
+        </div>
+        <div class="ov-chip">
+          <p class="ov-label">Top Range</p>
+          <p class="ov-value" id="ovTopRange" style="color:var(--r30);font-size:20px">—</p>
+          <p class="ov-note" id="ovTopRangeNote">most patterns</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chart card -->
+    <div class="gp-card">
+      <p class="gp-card-title">Patterns by Decade</p>
+      <p class="gp-card-sub">Frequency distribution across number ranges</p>
+      <div class="chart-wrap"><canvas id="rangeChart"></canvas></div>
+    </div>
+
+    <!-- AI Panel -->
+    <div class="gp-card">
+      <div class="ai-panel-header">
+        <div>
+          <p class="ai-eyebrow">✦ Groq AI · Pattern Intelligence</p>
+          <p class="ai-panel-title">Pattern Insight Report</p>
+        </div>
+        <button class="ai-btn" id="aiBtn">◈ Analyse Patterns</button>
+      </div>
+      <div class="ai-thinking" id="aiThinking">
+        <div class="ai-dots"><span></span><span></span><span></span></div>
+        Scanning decade patterns…
+      </div>
+      <div class="ai-output" id="aiOutput">
+        <div class="ai-highlights" id="aiHighlights"></div>
+        <div class="ai-narrative" id="aiNarrative"></div>
+      </div>
+      <div class="ai-error" id="aiError" style="display:none"></div>
+    </div>
+
+    <!-- Filters + Table -->
+    <div class="gp-card">
+      <p class="gp-card-title">Pattern Explorer</p>
+      <p class="gp-card-sub">Filter, sort, and drill into specific decades and years</p>
+
+      <!-- Filters -->
+      <div class="filters-row" style="margin-bottom:20px">
+        <div class="filter-group">
+          <label>Year</label>
+          <select id="filter-year">
+            <option value="all">All Years</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Range</label>
+          <select id="filter-range">
+            <option value="all">All Ranges</option>
+          </select>
+        </div>
+        <div class="type-pills">
+          <button class="type-pill all active" data-type="all">All</button>
+          <button class="type-pill pair" data-type="Pair">Pairs</button>
+          <button class="type-pill triplet" data-type="Triplet">Triplets</button>
+        </div>
+        <button class="reset-btn" id="reset-filters">↺ Reset</button>
+      </div>
+
+      <!-- Table meta -->
+      <div class="gp-table-meta">
+        <p class="gp-count">Showing <strong id="rowCount">0</strong> patterns</p>
+      </div>
+
+      <div class="gp-table-scroll">
+        <table class="gp-table">
+          <thead>
+            <tr>
+              <th class="sortable" data-col="year">Year <span class="th-arrow" id="arr-year">↕</span></th>
+              <th class="sortable" data-col="range">Range <span class="th-arrow" id="arr-range">↕</span></th>
+              <th class="sortable" data-col="type">Type <span class="th-arrow" id="arr-type">↕</span></th>
+              <th>Pattern</th>
+              <th class="sortable sort-active" data-col="count">Count <span class="th-arrow" id="arr-count">↓</span></th>
+            </tr>
+          </thead>
+          <tbody id="patterns-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  {% else %}
+    <div class="gp-card" style="text-align:center;padding:60px">
+      <p style="font-size:36px;margin-bottom:12px">⬡</p>
+      <p style="color:var(--muted);font-size:14px">No grouped pattern data available. Please ensure historical data is loaded.</p>
+    </div>
+  {% endif %}
+
+  </div><!-- /gp-wrap -->
+</div><!-- /gp-page -->
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Original data received from Flask
-        const originalPatternsData = {{ patterns_data | tojson }}; 
-        let currentFilteredData = [...originalPatternsData]; // Data after filtering, before sorting
+document.addEventListener('DOMContentLoaded', function () {
 
-        const tableBody = document.getElementById('patterns-table-body');
-        const tableHeaders = document.querySelectorAll('th[data-sort-by]');
-        const filterYearSelect = document.getElementById('filter-year');
-        const filterRangeSelect = document.getElementById('filter-range');
-        const resetFiltersBtn = document.getElementById('reset-filters');
+  const allData = {{ patterns_data | tojson }};
+  if (!allData || !allData.length) return;
 
-        let currentSortBy = 'count'; 
-        let currentSortDir = 'desc'; 
+  // ── Range config ─────────────────────────────────────────
+  const RANGE_COLORS = {
+    '1-9':   { bg: '#f87171', dim: 'rgba(248,113,113,0.15)', border: 'rgba(248,113,113,0.5)' },
+    '10-19': { bg: '#fb923c', dim: 'rgba(251,146,60,0.15)',  border: 'rgba(251,146,60,0.5)'  },
+    '20-29': { bg: '#facc15', dim: 'rgba(250,204,21,0.15)',  border: 'rgba(250,204,21,0.5)'  },
+    '30-39': { bg: '#4ade80', dim: 'rgba(74,222,128,0.15)',  border: 'rgba(74,222,128,0.5)'  },
+    '40-49': { bg: '#38bdf8', dim: 'rgba(56,189,248,0.15)',  border: 'rgba(56,189,248,0.5)'  },
+    '50-59': { bg: '#a78bfa', dim: 'rgba(167,139,250,0.15)', border: 'rgba(167,139,250,0.5)' },
+    '60-69': { bg: '#f472b6', dim: 'rgba(244,114,182,0.15)', border: 'rgba(244,114,182,0.5)' },
+  };
 
-        // Populate filter dropdowns dynamically
-        function populateFilters() {
-            const uniqueYears = [...new Set(originalPatternsData.map(d => d.year))].sort((a, b) => b - a);
-            uniqueYears.forEach(year => {
-                const option = document.createElement('option');
-                option.value = year;
-                option.textContent = year;
-                filterYearSelect.appendChild(option);
-            });
+  function rangeColor(r)    { return (RANGE_COLORS[r] || {}).bg     || '#fff'; }
+  function rangeDim(r)      { return (RANGE_COLORS[r] || {}).dim    || 'rgba(255,255,255,0.1)'; }
+  function rangeBorder(r)   { return (RANGE_COLORS[r] || {}).border || 'rgba(255,255,255,0.3)'; }
 
-            const uniqueRanges = [...new Set(originalPatternsData.map(d => d.range))].sort();
-            uniqueRanges.forEach(range => {
-                const option = document.createElement('option');
-                option.value = range;
-                option.textContent = range;
-                filterRangeSelect.appendChild(option);
-            });
+  // ── Overview stats ────────────────────────────────────────
+  const pairs    = allData.filter(d => d.type === 'Pair').length;
+  const triplets = allData.filter(d => d.type === 'Triplet').length;
+
+  // Top range by total count
+  const rangeScore = {};
+  allData.forEach(d => { rangeScore[d.range] = (rangeScore[d.range] || 0) + d.count; });
+  const topRange = Object.entries(rangeScore).sort((a,b) => b[1]-a[1])[0] || ['—', 0];
+
+  document.getElementById('ovTotal').textContent    = allData.length;
+  document.getElementById('ovPairs').textContent    = pairs;
+  document.getElementById('ovTriplets').textContent = triplets;
+  document.getElementById('ovTopRange').textContent = topRange[0];
+  document.getElementById('ovTopRangeNote').textContent = `${topRange[1]} total appearances`;
+
+  // ── Chart: patterns by decade ─────────────────────────────
+  const orderedRanges = ['1-9','10-19','20-29','30-39','40-49','50-59','60-69'];
+  const pairCounts    = orderedRanges.map(r =>
+    allData.filter(d => d.range === r && d.type === 'Pair').reduce((s,d) => s + d.count, 0)
+  );
+  const tripletCounts = orderedRanges.map(r =>
+    allData.filter(d => d.range === r && d.type === 'Triplet').reduce((s,d) => s + d.count, 0)
+  );
+
+  new Chart(document.getElementById('rangeChart'), {
+    type: 'bar',
+    data: {
+      labels: orderedRanges,
+      datasets: [
+        {
+          label: 'Pairs',
+          data: pairCounts,
+          backgroundColor: orderedRanges.map(r => rangeDim(r)),
+          borderColor:     orderedRanges.map(r => rangeBorder(r)),
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+        {
+          label: 'Triplets',
+          data: tripletCounts,
+          backgroundColor: orderedRanges.map(r => rangeDim(r).replace('0.15','0.35')),
+          borderColor:     orderedRanges.map(r => rangeBorder(r)),
+          borderWidth: 1,
+          borderRadius: 4,
         }
-
-        // Function to render the table based on current data
-        function renderTable(data) {
-            tableBody.innerHTML = ''; // Clear existing rows
-            if (!data || data.length === 0) {
-                const noDataRow = document.createElement('tr');
-                noDataRow.innerHTML = `<td colspan="5" class="px-4 py-2 text-center text-gray-600">No matching patterns found for the selected filters.</td>`;
-                tableBody.appendChild(noDataRow);
-                return;
-            }
-
-            data.forEach(pattern => {
-                const row = document.createElement('tr');
-                row.className = 'hover:bg-gray-50';
-                
-                const patternHtml = `<div class="flex space-x-1">
-                                    ${pattern.pattern.map(num => `
-                                        <span class="ball-small">
-                                            ${num}
-                                        </span>
-                                    `).join('')}
-                                </div>`;
-
-                row.innerHTML = `
-                    <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${pattern.year}</td>
-                    <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${pattern.range}</td>
-                    <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${pattern.type}</td>
-                    <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">${patternHtml}</td>
-                    <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900 font-bold">${pattern.count}</td>
-                `;
-                tableBody.appendChild(row);
-            });
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 700 },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.03)' },
+          ticks: { color: 'rgba(255,255,255,0.45)', font: { family: 'IBM Plex Mono', size: 10 } }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 10 } },
+          beginAtZero: true,
+          stacked: false,
+          title: { display: true, text: 'Total Count', color: 'rgba(255,255,255,0.3)', font: { size: 10 } }
         }
-
-        // Function to apply filters and then sort, then render
-        function filterSortAndRender() {
-            const selectedYear = filterYearSelect.value;
-            const selectedRange = filterRangeSelect.value;
-
-            // Apply filters
-            currentFilteredData = originalPatternsData.filter(pattern => {
-                const matchesYear = (selectedYear === 'all' || pattern.year == selectedYear);
-                const matchesRange = (selectedRange === 'all' || pattern.range === selectedRange);
-                return matchesYear && matchesRange;
-            });
-
-            // Apply current sorting to the filtered data
-            currentFilteredData.sort((a, b) => {
-                let valA, valB;
-
-                valA = a[currentSortBy];
-                valB = b[currentSortBy];
-
-                if (typeof valA === 'number' && typeof valB === 'number') {
-                    return currentSortDir === 'asc' ? valA - valB : valB - valA;
-                } else {
-                    const comparison = String(valA).localeCompare(String(valB));
-                    return currentSortDir === 'asc' ? comparison : -comparison;
-                }
-            });
-
-            renderTable(currentFilteredData);
-            updateSortIcons();
+      },
+      plugins: {
+        legend: {
+          labels: { color: 'rgba(255,255,255,0.5)', font: { family: 'IBM Plex Mono', size: 10 },
+                    boxWidth: 10, usePointStyle: true }
+        },
+        tooltip: {
+          backgroundColor: '#0d0f1c',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleColor: '#fff',
+          bodyColor: 'rgba(255,255,255,0.6)',
+          padding: 12
         }
+      }
+    }
+  });
 
-        // Function to update sort icons in headers
-        function updateSortIcons() {
-            tableHeaders.forEach(header => {
-                const icon = header.querySelector('.sort-icon');
-                if (icon) {
-                    icon.classList.remove('asc', 'desc');
-                    if (header.dataset.sortBy === currentSortBy) {
-                        icon.classList.add(currentSortDir);
-                    }
-                }
-            });
-        }
+  // ── Table state ───────────────────────────────────────────
+  let sortCol  = 'count';
+  let sortDir  = 'desc';
+  let filterYear  = 'all';
+  let filterRange = 'all';
+  let filterType  = 'all';
 
-        // Event listeners for filter dropdowns
-        filterYearSelect.addEventListener('change', filterSortAndRender);
-        filterRangeSelect.addEventListener('change', filterSortAndRender);
+  const maxCount = Math.max(...allData.map(d => d.count));
 
-        // Event listener for reset button
-        resetFiltersBtn.addEventListener('click', function() {
-            filterYearSelect.value = 'all';
-            filterRangeSelect.value = 'all';
-            currentSortBy = 'count'; // Reset sort to default
-            currentSortDir = 'desc'; // Reset sort direction to default
-            filterSortAndRender();
-        });
+  // ── Populate filters ──────────────────────────────────────
+  const yearSel  = document.getElementById('filter-year');
+  const rangeSel = document.getElementById('filter-range');
 
-        // Add event listeners to headers for sorting
-        tableHeaders.forEach(header => {
-            header.addEventListener('click', function() {
-                const sortBy = this.dataset.sortBy;
-                
-                if (currentSortBy === sortBy) {
-                    currentSortDir = (currentSortDir === 'asc') ? 'desc' : 'asc';
-                } else {
-                    currentSortBy = sortBy;
-                    currentSortDir = this.dataset.sortDir || 'asc'; 
-                }
-                
-                filterSortAndRender(); // Re-filter and sort with new criteria
-            });
-        });
+  const years  = [...new Set(allData.map(d => d.year))].sort((a,b) => b-a);
+  const ranges = [...new Set(allData.map(d => d.range))].sort();
 
-        // Initial setup
-        populateFilters();
-        filterSortAndRender(); // Initial render with default filters and sort
+  years.forEach(y => {
+    const o = document.createElement('option'); o.value = y; o.textContent = y;
+    yearSel.appendChild(o);
+  });
+  ranges.forEach(r => {
+    const o = document.createElement('option'); o.value = r; o.textContent = r;
+    rangeSel.appendChild(o);
+  });
+
+  // ── Render table ──────────────────────────────────────────
+  const tbody = document.getElementById('patterns-table-body');
+
+  function renderTable() {
+    // Filter
+    let data = allData.filter(d => {
+      return (filterYear  === 'all' || d.year  == filterYear)
+          && (filterRange === 'all' || d.range === filterRange)
+          && (filterType  === 'all' || d.type  === filterType);
     });
+
+    // Sort
+    data.sort((a, b) => {
+      let va = a[sortCol], vb = b[sortCol];
+      if (typeof va === 'number') return sortDir === 'asc' ? va - vb : vb - va;
+      return sortDir === 'asc'
+        ? String(va).localeCompare(String(vb))
+        : String(vb).localeCompare(String(va));
+    });
+
+    document.getElementById('rowCount').textContent = data.length;
+    tbody.innerHTML = '';
+
+    if (!data.length) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">No patterns match these filters.</td></tr>`;
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    data.forEach(d => {
+      const rc  = rangeColor(d.range);
+      const rdm = rangeDim(d.range);
+      const rb  = rangeBorder(d.range);
+      const isPair = d.type === 'Pair';
+
+      const ballsHtml = d.pattern.map(n =>
+        `<span class="pb-ball" style="background:${rdm};border:1px solid ${rb};color:${rc}">${n}</span>`
+      ).join('');
+
+      const barW = Math.round((d.count / maxCount) * 100);
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="td-year">${d.year}</td>
+        <td><span class="range-badge" style="color:${rc};background:${rdm};border-color:${rb}">${d.range}</span></td>
+        <td><span class="type-badge ${isPair ? 'tb-pair' : 'tb-triplet'}">${d.type}</span></td>
+        <td><div class="pattern-balls">${ballsHtml}</div></td>
+        <td>
+          <div class="count-cell">
+            <span class="count-num">${d.count}</span>
+            <div class="count-bar-wrap">
+              <div class="count-bar-fill" style="width:${barW}%;background:${rc}"></div>
+            </div>
+          </div>
+        </td>
+      `;
+      frag.appendChild(tr);
+    });
+    tbody.appendChild(frag);
+
+    // Update sort arrows
+    ['year','range','type','count'].forEach(col => {
+      const el = document.getElementById('arr-' + col);
+      if (!el) return;
+      el.textContent = sortCol === col ? (sortDir === 'desc' ? '↓' : '↑') : '↕';
+    });
+    document.querySelectorAll('th.sortable').forEach(th => {
+      th.classList.toggle('sort-active', th.dataset.col === sortCol);
+    });
+  }
+
+  // ── Sort headers ──────────────────────────────────────────
+  document.querySelectorAll('th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      else { sortCol = col; sortDir = col === 'count' ? 'desc' : 'asc'; }
+      renderTable();
+    });
+  });
+
+  // ── Filter controls ───────────────────────────────────────
+  yearSel.addEventListener('change',  () => { filterYear  = yearSel.value;  renderTable(); });
+  rangeSel.addEventListener('change', () => { filterRange = rangeSel.value; renderTable(); });
+
+  document.querySelectorAll('.type-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      filterType = pill.dataset.type;
+      renderTable();
+    });
+  });
+
+  document.getElementById('reset-filters').addEventListener('click', () => {
+    yearSel.value = 'all'; rangeSel.value = 'all';
+    filterYear = filterRange = 'all'; filterType = 'all';
+    sortCol = 'count'; sortDir = 'desc';
+    document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
+    document.querySelector('.type-pill.all').classList.add('active');
+    renderTable();
+  });
+
+  // ── AI Analysis ───────────────────────────────────────────
+  document.getElementById('aiBtn').addEventListener('click', async function () {
+    const btn      = this;
+    const thinking = document.getElementById('aiThinking');
+    const output   = document.getElementById('aiOutput');
+    const narrative= document.getElementById('aiNarrative');
+    const errorEl  = document.getElementById('aiError');
+    const hlWrap   = document.getElementById('aiHighlights');
+
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Thinking…';
+    thinking.classList.add('visible');
+    output.classList.remove('visible');
+    errorEl.style.display = 'none';
+    narrative.textContent = '';
+    hlWrap.innerHTML = '';
+
+    // Build summary for AI
+    const topPairs    = [...allData].filter(d => d.type === 'Pair')
+                          .sort((a,b) => b.count - a.count).slice(0, 10);
+    const topTriplets = [...allData].filter(d => d.type === 'Triplet')
+                          .sort((a,b) => b.count - a.count).slice(0, 10);
+    const rangeBreakdown = orderedRanges.map(r => ({
+      range: r,
+      pairs:    allData.filter(d => d.range===r && d.type==='Pair').reduce((s,d)=>s+d.count,0),
+      triplets: allData.filter(d => d.range===r && d.type==='Triplet').reduce((s,d)=>s+d.count,0),
+    }));
+
+    try {
+      const res  = await fetch('/api/grouped-patterns-ai-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          total_patterns:   allData.length,
+          total_pairs:      pairs,
+          total_triplets:   triplets,
+          top_pairs:        topPairs,
+          top_triplets:     topTriplets,
+          range_breakdown:  rangeBreakdown,
+          top_range:        topRange[0],
+        })
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        errorEl.textContent = 'AI analysis unavailable: ' + data.error;
+        errorEl.style.display = 'block';
+      } else {
+        // Render highlight cards
+        if (data.highlights && data.highlights.length) {
+          data.highlights.forEach(hl => {
+            const card = document.createElement('div');
+            card.className = 'ai-hl-card';
+            card.innerHTML = `<div class="ai-hl-icon">${hl.icon}</div><p class="ai-hl-label">${hl.label}</p><p class="ai-hl-value">${hl.value}</p>`;
+            hlWrap.appendChild(card);
+          });
+        }
+        narrative.textContent = data.analysis;
+        output.classList.add('visible');
+      }
+    } catch (err) {
+      errorEl.textContent = 'Request failed. Please try again.';
+      errorEl.style.display = 'block';
+    } finally {
+      thinking.classList.remove('visible');
+      btn.disabled = false;
+      btn.innerHTML = '◈ Analyse Patterns';
+    }
+  });
+
+  // ── Initial render ────────────────────────────────────────
+  renderTable();
+});
 </script>
 {% endblock %}
