@@ -1,5 +1,770 @@
 {% extends "base.html" %}
 
+{% block title %}Sum Trends & Gaps — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
+
+{% block content %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg:     #070a0f;
+    --s1:     #0c1018;
+    --s2:     #111822;
+    --s3:     #18202e;
+    --border: rgba(255,255,255,0.07);
+    --text:   rgba(255,255,255,0.87);
+    --muted:  rgba(255,255,255,0.36);
+    --teal:   #2dd4bf;
+    --green:  #10b981;
+    --blue:   #3b82f6;
+    --indigo: #6366f1;
+    --violet: #8b5cf6;
+    --amber:  #f59e0b;
+    --orange: #f97316;
+    --red:    #f43f5e;
+    --cyan:   #22d3ee;
+  }
+
+  /* Zone palette — consistent across all components */
+  :root {
+    --z0: #38bdf8; --z1: #34d399; --z2: #a78bfa;
+    --z3: #fb923c; --z4: #f43f5e; --z5: #fbbf24;
+    --z6: #06b6d4; --z7: #818cf8;
+  }
+
+  #stg-page * { box-sizing: border-box; }
+  #stg-page {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg); min-height: 100vh;
+    color: var(--text); padding-bottom: 80px;
+  }
+
+  /* ── Hero ── */
+  .stg-hero {
+    position: relative; padding: 52px 24px 40px; text-align: center; overflow: hidden;
+  }
+  .stg-hero::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 55% 50% at 50% 0%,  rgba(45,212,191,0.09) 0%, transparent 65%),
+      radial-gradient(ellipse 30% 40% at 15% 65%, rgba(99,102,241,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 30% 40% at 85% 65%, rgba(249,115,22,0.05) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .stg-hero::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--teal), var(--cyan), transparent);
+    opacity: 0.3;
+  }
+  .stg-eyebrow {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 3px; text-transform: uppercase;
+    color: var(--teal); margin-bottom: 12px; opacity: 0.8;
+  }
+  .stg-hero h1 {
+    font-size: clamp(34px, 5vw, 64px); font-weight: 700;
+    line-height: 1.08; margin: 0 0 14px;
+    background: linear-gradient(135deg, var(--teal) 0%, #fff 50%, var(--orange) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .stg-hero p {
+    font-size: 14px; color: var(--muted); max-width: 540px; margin: 0 auto; line-height: 1.75;
+  }
+
+  /* ── Layout ── */
+  .stg-wrap { max-width: 1280px; margin: 0 auto; padding: 0 24px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* ── Card ── */
+  .stg-card {
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px 26px; position: relative; overflow: hidden;
+  }
+  .stg-card-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--teal);
+    margin: 0 0 16px; opacity: 0.8;
+  }
+
+  /* ── Overview stat chips ── */
+  .stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+  @media(max-width:680px){ .stat-row { grid-template-columns: 1fr 1fr; } }
+
+  .st-chip {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px; text-align: center;
+  }
+  .st-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .st-val   { font-size: 28px; font-weight: 700; line-height: 1; }
+  .st-note  { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+  /* ── Donut chart ── */
+  .donut-layout {
+    display: grid; grid-template-columns: 280px 1fr; gap: 24px; align-items: center;
+  }
+  @media(max-width:680px){ .donut-layout { grid-template-columns: 1fr; } }
+
+  .donut-wrap { position: relative; width: 280px; height: 280px; }
+  @media(max-width:680px){ .donut-wrap { width: 220px; height: 220px; margin: 0 auto; } }
+
+  .donut-center {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; pointer-events: none;
+  }
+  .donut-total { font-size: 32px; font-weight: 700; color: #fff; line-height: 1; }
+  .donut-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 1px; margin-top: 3px; }
+
+  /* Custom legend */
+  .zone-legend { display: flex; flex-direction: column; gap: 8px; }
+  .zl-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; border-radius: 8px;
+    border: 1px solid transparent; cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .zl-row:hover  { background: var(--s2); border-color: var(--border); }
+  .zl-row.active { background: var(--s2); }
+  .zl-dot  { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .zl-name { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text); flex: 1; }
+  .zl-count{ font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
+  .zl-pct  { font-family: 'JetBrains Mono', monospace; font-size: 11px; min-width: 38px; text-align: right; }
+
+  /* ── Sum grid (appeared / missing visual) ── */
+  .grid-legend {
+    display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 16px;
+  }
+  .gl-item { display: flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); }
+  .gl-swatch { width: 12px; height: 12px; border-radius: 2px; }
+
+  .sum-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(28px, 1fr));
+    gap: 3px;
+  }
+  .sg-cell {
+    aspect-ratio: 1; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 8px;
+    cursor: default; position: relative; transition: transform 0.1s;
+  }
+  .sg-cell:hover { transform: scale(1.4); z-index: 10; }
+  .sg-cell.missing  { background: rgba(244,63,94,0.15); color: rgba(244,63,94,0.5); border: 1px solid rgba(244,63,94,0.2); }
+  .sg-cell.rare     { background: rgba(45,212,191,0.08); color: rgba(45,212,191,0.4); }
+  .sg-cell.uncommon { background: rgba(45,212,191,0.18); color: rgba(45,212,191,0.6); }
+  .sg-cell.common   { background: rgba(45,212,191,0.35); color: rgba(45,212,191,0.9); }
+  .sg-cell.frequent { background: rgba(45,212,191,0.65); color: #fff; }
+
+  /* ── Zone selector ── */
+  .zone-pills { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 20px; }
+  .zone-pill {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 1px; padding: 7px 14px; border-radius: 8px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .zone-pill:hover:not(.active) { border-color: rgba(255,255,255,0.15); color: var(--text); }
+
+  /* Zone range cards */
+  .zone-detail { display: none; }
+  .zone-detail.visible { display: block; }
+
+  .zone-stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 18px; }
+  @media(max-width:580px){ .zone-stats-row { grid-template-columns: 1fr 1fr; } }
+
+  .zs-chip { background: var(--s2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
+  .zs-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .zs-val   { font-size: 22px; font-weight: 700; color: #fff; line-height: 1; }
+
+  .zone-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media(max-width:580px){ .zone-tables { grid-template-columns: 1fr; } }
+
+  .zone-mini-table { background: var(--s2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .zmt-header { padding: 10px 14px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .zmt-row { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid rgba(255,255,255,0.03); transition: background 0.12s; }
+  .zmt-row:last-child { border-bottom: none; }
+  .zmt-row:hover { background: var(--s3); }
+  .zmt-sum { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: #fff; min-width: 36px; }
+  .zmt-bar-track { flex: 1; height: 5px; background: var(--s3); border-radius: 3px; }
+  .zmt-bar-fill  { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+  .zmt-cnt { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); min-width: 28px; text-align: right; }
+
+  /* ── Appeared sums table ── */
+  .tbl-controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+  .tbl-count { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
+  .tbl-count strong { color: var(--teal); }
+
+  .tbl-scroll { overflow-x: auto; border-radius: 10px; }
+  table.stg-table { width: 100%; border-collapse: collapse; min-width: 480px; }
+  table.stg-table thead th {
+    background: var(--s2); padding: 10px 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--muted);
+    text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap;
+    cursor: pointer; user-select: none; transition: color 0.15s;
+  }
+  table.stg-table thead th:hover { color: var(--teal); }
+  table.stg-table thead th.sort-active { color: var(--teal); }
+  table.stg-table thead th.no-sort { cursor: default; }
+  table.stg-table thead th.no-sort:hover { color: var(--muted); }
+  .th-arr { margin-left: 4px; opacity: 0.6; font-size: 10px; }
+  th.sort-active .th-arr { opacity: 1; }
+
+  table.stg-table tbody tr { border-bottom: 1px solid rgba(255,255,255,0.03); transition: background 0.12s; }
+  table.stg-table tbody tr:hover { background: var(--s2); }
+  table.stg-table tbody tr:last-child { border-bottom: none; }
+  table.stg-table td { padding: 9px 14px; vertical-align: middle; font-size: 13px; }
+
+  .sum-pill { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 6px; display: inline-block; }
+  .freq-bar-wrap { display: flex; align-items: center; gap: 8px; min-width: 120px; }
+  .fb-track { flex: 1; height: 5px; background: var(--s3); border-radius: 3px; }
+  .fb-fill  { height: 100%; border-radius: 3px; background: var(--teal); transition: width 0.4s ease; }
+  .fb-cnt   { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); min-width: 24px; text-align: right; }
+  .td-date  { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+  /* Dormancy badge */
+  .dorm-badge { font-family: 'JetBrains Mono', monospace; font-size: 9px; padding: 2px 6px; border-radius: 4px; }
+  .dorm-fresh  { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.2); }
+  .dorm-mid    { background: rgba(245,158,11,0.12); color: var(--amber); border: 1px solid rgba(245,158,11,0.2); }
+  .dorm-old    { background: rgba(249,115,22,0.12); color: var(--orange); border: 1px solid rgba(249,115,22,0.2); }
+  .dorm-stale  { background: rgba(244,63,94,0.12);  color: var(--red);   border: 1px solid rgba(244,63,94,0.2); }
+
+  /* Missing sums toggle */
+  .missing-toggle { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 1px; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+  .missing-toggle.open { background: rgba(244,63,94,0.1); border-color: rgba(244,63,94,0.3); color: var(--red); }
+
+  .missing-grid { display: none; }
+  .missing-grid.visible { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+  .ms-pill { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 4px 9px; border-radius: 5px; background: rgba(244,63,94,0.1); border: 1px solid rgba(244,63,94,0.25); color: var(--red); }
+
+  /* ── AI Panel ── */
+  .ai-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--teal), var(--cyan), transparent);
+    opacity: 0.4;
+  }
+  .ai-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+  .ai-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--teal); opacity: 0.8; margin-bottom: 3px; }
+  .ai-title   { font-size: 19px; font-weight: 700; color: #fff; margin: 0; }
+  .ai-btn {
+    display: flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, var(--teal2, #0d9488), var(--teal));
+    color: #fff; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    border: none; border-radius: 10px; padding: 12px 22px;
+    cursor: pointer; white-space: nowrap;
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    box-shadow: 0 0 20px rgba(45,212,191,0.2);
+  }
+  .ai-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 36px rgba(45,212,191,0.4); }
+  .ai-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .ai-thinking { display: none; align-items: center; gap: 10px; padding: 14px 0 4px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: rgba(45,212,191,0.7); letter-spacing: 1px; }
+  .ai-thinking.visible { display: flex; }
+  .ai-dots span { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--teal); margin: 0 2px; animation: dotB 1.2s infinite; }
+  .ai-dots span:nth-child(2) { animation-delay: 0.2s; background: var(--cyan); }
+  .ai-dots span:nth-child(3) { animation-delay: 0.4s; background: var(--green); }
+  @keyframes dotB { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1);opacity:1} }
+
+  .ai-output { display: none; margin-top: 20px; border-top: 1px solid rgba(45,212,191,0.1); padding-top: 20px; }
+  .ai-output.visible { display: block; }
+
+  .ai-chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 12px; margin-bottom: 20px; }
+  .ai-chip { background: var(--s2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .ai-chip-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .ai-chip-val   { font-size: 13px; font-weight: 500; color: #fff; line-height: 1.5; }
+
+  .ai-narrative {
+    background: var(--s2); border: 1px solid rgba(45,212,191,0.1);
+    border-left: 3px solid var(--teal); border-radius: 0 10px 10px 0;
+    padding: 18px 20px; font-size: 14px; line-height: 1.85; color: var(--text); white-space: pre-wrap;
+  }
+  .ai-error { margin-top: 14px; background: rgba(244,63,94,0.08); border: 1px solid rgba(244,63,94,0.25); border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #ff8aaa; }
+</style>
+
+<div id="stg-page">
+  <div class="stg-hero">
+    <p class="stg-eyebrow">∑ Sum Intelligence · Gaps &amp; Zones</p>
+    <h1>Sum Trends<br>&amp; Gaps</h1>
+    <p>Which white ball sums have never appeared, which zones dominate, and what the data says about where the next sum is likely to fall.</p>
+  </div>
+
+  <div class="stg-wrap">
+
+    <!-- ① Overview stats -->
+    <div class="stg-card">
+      <p class="stg-card-title">Overview</p>
+      <div class="stat-row">
+        <div class="st-chip">
+          <p class="st-label">Theoretical Range</p>
+          <p class="st-val" style="color:var(--teal);font-size:20px">{{ min_possible_sum }}–{{ max_possible_sum }}</p>
+          <p class="st-note">min to max possible</p>
+        </div>
+        <div class="st-chip">
+          <p class="st-label">Appeared Sums</p>
+          <p class="st-val" style="color:var(--green)" id="stAppeared">—</p>
+          <p class="st-note">distinct sums drawn</p>
+        </div>
+        <div class="st-chip">
+          <p class="st-label">Missing Sums</p>
+          <p class="st-val" style="color:var(--red)">{{ missing_sums | length }}</p>
+          <p class="st-note">never drawn</p>
+        </div>
+        <div class="st-chip">
+          <p class="st-label">Hottest Zone</p>
+          <p class="st-val" style="color:var(--amber);font-size:18px" id="stHottestZone">—</p>
+          <p class="st-note" id="stHottestNote">—</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ② Zone Donut -->
+    {% if grouped_sums_analysis %}
+    <div class="stg-card">
+      <p class="stg-card-title">Sum Zone Distribution</p>
+      <div class="donut-layout">
+        <div class="donut-wrap">
+          <canvas id="sumZonesChart"></canvas>
+          <div class="donut-center">
+            <span class="donut-total" id="donutTotal">—</span>
+            <span class="donut-label">total draws</span>
+          </div>
+        </div>
+        <div class="zone-legend" id="zoneLegend"></div>
+      </div>
+    </div>
+
+    <!-- ③ Zone Range Cards -->
+    <div class="stg-card">
+      <p class="stg-card-title">Zone Deep Dive</p>
+      <div class="zone-pills" id="zonePills"></div>
+      <div id="zoneDetailContainer"></div>
+    </div>
+    {% endif %}
+
+    <!-- ④ Sum Grid — appeared vs missing -->
+    <div class="stg-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+        <p class="stg-card-title" style="margin:0">Sum Coverage Grid</p>
+        <button class="missing-toggle" id="missingToggle">Show Missing ({{ missing_sums | length }})</button>
+      </div>
+      <div class="grid-legend">
+        <div class="gl-item"><span class="gl-swatch" style="background:rgba(244,63,94,0.3)"></span> Never drawn</div>
+        <div class="gl-item"><span class="gl-swatch" style="background:rgba(45,212,191,0.1)"></span> Rare (1–2×)</div>
+        <div class="gl-item"><span class="gl-swatch" style="background:rgba(45,212,191,0.2)"></span> Uncommon (3–5×)</div>
+        <div class="gl-item"><span class="gl-swatch" style="background:rgba(45,212,191,0.4)"></span> Common (6–10×)</div>
+        <div class="gl-item"><span class="gl-swatch" style="background:rgba(45,212,191,0.7)"></span> Frequent (11×+)</div>
+      </div>
+      <div class="sum-grid" id="sumGrid"></div>
+      <div class="missing-grid" id="missingGrid">
+        {% for s in missing_sums %}
+        <span class="ms-pill">{{ s }}</span>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- ⑤ AI Panel -->
+    {% if grouped_sums_analysis %}
+    <div class="stg-card ai-card">
+      <div class="ai-header">
+        <div>
+          <p class="ai-eyebrow">✦ Groq AI · Sum Intelligence</p>
+          <p class="ai-title">Zone &amp; Gap Analysis</p>
+        </div>
+        <button class="ai-btn" id="aiBtn">◈ Analyse Zones</button>
+      </div>
+      <div class="ai-thinking" id="aiThinking"><div class="ai-dots"><span></span><span></span><span></span></div>Scanning zones…</div>
+      <div class="ai-output" id="aiOutput">
+        <div class="ai-chips" id="aiChips"></div>
+        <div class="ai-narrative" id="aiNarrative"></div>
+      </div>
+      <div class="ai-error" id="aiError" style="display:none"></div>
+    </div>
+    {% endif %}
+
+    <!-- ⑥ Appeared Sums Table -->
+    <div class="stg-card">
+      <div class="tbl-controls">
+        <p class="stg-card-title" style="margin:0">All Appeared Sums</p>
+        <p class="tbl-count">Showing <strong id="tblRowCount">0</strong> sums</p>
+      </div>
+      <div class="tbl-scroll">
+        <table class="stg-table">
+          <thead><tr>
+            <th data-sort="sum" class="sort-active">Sum <span class="th-arr" id="arr-sum">↑</span></th>
+            <th data-sort="count">Frequency <span class="th-arr" id="arr-count">↕</span></th>
+            <th class="no-sort">Chart</th>
+            <th data-sort="date">Last Drawn <span class="th-arr" id="arr-date">↕</span></th>
+            <th class="no-sort">Dormancy</th>
+          </tr></thead>
+          <tbody id="stgTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+  // ── Data ─────────────────────────────────────────────────
+  const appearedRaw     = {{ appeared_sums_details | tojson }};
+  const groupedRaw      = {{ grouped_sums_analysis | tojson if grouped_sums_analysis else '{}' }};
+  const missingRaw      = {{ missing_sums | tojson }};
+  const minPossible     = {{ min_possible_sum }};
+  const maxPossible     = {{ max_possible_sum }};
+
+  const ZONE_COLORS = ['#38bdf8','#34d399','#a78bfa','#fb923c','#f43f5e','#fbbf24','#06b6d4','#818cf8'];
+
+  // ── Overview stats ────────────────────────────────────────
+  document.getElementById('stAppeared').textContent = appearedRaw.length;
+
+  if (Object.keys(groupedRaw).length) {
+    const hottest = Object.entries(groupedRaw).sort((a,b) =>
+      (b[1].appeared_in_range_count || 0) - (a[1].appeared_in_range_count || 0)
+    )[0];
+    const totalDraws = Object.values(groupedRaw).reduce((s,v) => s+(v.appeared_in_range_count||0),0);
+    document.getElementById('stHottestZone').textContent = hottest[0];
+    const pct = totalDraws ? Math.round(hottest[1].appeared_in_range_count/totalDraws*100) : 0;
+    document.getElementById('stHottestNote').textContent = `${pct}% of all draws`;
+    document.getElementById('donutTotal').textContent = totalDraws.toLocaleString();
+  }
+
+  // ── Donut chart ───────────────────────────────────────────
+  const zoneNames  = Object.keys(groupedRaw);
+  const zoneCounts = zoneNames.map(k => groupedRaw[k].appeared_in_range_count || 0);
+  const zoneTotal  = zoneCounts.reduce((s,v) => s+v, 0);
+
+  if (zoneNames.length) {
+    const ctx = document.getElementById('sumZonesChart');
+    let donutChart;
+
+    if (ctx) {
+      donutChart = new Chart(ctx.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: zoneNames,
+          datasets: [{
+            data: zoneCounts,
+            backgroundColor: ZONE_COLORS.slice(0, zoneNames.length).map(c => c + 'cc'),
+            borderColor:     ZONE_COLORS.slice(0, zoneNames.length),
+            borderWidth: 2, hoverOffset: 8,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: true,
+          cutout: '68%',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0c1018', borderColor: 'rgba(45,212,191,0.3)', borderWidth: 1,
+              titleColor: 'rgba(255,255,255,0.7)', bodyColor: 'rgba(255,255,255,0.5)', padding: 12,
+              titleFont: { family: 'JetBrains Mono', size: 11 },
+              callbacks: {
+                label: ctx => ` ${ctx.raw} sums (${zoneTotal ? (ctx.raw/zoneTotal*100).toFixed(1) : 0}%)`
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Build custom legend
+    const legWrap = document.getElementById('zoneLegend');
+    zoneNames.forEach((name, i) => {
+      const pct  = zoneTotal ? (zoneCounts[i]/zoneTotal*100).toFixed(1) : 0;
+      const row  = document.createElement('div');
+      row.className = 'zl-row';
+      row.innerHTML = `
+        <span class="zl-dot" style="background:${ZONE_COLORS[i]}"></span>
+        <span class="zl-name">${name}</span>
+        <span class="zl-count">${zoneCounts[i]}</span>
+        <span class="zl-pct" style="color:${ZONE_COLORS[i]}">${pct}%</span>
+      `;
+      row.addEventListener('click', () => activateZone(name));
+      legWrap.appendChild(row);
+    });
+  }
+
+  // ── Zone deep dive ────────────────────────────────────────
+  const pillsWrap  = document.getElementById('zonePills');
+  const detailWrap = document.getElementById('zoneDetailContainer');
+  let activeZone   = null;
+
+  zoneNames.forEach((name, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'zone-pill';
+    btn.dataset.zone = name;
+    btn.style.setProperty('--zc', ZONE_COLORS[i]);
+    btn.textContent = name;
+    btn.addEventListener('click', () => activateZone(name));
+    pillsWrap.appendChild(btn);
+  });
+
+  function activateZone(name) {
+    activeZone = name;
+    document.querySelectorAll('.zone-pill').forEach((b,i) => {
+      const isActive = b.dataset.zone === name;
+      b.classList.toggle('active', isActive);
+      if (isActive) {
+        b.style.background = ZONE_COLORS[i] + '22';
+        b.style.borderColor= ZONE_COLORS[i] + '66';
+        b.style.color      = ZONE_COLORS[i];
+      } else {
+        b.style.background = ''; b.style.borderColor = ''; b.style.color = '';
+      }
+    });
+    renderZoneDetail(name);
+  }
+
+  function renderZoneDetail(name) {
+    const d     = groupedRaw[name];
+    const zi    = zoneNames.indexOf(name);
+    const color = ZONE_COLORS[zi] || '#2dd4bf';
+    detailWrap.innerHTML = '';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'zone-detail visible';
+
+    const pct = zoneTotal ? (d.appeared_in_range_count/zoneTotal*100).toFixed(1) : 0;
+
+    wrap.innerHTML = `
+      <div class="zone-stats-row">
+        <div class="zs-chip"><p class="zs-label">Appeared</p><p class="zs-val" style="color:${color}">${d.appeared_in_range_count}</p></div>
+        <div class="zs-chip"><p class="zs-label">Missing</p><p class="zs-val" style="color:var(--red)">${d.missing_in_range_count}</p></div>
+        <div class="zs-chip"><p class="zs-label">Avg Freq</p><p class="zs-val">${d.average_frequency_in_range}</p></div>
+        <div class="zs-chip"><p class="zs-label">Last Drawn</p><p class="zs-val" style="font-size:14px">${d.last_drawn_date_for_range || '—'}</p></div>
+      </div>
+      <div class="zone-tables" id="zoneTbls-${zi}"></div>
+    `;
+    detailWrap.appendChild(wrap);
+
+    const tblsWrap = document.getElementById(`zoneTbls-${zi}`);
+
+    // Most frequent
+    const hotBox = document.createElement('div');
+    hotBox.className = 'zone-mini-table';
+    const maxHot = d.most_frequent_sums_in_range?.[0]?.count || 1;
+    hotBox.innerHTML = `<div class="zmt-header">🔥 Most Frequent</div>`;
+    (d.most_frequent_sums_in_range || []).slice(0,8).forEach(s => {
+      const barW = Math.round(s.count / maxHot * 100);
+      hotBox.innerHTML += `<div class="zmt-row">
+        <span class="zmt-sum">${s.sum}</span>
+        <div class="zmt-bar-track"><div class="zmt-bar-fill" style="width:${barW}%;background:${color}"></div></div>
+        <span class="zmt-cnt">${s.count}</span>
+      </div>`;
+    });
+    tblsWrap.appendChild(hotBox);
+
+    // Least frequent
+    const coldBox = document.createElement('div');
+    coldBox.className = 'zone-mini-table';
+    const maxCold = d.least_frequent_sums_in_range?.[0]?.count || 1;
+    coldBox.innerHTML = `<div class="zmt-header">❄️ Least Frequent</div>`;
+    (d.least_frequent_sums_in_range || []).slice(0,8).forEach(s => {
+      const barW = Math.max(Math.round(s.count / maxCold * 100), 4);
+      coldBox.innerHTML += `<div class="zmt-row">
+        <span class="zmt-sum">${s.sum}</span>
+        <div class="zmt-bar-track"><div class="zmt-bar-fill" style="width:${barW}%;background:rgba(148,163,184,0.5)"></div></div>
+        <span class="zmt-cnt">${s.count}</span>
+      </div>`;
+    });
+    tblsWrap.appendChild(coldBox);
+  }
+
+  // Activate first zone by default
+  if (zoneNames.length) activateZone(zoneNames[0]);
+
+  // ── Sum grid ──────────────────────────────────────────────
+  const missingSet = new Set(missingRaw.map(Number));
+  const countMap   = {};
+  appearedRaw.forEach(d => { countMap[d.sum] = d.count; });
+  const maxCount   = Math.max(...Object.values(countMap), 1);
+
+  const grid = document.getElementById('sumGrid');
+  for (let s = minPossible; s <= maxPossible; s++) {
+    const cell = document.createElement('div');
+    cell.className = 'sg-cell';
+    cell.title = missingSet.has(s) ? `Sum ${s}: never drawn` : `Sum ${s}: drawn ${countMap[s]||0}×`;
+
+    if (missingSet.has(s)) {
+      cell.classList.add('missing');
+      cell.textContent = '';
+    } else {
+      const cnt = countMap[s] || 0;
+      if      (cnt >= 11) cell.classList.add('frequent');
+      else if (cnt >= 6)  cell.classList.add('common');
+      else if (cnt >= 3)  cell.classList.add('uncommon');
+      else                cell.classList.add('rare');
+    }
+    grid.appendChild(cell);
+  }
+
+  // Missing toggle
+  document.getElementById('missingToggle').addEventListener('click', function () {
+    const mg = document.getElementById('missingGrid');
+    const open = mg.classList.toggle('visible');
+    this.classList.toggle('open', open);
+    this.textContent = open ? 'Hide Missing' : `Show Missing (${missingRaw.length})`;
+  });
+
+  // ── Appeared sums table ───────────────────────────────────
+  let sortCol = 'sum', sortDir = 'asc';
+  const tbody = document.getElementById('stgTableBody');
+  const today = new Date();
+
+  function dormClass(dateStr) {
+    if (!dateStr || dateStr === 'N/A') return 'dorm-stale';
+    const days = Math.round((today - new Date(dateStr)) / 86400000);
+    if (days < 100)  return 'dorm-fresh';
+    if (days < 300)  return 'dorm-mid';
+    if (days < 700)  return 'dorm-old';
+    return 'dorm-stale';
+  }
+  function dormLabel(dateStr) {
+    if (!dateStr || dateStr === 'N/A') return 'Unknown';
+    const days = Math.round((today - new Date(dateStr)) / 86400000);
+    if (days < 100)  return `${days}d ago`;
+    if (days < 700)  return `${Math.round(days/30)}mo ago`;
+    return `${(days/365).toFixed(1)}yr ago`;
+  }
+
+  function renderTable() {
+    let data = [...appearedRaw];
+    data.sort((a,b) => {
+      if (sortCol === 'sum')   return sortDir === 'asc' ? a.sum - b.sum : b.sum - a.sum;
+      if (sortCol === 'count') return sortDir === 'asc' ? a.count - b.count : b.count - a.count;
+      if (sortCol === 'date') {
+        const da = new Date(a.last_drawn_date || 0), db = new Date(b.last_drawn_date || 0);
+        return sortDir === 'asc' ? da - db : db - da;
+      }
+      return 0;
+    });
+
+    document.getElementById('tblRowCount').textContent = data.length;
+    tbody.innerHTML = '';
+    const frag = document.createDocumentFragment();
+
+    data.forEach(d => {
+      const barW = Math.round(d.count / maxCount * 100);
+      const tr   = document.createElement('tr');
+      const dc   = dormClass(d.last_drawn_date);
+      const dl   = dormLabel(d.last_drawn_date);
+      tr.innerHTML = `
+        <td><span class="sum-pill" style="background:rgba(45,212,191,0.1);border:1px solid rgba(45,212,191,0.2);color:var(--teal)">${d.sum}</span></td>
+        <td class="fb-cnt" style="font-weight:700;color:#fff">${d.count}</td>
+        <td>
+          <div class="freq-bar-wrap">
+            <div class="fb-track"><div class="fb-fill" style="width:${barW}%"></div></div>
+          </div>
+        </td>
+        <td class="td-date">${d.last_drawn_date || '—'}</td>
+        <td><span class="dorm-badge ${dc}">${dl}</span></td>
+      `;
+      frag.appendChild(tr);
+    });
+    tbody.appendChild(frag);
+
+    ['sum','count','date'].forEach(col => {
+      const el = document.getElementById('arr-'+col);
+      if (el) el.textContent = sortCol === col ? (sortDir === 'asc' ? '↑' : '↓') : '↕';
+    });
+    document.querySelectorAll('th[data-sort]').forEach(th => {
+      th.classList.toggle('sort-active', th.dataset.sort === sortCol);
+    });
+  }
+
+  document.querySelectorAll('th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      else { sortCol = col; sortDir = col === 'date' ? 'desc' : 'asc'; }
+      renderTable();
+    });
+  });
+
+  renderTable();
+
+  // ── AI Analysis ───────────────────────────────────────────
+  const aiBtn = document.getElementById('aiBtn');
+  if (aiBtn) {
+    aiBtn.addEventListener('click', async function () {
+      const thinking = document.getElementById('aiThinking');
+      const output   = document.getElementById('aiOutput');
+      const narrative= document.getElementById('aiNarrative');
+      const errorEl  = document.getElementById('aiError');
+      const chipsWrap= document.getElementById('aiChips');
+
+      this.disabled = true; this.innerHTML = '⏳ Analysing…';
+      thinking.classList.add('visible');
+      output.classList.remove('visible');
+      errorEl.style.display = 'none';
+      narrative.textContent = ''; chipsWrap.innerHTML = '';
+
+      // Build zone summary
+      const zoneSummary = zoneNames.map((name,i) => ({
+        zone: name,
+        appeared: groupedRaw[name].appeared_in_range_count,
+        missing:  groupedRaw[name].missing_in_range_count,
+        avg_freq: groupedRaw[name].average_frequency_in_range,
+        last_drawn: groupedRaw[name].last_drawn_date_for_range,
+        pct: zoneTotal ? (groupedRaw[name].appeared_in_range_count/zoneTotal*100).toFixed(1) : 0,
+      }));
+
+      // Top 10 most frequent sums
+      const top10 = [...appearedRaw].sort((a,b) => b.count - a.count).slice(0,10);
+      // Most dormant appeared sums (oldest last_drawn)
+      const dormant = [...appearedRaw]
+        .filter(d => d.last_drawn_date && d.last_drawn_date !== 'N/A')
+        .sort((a,b) => new Date(a.last_drawn_date) - new Date(b.last_drawn_date))
+        .slice(0,5);
+
+      try {
+        const res = await fetch('/api/sum-trends-ai-analysis', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            zone_summary: zoneSummary,
+            top_sums: top10,
+            dormant_sums: dormant,
+            missing_count: missingRaw.length,
+            total_appeared: appearedRaw.length,
+            min_possible: minPossible,
+            max_possible: maxPossible,
+          })
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          errorEl.textContent = 'AI unavailable: ' + data.error;
+          errorEl.style.display = 'block';
+        } else {
+          (data.insights || []).forEach(ins => {
+            const c = document.createElement('div'); c.className = 'ai-chip';
+            c.innerHTML = `<p class="ai-chip-label">${ins.label}</p><div class="ai-chip-val">${ins.value}</div>`;
+            chipsWrap.appendChild(c);
+          });
+          narrative.textContent = data.analysis;
+          output.classList.add('visible');
+        }
+      } catch(e) {
+        errorEl.textContent = 'Request failed. Please try again.';
+        errorEl.style.display = 'block';
+      } finally {
+        thinking.classList.remove('visible');
+        this.disabled = false; this.innerHTML = '◈ Analyse Zones';
+      }
+    });
+  }
+
+});
+</script>
+{% endblock %}{% extends "base.html" %}
+
 {% block title %}Sum Trends & Gaps{% endblock %}
 
 {% block page_heading %}Sum Trends & Gaps Analysis{% endblock %}
