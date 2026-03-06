@@ -1,200 +1,668 @@
 {% extends "base.html" %}
 
-{% block title %}Boundary Crossing Pairs Trends{% endblock %}
-
-{% block page_heading %}Boundary Crossing Pairs Trends{% endblock %}
+{% block title %}Boundary Crossing Pairs — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
-<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="card p-6 bg-white rounded-xl shadow-lg mb-8">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Boundary Crossing Pairs Analysis</h2>
-        <p class="text-gray-700 mb-6">This page analyzes "boundary crossing" pairs, which are numbers that span across traditional decade groupings (e.g., 9-10, 19-20). You can see their overall frequency and select a specific pair to view its yearly trend.</p>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-        <h3 class="text-xl font-semibold mb-4 text-gray-800">Overall Frequency of Boundary Pairs</h3>
-        {% if all_boundary_patterns_summary %}
-        <div class="overflow-x-auto shadow-md rounded-lg mb-8">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pair</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Occurrences</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for pattern in all_boundary_patterns_summary %}
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">({{ pattern.pattern | join(', ') }})</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ pattern.count }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+  :root {
+    --bg:     #08070f;
+    --s1:     #0d0c1a;
+    --s2:     #121125;
+    --s3:     #191730;
+    --border: rgba(255,255,255,0.07);
+    --text:   rgba(255,255,255,0.87);
+    --muted:  rgba(255,255,255,0.36);
+    --indigo: #6366f1;
+    --violet: #8b5cf6;
+    --purple: #a855f7;
+    --blue:   #3b82f6;
+    --cyan:   #22d3ee;
+    --teal:   #2dd4bf;
+    --green:  #10b981;
+    --amber:  #f59e0b;
+    --red:    #f43f5e;
+  }
+
+  #bcp-page * { box-sizing: border-box; }
+  #bcp-page {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg); min-height: 100vh;
+    color: var(--text); padding-bottom: 80px;
+  }
+
+  /* ── Hero ── */
+  .bcp-hero {
+    position: relative; padding: 52px 24px 40px; text-align: center; overflow: hidden;
+  }
+  .bcp-hero::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 55% 50% at 50% 0%,  rgba(99,102,241,0.12) 0%, transparent 65%),
+      radial-gradient(ellipse 30% 40% at 15% 65%, rgba(139,92,246,0.07) 0%, transparent 60%),
+      radial-gradient(ellipse 30% 40% at 85% 65%, rgba(168,85,247,0.05) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .bcp-hero::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--indigo), var(--violet), transparent);
+    opacity: 0.4;
+  }
+  .bcp-eyebrow {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 3px; text-transform: uppercase;
+    color: var(--indigo); margin-bottom: 12px; opacity: 0.85;
+  }
+  .bcp-hero h1 {
+    font-size: clamp(34px, 5vw, 64px); font-weight: 700;
+    line-height: 1.08; margin: 0 0 14px;
+    background: linear-gradient(135deg, var(--indigo) 0%, #fff 45%, var(--violet) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .bcp-hero p {
+    font-size: 14px; color: var(--muted); max-width: 540px; margin: 0 auto; line-height: 1.75;
+  }
+
+  /* ── Layout ── */
+  .bcp-wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* ── Card ── */
+  .bcp-card {
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px 26px; position: relative; overflow: hidden;
+  }
+  .bcp-card-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--indigo);
+    margin: 0 0 16px; opacity: 0.8;
+  }
+
+  /* ── Overview stats ── */
+  .stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+  @media(max-width:680px){ .stat-row { grid-template-columns: 1fr 1fr; } }
+  .st-chip { background: var(--s2); border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; }
+  .st-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .st-val   { font-size: 26px; font-weight: 700; line-height: 1; }
+  .st-note  { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+  /* ── Pair cards grid ── */
+  .pairs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 10px;
+  }
+
+  .pair-card {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 12px;
+    cursor: pointer; transition: all 0.18s;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    position: relative; overflow: hidden;
+  }
+  .pair-card:hover { border-color: rgba(99,102,241,0.35); background: var(--s3); transform: translateY(-2px); }
+  .pair-card.active {
+    border-color: rgba(99,102,241,0.7);
+    background: rgba(99,102,241,0.08);
+    box-shadow: 0 0 20px rgba(99,102,241,0.2);
+  }
+  .pair-card.active::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--indigo), var(--violet));
+  }
+
+  /* Twin balls inside card */
+  .twin-balls { display: flex; align-items: center; gap: 6px; }
+  .wb-ball-sm {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, #e8edf5 0%, #b8c8e0 50%, #8aaac8 100%);
+    color: #0d1829;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4), inset 0 1px 2px rgba(255,255,255,0.5);
+    flex-shrink: 0; transition: transform 0.15s;
+  }
+  .pair-card.active .wb-ball-sm {
+    box-shadow: 0 0 0 2px rgba(99,102,241,0.7), 0 2px 8px rgba(99,102,241,0.3);
+  }
+  .pair-connector {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--muted); flex-shrink: 0;
+  }
+  .pair-card.active .pair-connector { color: var(--indigo); }
+
+  /* Freq bar inside card */
+  .pair-freq-bar { width: 100%; height: 4px; background: var(--s3); border-radius: 2px; }
+  .pair-freq-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--indigo), var(--violet)); transition: width 0.5s ease; }
+  .pair-count {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    font-weight: 600; color: var(--muted);
+    transition: color 0.15s;
+  }
+  .pair-card.active .pair-count { color: var(--indigo); }
+
+  /* Rank badge */
+  .pair-rank {
+    position: absolute; top: 8px; right: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    padding: 1px 5px; border-radius: 3px; letter-spacing: 0.5px;
+  }
+  .rank-hot  { background: rgba(245,158,11,0.15); color: var(--amber); border: 1px solid rgba(245,158,11,0.25); }
+  .rank-warm { background: rgba(99,102,241,0.12); color: var(--indigo); border: 1px solid rgba(99,102,241,0.2); }
+  .rank-cold { background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid var(--border); }
+
+  /* ── Hidden form ── */
+  #pairSelectForm { display: none; }
+
+  /* ── Selected pair header ── */
+  .sel-pair-header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 14px; margin-bottom: 20px;
+  }
+  .sel-pair-title { font-size: 18px; font-weight: 700; color: #fff; }
+  .sel-pair-balls { display: flex; align-items: center; gap: 8px; }
+  .sel-ball {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700;
+    background: radial-gradient(circle at 35% 35%, #e8edf5 0%, #b8c8e0 50%, #8aaac8 100%);
+    color: #0d1829;
+    box-shadow: 0 0 0 2px rgba(99,102,241,0.7), 0 4px 12px rgba(99,102,241,0.3);
+  }
+  .sel-connector { font-family: 'JetBrains Mono', monospace; font-size: 20px; color: var(--indigo); }
+
+  /* Peak year chip */
+  .peak-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 1px;
+    padding: 5px 12px; border-radius: 8px;
+    background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); color: var(--amber);
+  }
+  .trend-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 1px;
+    padding: 5px 12px; border-radius: 8px;
+  }
+  .tc-up   { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); color: #34d399; }
+  .tc-down { background: rgba(244,63,94,0.1);  border: 1px solid rgba(244,63,94,0.3);  color: var(--red); }
+  .tc-flat { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--muted); }
+
+  /* ── Chart ── */
+  .chart-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .chart-canvas-wrap { position: relative; height: 300px; }
+
+  /* ── Yearly table ── */
+  .tbl-scroll { overflow-x: auto; border-radius: 10px; }
+  table.bcp-table { width: 100%; border-collapse: collapse; min-width: 360px; }
+  table.bcp-table thead th {
+    background: var(--s2); padding: 10px 16px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--muted);
+    text-align: left; border-bottom: 1px solid var(--border);
+  }
+  table.bcp-table tbody tr { border-bottom: 1px solid rgba(255,255,255,0.03); transition: background 0.12s; }
+  table.bcp-table tbody tr:hover { background: var(--s2); }
+  table.bcp-table tbody tr:last-child { border-bottom: none; }
+  table.bcp-table td { padding: 10px 16px; vertical-align: middle; font-size: 13px; }
+
+  .td-year  { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: #fff; }
+  .td-count { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 700; color: var(--indigo); }
+
+  .chg-chip { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 2px 7px; border-radius: 4px; }
+  .chg-up   { background: rgba(16,185,129,0.12); color: #34d399; }
+  .chg-down { background: rgba(244,63,94,0.12);  color: var(--red); }
+  .chg-flat { background: rgba(255,255,255,0.06); color: var(--muted); }
+
+  .mini-bar-wrap { display: flex; align-items: center; gap: 6px; min-width: 100px; }
+  .mb-track { flex: 1; height: 5px; background: var(--s3); border-radius: 3px; }
+  .mb-fill  { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--indigo), var(--violet)); transition: width 0.4s ease; }
+
+  /* ── AI Panel ── */
+  .ai-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--indigo), var(--violet), transparent);
+    opacity: 0.4;
+  }
+  .ai-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+  .ai-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--indigo); opacity: 0.8; margin-bottom: 3px; }
+  .ai-title   { font-size: 19px; font-weight: 700; color: #fff; margin: 0; }
+  .ai-btn {
+    display: flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, #4338ca, var(--indigo));
+    color: #fff; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    border: none; border-radius: 10px; padding: 12px 22px;
+    cursor: pointer; white-space: nowrap;
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    box-shadow: 0 0 20px rgba(99,102,241,0.2);
+  }
+  .ai-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 36px rgba(99,102,241,0.45); }
+  .ai-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .ai-thinking { display: none; align-items: center; gap: 10px; padding: 14px 0 4px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: rgba(99,102,241,0.7); letter-spacing: 1px; }
+  .ai-thinking.visible { display: flex; }
+  .ai-dots span { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--indigo); margin: 0 2px; animation: dotB 1.2s infinite; }
+  .ai-dots span:nth-child(2) { animation-delay: 0.2s; background: var(--violet); }
+  .ai-dots span:nth-child(3) { animation-delay: 0.4s; background: var(--purple); }
+  @keyframes dotB { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1);opacity:1} }
+
+  .ai-output { display: none; margin-top: 20px; border-top: 1px solid rgba(99,102,241,0.1); padding-top: 20px; }
+  .ai-output.visible { display: block; }
+
+  .ai-chips { display: grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap: 12px; margin-bottom: 20px; }
+  .ai-chip  { background: var(--s2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .ai-chip-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .ai-chip-val   { font-size: 13px; font-weight: 500; color: #fff; line-height: 1.5; }
+
+  .ai-narrative {
+    background: var(--s2); border: 1px solid rgba(99,102,241,0.12);
+    border-left: 3px solid var(--indigo); border-radius: 0 10px 10px 0;
+    padding: 18px 20px; font-size: 14px; line-height: 1.85; color: var(--text); white-space: pre-wrap;
+  }
+  .ai-error { margin-top: 14px; background: rgba(244,63,94,0.08); border: 1px solid rgba(244,63,94,0.25); border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #ff8aaa; }
+
+  /* No selection state */
+  .no-selection {
+    text-align: center; padding: 48px 20px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--muted); letter-spacing: 1px;
+  }
+  .ns-icon { font-size: 36px; margin-bottom: 12px; }
+</style>
+
+<div id="bcp-page">
+  <div class="bcp-hero">
+    <p class="bcp-eyebrow">⟡ Decade Boundary Intelligence</p>
+    <h1>Boundary Crossing<br>Pairs Trends</h1>
+    <p>Numbers that span decade boundaries (9–10, 19–20, 29–30…) — how often they appear together, which pairs dominate, and how their frequency has shifted year by year.</p>
+  </div>
+
+  <!-- Hidden form for POST submission -->
+  <form id="pairSelectForm" method="POST" action="{{ url_for('boundary_crossing_pairs_trends_route') }}">
+    <input type="hidden" name="selected_pair" id="hiddenPairInput" value="{{ selected_pair or '' }}">
+  </form>
+
+  <div class="bcp-wrap">
+
+    <!-- ① Overview stats -->
+    {% if all_boundary_patterns_summary %}
+    <div class="bcp-card">
+      <p class="bcp-card-title">Overview</p>
+      <div class="stat-row">
+        <div class="st-chip">
+          <p class="st-label">Total Pairs</p>
+          <p class="st-val" style="color:var(--indigo)">{{ all_boundary_patterns_summary | length }}</p>
+          <p class="st-note">boundary pairs tracked</p>
         </div>
-        {% else %}
-        <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 mb-8">
-            No overall boundary crossing pairs data available.
+        <div class="st-chip">
+          <p class="st-label">Hottest Pair</p>
+          <p class="st-val" style="color:var(--amber);font-size:18px" id="stHottestPair">—</p>
+          <p class="st-note" id="stHottestCount">—</p>
         </div>
-        {% endif %}
-
-        <h3 class="text-xl font-semibold mb-4 text-gray-800">Yearly Trends for a Specific Boundary Pair</h3>
-        <form method="POST" action="{{ url_for('boundary_crossing_pairs_trends_route') }}" class="mb-6 flex flex-col sm:flex-row items-start sm:items-end space-y-4 sm:space-y-0 sm:space-x-4">
-            <div class="form-group flex-grow w-full sm:w-auto">
-                <label for="selected_pair" class="form-label">Select a Boundary Pair:</label>
-                <select id="selected_pair" name="selected_pair" class="form-input">
-                    {% for pair_str in boundary_pairs_for_dropdown %}
-                        <option value="{{ pair_str }}" {% if selected_pair == pair_str %}selected{% endif %}>({{ pair_str }})</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <button type="submit" class="btn-primary">View Yearly Trend</button>
-        </form>
-
-        {% if selected_pair %}
-            <div class="card p-6 bg-white rounded-xl shadow-lg mb-8">
-                <h4 class="text-xl font-semibold mb-4 text-gray-800">Yearly Occurrences of ({{ selected_pair }})</h4>
-                {% if yearly_data_for_selected_pattern %}
-                    <div class="chart-container mb-6">
-                        <canvas id="yearlyPairChart"></canvas>
-                    </div>
-
-                    <h5 class="text-lg font-semibold mb-3 text-gray-700">Detailed Yearly Data for ({{ selected_pair }})</h5>
-                    <div class="overflow-x-auto shadow-md rounded-lg">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Year</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Occurrences</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                {% for data in yearly_data_for_selected_pattern %}
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ data.year }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ data.draws_with_pattern }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
-                        No yearly data available for the selected pair ({{ selected_pair }}).
-                    </div>
-                {% endif %}
-            </div>
-        {% else %}
-            <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-800">
-                Select a boundary pair from the dropdown above to view its yearly trend.
-            </div>
-        {% endif %}
+        <div class="st-chip">
+          <p class="st-label">Coldest Pair</p>
+          <p class="st-val" style="color:var(--cyan);font-size:18px" id="stColdestPair">—</p>
+          <p class="st-note" id="stColdestCount">—</p>
+        </div>
+        <div class="st-chip">
+          <p class="st-label">Total Occurrences</p>
+          <p class="st-val" style="color:var(--violet)" id="stTotalOcc">—</p>
+          <p class="st-note">all pairs combined</p>
+        </div>
+      </div>
     </div>
+
+    <!-- ② Pair cards grid -->
+    <div class="bcp-card">
+      <p class="bcp-card-title">Select a Pair to Explore</p>
+      <div class="pairs-grid" id="pairsGrid"></div>
+    </div>
+    {% endif %}
+
+    <!-- ③ Trend chart + table (shown after pair selected) -->
+    {% if selected_pair %}
+    <div class="bcp-card">
+      <div class="sel-pair-header">
+        <div>
+          <p class="bcp-card-title" style="margin-bottom:6px">Year-by-Year Trend</p>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <div class="sel-pair-balls">
+              {% set parts = selected_pair.split(',') %}
+              <span class="sel-ball">{{ parts[0].strip() }}</span>
+              <span class="sel-connector">↔</span>
+              <span class="sel-ball">{{ parts[1].strip() if parts|length > 1 else '' }}</span>
+            </div>
+            <div class="chart-meta" id="chartMeta">
+              <!-- populated by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {% if yearly_data_for_selected_pattern %}
+      <div class="chart-canvas-wrap" style="margin-bottom:24px">
+        <canvas id="yearlyPairChart"></canvas>
+      </div>
+
+      <!-- Yearly table -->
+      <p class="bcp-card-title" style="margin-top:8px">Yearly Breakdown</p>
+      <div class="tbl-scroll">
+        <table class="bcp-table">
+          <thead><tr>
+            <th>Year</th>
+            <th>Occurrences</th>
+            <th>Frequency</th>
+            <th>vs Prev Year</th>
+          </tr></thead>
+          <tbody id="yearlyTableBody"></tbody>
+        </table>
+      </div>
+
+      {% else %}
+      <div class="no-selection">
+        <p>No yearly data available for pair ({{ selected_pair }}).</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ④ AI Analysis -->
+    <div class="bcp-card ai-card">
+      <div class="ai-header">
+        <div>
+          <p class="ai-eyebrow">✦ Groq AI · Boundary Intelligence</p>
+          <p class="ai-title">Pair Pattern Analysis</p>
+        </div>
+        <button class="ai-btn" id="aiBtn">◈ Analyse Pairs</button>
+      </div>
+      <div class="ai-thinking" id="aiThinking"><div class="ai-dots"><span></span><span></span><span></span></div>Scanning boundary patterns…</div>
+      <div class="ai-output" id="aiOutput">
+        <div class="ai-chips" id="aiChips"></div>
+        <div class="ai-narrative" id="aiNarrative"></div>
+      </div>
+      <div class="ai-error" id="aiError" style="display:none"></div>
+    </div>
+
+    {% else %}
+    <!-- No pair selected yet -->
+    <div class="bcp-card">
+      <div class="no-selection">
+        <div class="ns-icon">⟡</div>
+        <p>Click any pair card above to view its yearly trend and AI analysis.</p>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
 </div>
 
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const yearlyData = {{ yearly_data_for_selected_pattern | tojson }};
-        const selectedPair = "{{ selected_pair }}";
+document.addEventListener('DOMContentLoaded', function () {
 
-        if (yearlyData && yearlyData.length > 0) {
-            const years = yearlyData.map(d => d.year);
-            // Corrected to use 'draws_with_pattern' which is the count from the Python backend
-            const counts = yearlyData.map(d => d.draws_with_pattern); 
+  // ── Data ─────────────────────────────────────────────────
+  const summaryRaw  = {{ all_boundary_patterns_summary | tojson if all_boundary_patterns_summary else '[]' }};
+  const yearlyRaw   = {{ yearly_data_for_selected_pattern | tojson if yearly_data_for_selected_pattern else '[]' }};
+  const selectedPair= "{{ selected_pair or '' }}";
 
-            const ctx = document.getElementById('yearlyPairChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: years,
-                    datasets: [{
-                        label: `Occurrences of (${selectedPair}) per Year`,
-                        data: counts,
-                        backgroundColor: 'rgba(99, 102, 241, 0.6)', // Indigo-500 with opacity
-                        borderColor: 'rgba(79, 70, 229, 1)', // Indigo-600
-                        borderWidth: 1,
-                        borderRadius: 5, // Rounded bars
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: `Yearly Occurrences of (${selectedPair})`,
-                            font: {
-                                size: 18,
-                                weight: 'bold',
-                                family: 'Inter, sans-serif'
-                            },
-                            color: '#374151'
-                        },
-                        legend: {
-                            display: false // No need for legend with single dataset
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) {
-                                        label += ': ';
-                                    }
-                                    if (context.parsed.y !== null) {
-                                        label += context.parsed.y + ' times';
-                                    }
-                                    return label;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Year',
-                                font: {
-                                    size: 14,
-                                    weight: 'bold',
-                                    family: 'Inter, sans-serif'
-                                },
-                                color: '#4b5563'
-                            },
-                            grid: {
-                                display: false
-                            }
-                        },
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Number of Occurrences',
-                                font: {
-                                    size: 14,
-                                    weight: 'bold',
-                                    family: 'Inter, sans-serif'
-                                },
-                                color: '#4b5563'
-                            },
-                            ticks: {
-                                precision: 0 // Ensure integer ticks for counts
-                            }
-                        }
-                    },
-                    layout: {
-                        padding: {
-                            left: 10,
-                            right: 10,
-                            top: 10,
-                            bottom: 10
-                        }
-                    }
-                }
-            });
-        }
+  if (!summaryRaw.length) return;
+
+  // ── Sort by count desc ────────────────────────────────────
+  const sorted    = [...summaryRaw].sort((a,b) => b.count - a.count);
+  const maxCount  = sorted[0]?.count || 1;
+  const totalOcc  = sorted.reduce((s,r) => s + r.count, 0);
+
+  // ── Overview stats ────────────────────────────────────────
+  const pairLabel = p => `(${p.pattern.join(', ')})`;
+  document.getElementById('stHottestPair').textContent  = pairLabel(sorted[0]);
+  document.getElementById('stHottestCount').textContent = `${sorted[0].count} times`;
+  document.getElementById('stColdestPair').textContent  = pairLabel(sorted[sorted.length-1]);
+  document.getElementById('stColdestCount').textContent = `${sorted[sorted.length-1].count} times`;
+  document.getElementById('stTotalOcc').textContent     = totalOcc.toLocaleString();
+
+  // ── Pair cards ────────────────────────────────────────────
+  const grid = document.getElementById('pairsGrid');
+  sorted.forEach((row, i) => {
+    const pairStr = row.pattern.join(', ');
+    const barW    = Math.round(row.count / maxCount * 100);
+    const isActive= pairStr === selectedPair;
+    const rankCls = i < 3 ? 'rank-hot' : i < Math.ceil(sorted.length/2) ? 'rank-warm' : 'rank-cold';
+    const rankTxt = i === 0 ? '🔥 #1' : i === 1 ? '🔥 #2' : i === 2 ? '🔥 #3' : `#${i+1}`;
+
+    const card = document.createElement('div');
+    card.className = `pair-card${isActive ? ' active' : ''}`;
+    card.dataset.pair = pairStr;
+    card.innerHTML = `
+      <span class="pair-rank ${rankCls}">${rankTxt}</span>
+      <div class="twin-balls">
+        <span class="wb-ball-sm">${row.pattern[0]}</span>
+        <span class="pair-connector">↔</span>
+        <span class="wb-ball-sm">${row.pattern[1] || '?'}</span>
+      </div>
+      <div class="pair-freq-bar"><div class="pair-freq-fill" style="width:${barW}%"></div></div>
+      <span class="pair-count">${row.count}×</span>
+    `;
+    card.addEventListener('click', () => {
+      document.getElementById('hiddenPairInput').value = pairStr;
+      document.getElementById('pairSelectForm').submit();
     });
+    grid.appendChild(card);
+  });
+
+  // ── Chart & table (only if pair selected) ────────────────
+  if (!yearlyRaw.length || !selectedPair) return;
+
+  const years  = yearlyRaw.map(d => d.year);
+  const counts = yearlyRaw.map(d => d.draws_with_pattern);
+  const maxCnt = Math.max(...counts, 1);
+  const peakIdx= counts.indexOf(Math.max(...counts));
+
+  // ── Chart meta chips ──────────────────────────────────────
+  const metaWrap = document.getElementById('chartMeta');
+  if (metaWrap) {
+    // Peak year
+    const peakChip = document.createElement('span');
+    peakChip.className = 'peak-chip';
+    peakChip.innerHTML = `★ Peak: ${years[peakIdx]} (${counts[peakIdx]}×)`;
+    metaWrap.appendChild(peakChip);
+
+    // Trend direction (compare last 3 vs first 3)
+    const n = counts.length;
+    if (n >= 6) {
+      const recent = counts.slice(-3).reduce((s,v)=>s+v,0)/3;
+      const early  = counts.slice(0,3).reduce((s,v)=>s+v,0)/3;
+      const diff   = recent - early;
+      const trendChip = document.createElement('span');
+      if (diff > 0.5)       { trendChip.className = 'trend-chip tc-up';   trendChip.innerHTML = `↑ Rising (+${diff.toFixed(1)}/yr avg)`; }
+      else if (diff < -0.5) { trendChip.className = 'trend-chip tc-down'; trendChip.innerHTML = `↓ Falling (${diff.toFixed(1)}/yr avg)`; }
+      else                  { trendChip.className = 'trend-chip tc-flat'; trendChip.innerHTML = `→ Stable`; }
+      metaWrap.appendChild(trendChip);
+    }
+  }
+
+  // ── Linear regression ─────────────────────────────────────
+  function linReg(ys) {
+    const n = ys.length;
+    const xMean = (n-1)/2, yMean = ys.reduce((s,v)=>s+v,0)/n;
+    let num = 0, den = 0;
+    ys.forEach((y,i) => { num += (i-xMean)*(y-yMean); den += (i-xMean)**2; });
+    const slope = den ? num/den : 0;
+    const intercept = yMean - slope*xMean;
+    return ys.map((_,i) => +(intercept + slope*i).toFixed(2));
+  }
+  const trendLine = linReg(counts);
+
+  // Bar colors by intensity
+  const barColors = counts.map((c,i) => {
+    const t = c / maxCnt;
+    return i === peakIdx
+      ? `rgba(245,158,11,${0.5+t*0.4})`
+      : `rgba(99,102,241,${0.25+t*0.55})`;
+  });
+
+  // ── Build chart ───────────────────────────────────────────
+  const ctx = document.getElementById('yearlyPairChart');
+  if (ctx) {
+    new Chart(ctx.getContext('2d'), {
+      data: {
+        labels: years.map(String),
+        datasets: [
+          {
+            type: 'bar',
+            label: 'Occurrences',
+            data: counts,
+            backgroundColor: barColors,
+            borderColor: barColors.map(c => c.replace(/[\d.]+\)$/, '1)')),
+            borderWidth: 1,
+            borderRadius: 5,
+            order: 2,
+          },
+          {
+            type: 'line',
+            label: 'Trend',
+            data: trendLine,
+            borderColor: 'rgba(139,92,246,0.7)',
+            borderWidth: 2,
+            borderDash: [6,3],
+            pointRadius: 0,
+            fill: false,
+            tension: 0.4,
+            order: 1,
+          }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        animation: { duration: 500 },
+        scales: {
+          x: {
+            grid: { color: 'rgba(255,255,255,0.03)' },
+            ticks: { color: 'rgba(255,255,255,0.4)', font: { family: 'JetBrains Mono', size: 10 } }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            ticks: { color: 'rgba(255,255,255,0.35)', precision: 0 },
+            title: { display: true, text: 'Occurrences', color: 'rgba(255,255,255,0.2)', font: { size: 10 } }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true,
+            labels: { color: 'rgba(255,255,255,0.4)', font: { family: 'JetBrains Mono', size: 10 }, boxWidth: 12, padding: 16 }
+          },
+          tooltip: {
+            backgroundColor: '#0d0c1a', borderColor: 'rgba(99,102,241,0.3)', borderWidth: 1,
+            titleColor: 'rgba(255,255,255,0.7)', bodyColor: 'rgba(255,255,255,0.5)', padding: 12,
+            titleFont: { family: 'JetBrains Mono', size: 11 },
+            callbacks: {
+              label: ctx => ctx.dataset.type === 'line'
+                ? ` Trend: ${ctx.raw}`
+                : ` ${ctx.raw} occurrence${ctx.raw !== 1 ? 's' : ''}`
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // ── Yearly table ──────────────────────────────────────────
+  const tbody = document.getElementById('yearlyTableBody');
+  if (tbody) {
+    const frag = document.createDocumentFragment();
+    yearlyRaw.forEach((d, i) => {
+      const prev = i > 0 ? yearlyRaw[i-1].draws_with_pattern : null;
+      const diff = prev !== null ? d.draws_with_pattern - prev : null;
+      const barW = Math.round(d.draws_with_pattern / maxCnt * 100);
+      const isPeak = i === peakIdx;
+
+      let chgHtml = '<span class="chg-chip chg-flat">—</span>';
+      if (diff !== null) {
+        if (diff > 0)       chgHtml = `<span class="chg-chip chg-up">↑ +${diff}</span>`;
+        else if (diff < 0)  chgHtml = `<span class="chg-chip chg-down">↓ ${diff}</span>`;
+        else                chgHtml = `<span class="chg-chip chg-flat">→ 0</span>`;
+      }
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="td-year">${d.year}${isPeak ? ' <span style="color:var(--amber);font-size:10px">★ peak</span>' : ''}</td>
+        <td class="td-count">${d.draws_with_pattern}</td>
+        <td>
+          <div class="mini-bar-wrap">
+            <div class="mb-track"><div class="mb-fill" style="width:${barW}%"></div></div>
+          </div>
+        </td>
+        <td>${chgHtml}</td>
+      `;
+      frag.appendChild(tr);
+    });
+    tbody.appendChild(frag);
+  }
+
+  // ── AI Analysis ───────────────────────────────────────────
+  const aiBtn = document.getElementById('aiBtn');
+  if (aiBtn) {
+    aiBtn.addEventListener('click', async function () {
+      const thinking = document.getElementById('aiThinking');
+      const output   = document.getElementById('aiOutput');
+      const narrative= document.getElementById('aiNarrative');
+      const errorEl  = document.getElementById('aiError');
+      const chipsWrap= document.getElementById('aiChips');
+
+      this.disabled = true; this.innerHTML = '⏳ Analysing…';
+      thinking.classList.add('visible');
+      output.classList.remove('visible');
+      errorEl.style.display = 'none';
+      narrative.textContent = ''; chipsWrap.innerHTML = '';
+
+      // Linear regression slope for selected pair
+      const n = counts.length;
+      const xm = (n-1)/2, ym = counts.reduce((s,v)=>s+v,0)/n;
+      let num=0,den=0; counts.forEach((y,i)=>{num+=(i-xm)*(y-ym);den+=(i-xm)**2;});
+      const slope = den ? +(num/den).toFixed(3) : 0;
+
+      try {
+        const res = await fetch('/api/boundary-pairs-ai-analysis', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            all_pairs:     sorted.map(r => ({ pair: r.pattern.join(', '), count: r.count })),
+            selected_pair: selectedPair,
+            yearly_data:   yearlyRaw,
+            slope:         slope,
+            peak_year:     years[peakIdx],
+            peak_count:    counts[peakIdx],
+            total_occ:     totalOcc,
+          })
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          errorEl.textContent = 'AI unavailable: ' + data.error;
+          errorEl.style.display = 'block';
+        } else {
+          (data.insights || []).forEach(ins => {
+            const c = document.createElement('div'); c.className = 'ai-chip';
+            c.innerHTML = `<p class="ai-chip-label">${ins.label}</p><div class="ai-chip-val">${ins.value}</div>`;
+            chipsWrap.appendChild(c);
+          });
+          narrative.textContent = data.analysis;
+          output.classList.add('visible');
+        }
+      } catch(e) {
+        errorEl.textContent = 'Request failed. Please try again.';
+        errorEl.style.display = 'block';
+      } finally {
+        thinking.classList.remove('visible');
+        this.disabled = false; this.innerHTML = '◈ Analyse Pairs';
+      }
+    });
+  }
+
+});
 </script>
 {% endblock %}
