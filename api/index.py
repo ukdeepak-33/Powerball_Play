@@ -8509,6 +8509,132 @@ End with one NEXT DRAW SUM — a single specific sum recommendation with a one-s
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+# ── Paste into index.py with your other API routes ───────────────────────────
+
+@app.route('/api/boundary-pairs-ai-analysis', methods=['POST'])
+def boundary_pairs_ai_analysis():
+    try:
+        payload       = request.get_json()
+        all_pairs     = payload.get('all_pairs', [])      # [{pair, count}]
+        selected_pair = payload.get('selected_pair', '')
+        yearly_data   = payload.get('yearly_data', [])    # [{year, draws_with_pattern}]
+        slope         = payload.get('slope', 0)
+        peak_year     = payload.get('peak_year', '—')
+        peak_count    = payload.get('peak_count', 0)
+        total_occ     = payload.get('total_occ', 0)
+
+        if not all_pairs:
+            return jsonify({'error': 'No data provided'}), 400
+
+        # ── Derive stats ───────────────────────────────────
+        sorted_pairs  = sorted(all_pairs, key=lambda x: -x['count'])
+        top3          = sorted_pairs[:3]
+        bottom3       = sorted_pairs[-3:]
+
+        # Year-over-year change for selected pair
+        yoy_changes = []
+        for i in range(1, len(yearly_data)):
+            prev = yearly_data[i-1]['draws_with_pattern']
+            curr = yearly_data[i]['draws_with_pattern']
+            yoy_changes.append({
+                'year': yearly_data[i]['year'],
+                'change': curr - prev,
+                'pct': round((curr - prev) / prev * 100, 1) if prev else 0
+            })
+
+        best_yoy  = max(yoy_changes, key=lambda x: x['change']) if yoy_changes else None
+        worst_yoy = min(yoy_changes, key=lambda x: x['change']) if yoy_changes else None
+
+        # Recent momentum (last 3 vs prior 3)
+        counts = [d['draws_with_pattern'] for d in yearly_data]
+        n = len(counts)
+        if n >= 6:
+            recent  = sum(counts[-3:]) / 3
+            prior   = sum(counts[-6:-3]) / 3
+            momentum= round((recent - prior) / prior * 100, 1) if prior else 0
+        else:
+            momentum= 0
+
+        # Trend label
+        if slope > 0.3:    trend_label = 'RISING'
+        elif slope < -0.3: trend_label = 'FALLING'
+        else:              trend_label = 'STABLE'
+
+        # Build prompt
+        prompt = f"""You are an expert Powerball boundary crossing pairs analyst. Boundary pairs are numbers that span decade boundaries (9-10, 19-20, 29-30, etc.) appearing together in the same draw.
+
+═══ ALL PAIRS OVERVIEW ═══
+Total pairs tracked: {len(all_pairs)}
+Combined occurrences across all pairs: {total_occ}
+Average per pair: {round(total_occ / len(all_pairs), 1) if all_pairs else 0}
+
+═══ TOP 3 MOST FREQUENT PAIRS ═══
+{chr(10).join(f"  ({p['pair']}): {p['count']} times ({round(p['count']/total_occ*100,1) if total_occ else 0}% of all boundary pair draws)" for p in top3)}
+
+═══ BOTTOM 3 LEAST FREQUENT PAIRS ═══
+{chr(10).join(f"  ({p['pair']}): {p['count']} times" for p in bottom3)}
+
+═══ SELECTED PAIR: ({selected_pair}) ═══
+Yearly data:
+{chr(10).join(f"  {d['year']}: {d['draws_with_pattern']} occurrences" for d in yearly_data)}
+
+Peak year: {peak_year} ({peak_count} occurrences)
+Linear trend slope: {slope:+.3f} per year ({trend_label})
+Recent momentum (last 3yr vs prior 3yr): {momentum:+.1f}%
+{f"Best single-year jump: {best_yoy['year']} (+{best_yoy['change']})" if best_yoy and best_yoy['change'] > 0 else ""}
+{f"Worst single-year drop: {worst_yoy['year']} ({worst_yoy['change']})" if worst_yoy and worst_yoy['change'] < 0 else ""}
+
+Write EXACTLY these 4 sections, each header on its own line:
+
+PAIR DOMINANCE
+Name the top 2 most frequent boundary pairs. What percentage of all boundary pair draws do they account for combined? Is any single pair disproportionately dominant?
+
+SELECTED PAIR TREND: ({selected_pair})
+Describe the trend for ({selected_pair}). Is it rising, falling, or stable? Name the peak year and any notable multi-year stretches (e.g. "appeared 3+ times for 4 consecutive years"). What does the slope of {slope:+.3f} mean practically?
+
+DORMANCY vs MOMENTUM
+Identify 1 pair that appears to be losing frequency recently vs 1 gaining momentum. Use the data above to justify.
+
+NEXT DRAW RECOMMENDATION
+Based on pair dominance, trend analysis, and recent momentum — name ONE specific boundary pair most likely to appear in the next draw. Justify with 2 data points. State the pair in format (X, Y)."""
+
+        groq_api_key = os.environ.get('GROQ_API_KEY', '')
+        response = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {groq_api_key}',
+                'Content-Type':  'application/json'
+            },
+            json={
+                'model':       'llama-3.1-8b-instant',
+                'messages':    [{'role': 'user', 'content': prompt}],
+                'max_tokens':  600,
+                'temperature': 0.6
+            },
+            timeout=35
+        )
+
+        result = response.json()
+        if 'error' in result:
+            return jsonify({'error': result['error'].get('message', 'Groq error')}), 500
+
+        analysis = result['choices'][0]['message']['content'].strip()
+
+        insights = [
+            { 'label': '🔥 Hottest Pair',    'value': f"({top3[0]['pair']}) · {top3[0]['count']}×" if top3 else '—' },
+            { 'label': '📈 Selected Trend',  'value': f"({selected_pair}) · {trend_label}" },
+            { 'label': '★ Peak Year',        'value': f"{peak_year} · {peak_count} occurrences" },
+            { 'label': '⚡ Momentum',         'value': f"{momentum:+.1f}% vs prior 3 years" },
+            { 'label': '📊 Slope',            'value': f"{slope:+.3f}/yr — {'gaining' if slope > 0 else 'declining' if slope < 0 else 'flat'}" },
+            { 'label': '🧊 Coldest Pair',     'value': f"({bottom3[-1]['pair']}) · {bottom3[-1]['count']}×" if bottom3 else '—' },
+        ]
+
+        return jsonify({'analysis': analysis, 'insights': insights})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 initialize_core_data()
 
 # ── Start the draw-day scheduler ──────────────────────────────
