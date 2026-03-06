@@ -1,5 +1,684 @@
 {% extends "base.html" %}
 
+{% block title %}Positional Analysis — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
+
+{% block content %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg:     #07090e;
+    --s1:     #0c0f18;
+    --s2:     #111420;
+    --s3:     #171c2c;
+    --border: rgba(255,255,255,0.07);
+    --text:   rgba(255,255,255,0.87);
+    --muted:  rgba(255,255,255,0.36);
+    --amber:  #f59e0b;
+    --gold:   #fbbf24;
+    --orange: #f97316;
+    --blue:   #3b82f6;
+    --indigo: #6366f1;
+    --teal:   #2dd4bf;
+    --green:  #10b981;
+    --red:    #f43f5e;
+
+    /* Position accent colors */
+    --p1: #38bdf8;   /* sky   — 1st ball */
+    --p2: #a78bfa;   /* violet — 2nd */
+    --p3: #34d399;   /* emerald — 3rd */
+    --p4: #fb923c;   /* orange — 4th */
+    --p5: #f472b6;   /* pink  — 5th */
+  }
+
+  #pa-page * { box-sizing: border-box; }
+  #pa-page {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg); min-height: 100vh;
+    color: var(--text); padding-bottom: 80px;
+  }
+
+  /* ── Hero ── */
+  .pa-hero {
+    position: relative; padding: 52px 24px 40px; text-align: center; overflow: hidden;
+  }
+  .pa-hero::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 55% 50% at 50% 0%,  rgba(245,158,11,0.09) 0%, transparent 65%),
+      radial-gradient(ellipse 30% 40% at 15% 65%, rgba(99,102,241,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 30% 40% at 85% 65%, rgba(249,115,22,0.05) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .pa-hero::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--amber), var(--gold), transparent);
+    opacity: 0.35;
+  }
+  .pa-eyebrow {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 3px; text-transform: uppercase;
+    color: var(--amber); margin-bottom: 12px; opacity: 0.85;
+  }
+  .pa-hero h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(34px, 5vw, 64px); font-weight: 700;
+    line-height: 1.08; margin: 0 0 14px;
+    background: linear-gradient(135deg, var(--amber) 0%, #fff 50%, var(--orange) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .pa-hero p {
+    font-size: 14px; color: var(--muted); max-width: 540px; margin: 0 auto; line-height: 1.75;
+  }
+
+  /* ── Layout ── */
+  .pa-wrap { max-width: 1280px; margin: 0 auto; padding: 0 24px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* ── Card ── */
+  .pa-card {
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px 26px; position: relative; overflow: hidden;
+  }
+  .pa-card-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--amber);
+    margin: 0 0 16px; opacity: 0.8;
+  }
+
+  /* ── Loading skeleton ── */
+  .pa-loading {
+    display: flex; align-items: center; justify-content: center; gap: 14px;
+    padding: 60px 20px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: rgba(245,158,11,0.6); letter-spacing: 1.5px;
+  }
+  .pa-spinner {
+    width: 22px; height: 22px;
+    border: 2px solid rgba(245,158,11,0.2);
+    border-top-color: var(--amber);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Year tabs ── */
+  .year-tabs { display: flex; flex-wrap: wrap; gap: 7px; }
+  .year-tab {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 1px; padding: 8px 16px; border-radius: 9px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer; transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .year-tab:hover:not(.active) { border-color: rgba(245,158,11,0.3); color: var(--text); }
+  .year-tab.active {
+    background: rgba(245,158,11,0.12);
+    border-color: rgba(245,158,11,0.45);
+    color: var(--amber);
+  }
+
+  .year-meta {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--muted); margin-left: auto;
+    align-self: center; letter-spacing: 0.5px;
+  }
+  .year-meta strong { color: var(--amber); }
+
+  /* ── Position pills ── */
+  .pos-row {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .pos-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted);
+    white-space: nowrap;
+  }
+  .pos-pill {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 1px; padding: 6px 14px; border-radius: 8px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer; transition: all 0.15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .pos-pill:hover:not(.active) { border-color: rgba(255,255,255,0.15); color: var(--text); }
+  .pos-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+  .pos-pill[data-pos="all"].active { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.2); color: var(--text); }
+  .pos-pill[data-pos="1"].active { background: rgba(56,189,248,0.12);  border-color: rgba(56,189,248,0.4);  color: var(--p1); }
+  .pos-pill[data-pos="2"].active { background: rgba(167,139,250,0.12); border-color: rgba(167,139,250,0.4); color: var(--p2); }
+  .pos-pill[data-pos="3"].active { background: rgba(52,211,153,0.12);  border-color: rgba(52,211,153,0.4);  color: var(--p3); }
+  .pos-pill[data-pos="4"].active { background: rgba(251,146,60,0.12);  border-color: rgba(251,146,60,0.4);  color: var(--p4); }
+  .pos-pill[data-pos="5"].active { background: rgba(244,114,182,0.12); border-color: rgba(244,114,182,0.4); color: var(--p5); }
+
+  /* ── Range pills ── */
+  .range-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .range-pill {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 1px; padding: 6px 12px; border-radius: 7px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer; transition: all 0.15s;
+  }
+  .range-pill:hover:not(.active) { border-color: rgba(245,158,11,0.3); color: var(--text); }
+  .range-pill.active {
+    background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.35); color: var(--amber);
+  }
+
+  /* ── Spotlight cards (top 3 per combo) ── */
+  .spotlight-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px; margin-bottom: 20px;
+  }
+  .spotlight-card {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px;
+    transition: border-color 0.15s;
+  }
+  .spotlight-card:hover { border-color: rgba(245,158,11,0.2); }
+  .sc-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .sc-range-pos {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 1px; color: var(--muted);
+  }
+  .sc-pos-badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 1px; padding: 2px 8px; border-radius: 4px;
+  }
+  .sc-balls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+  /* Rank balls inside spotlight */
+  .rank-ball-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .rank-ball {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, #e8edf5 0%, #b8c8e0 50%, #8aaac8 100%);
+    color: #0d1829;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4), inset 0 1px 2px rgba(255,255,255,0.5);
+    transition: transform 0.15s;
+  }
+  .rank-ball:hover { transform: scale(1.1); }
+  .rank-ball.gold-ring   { box-shadow: 0 0 0 2px var(--gold),   0 2px 8px rgba(251,191,36,0.3); }
+  .rank-ball.silver-ring { box-shadow: 0 0 0 2px #94a3b8, 0 2px 8px rgba(148,163,184,0.2); }
+  .rank-ball.bronze-ring { box-shadow: 0 0 0 2px #b45309, 0 2px 8px rgba(180,83,9,0.2); }
+  .rank-pct {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    color: var(--muted); letter-spacing: 0.3px;
+  }
+
+  /* ── Section label ── */
+  .combo-section { margin-bottom: 26px; }
+  .combo-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+  }
+  .combo-title {
+    font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 600; color: #fff;
+  }
+  .combo-pos-tag {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    padding: 3px 10px; border-radius: 5px; letter-spacing: 0.5px;
+  }
+  .combo-count {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); margin-left: auto;
+  }
+
+  /* ── Frequency table ── */
+  .freq-table-wrap { overflow-x: auto; border-radius: 10px; }
+  table.freq-table { width: 100%; border-collapse: collapse; min-width: 380px; }
+  table.freq-table thead th {
+    background: var(--s2); padding: 9px 12px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--muted);
+    text-align: left; border-bottom: 1px solid var(--border);
+  }
+  table.freq-table tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.03); transition: background 0.12s;
+  }
+  table.freq-table tbody tr:hover { background: var(--s2); }
+  table.freq-table tbody tr:last-child { border-bottom: none; }
+  table.freq-table td { padding: 8px 12px; vertical-align: middle; font-size: 13px; }
+
+  .td-wb-ball {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, #e8edf5 0%, #b8c8e0 50%, #8aaac8 100%);
+    color: #0d1829;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.35), inset 0 1px 1px rgba(255,255,255,0.5);
+    transition: transform 0.12s;
+  }
+  .td-wb-ball:hover { transform: scale(1.1); }
+
+  .td-count { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: #fff; }
+
+  /* Freq bar */
+  .freq-bar-wrap { display: flex; align-items: center; gap: 8px; min-width: 140px; }
+  .freq-bar-track { flex: 1; height: 5px; background: var(--s3); border-radius: 3px; }
+  .freq-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+  .freq-pct { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); min-width: 38px; text-align: right; }
+
+  /* ── Position color helpers ── */
+  .pc-1 { color: var(--p1); }
+  .pc-2 { color: var(--p2); }
+  .pc-3 { color: var(--p3); }
+  .pc-4 { color: var(--p4); }
+  .pc-5 { color: var(--p5); }
+  .bg-p1 { background: var(--p1); }
+  .bg-p2 { background: var(--p2); }
+  .bg-p3 { background: var(--p3); }
+  .bg-p4 { background: var(--p4); }
+  .bg-p5 { background: var(--p5); }
+  .border-p1 { border-color: rgba(56,189,248,0.4); }
+  .border-p2 { border-color: rgba(167,139,250,0.4); }
+  .border-p3 { border-color: rgba(52,211,153,0.4); }
+  .border-p4 { border-color: rgba(251,146,60,0.4); }
+  .border-p5 { border-color: rgba(244,114,182,0.4); }
+
+  /* ── Error / empty ── */
+  .pa-error {
+    text-align: center; padding: 40px 20px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--muted); letter-spacing: 1px;
+  }
+
+  /* Flash */
+  .flash-msg { padding: 12px 16px; border-radius: 10px; font-size: 13px; margin-bottom: 8px; }
+  .flash-error   { background: rgba(244,63,94,0.08); border: 1px solid rgba(244,63,94,0.25);  color: #ff8aaa; }
+  .flash-info    { background: rgba(56,189,248,0.08); border: 1px solid rgba(56,189,248,0.25); color: #7dd3fc; }
+  .flash-success { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); color: #6ee7b7; }
+
+  /* No-data divider */
+  .combo-divider {
+    border: none; border-top: 1px solid var(--border); margin: 20px 0;
+  }
+</style>
+
+<div id="pa-page">
+
+  <!-- Hero -->
+  <div class="pa-hero">
+    <p class="pa-eyebrow">⟡ Positional Intelligence · Year by Year</p>
+    <h1>Positional<br>Analysis</h1>
+    <p>How often each white ball appears at each sorted position (1st–5th) within number ranges — uncovering whether numbers tend to land early, mid, or late in the sequence.</p>
+  </div>
+
+  <div class="pa-wrap">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div>{% for category, message in messages %}
+          <div class="flash-msg flash-{{ category }}">{{ message }}</div>
+        {% endfor %}</div>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Loading card -->
+    <div class="pa-card" id="loadingCard">
+      <div class="pa-loading" id="loadingIndicator">
+        <div class="pa-spinner"></div>
+        Loading positional data…
+      </div>
+    </div>
+
+    <!-- Main analysis card (hidden until loaded) -->
+    <div class="pa-card" id="mainCard" style="display:none">
+
+      <!-- Year tabs + meta row -->
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px">
+        <p class="pa-card-label" style="margin:0;white-space:nowrap">Year</p>
+        <div class="year-tabs" id="yearTabs"></div>
+        <span class="year-meta" id="yearMeta"></span>
+      </div>
+
+      <!-- Position filter -->
+      <div style="margin-bottom:14px">
+        <div class="pos-row">
+          <span class="pos-label">Position</span>
+          <button class="pos-pill active" data-pos="all">
+            <span class="pos-dot" style="background:rgba(255,255,255,0.3)"></span> All
+          </button>
+          <button class="pos-pill" data-pos="1">
+            <span class="pos-dot bg-p1"></span> <span class="pc-1">1st</span>
+          </button>
+          <button class="pos-pill" data-pos="2">
+            <span class="pos-dot bg-p2"></span> <span class="pc-2">2nd</span>
+          </button>
+          <button class="pos-pill" data-pos="3">
+            <span class="pos-dot bg-p3"></span> <span class="pc-3">3rd</span>
+          </button>
+          <button class="pos-pill" data-pos="4">
+            <span class="pos-dot bg-p4"></span> <span class="pc-4">4th</span>
+          </button>
+          <button class="pos-pill" data-pos="5">
+            <span class="pos-dot bg-p5"></span> <span class="pc-5">5th</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Range filter -->
+      <div style="margin-bottom:24px">
+        <div class="range-row" id="rangePills">
+          <span class="pos-label">Range</span>
+          <!-- populated by JS -->
+        </div>
+      </div>
+
+      <!-- Spotlight row -->
+      <p class="pa-card-label">Top 3 Balls Per Combo</p>
+      <div class="spotlight-grid" id="spotlightGrid"></div>
+
+      <!-- Divider -->
+      <hr class="combo-divider">
+
+      <!-- Detailed tables -->
+      <p class="pa-card-label">Full Frequency Tables</p>
+      <div id="tablesContainer"></div>
+
+    </div><!-- /mainCard -->
+
+    <div class="pa-card" id="errorCard" style="display:none">
+      <div class="pa-error" id="errorMsg">Failed to load data.</div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+  const POSITION_COLORS = {
+    1: { bar: '#38bdf8', cls: 'pc-1', bg: 'bg-p1', border: 'border-p1', label: '1st' },
+    2: { bar: '#a78bfa', cls: 'pc-2', bg: 'bg-p2', border: 'border-p2', label: '2nd' },
+    3: { bar: '#34d399', cls: 'pc-3', bg: 'bg-p3', border: 'border-p3', label: '3rd' },
+    4: { bar: '#fb923c', cls: 'pc-4', bg: 'bg-p4', border: 'border-p4', label: '4th' },
+    5: { bar: '#f472b6', cls: 'pc-5', bg: 'bg-p5', border: 'border-p5', label: '5th' },
+  };
+
+  const RANGE_ORDER = ['1-10','11-20','21-30','31-40','41-50','51-60','61-69'];
+
+  // ── State ─────────────────────────────────────────────────
+  let allYearData   = [];
+  let activeYear    = null;
+  let activePos     = 'all';
+  let activeRange   = 'all';
+  let allRanges     = [];
+
+  // ── Fetch ─────────────────────────────────────────────────
+  fetch('/positional_analysis', {
+    method: 'GET',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(res => {
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  })
+  .then(data => {
+    document.getElementById('loadingCard').style.display = 'none';
+
+    if (!data || data.length === 0) {
+      document.getElementById('errorCard').style.display = 'block';
+      document.getElementById('errorMsg').textContent = 'No positional data available.';
+      return;
+    }
+
+    allYearData = data.sort((a, b) => b.year - a.year); // newest first
+    activeYear  = allYearData[0].year;
+
+    // Collect all unique ranges from data
+    const rangeSet = new Set();
+    allYearData.forEach(yd => yd.data.forEach(d => rangeSet.add(d.range_label)));
+    allRanges = RANGE_ORDER.filter(r => rangeSet.has(r));
+
+    buildYearTabs();
+    buildRangePills();
+    buildPositionPills();
+    renderActiveYear();
+
+    document.getElementById('mainCard').style.display = 'block';
+  })
+  .catch(err => {
+    console.error(err);
+    document.getElementById('loadingCard').style.display = 'none';
+    document.getElementById('errorCard').style.display   = 'block';
+    document.getElementById('errorMsg').textContent = `Failed to load: ${err.message}`;
+  });
+
+  // ── Year tabs ─────────────────────────────────────────────
+  function buildYearTabs() {
+    const wrap = document.getElementById('yearTabs');
+    wrap.innerHTML = '';
+    allYearData.forEach(yd => {
+      const btn = document.createElement('button');
+      btn.className = 'year-tab' + (yd.year === activeYear ? ' active' : '');
+      btn.textContent = yd.year;
+      btn.dataset.year = yd.year;
+      btn.addEventListener('click', () => {
+        activeYear = parseInt(btn.dataset.year);
+        document.querySelectorAll('.year-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderActiveYear();
+      });
+      wrap.appendChild(btn);
+    });
+  }
+
+  // ── Range pills ───────────────────────────────────────────
+  function buildRangePills() {
+    const wrap = document.getElementById('rangePills');
+    // keep label, clear the rest
+    const label = wrap.querySelector('.pos-label');
+    wrap.innerHTML = '';
+    wrap.appendChild(label);
+
+    const allBtn = document.createElement('button');
+    allBtn.className = 'range-pill active';
+    allBtn.dataset.range = 'all';
+    allBtn.textContent = 'All Ranges';
+    allBtn.addEventListener('click', () => setRange('all'));
+    wrap.appendChild(allBtn);
+
+    allRanges.forEach(r => {
+      const btn = document.createElement('button');
+      btn.className = 'range-pill';
+      btn.dataset.range = r;
+      btn.textContent = r;
+      btn.addEventListener('click', () => setRange(r));
+      wrap.appendChild(btn);
+    });
+  }
+
+  function setRange(r) {
+    activeRange = r;
+    document.querySelectorAll('.range-pill').forEach(b => b.classList.toggle('active', b.dataset.range === r));
+    renderActiveYear();
+  }
+
+  // ── Position pills ────────────────────────────────────────
+  function buildPositionPills() {
+    document.querySelectorAll('.pos-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        activePos = pill.dataset.pos;
+        document.querySelectorAll('.pos-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        renderActiveYear();
+      });
+    });
+  }
+
+  // ── Main render ───────────────────────────────────────────
+  function renderActiveYear() {
+    const yearData = allYearData.find(yd => yd.year === activeYear);
+    if (!yearData) return;
+
+    document.getElementById('yearMeta').innerHTML =
+      `<strong>${yearData.total_draws}</strong> draws`;
+
+    // Filter data
+    let filtered = yearData.data;
+    if (activePos !== 'all') {
+      filtered = filtered.filter(d => d.position === parseInt(activePos));
+    }
+    if (activeRange !== 'all') {
+      filtered = filtered.filter(d => d.range_label === activeRange);
+    }
+
+    // Group: {range → {position → [{ball_number, count, percentage}]}}
+    const grouped = {};
+    filtered.forEach(item => {
+      if (!grouped[item.range_label]) grouped[item.range_label] = {};
+      if (!grouped[item.range_label][item.position]) grouped[item.range_label][item.position] = [];
+      grouped[item.range_label][item.position].push({
+        ball: item.ball_number,
+        count: item.count,
+        pct: parseFloat(item.percentage),
+      });
+    });
+
+    // Sort each combo by count desc
+    Object.values(grouped).forEach(rangeObj =>
+      Object.values(rangeObj).forEach(arr => arr.sort((a, b) => b.count - a.count || a.ball - b.ball))
+    );
+
+    renderSpotlight(grouped);
+    renderTables(grouped);
+  }
+
+  // ── Spotlight cards ───────────────────────────────────────
+  function renderSpotlight(grouped) {
+    const grid = document.getElementById('spotlightGrid');
+    grid.innerHTML = '';
+
+    const orderedRanges = RANGE_ORDER.filter(r => grouped[r]);
+    if (!orderedRanges.length) {
+      grid.innerHTML = `<div class="pa-error" style="padding:20px;grid-column:1/-1">No data for selected filters.</div>`;
+      return;
+    }
+
+    orderedRanges.forEach(rangeLabel => {
+      const rangeObj = grouped[rangeLabel];
+      const positions = Object.keys(rangeObj).map(Number).sort();
+
+      positions.forEach(pos => {
+        const items   = rangeObj[pos].slice(0, 3);
+        if (!items.length) return;
+        const pc      = POSITION_COLORS[pos] || {};
+        const maxPct  = items[0]?.pct || 1;
+
+        const card = document.createElement('div');
+        card.className = `spotlight-card`;
+        card.style.borderColor = `rgba(255,255,255,0.07)`;
+
+        const ringClasses = ['gold-ring','silver-ring','bronze-ring'];
+        const ballsHtml = items.map((item, i) => `
+          <div class="rank-ball-wrap">
+            <span class="td-wb-ball ${ringClasses[i] || ''}">${item.ball}</span>
+            <span class="rank-pct">${item.pct}%</span>
+          </div>
+        `).join('');
+
+        card.innerHTML = `
+          <div class="sc-header">
+            <span class="sc-range-pos">${rangeLabel}</span>
+            <span class="sc-pos-badge ${pc.cls || ''}" style="background:rgba(255,255,255,0.05);border:1px solid ${pc.bar || '#888'}22">
+              ${pc.label || pos}
+            </span>
+          </div>
+          <div class="sc-balls">${ballsHtml}</div>
+        `;
+        grid.appendChild(card);
+      });
+    });
+  }
+
+  // ── Detailed tables ───────────────────────────────────────
+  function renderTables(grouped) {
+    const container = document.getElementById('tablesContainer');
+    container.innerHTML = '';
+
+    const orderedRanges = RANGE_ORDER.filter(r => grouped[r]);
+    if (!orderedRanges.length) return;
+
+    orderedRanges.forEach(rangeLabel => {
+      const rangeObj  = grouped[rangeLabel];
+      const positions = Object.keys(rangeObj).map(Number).sort();
+
+      positions.forEach(pos => {
+        const items = rangeObj[pos];
+        if (!items.length) return;
+        const pc     = POSITION_COLORS[pos] || {};
+        const maxCnt = items[0]?.count || 1;
+
+        const section = document.createElement('div');
+        section.className = 'combo-section';
+
+        // Header
+        const header = document.createElement('div');
+        header.className = 'combo-header';
+        header.innerHTML = `
+          <span class="combo-title">Range <span style="color:var(--amber)">${rangeLabel}</span></span>
+          <span class="combo-pos-tag ${pc.cls || ''}" style="background:rgba(255,255,255,0.04);border:1px solid currentColor;border-radius:5px;padding:2px 8px;opacity:0.9">
+            ${pc.label || pos} Ball
+          </span>
+          <span class="combo-count">${items.length} numbers</span>
+        `;
+        section.appendChild(header);
+
+        // Table
+        const tblWrap = document.createElement('div');
+        tblWrap.className = 'freq-table-wrap';
+        tblWrap.innerHTML = `
+          <table class="freq-table">
+            <thead>
+              <tr>
+                <th>Ball</th>
+                <th>Count</th>
+                <th>Frequency</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-${rangeLabel.replace(/[^a-z0-9]/gi,'-')}-${pos}"></tbody>
+          </table>
+        `;
+        section.appendChild(tblWrap);
+        container.appendChild(section);
+
+        const tbody = tblWrap.querySelector('tbody');
+        const frag  = document.createDocumentFragment();
+
+        items.forEach(item => {
+          const barW = Math.max(Math.round((item.count / maxCnt) * 100), 2);
+          const tr   = document.createElement('tr');
+          tr.innerHTML = `
+            <td><span class="td-wb-ball">${item.ball}</span></td>
+            <td class="td-count">${item.count}</td>
+            <td>
+              <div class="freq-bar-wrap">
+                <div class="freq-bar-track">
+                  <div class="freq-bar-fill" style="width:${barW}%;background:${pc.bar || '#888'}"></div>
+                </div>
+                <span class="freq-pct">${item.pct}%</span>
+              </div>
+            </td>
+          `;
+          frag.appendChild(tr);
+        });
+        tbody.appendChild(frag);
+      });
+    });
+  }
+
+});
+</script>
+{% endblock %}{% extends "base.html" %}
+
 {% block title %}Positional White Ball Frequency Analysis{% endblock %}
 
 {% block page_heading %}Positional White Ball Frequency Analysis{% endblock %}
