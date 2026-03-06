@@ -8635,6 +8635,137 @@ Based on pair dominance, trend analysis, and recent momentum — name ONE specif
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+# ── Paste into index.py with your other API routes ───────────────────────────
+
+@app.route('/api/special-patterns-ai-analysis', methods=['POST'])
+def special_patterns_ai_analysis():
+    try:
+        p = request.get_json()
+
+        recent_n      = p.get('recent_n', 0)
+        ta_pct        = p.get('ta_pct', 0)
+        sl_pct        = p.get('sl_pct', 0)
+        rd_pct        = p.get('rd_pct', 0)
+        ta_streak     = p.get('ta_streak', 0)
+        sl_streak     = p.get('sl_streak', 0)
+        rd_streak     = p.get('rd_streak', 0)
+        top5_ta       = p.get('top5_tens_apart', [])
+        top5_sl       = p.get('top5_same_last_digit', [])
+        top5_rd       = p.get('top5_repeating_digit', [])
+        last_yr       = p.get('last_year', {})
+        prev_yr       = p.get('prev_year', {})
+
+        if not recent_n:
+            return jsonify({'error': 'No data provided'}), 400
+
+        # YoY deltas
+        def yoy(key):
+            l = last_yr.get(key, 0) or 0
+            p2 = prev_yr.get(key, 0) or 0
+            return round(l - p2, 1) if p2 else 0
+
+        ta_yoy = yoy('tens_apart_draw_percentage')
+        sl_yoy = yoy('same_last_digit_draw_percentage')
+        rd_yoy = yoy('repeating_digit_draw_percentage')
+
+        dominant = max([('Tens Apart', ta_pct), ('Same Last Digit', sl_pct), ('Repeating Digit', rd_pct)], key=lambda x: x[1])
+        weakest  = min([('Tens Apart', ta_pct), ('Same Last Digit', sl_pct), ('Repeating Digit', rd_pct)], key=lambda x: x[1])
+        best_streak_type = max([('Tens Apart', ta_streak), ('Same Last Digit', sl_streak), ('Repeating Digit', rd_streak)], key=lambda x: x[1])
+
+        prompt = f"""You are an expert Powerball special pattern analyst. Analyse three pattern types across historical draws:
+- TENS APART: pairs of white balls exactly 10, 20, or 30 apart (e.g. 5 and 15)
+- SAME LAST DIGIT: pairs sharing the same units digit (e.g. 3 and 13 and 23)
+- REPEATING DIGIT: numbers with both digits the same (11, 22, 33, 44, 55, 66)
+
+═══ RECENT 12-MONTH SNAPSHOT ({recent_n} draws) ═══
+Tens Apart:        {p.get('ta_recent_count')} draws ({ta_pct}%) | longest streak: {ta_streak} consecutive
+Same Last Digit:   {p.get('sl_recent_count')} draws ({sl_pct}%) | longest streak: {sl_streak} consecutive
+Repeating Digit:   {p.get('rd_recent_count')} draws ({rd_pct}%) | longest streak: {rd_streak} consecutive
+
+Dominant pattern type: {dominant[0]} ({dominant[1]}%)
+Weakest pattern type:  {weakest[0]} ({weakest[1]}%)
+Best streak type:      {best_streak_type[0]} ({best_streak_type[1]} consecutive draws)
+
+═══ YEAR-OVER-YEAR CHANGE (last year vs prior year) ═══
+Tens Apart:       {ta_yoy:+.1f}% change
+Same Last Digit:  {sl_yoy:+.1f}% change
+Repeating Digit:  {rd_yoy:+.1f}% change
+
+═══ LAST YEAR STATS ═══
+Year: {last_yr.get('year', '—')}
+Tens Apart: {last_yr.get('tens_apart_draw_percentage', '—')}% ({last_yr.get('tens_apart_count', '—')} draws)
+Same Last Digit: {last_yr.get('same_last_digit_draw_percentage', '—')}% ({last_yr.get('same_last_digit_count', '—')} draws)
+Repeating Digit: {last_yr.get('repeating_digit_draw_percentage', '—')}% ({last_yr.get('repeating_digit_count', '—')} draws)
+
+═══ TOP 5 ALL-TIME TENS APART PAIRS ═══
+{chr(10).join(f"  ({r['pattern']}): {r['count']} times" for r in top5_ta)}
+
+═══ TOP 5 ALL-TIME SAME LAST DIGIT PAIRS ═══
+{chr(10).join(f"  ({r['pattern']}): {r['count']} times" for r in top5_sl)}
+
+═══ TOP 5 ALL-TIME REPEATING DIGIT NUMBERS ═══
+{chr(10).join(f"  {r['pattern']}: {r['count']} times" for r in top5_rd)}
+
+Write EXACTLY these 5 sections, each header on its own line:
+
+PATTERN DOMINANCE
+Which pattern type appears most frequently in the last 12 months? Give the exact percentage and compare it to the weakest type. Is any type surprisingly high or low compared to what you'd expect?
+
+STREAK ANALYSIS
+Name the pattern type with the longest recent streak ({best_streak_type[1]} draws). What does this streak tell us — is the pattern on a hot run? Which type has been most consistent vs most erratic recently?
+
+YEAR-OVER-YEAR MOMENTUM
+Compare this year vs last for all 3 types using the percentage changes above. Which type is gaining momentum (↑), losing it (↓), or flat (→)? Name the most notable shift.
+
+ALL-TIME TOP PATTERNS
+Name the single most dominant pair across ALL THREE categories combined. Are any top pairs shared across categories (same numbers appearing in both Tens Apart and Same Last Digit)? What does the top Repeating Digit number tell us about which numbers tend to appear twice?
+
+NEXT DRAW PREDICTION
+Based on recent frequency, streak momentum, and year-over-year changes — predict:
+1. Which pattern type is MOST LIKELY to appear in the next draw (give %)
+2. ONE specific pair or number recommendation from that type (e.g. "(5, 15)" or "33")
+3. ONE pattern type to AVOID in the next draw (lowest likelihood)
+Justify each prediction with data from the analysis above."""
+
+        groq_api_key = os.environ.get('GROQ_API_KEY', '')
+        response = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {groq_api_key}',
+                'Content-Type':  'application/json'
+            },
+            json={
+                'model':       'llama-3.1-8b-instant',
+                'messages':    [{'role': 'user', 'content': prompt}],
+                'max_tokens':  720,
+                'temperature': 0.6
+            },
+            timeout=35
+        )
+
+        result = response.json()
+        if 'error' in result:
+            return jsonify({'error': result['error'].get('message', 'Groq error')}), 500
+
+        analysis = result['choices'][0]['message']['content'].strip()
+
+        insights = [
+            { 'label': '🏆 Dominant Type (12mo)',   'value': f"{dominant[0]} · {dominant[1]}% of draws" },
+            { 'label': '📉 Weakest Type (12mo)',     'value': f"{weakest[0]} · {weakest[1]}% of draws" },
+            { 'label': '🔥 Best Streak',             'value': f"{best_streak_type[0]} · {best_streak_type[1]} consecutive" },
+            { 'label': '📈 Tens Apart YoY',          'value': f"{ta_yoy:+.1f}% vs prior year" },
+            { 'label': '📈 Same Last Digit YoY',     'value': f"{sl_yoy:+.1f}% vs prior year" },
+            { 'label': '👑 #1 Tens Apart Pair',      'value': f"({top5_ta[0]['pattern']}) · {top5_ta[0]['count']}×" if top5_ta else '—' },
+            { 'label': '👑 #1 Same Last Digit Pair', 'value': f"({top5_sl[0]['pattern']}) · {top5_sl[0]['count']}×" if top5_sl else '—' },
+            { 'label': '👑 #1 Repeating Digit',      'value': f"{top5_rd[0]['pattern']} · {top5_rd[0]['count']}×" if top5_rd else '—' },
+        ]
+
+        return jsonify({'analysis': analysis, 'insights': insights})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 initialize_core_data()
 
 # ── Start the draw-day scheduler ──────────────────────────────
