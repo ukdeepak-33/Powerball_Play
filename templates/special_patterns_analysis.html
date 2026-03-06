@@ -1,910 +1,1061 @@
 {% extends "base.html" %}
 
-{% block title %}Special Patterns Analysis{% endblock %}
-
-{% block page_heading %}Special Patterns Analysis & Trends{% endblock %}
+{% block title %}Special Patterns Analysis — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
-<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8" id="analysisContent">
-    {# Flash messages display #}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg:     #07080f;
+    --s1:     #0c0d1a;
+    --s2:     #111220;
+    --s3:     #171828;
+    --border: rgba(255,255,255,0.07);
+    --text:   rgba(255,255,255,0.87);
+    --muted:  rgba(255,255,255,0.36);
+    --indigo: #6366f1; --indigo2: rgba(99,102,241,0.15);
+    --green:  #10b981; --green2:  rgba(16,185,129,0.15);
+    --violet: #a855f7; --violet2: rgba(168,85,247,0.15);
+    --amber:  #f59e0b;
+    --red:    #f43f5e;
+    --cyan:   #22d3ee;
+    --blue:   #3b82f6;
+  }
+
+  /* TYPE COLORS */
+  :root {
+    --ta-color: #6366f1; --ta-bg: rgba(99,102,241,0.12);  --ta-border: rgba(99,102,241,0.35);
+    --sl-color: #10b981; --sl-bg: rgba(16,185,129,0.12);  --sl-border: rgba(16,185,129,0.35);
+    --rd-color: #a855f7; --rd-bg: rgba(168,85,247,0.12);  --rd-border: rgba(168,85,247,0.35);
+  }
+
+  #spa-page * { box-sizing: border-box; }
+  #spa-page {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg); min-height: 100vh;
+    color: var(--text); padding-bottom: 80px;
+  }
+
+  /* ── Hero ── */
+  .spa-hero {
+    position: relative; padding: 52px 24px 40px; text-align: center; overflow: hidden;
+  }
+  .spa-hero::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 40% 50% at 30% 0%,  rgba(99,102,241,0.1) 0%, transparent 65%),
+      radial-gradient(ellipse 40% 50% at 70% 0%,  rgba(16,185,129,0.07) 0%, transparent 65%),
+      radial-gradient(ellipse 30% 40% at 50% 80%, rgba(168,85,247,0.06) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .spa-hero::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--indigo), var(--green), var(--violet), transparent);
+    opacity: 0.35;
+  }
+  .spa-eyebrow {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 3px; text-transform: uppercase;
+    color: var(--indigo); margin-bottom: 12px; opacity: 0.85;
+  }
+  .spa-hero h1 {
+    font-size: clamp(34px, 5vw, 64px); font-weight: 700;
+    line-height: 1.08; margin: 0 0 14px;
+    background: linear-gradient(135deg, var(--indigo) 0%, #fff 40%, var(--green) 70%, var(--violet) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .spa-hero p {
+    font-size: 14px; color: var(--muted); max-width: 540px; margin: 0 auto; line-height: 1.75;
+  }
+
+  /* ── Layout ── */
+  .spa-wrap { max-width: 1280px; margin: 0 auto; padding: 0 24px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* ── Card ── */
+  .spa-card {
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px 26px; position: relative; overflow: hidden;
+  }
+  .spa-card-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--muted);
+    margin: 0 0 16px; opacity: 0.7;
+  }
+
+  /* ── Loading overlay ── */
+  #spaLoadingOverlay {
+    position: fixed; inset: 0;
+    background: rgba(7,8,15,0.92);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 999; gap: 16px;
+  }
+  .spa-spinner {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 3px solid rgba(99,102,241,0.15);
+    border-top-color: var(--indigo);
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #spaLoadingOverlay p {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: rgba(99,102,241,0.7); letter-spacing: 2px; text-transform: uppercase;
+  }
+
+  /* ── Stat ring cards ── */
+  .ring-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+  @media(max-width:680px){ .ring-grid { grid-template-columns: 1fr; } }
+
+  .ring-card {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px; display: flex; align-items: center; gap: 16px;
+  }
+  .ring-wrap { position: relative; width: 72px; height: 72px; flex-shrink: 0; }
+  .ring-svg  { width: 72px; height: 72px; transform: rotate(-90deg); }
+  .ring-bg   { fill: none; stroke-width: 6; }
+  .ring-fill { fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 1s ease; }
+  .ring-center {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  .ring-pct { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; line-height: 1; }
+  .ring-pct-sub { font-family: 'JetBrains Mono', monospace; font-size: 8px; color: var(--muted); }
+
+  .ring-info {}
+  .ring-type { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .ring-name { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 6px; line-height: 1.2; }
+  .ring-meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
+
+  /* ── Streak badges ── */
+  .streak-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .streak-badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.5px;
+    padding: 4px 10px; border-radius: 6px;
+  }
+
+  /* ── Pattern summary cards (top pairs) ── */
+  .pattern-type-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+  @media(max-width:800px){ .pattern-type-grid { grid-template-columns: 1fr; } }
+
+  .pt-card { background: var(--s2); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .pt-card-header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .pt-card-title  { font-size: 14px; font-weight: 700; }
+  .pt-total { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); }
+  .pt-card-body   { padding: 12px; display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; }
+
+  .pair-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; transition: background 0.12s; }
+  .pair-row:hover { background: var(--s3); }
+  .twin-sm { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+  .wb-sm {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, #e8edf5 0%, #b8c8e0 50%, #8aaac8 100%);
+    color: #0d1829; flex-shrink: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+  .conn-sm { font-size: 10px; color: var(--muted); }
+  .pair-bar-wrap { flex: 1; height: 4px; background: var(--s3); border-radius: 2px; }
+  .pair-bar-fill  { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+  .pair-cnt { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); min-width: 24px; text-align: right; }
+
+  /* ── Co-occurrence matrix ── */
+  .cooc-grid {
+    display: grid; grid-template-columns: repeat(4,1fr); gap: 10px;
+  }
+  @media(max-width:580px){ .cooc-grid { grid-template-columns: 1fr 1fr; } }
+
+  .cooc-cell {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; text-align: center;
+  }
+  .cooc-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; line-height: 1.4; }
+  .cooc-val   { font-size: 24px; font-weight: 700; color: #fff; line-height: 1; }
+  .cooc-pct   { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+  /* ── Recent trends table ── */
+  .rt-filters { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; }
+  .rt-filter {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 1px; padding: 6px 12px; border-radius: 7px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer; transition: all 0.15s;
+  }
+  .rt-filter:hover:not(.active) { border-color: rgba(255,255,255,0.15); color: var(--text); }
+  .rt-filter.active { }
+  .rt-filter[data-f="all"].active { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.2); color: var(--text); }
+  .rt-filter[data-f="ta"].active  { background: var(--ta-bg); border-color: var(--ta-border); color: var(--ta-color); }
+  .rt-filter[data-f="sl"].active  { background: var(--sl-bg); border-color: var(--sl-border); color: var(--sl-color); }
+  .rt-filter[data-f="rd"].active  { background: var(--rd-bg); border-color: var(--rd-border); color: var(--rd-color); }
+
+  .tbl-scroll { overflow-x: auto; border-radius: 10px; }
+  table.spa-table { width: 100%; border-collapse: collapse; min-width: 560px; }
+  table.spa-table thead th {
+    background: var(--s2); padding: 10px 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--muted);
+    text-align: left; border-bottom: 1px solid var(--border);
+  }
+  table.spa-table tbody tr { border-bottom: 1px solid rgba(255,255,255,0.03); transition: background 0.12s; }
+  table.spa-table tbody tr:hover { background: var(--s2); }
+  table.spa-table tbody tr:last-child { border-bottom: none; }
+  table.spa-table td { padding: 9px 14px; vertical-align: middle; font-size: 13px; }
+
+  .td-date { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .balls-row { display: flex; gap: 4px; flex-wrap: wrap; }
+  .wb-ball-rt {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, #e8edf5 0%, #b8c8e0 50%, #8aaac8 100%);
+    color: #0d1829; flex-shrink: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+
+  .pat-badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.5px;
+    padding: 3px 7px; border-radius: 4px; white-space: nowrap; display: inline-block; margin: 2px;
+  }
+  .pat-none { background: rgba(255,255,255,0.04); color: var(--muted); border: 1px solid var(--border); }
+  .pat-ta   { background: var(--ta-bg); border: 1px solid var(--ta-border); color: var(--ta-color); }
+  .pat-sl   { background: var(--sl-bg); border: 1px solid var(--sl-border); color: var(--sl-color); }
+  .pat-rd   { background: var(--rd-bg); border: 1px solid var(--rd-border); color: var(--rd-color); }
+
+  .show-more-btn {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 1px; padding: 8px 18px; border-radius: 8px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer; transition: all 0.15s; margin-top: 12px;
+  }
+  .show-more-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+
+  /* ── Year pills + chart ── */
+  .year-pills { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 20px; }
+  .year-pill {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 1px; padding: 7px 14px; border-radius: 8px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer; transition: all 0.15s; user-select: none;
+  }
+  .year-pill:hover { border-color: rgba(255,255,255,0.15); color: var(--text); }
+  .year-pill.active { background: rgba(99,102,241,0.12); border-color: rgba(99,102,241,0.4); color: var(--indigo); }
+  .year-pill-ctrl {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 1px; padding: 7px 12px; border-radius: 8px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer; transition: all 0.15s;
+  }
+  .year-pill-ctrl:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+
+  .chart-canvas-wrap { position: relative; height: 340px; }
+
+  /* ── Yearly detail tabs ── */
+  .yd-tabs { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 20px; }
+  .yd-tab {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 1px; padding: 7px 14px; border-radius: 8px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer; transition: all 0.15s;
+  }
+  .yd-tab.active { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.2); color: var(--text); }
+
+  .yd-panel { display: none; }
+  .yd-panel.visible { display: block; }
+
+  .yd-type-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+  @media(max-width:800px){ .yd-type-grid { grid-template-columns: 1fr; } }
+
+  .yd-type-card { background: var(--s2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .yd-type-header { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .yd-type-title { font-size: 13px; font-weight: 700; }
+  .yd-type-body  { padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; max-height: 260px; overflow-y: auto; }
+
+  /* sort row for yearly tables */
+  .yd-sort { display: flex; gap: 6px; margin-bottom: 8px; }
+  .yd-sort-btn {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 1px; padding: 4px 9px; border-radius: 5px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer; transition: all 0.15s;
+  }
+  .yd-sort-btn.active { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.2); color: var(--text); }
+
+  /* ── AI Panel ── */
+  .ai-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--indigo), var(--green), var(--violet), transparent);
+    opacity: 0.4;
+  }
+  .ai-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+  .ai-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--indigo); opacity: 0.8; margin-bottom: 3px; }
+  .ai-title   { font-size: 19px; font-weight: 700; color: #fff; margin: 0; }
+  .ai-btn {
+    display: flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, #4338ca, var(--indigo));
+    color: #fff; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    border: none; border-radius: 10px; padding: 12px 22px;
+    cursor: pointer; white-space: nowrap;
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    box-shadow: 0 0 20px rgba(99,102,241,0.2);
+  }
+  .ai-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 36px rgba(99,102,241,0.45); }
+  .ai-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .ai-thinking { display: none; align-items: center; gap: 10px; padding: 14px 0 4px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: rgba(99,102,241,0.7); letter-spacing: 1px; }
+  .ai-thinking.visible { display: flex; }
+  .ai-dots span { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin: 0 2px; animation: dotB 1.2s infinite; }
+  .ai-dots span:nth-child(1) { background: var(--indigo); }
+  .ai-dots span:nth-child(2) { animation-delay: 0.2s; background: var(--green); }
+  .ai-dots span:nth-child(3) { animation-delay: 0.4s; background: var(--violet); }
+  @keyframes dotB { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1);opacity:1} }
+  .ai-output { display: none; margin-top: 20px; border-top: 1px solid rgba(99,102,241,0.1); padding-top: 20px; }
+  .ai-output.visible { display: block; }
+  .ai-chips { display: grid; grid-template-columns: repeat(auto-fit,minmax(155px,1fr)); gap: 12px; margin-bottom: 20px; }
+  .ai-chip  { background: var(--s2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .ai-chip-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .ai-chip-val   { font-size: 13px; font-weight: 500; color: #fff; line-height: 1.5; }
+  .ai-narrative {
+    background: var(--s2); border: 1px solid rgba(99,102,241,0.12);
+    border-left: 3px solid var(--indigo); border-radius: 0 10px 10px 0;
+    padding: 18px 20px; font-size: 14px; line-height: 1.85; color: var(--text); white-space: pre-wrap;
+  }
+  .ai-error { margin-top: 14px; background: rgba(244,63,94,0.08); border: 1px solid rgba(244,63,94,0.25); border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #ff8aaa; }
+</style>
+
+<!-- Loading Overlay -->
+<div id="spaLoadingOverlay">
+  <div class="spa-spinner"></div>
+  <p>Loading Pattern Intelligence…</p>
+</div>
+
+<div id="spa-page" style="display:none">
+  <div class="spa-hero">
+    <p class="spa-eyebrow">⟡ Pattern Intelligence · 3 Pattern Types</p>
+    <h1>Special Patterns<br>Analysis</h1>
+    <p>Tens-Apart, Same Last Digit, and Repeating Digit patterns — frequency, co-occurrence, streaks, and year-by-year trends across all historical draws.</p>
+  </div>
+
+  <div class="spa-wrap">
+
     {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="flash-messages space-y-3 mb-4">
-                {% for category, message in messages %}
-                    <div class="p-4 rounded-lg shadow-md text-sm {% if category == 'error' %}bg-red-100 text-red-700 border border-red-200{% elif category == 'info' %}bg-blue-100 text-blue-700 border border-blue-200{% else %}bg-green-100 text-green-700 border border-green-200{% endif %} animate-fade-in">
-                        <p class="font-medium">{{ message }}</p>
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
+      {% if messages %}{% for cat, msg in messages %}
+        <div class="spa-card" style="padding:12px 16px;font-size:13px">{{ msg }}</div>
+      {% endfor %}{% endif %}
     {% endwith %}
 
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <details open> {# Overall Patterns section starts as open #}
-            <summary class="text-2xl font-bold mb-6 text-gray-800 cursor-pointer flex justify-between items-center">
-                Overall Special Pattern Frequencies
-                <svg class="w-6 h-6 transform transition-transform duration-200 details-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-            </summary>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-                <!-- Tens Apart Patterns -->
-                <div class="col-span-1 bg-gray-50 p-4 rounded-lg border border-gray-100 shadow-sm">
-                    <h3 class="text-xl font-semibold mb-3 text-indigo-700">Tens Apart Patterns (e.g., 1, 11)</h3>
-                    <p class="text-gray-600 text-sm mb-4">Pairs where numbers are 10, 20, etc., apart.</p>
-                    <div id="tensApartPatterns" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-                        <!-- Data will be rendered here by JS -->
-                    </div>
-                    <p class="text-gray-500 text-xs mt-3 text-right" id="tensApartTotalCount"></p>
-                </div>
-
-                <!-- Same Last Digit Patterns -->
-                <div class="col-span-1 bg-gray-50 p-4 rounded-lg border border-gray-100 shadow-sm">
-                    <h3 class="text-xl font-semibold mb-3 text-green-700">Same Last Digit Patterns (e.g., 1, 11, 21)</h3>
-                    <p class="text-gray-600 text-sm mb-4">Pairs sharing the same last digit.</p>
-                    <div id="sameLastDigitPatterns" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-                        <!-- Data will be rendered here by JS -->
-                    </div>
-                    <p class="text-gray-500 text-xs mt-3 text-right" id="sameLastDigitTotalCount"></p>
-                </div>
-
-                <!-- Repeating Digit Patterns -->
-                <div class="col-span-1 bg-gray-50 p-4 rounded-lg border border-gray-100 shadow-sm">
-                    <h3 class="text-xl font-semibold mb-3 text-purple-700">Repeating Digit Patterns (e.g., 11, 22)</h3>
-                    <p class="text-gray-600 text-sm mb-4">Numbers with repeating digits (e.g., 11, 22, 33).</p>
-                    <div id="repeatingDigitPatterns" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-                        <!-- Data will be rendered here by JS -->
-                    </div>
-                    <p class="text-gray-500 text-xs mt-3 text-right" id="repeatingDigitTotalCount"></p>
-                </div>
-            </div>
-        </details>
+    <!-- ① Ring stat cards -->
+    <div class="spa-card">
+      <p class="spa-card-title">Pattern Prevalence — % of Draws Containing Each Type</p>
+      <div class="ring-grid" id="ringGrid"></div>
     </div>
 
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-6 text-gray-800">Recent Trends in Special Patterns (Last 12 Months)</h2>
-        <p class="text-gray-700 mb-4">This table shows which special patterns were present in each Powerball draw over the last 12 months, along with the drawn numbers.</p>
-        
-        <div class="overflow-x-auto shadow-md rounded-lg pattern-table-scroll">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-blue-100 text-blue-800">
-                    <tr>
-                        <th class="py-3 px-4 text-left text-sm font-semibold">Draw Date</th>
-                        <th class="py-3 px-4 text-left text-sm font-semibold">White Balls</th>
-                        <th class="py-3 px-4 text-left text-sm font-semibold">Tens-Apart Present</th>
-                        <th class="py-3 px-4 text-left text-sm font-semibold">Same Last Digit Present</th>
-                        <th class="py-3 px-4 text-left text-sm font-semibold">Repeating Digit Present</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200" id="recentTrendsTableBody">
-                    <tr><td colspan="5" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">Loading recent trends...</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <div class="text-center mt-4 hidden" id="recentTrendsToggleContainer">
-            <button id="recentTrendsToggleBtn" class="btn-secondary">Show All</button>
-        </div>
+    <!-- ② Streak detector -->
+    <div class="spa-card">
+      <p class="spa-card-title">Streak Intelligence · Recent 12 Months</p>
+      <div id="streakContent" style="display:flex;flex-wrap:wrap;gap:14px"></div>
     </div>
 
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-6 text-gray-800">Yearly Distribution of Special Patterns</h2>
-        <p class="text-gray-700 mb-4">View the occurrences of special patterns per year. Select multiple years to compare trends.</p>
-        
-        <div class="mb-4">
-            <label for="yearMultiSelect" class="block text-sm font-medium text-gray-700 mb-2">Select Year(s):</label>
-            <select id="yearMultiSelect" multiple class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-500 focus:ring-opacity-50" style="min-height: 100px;">
-                <!-- Years will be populated by JS -->
-            </select>
-        </div>
-
-        <div class="chart-container mb-6">
-            <canvas id="yearlySpecialPatternsChart"></canvas>
-        </div>
-
-        {# Container for detailed yearly pattern tables #}
-        <h3 class="text-xl font-bold mb-4 text-gray-800">Detailed Yearly Pattern Breakdown</h3>
-        <div id="detailedYearlyPatternsContainer" class="space-y-6">
-            <p class="text-gray-600 text-center py-4">Select year(s) above to view detailed patterns.</p>
-        </div>
+    <!-- ③ Co-occurrence matrix -->
+    <div class="spa-card">
+      <p class="spa-card-title">Pattern Co-occurrence · Recent 12 Months</p>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">How often do pattern types appear together in the same draw?</p>
+      <div class="cooc-grid" id="coocGrid"></div>
     </div>
+
+    <!-- ④ Pattern summary cards (top pairs) -->
+    <div class="spa-card">
+      <p class="spa-card-title">Top Patterns — All-Time Frequency</p>
+      <div class="pattern-type-grid" id="patternTypeGrid"></div>
+    </div>
+
+    <!-- ⑤ Recent trends table -->
+    <div class="spa-card">
+      <p class="spa-card-title">Recent Draws · Last 12 Months</p>
+      <div class="rt-filters" id="rtFilters">
+        <button class="rt-filter active" data-f="all">All Draws</button>
+        <button class="rt-filter" data-f="ta">Tens Apart</button>
+        <button class="rt-filter" data-f="sl">Same Last Digit</button>
+        <button class="rt-filter" data-f="rd">Repeating Digit</button>
+        <button class="rt-filter" data-f="multi">Multi-Pattern</button>
+        <button class="rt-filter" data-f="none">No Patterns</button>
+      </div>
+      <div class="tbl-scroll">
+        <table class="spa-table">
+          <thead><tr>
+            <th>Draw Date</th>
+            <th>White Balls</th>
+            <th>Tens Apart</th>
+            <th>Same Last Digit</th>
+            <th>Repeating Digit</th>
+            <th>Patterns</th>
+          </tr></thead>
+          <tbody id="rtTableBody"></tbody>
+        </table>
+      </div>
+      <div style="text-align:center">
+        <button class="show-more-btn" id="rtShowMore" style="display:none">Show More</button>
+      </div>
+    </div>
+
+    <!-- ⑥ Yearly chart with year pills -->
+    <div class="spa-card">
+      <p class="spa-card-title">Yearly Distribution</p>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px">YEARS</span>
+        <div class="year-pills" id="yearPills" style="margin:0;flex:1"></div>
+        <button class="year-pill-ctrl" id="yearSelectAll">All</button>
+        <button class="year-pill-ctrl" id="yearSelectNone">None</button>
+      </div>
+      <div class="chart-canvas-wrap">
+        <canvas id="yearlySpecialPatternsChart"></canvas>
+      </div>
+    </div>
+
+    <!-- ⑦ AI Analysis -->
+    <div class="spa-card ai-card">
+      <div class="ai-header">
+        <div>
+          <p class="ai-eyebrow">✦ Groq AI · Pattern Intelligence</p>
+          <p class="ai-title">Special Patterns Deep Analysis</p>
+        </div>
+        <button class="ai-btn" id="aiBtn">◈ Analyse Patterns</button>
+      </div>
+      <div class="ai-thinking" id="aiThinking"><div class="ai-dots"><span></span><span></span><span></span></div>Scanning all 3 pattern types…</div>
+      <div class="ai-output" id="aiOutput">
+        <div class="ai-chips" id="aiChips"></div>
+        <div class="ai-narrative" id="aiNarrative"></div>
+      </div>
+      <div class="ai-error" id="aiError" style="display:none"></div>
+    </div>
+
+    <!-- ⑧ Yearly detailed breakdown with tabs -->
+    <div class="spa-card">
+      <p class="spa-card-title">Detailed Yearly Breakdown</p>
+      <div class="yd-tabs" id="ydTabs"></div>
+      <div id="ydPanels"></div>
+    </div>
+
+  </div>
 </div>
-
-{# Loading Indicator #}
-<div id="loadingIndicator" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 hidden">
-    <div class="bg-white p-6 rounded-lg shadow-xl flex flex-col items-center">
-        <div class="animate-spin rounded-full h-12 w-12 border-4 border-t-4 border-blue-500 border-opacity-75"></div>
-        <p class="mt-4 text-gray-700 font-semibold">Loading analysis data...</p>
-    </div>
-</div>
-
-
-<style>
-    /* Basic styling for the details arrow */
-    details > summary::-webkit-details-marker {
-        display: none; /* Hide default marker */
-    }
-    details > summary {
-        list-style: none; /* Remove default list style */
-    }
-    details[open] .details-arrow {
-        transform: rotate(180deg); /* Rotate arrow when open */
-    }
-    .btn-secondary {
-        @apply bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-300 transition duration-300 ease-in-out transform hover:scale-105;
-    }
-    .pattern-table-scroll {
-        max-height: 400px; /* Limit height for scrollable tables */
-        overflow-y: auto;
-    }
-    .hidden-row {
-        display: none;
-    }
-    /* ADDED STYLING FOR BALLS */
-    .ball {
-        display: inline-flex;
-        justify-content: center;
-        align-items: center;
-        width: 30px;
-        height: 30px;
-        background-color: #60a5fa; /* Tailwind blue-400 */
-        color: white;
-        font-weight: bold;
-        border-radius: 50%;
-        margin: 0 2px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-    /* Add styling for selected multi-select options */
-    #yearMultiSelect option:checked {
-        background-color: #e0e7ff; /* Light blue */
-        color: #4338ca; /* Darker blue text */
-    }
-
-    /* Toast notification styling */
-    .toast-popup {
-        position: fixed;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 12px 20px;
-        border-radius: 8px;
-        font-size: 14px;
-        color: white;
-        opacity: 0;
-        visibility: hidden;
-        transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
-        z-index: 1000;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-    .toast-popup.show {
-        opacity: 1;
-        visibility: visible;
-    }
-    .toast-popup.success {
-        background-color: #28a745; /* Green */
-    }
-    .toast-popup.error {
-        background-color: #dc3545; /* Red */
-    }
-    .toast-popup.info {
-        background-color: #007bff; /* Blue */
-    }
-    .toast-popup.animate-fade-out {
-        animation: fadeOut 0.5s forwards;
-    }
-    @keyframes fadeOut {
-        from { opacity: 1; }
-        to { opacity: 0; }
-    }
-</style>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Elements for overall patterns summary cards
-        const overallTensApartDiv = document.getElementById('tensApartPatterns');
-        const overallSameLastDigitDiv = document.getElementById('sameLastDigitPatterns');
-        const overallRepeatingDigitDiv = document.getElementById('repeatingDigitPatterns');
-        const overallTensApartTotalCount = document.getElementById('tensApartTotalCount');
-        const overallSameLastDigitTotalCount = document.getElementById('sameLastDigitTotalCount');
-        const overallRepeatingDigitTotalCount = document.getElementById('repeatingDigitTotalCount');
-
-        // Elements for recent trends table
-        const recentTrendsTableBody = document.getElementById('recentTrendsTableBody');
-        const recentTrendsToggleBtn = document.getElementById('recentTrendsToggleBtn');
-        const recentTrendsToggleContainer = document.getElementById('recentTrendsToggleContainer');
-        
-        // Elements for yearly chart and detailed tables
-        const yearMultiSelect = document.getElementById('yearMultiSelect');
-        const yearlySpecialPatternsChartCtx = document.getElementById('yearlySpecialPatternsChart').getContext('2d');
-        let yearlyChartInstance = null; // To store the Chart.js instance
-
-        const detailedYearlyPatternsContainer = document.getElementById('detailedYearlyPatternsContainer');
-
-        const loadingIndicator = document.getElementById('loadingIndicator');
-        const analysisContent = document.getElementById('analysisContent');
-
-        let allSpecialPatternsData = null; // To store all fetched data from the API
-
-        // --- Custom Toast Popup Function (for dynamic messages) ---
-        function showToast(message, category) {
-            const existingToast = document.querySelector('.toast-popup');
-            if (existingToast) {
-                existingToast.remove(); // Remove any existing toast
-            }
-
-            const toastDiv = document.createElement('div');
-            toastDiv.className = `toast-popup ${category}`;
-            toastDiv.textContent = message;
-            document.body.appendChild(toastDiv);
-
-            setTimeout(() => {
-                toastDiv.classList.add('show');
-            }, 10); // Small delay to ensure transition applies
-
-            setTimeout(() => {
-                toastDiv.classList.remove('show');
-                toastDiv.classList.add('animate-fade-out');
-                toastDiv.addEventListener('animationend', () => {
-                    toastDiv.remove();
-                }, { once: true });
-            }, 5000); // Toast disappears after 5 seconds
-        }
-
-        // --- Function to Render Overall Patterns (for the three top summary cards) ---
-        function renderOverallPatterns(data, container, type) {
-            container.innerHTML = ''; // Clear previous content
-            if (data && data.length > 0) {
-                let totalCount = 0;
-                data.forEach(item => {
-                    const patternDiv = document.createElement('div');
-                    patternDiv.className = 'flex justify-between items-center bg-white p-2 rounded-md border border-gray-200 shadow-sm';
-                    const patternName = Array.isArray(item.pattern) ? `(${item.pattern.join(', ')})` : item.pattern;
-                    patternDiv.innerHTML = `
-                        <span class="text-gray-700 text-sm font-semibold">${patternName}</span>
-                        <span class="text-gray-900 font-bold">${item.count}</span>
-                    `;
-                    container.appendChild(patternDiv);
-                    totalCount += item.count;
-                });
-                 // Update total count for overall sections
-                if (type === 'tensApart') {
-                    overallTensApartTotalCount.textContent = `Total unique patterns: ${data.length} | Total occurrences: ${totalCount}`;
-                } else if (type === 'sameLastDigit') {
-                    overallSameLastDigitTotalCount.textContent = `Total unique patterns: ${data.length} | Total occurrences: ${totalCount}`;
-                } else if (type === 'repeatingDigit') {
-                    overallRepeatingDigitTotalCount.textContent = `Total unique patterns: ${data.length} | Total occurrences: ${totalCount}`;
-                }
-            } else {
-                container.innerHTML = '<p class="text-gray-600 text-sm">No patterns found.</p>';
-                if (type === 'tensApart') overallTensApartTotalCount.textContent = '';
-                if (type === 'sameLastDigit') overallSameLastDigitTotalCount.textContent = '';
-                if (type === 'repeatingDigit') overallRepeatingDigitTotalCount.textContent = '';
-            }
-        }
-
-        // --- Function to Render Recent Trends (Last 12 Months Table) ---
-        function renderRecentTrends(trendsData, initialShowCount = 10) {
-            recentTrendsTableBody.innerHTML = ''; // Clear existing rows
-            if (!trendsData || trendsData.length === 0) {
-                const noDataRow = document.createElement('tr');
-                noDataRow.innerHTML = `<td colspan="5" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No recent special pattern trends found.</td>`;
-                recentTrendsTableBody.appendChild(noDataRow);
-                recentTrendsToggleContainer.classList.add('hidden');
-                return;
-            }
-
-            trendsData.forEach((trend, index) => {
-                const row = document.createElement('tr');
-                row.className = `hover:bg-gray-50 ${index >= initialShowCount ? 'hidden-row' : ''}`;
-                
-                // Generate HTML for white balls with styling
-                const whiteBallsHtml = trend.white_balls ? trend.white_balls.map(ball => `<span class="ball">${ball}</span>`).join('') : 'N/A';
-
-                row.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${trend.draw_date}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 flex flex-wrap">${whiteBallsHtml}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${trend.tens_apart}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${trend.same_last_digit}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${trend.repeating_digit}</td>
-                `;
-                recentTrendsTableBody.appendChild(row);
-            });
-
-            // Setup toggle button for recent trends table
-            if (trendsData.length > initialShowCount) {
-                recentTrendsToggleContainer.classList.remove('hidden');
-                recentTrendsToggleBtn.textContent = `Show All (${trendsData.length} entries)`;
-                recentTrendsToggleBtn.dataset.isExpanded = 'false';
-                // Reset scroll/max-height for the table when re-rendering
-                recentTrendsTableBody.parentElement.style.maxHeight = '';
-                recentTrendsTableBody.parentElement.style.overflowY = '';
-            } else {
-                recentTrendsToggleContainer.classList.add('hidden');
-            }
-        }
-
-        // Toggle functionality for the recent trends table
-        recentTrendsToggleBtn.addEventListener('click', function() {
-            let isExpanded = this.dataset.isExpanded === 'true';
-            const rows = Array.from(recentTrendsTableBody.children);
-            const initialShowCount = 10; // Must match initial render count
-
-            isExpanded = !isExpanded;
-            rows.forEach((row, index) => {
-                if (index >= initialShowCount) {
-                    if (isExpanded) {
-                        row.classList.remove('hidden-row');
-                    } else {
-                        row.classList.add('hidden-row');
-                    }
-                }
-            });
-
-            if (isExpanded) {
-                this.textContent = 'Show Less';
-                recentTrendsTableBody.parentElement.style.maxHeight = '400px'; // Set max height for scroll
-                recentTrendsTableBody.parentElement.style.overflowY = 'auto';  // Enable scroll
-            } else {
-                this.textContent = `Show All (${rows.length} entries)`;
-                recentTrendsTableBody.parentElement.style.maxHeight = ''; // Remove max height
-                recentTrendsTableBody.parentElement.style.overflowY = ''; // Remove scroll
-            }
-            this.dataset.isExpanded = isExpanded.toString();
-        });
-
-        // --- Function to Render Yearly Chart (using Chart.js) ---
-        function renderYearlyChart(chartData, selectedYears) {
-            if (yearlyChartInstance) {
-                yearlyChartInstance.destroy(); // Destroy previous chart instance to avoid conflicts
-            }
-
-            // Filter data to only include selected years
-            const filteredData = chartData.filter(d => selectedYears.includes(d.year.toString()));
-            
-            if (filteredData.length === 0) {
-                // Clear canvas and display message if no data for selected years
-                yearlySpecialPatternsChartCtx.clearRect(0, 0, yearlySpecialPatternsChartCtx.canvas.width, yearlySpecialPatternsChartCtx.canvas.height);
-                yearlySpecialPatternsChartCtx.font = "16px Inter, sans-serif";
-                yearlySpecialPatternsChartCtx.fillStyle = "#6b7280"; // text-gray-500
-                yearlySpecialPatternsChartCtx.textAlign = "center";
-                yearlySpecialPatternsChartCtx.fillText("No data for selected years.", yearlySpecialPatternsChartCtx.canvas.width / 2, yearlySpecialPatternsChartCtx.canvas.height / 2);
-                return;
-            }
-
-            // Ensure data is sorted by year ascending for proper chart display
-            filteredData.sort((a, b) => a.year - b.year);
-
-            // Extract labels and datasets for Chart.js
-            const labels = filteredData.map(d => d.year);
-            const tensApartPercentages = filteredData.map(d => d.tens_apart_draw_percentage);
-            const sameLastDigitPercentages = filteredData.map(d => d.same_last_digit_draw_percentage);
-            const repeatingDigitPercentages = filteredData.map(d => d.repeating_digit_draw_percentage);
-
-            const tensApartCounts = filteredData.map(d => d.tens_apart_count);
-            const sameLastDigitCounts = filteredData.map(d => d.same_last_digit_count);
-            const repeatingDigitCounts = filteredData.map(d => d.repeating_digit_count);
-
-            yearlyChartInstance = new Chart(yearlySpecialPatternsChartCtx, {
-                type: 'bar', // Combined bar and line chart
-                data: {
-                    labels: labels,
-                    datasets: [
-                        // Bar datasets for percentages
-                        {
-                            label: 'Tens Apart Patterns (% of Draws)',
-                            data: tensApartPercentages,
-                            backgroundColor: 'rgba(99, 102, 241, 0.7)', // Indigo
-                            borderColor: 'rgba(79, 70, 229, 1)',
-                            borderWidth: 1,
-                            borderRadius: 4,
-                            yAxisID: 'y_percentage',
-                        },
-                        {
-                            label: 'Same Last Digit Patterns (% of Draws)',
-                            data: sameLastDigitPercentages,
-                            backgroundColor: 'rgba(16, 185, 129, 0.7)', // Green
-                            borderColor: 'rgba(5, 150, 105, 1)',
-                            borderWidth: 1,
-                            borderRadius: 4,
-                            yAxisID: 'y_percentage',
-                        },
-                        {
-                            label: 'Repeating Digit Patterns (% of Draws)',
-                            data: repeatingDigitPercentages,
-                            backgroundColor: 'rgba(168, 85, 247, 0.7)', // Purple
-                            borderColor: 'rgba(139, 92, 246, 1)',
-                            borderWidth: 1,
-                            borderRadius: 4,
-                            yAxisID: 'y_percentage',
-                        },
-                        // Line datasets for counts
-                        {
-                            label: 'Tens Apart Patterns (Count)',
-                            data: tensApartCounts,
-                            backgroundColor: 'rgba(99, 102, 241, 0.3)', // Lighter Indigo for line fill
-                            borderColor: 'rgba(79, 70, 229, 0.8)',
-                            borderWidth: 2,
-                            yAxisID: 'y_count',
-                            type: 'line', // Specify as line chart
-                            tension: 0.3, // Smooth curves
-                            fill: false, // No fill under the line
-                            pointRadius: 4,
-                            pointBackgroundColor: 'rgba(79, 70, 229, 1)'
-                        },
-                        {
-                            label: 'Same Last Digit Patterns (Count)',
-                            data: sameLastDigitCounts,
-                            backgroundColor: 'rgba(16, 185, 129, 0.3)',
-                            borderColor: 'rgba(5, 150, 105, 0.8)',
-                            borderWidth: 2,
-                            yAxisID: 'y_count',
-                            type: 'line',
-                            tension: 0.3,
-                            fill: false,
-                            pointRadius: 4,
-                            pointBackgroundColor: 'rgba(5, 150, 105, 1)'
-                        },
-                        {
-                            label: 'Repeating Digit Patterns (Count)',
-                            data: repeatingDigitCounts,
-                            backgroundColor: 'rgba(168, 85, 247, 0.3)',
-                            borderColor: 'rgba(139, 92, 246, 0.8)',
-                            borderWidth: 2,
-                            yAxisID: 'y_count',
-                            type: 'line',
-                            tension: 0.3,
-                            fill: false,
-                            pointRadius: 4,
-                            pointBackgroundColor: 'rgba(139, 92, 246, 1)'
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: 'Yearly Occurrence of Special Patterns (Percentage of Draws & Counts)',
-                            font: {
-                                size: 18,
-                                weight: 'bold',
-                                family: 'Inter, sans-serif'
-                            },
-                            color: '#374151'
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) {
-                                        label += ': ';
-                                    }
-                                    if (context.parsed.y !== null) {
-                                        if (context.dataset.yAxisID === 'y_percentage') {
-                                            label += context.parsed.y + '%';
-                                        } else {
-                                            label += context.parsed.y + ' times';
-                                        }
-                                    }
-                                    return label;
-                                }
-                            }
-                        },
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                font: {
-                                    family: 'Inter, sans-serif'
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Year',
-                                font: {
-                                    size: 14,
-                                    weight: 'bold',
-                                    family: 'Inter, sans-serif'
-                                },
-                                color: '#4b5563'
-                            },
-                            grid: {
-                                display: false
-                            }
-                        },
-                        y_percentage: {
-                            type: 'linear',
-                            position: 'left',
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Percentage of Draws (%)',
-                                font: {
-                                    size: 14,
-                                    weight: 'bold',
-                                    family: 'Inter, sans-serif'
-                                },
-                                color: '#4b5563'
-                            },
-                            max: 100, // Percentage max is 100
-                            ticks: {
-                                callback: function(value) {
-                                    return value + '%';
-                                }
-                            },
-                            grid: {
-                                drawOnChartArea: false, // Only draw grid for one Y-axis
-                            },
-                        },
-                        y_count: {
-                            type: 'linear',
-                            position: 'right',
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Total Occurrences (Count)',
-                                font: {
-                                    size: 14,
-                                    weight: 'bold',
-                                    family: 'Inter, sans-serif'
-                                },
-                                color: '#4b5563'
-                            },
-                            grid: {
-                                drawOnChartArea: true, // Draw grid for this Y-axis
-                            },
-                            ticks: {
-                                precision: 0 // Ensure integer ticks for counts
-                            }
-                        }
-                    },
-                    animation: {
-                        duration: 1000, // Animation duration in milliseconds
-                        easing: 'easeOutQuart' // Easing function for animation
-                    }
-                }
-            });
-        }
-
-        // --- Populate Year Multi-Select Dropdown ---
-        function populateYearMultiSelect(availableYears) {
-            yearMultiSelect.innerHTML = ''; // Clear existing options
-            let defaultSelectedYears = [];
-
-            availableYears.sort((a, b) => b - a).forEach(year => { // Sort years descending for dropdown display
-                const option = document.createElement('option');
-                option.value = year;
-                option.textContent = year;
-                option.selected = true; // Select all years by default
-                yearMultiSelect.appendChild(option);
-                defaultSelectedYears.push(year.toString()); // Keep track of initially selected years
-            });
-
-            // Initial chart render with all years selected by default
-            renderYearlyChart(allSpecialPatternsData.yearly_chart_data, defaultSelectedYears);
-
-            // Add event listener for changes in year selection
-            yearMultiSelect.addEventListener('change', function() {
-                const selectedOptions = Array.from(this.selectedOptions);
-                const currentSelectedYears = selectedOptions.map(option => option.value);
-                renderYearlyChart(allSpecialPatternsData.yearly_chart_data, currentSelectedYears);
-                renderDetailedYearlyPatterns(allSpecialPatternsData.yearly_data, currentSelectedYears);
-            });
-        }
-
-
-        // --- Function to Render a single pattern type's table for a given year ---
-        function renderPatternTable(containerElement, patterns, typeId, totalDraws) {
-            containerElement.innerHTML = ''; // Clear existing content
-            if (!patterns || patterns.length === 0) {
-                containerElement.innerHTML = `<p class="text-gray-600 text-sm">No patterns found for this year.</p>`;
-                return;
-            }
-
-            // Create sort dropdown for this specific table
-            const sortDiv = document.createElement('div');
-            sortDiv.className = 'mb-4';
-            sortDiv.innerHTML = `
-                <label for="${typeId}SortOrder-${containerElement.dataset.year}" class="block text-gray-700 text-sm font-bold mb-2">Sort By:</label>
-                <select id="${typeId}SortOrder-${containerElement.dataset.year}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-white border-gray-300">
-                    <option value="count_desc">Most Frequent First</option>
-                    <option value="count_asc">Least Frequent First</option>
-                    <option value="pattern_asc">Pattern Numbers Ascending</option>
-                </select>
-            `;
-            containerElement.appendChild(sortDiv);
-
-            // Create table structure
-            const tableContainer = document.createElement('div');
-            tableContainer.className = 'overflow-x-auto shadow-md rounded-lg pattern-table-scroll'; // Added scroll class
-            tableContainer.innerHTML = `
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-blue-100 text-blue-800">
-                        <tr>
-                            <th class="py-3 px-4 text-left text-sm font-semibold">Pattern</th>
-                            <th class="py-3 px-4 text-left text-sm font-semibold">Count (Total Draws: ${totalDraws})</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200" id="${typeId}TableBody-${containerElement.dataset.year}">
-                        <!-- Rows will be populated here -->
-                    </tbody>
-                </table>
-            `;
-            containerElement.appendChild(tableContainer);
-
-            const tableBody = document.getElementById(`${typeId}TableBody-${containerElement.dataset.year}`);
-            const sortSelect = document.getElementById(`${typeId}SortOrder-${containerElement.dataset.year}`);
-
-            // Function to sort and render rows for yearly tables
-            const sortAndRenderRows = (currentPatterns, currentSortOrder, initialShowCount = 10) => {
-                let sortedData = [...currentPatterns]; // Create a mutable copy
-
-                sortedData.sort((a, b) => {
-                    const patternA = Array.isArray(a.pattern) ? a.pattern.join(',') : a.pattern;
-                    const patternB = Array.isArray(b.pattern) ? b.pattern.join(',') : b.pattern;
-
-                    if (currentSortOrder === 'count_desc') {
-                        if (b.count !== a.count) return b.count - a.count;
-                        return patternA.localeCompare(patternB); // Secondary sort by pattern string
-                    } else if (currentSortOrder === 'count_asc') {
-                        if (a.count !== b.count) return a.count - b.count;
-                        return patternA.localeCompare(patternB); // Secondary sort by pattern string
-                    } else if (currentSortOrder === 'pattern_asc') {
-                        // For pattern_asc, sort by pattern string first, then by count descending
-                        const patternComparison = patternA.localeCompare(patternB);
-                        if (patternComparison !== 0) return patternComparison;
-                        return b.count - a.count;
-                    }
-                    return 0; // No change if sort order is not recognized
-                });
-
-                tableBody.innerHTML = ''; // Clear previous table rows
-                if (sortedData.length === 0) {
-                    const noDataRow = document.createElement('tr');
-                    noDataRow.innerHTML = `<td colspan="2" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No patterns found for this year.</td>`;
-                    tableBody.appendChild(noDataRow);
-                    return;
-                }
-
-                sortedData.forEach((pattern, index) => {
-                    const row = document.createElement('tr');
-                    row.className = `hover:bg-gray-50 ${index >= initialShowCount ? 'hidden-row' : ''}`;
-                    const patternDisplay = Array.isArray(pattern.pattern) ? `(${pattern.pattern.map(ball => `<span class="ball">${ball}</span>`).join('')})` : `<span class="ball">${pattern.pattern}</span>`;
-                    row.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 flex items-center">${patternDisplay}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${pattern.count}</td>
-                    `;
-                    tableBody.appendChild(row);
-                });
-
-                // Add toggle button if more than initialShowCount rows
-                let toggleBtn = document.getElementById(`${typeId}ToggleBtn-${containerElement.dataset.year}`);
-                let toggleContainer = document.getElementById(`${typeId}ToggleContainer-${containerElement.dataset.year}`);
-
-                if (sortedData.length > initialShowCount) {
-                    if (!toggleBtn) { // Create button and container if they don't exist
-                        toggleContainer = document.createElement('div');
-                        toggleContainer.id = `${typeId}ToggleContainer-${containerElement.dataset.year}`;
-                        toggleContainer.className = 'text-center mt-4';
-                        toggleBtn = document.createElement('button');
-                        toggleBtn.id = `${typeId}ToggleBtn-${containerElement.dataset.year}`;
-                        toggleBtn.className = 'btn-secondary';
-                        toggleBtn.dataset.isExpanded = 'false';
-                        toggleBtn.textContent = `Show All (${sortedData.length} entries)`;
-                        toggleContainer.appendChild(toggleBtn);
-                        containerElement.appendChild(toggleContainer);
-
-                        // Add event listener for the new toggle button
-                        toggleBtn.addEventListener('click', function() {
-                            let isExpanded = this.dataset.isExpanded === 'true';
-                            const rows = Array.from(tableBody.children);
-                            isExpanded = !isExpanded; // Toggle state
-                            rows.forEach((row, index) => {
-                                if (index >= initialShowCount) {
-                                    if (isExpanded) {
-                                        row.classList.remove('hidden-row');
-                                    } else {
-                                        row.classList.add('hidden-row');
-                                    }
-                                }
-                            });
-                            this.textContent = isExpanded ? 'Show Less' : `Show All (${sortedData.length} entries)`;
-                            this.dataset.isExpanded = isExpanded.toString();
-                            tableContainer.style.maxHeight = isExpanded ? '400px' : ''; // Apply/remove max height for scroll
-                        });
-                    } else { // If button already exists, just update its state and text
-                        toggleContainer.classList.remove('hidden');
-                        toggleBtn.textContent = `Show All (${sortedData.length} entries)`;
-                        toggleBtn.dataset.isExpanded = 'false';
-                        tableContainer.style.maxHeight = ''; // Ensure no max height on initial load
-                    }
-                } else { // No need for toggle button if data fits
-                    if (toggleContainer) toggleContainer.classList.add('hidden');
-                }
-            };
-
-            // Initial render call for the current table, default sort order is 'count_desc'
-            sortAndRenderRows(patterns, sortSelect.value);
-
-            // Add event listener for sorting for this specific table
-            sortSelect.addEventListener('change', () => {
-                sortAndRenderRows(patterns, sortSelect.value);
-            });
-        }
-
-
-        // --- Function to Render Detailed Yearly Patterns (Collapsible Sections) ---
-        function renderDetailedYearlyPatterns(yearlyDataForTables, selectedYears) {
-            detailedYearlyPatternsContainer.innerHTML = ''; // Clear previous content
-
-            // Filter yearly data based on selected years from the multi-select dropdown
-            const filteredYearlyData = yearlyDataForTables.filter(d => selectedYears.includes(d.year.toString()));
-
-            if (filteredYearlyData.length === 0) {
-                detailedYearlyPatternsContainer.innerHTML = '<p class="text-gray-600 text-center py-4">Select year(s) above to view detailed patterns.</p>';
-                return;
-            }
-
-            // Sort filtered yearly data by year descending for display (most recent year first)
-            filteredYearlyData.sort((a, b) => b.year - a.year);
-
-            filteredYearlyData.forEach(yearData => {
-                const yearDetails = document.createElement('details');
-                yearDetails.className = 'card p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-100 mb-6';
-                yearDetails.setAttribute('open', ''); // Open all detailed sections by default
-
-                yearDetails.innerHTML = `
-                    <summary class="text-xl font-bold mb-3 text-gray-800 cursor-pointer flex justify-between items-center">
-                        Patterns in ${yearData.year} (${yearData.total_draws} Draws)
-                        <svg class="w-6 h-6 transform transition-transform duration-200 details-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </summary>
-                    <div class="space-y-6 mt-4" id="yearContent-${yearData.year}">
-                        <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
-                            <h3 class="text-lg font-bold mb-3 text-gray-800">Tens Apart Patterns</h3>
-                            <div id="tensApartPatterns-${yearData.year}" data-year="${yearData.year}"></div>
-                        </div>
-                        <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
-                            <h3 class="text-lg font-bold mb-3 text-gray-800">Same Last Digit Patterns</h3>
-                            <div id="sameLastDigitPatterns-${yearData.year}" data-year="${yearData.year}"></div>
-                        </div>
-                        <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
-                            <h3 class="text-lg font-bold mb-3 text-gray-800">Repeating Digit Patterns</h3>
-                            <div id="repeatingDigitPatterns-${yearData.year}" data-year="${yearData.year}"></div>
-                        </div>
-                    </div>
-                `;
-                detailedYearlyPatternsContainer.appendChild(yearDetails);
-
-                // Render the individual pattern tables for the current year
-                renderPatternTable(
-                    document.getElementById(`tensApartPatterns-${yearData.year}`),
-                    yearData.tens_apart_patterns,
-                    'tensApart',
-                    yearData.total_draws
-                );
-                renderPatternTable(
-                    document.getElementById(`sameLastDigitPatterns-${yearData.year}`),
-                    yearData.same_last_digit_patterns,
-                    'sameLastDigit',
-                    yearData.total_draws
-                );
-                renderPatternTable(
-                    document.getElementById(`repeatingDigitPatterns-${yearData.year}`),
-                    yearData.repeating_digit_patterns,
-                    'repeatingDigit',
-                    yearData.total_draws
-                );
-
-                // Add event listener to the details element for arrow rotation
-                yearDetails.addEventListener('toggle', () => {
-                    const arrow = yearDetails.querySelector('.details-arrow');
-                    if (yearDetails.open) {
-                        arrow.classList.add('rotate-180');
-                    } else {
-                        arrow.classList.remove('rotate-180');
-                    }
-                });
-            });
-        }
-
-
-        // --- Main function to Fetch and Render All Patterns on Page Load ---
-        async function fetchAndRenderAllPatterns() {
-            loadingIndicator.classList.remove('hidden'); // Show loading indicator
-            analysisContent.classList.add('hidden'); // Hide main content
-
-            try {
-                // Fetch data from Flask API endpoint
-                const response = await fetch('/special_patterns_analysis', {
-                    method: 'GET',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest' // Identify as an AJAX request
-                    }
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-                }
-
-                allSpecialPatternsData = await response.json(); // Store all fetched data globally
-
-                // Render the three overall summary cards at the top
-                renderOverallPatterns(allSpecialPatternsData.tens_apart_patterns_overall, overallTensApartDiv, 'tensApart');
-                renderOverallPatterns(allSpecialPatternsData.same_last_digit_patterns_overall, overallSameLastDigitDiv, 'sameLastDigit');
-                renderOverallPatterns(allSpecialPatternsData.repeating_digit_patterns_overall, overallRepeatingDigitDiv, 'repeatingDigit');
-
-                // Render the "Recent Trends (Last 12 Months)" table
-                renderRecentTrends(allSpecialPatternsData.recent_trends);
-
-                // Populate the multi-select year dropdown and render the yearly chart initially with all years selected
-                populateYearMultiSelect(allSpecialPatternsData.available_years);
-
-                // Initial render of detailed yearly patterns tables (for all years, as initially selected)
-                const initialSelectedYears = Array.from(yearMultiSelect.options).filter(option => option.selected).map(option => option.value);
-                renderDetailedYearlyPatterns(allSpecialPatternsData.yearly_data, initialSelectedYears);
-
-
-                analysisContent.classList.remove('hidden'); // Show main content once loading is complete
-
-            } catch (error) {
-                console.error('Error loading special patterns analysis:', error);
-                showToast(`Failed to load special patterns analysis: ${error.message}. Please try again.`, 'error');
-                // Fallback UI: Display error messages in respective sections
-                overallTensApartDiv.innerHTML = '<p class="text-red-600 text-sm">Failed to load patterns.</p>';
-                overallSameLastDigitDiv.innerHTML = '<p class="text-red-600 text-sm">Failed to load patterns.</p>';
-                overallRepeatingDigitDiv.innerHTML = '<p class="text-red-600 text-sm">Failed to load patterns.</p>';
-                recentTrendsTableBody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-center">Failed to load recent trends.</td></tr>';
-                detailedYearlyPatternsContainer.innerHTML = '<p class="text-red-600 text-center py-4">Failed to load detailed yearly patterns.</p>';
-
-                // Clear chart and display error message on canvas
-                if (yearlyChartInstance) {
-                    yearlyChartInstance.destroy(); // Destroy current chart
-                }
-                yearlySpecialPatternsChartCtx.clearRect(0, 0, yearlySpecialPatternsChartCtx.canvas.width, yearlySpecialPatternsChartCtx.canvas.height);
-                yearlySpecialPatternsChartCtx.font = "16px Inter, sans-serif";
-                yearlySpecialPatternsChartCtx.fillStyle = "#dc2626"; // red-600
-                yearlySpecialPatternsChartCtx.textAlign = "center";
-                yearlySpecialPatternsChartCtx.fillText("Failed to load chart data.", yearlySpecialPatternsChartCtx.canvas.width / 2, yearlySpecialPatternsChartCtx.canvas.height / 2);
-            } finally {
-                loadingIndicator.classList.add('hidden'); // Hide loading indicator
-            }
-        }
-
-        // Initial fetch and render when the page loads
-        fetchAndRenderAllPatterns();
-
-        // Helper function to show flash messages (remains unchanged, for server-side flashes)
-        function showFlashMessage(message, category) {
-            const flashMessagesDiv = document.querySelector('.flash-messages') || document.createElement('div');
-            flashMessagesDiv.className = 'flash-messages space-y-3'; 
-            if (!document.querySelector('.flash-messages')) {
-                // If the flashMessagesDiv doesn't exist yet, append it to a suitable container
-                document.querySelector('.space-y-8.max-w-6xl.mx-auto.px-4.sm\\:px-6.lg\\:px-8.py-8').prepend(flashMessagesDiv);
-            }
-
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `p-4 rounded-lg shadow-md text-sm animate-fade-in ${
-                category === 'error' ? 'bg-red-100 text-red-700 border border-red-200' :
-                category === 'info' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
-                'bg-green-100 text-green-700 border border-green-200'
-            }`;
-            messageDiv.innerHTML = `<p class="font-medium">${message}</p>`;
-            flashMessagesDiv.appendChild(messageDiv);
-
-            setTimeout(() => {
-                messageDiv.remove();
-            }, 5000); 
-        }
+document.addEventListener('DOMContentLoaded', function () {
+
+  let allData = null;
+  let yearlyChart = null;
+  let selectedYears = new Set();
+  let rtFilter = 'all';
+  let rtShowCount = 15;
+  let rtAllRows = [];
+
+  // ── Fetch data ────────────────────────────────────────────
+  fetch('/special_patterns_analysis', {
+    method: 'GET', headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+  .then(data => {
+    allData = data;
+    document.getElementById('spaLoadingOverlay').style.display = 'none';
+    document.getElementById('spa-page').style.display = 'block';
+
+    buildRingStats();
+    buildStreaks();
+    buildCoOccurrence();
+    buildPatternCards();
+    buildRecentTrends();
+    buildYearPills();
+    buildYearlyDetailTabs();
+  })
+  .catch(err => {
+    document.getElementById('spaLoadingOverlay').innerHTML =
+      `<p style="color:var(--red);font-family:'JetBrains Mono',monospace;font-size:12px">Failed to load: ${err.message}</p>`;
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // ① Ring stats
+  // ─────────────────────────────────────────────────────────
+  function buildRingStats() {
+    const yc  = allData.yearly_chart_data || [];
+    const n   = yc.length;
+    const avgTA = n ? yc.reduce((s,d)=>s+(d.tens_apart_draw_percentage||0),0)/n : 0;
+    const avgSL = n ? yc.reduce((s,d)=>s+(d.same_last_digit_draw_percentage||0),0)/n : 0;
+    const avgRD = n ? yc.reduce((s,d)=>s+(d.repeating_digit_draw_percentage||0),0)/n : 0;
+
+    const totalTA = (allData.tens_apart_patterns_overall||[]).reduce((s,p)=>s+p.count,0);
+    const totalSL = (allData.same_last_digit_patterns_overall||[]).reduce((s,p)=>s+p.count,0);
+    const totalRD = (allData.repeating_digit_patterns_overall||[]).reduce((s,p)=>s+p.count,0);
+
+    const types = [
+      { key:'ta', label:'TENS APART',       name:'Tens-Apart Pairs',     color:'var(--ta-color)', stroke:'#6366f1', pct: avgTA, total: totalTA, unique: (allData.tens_apart_patterns_overall||[]).length },
+      { key:'sl', label:'SAME LAST DIGIT',  name:'Same Last Digit',      color:'var(--sl-color)', stroke:'#10b981', pct: avgSL, total: totalSL, unique: (allData.same_last_digit_patterns_overall||[]).length },
+      { key:'rd', label:'REPEATING DIGIT',  name:'Repeating Digit',      color:'var(--rd-color)', stroke:'#a855f7', pct: avgRD, total: totalRD, unique: (allData.repeating_digit_patterns_overall||[]).length },
+    ];
+
+    const grid = document.getElementById('ringGrid');
+    const R = 28, C = 2*Math.PI*R;
+
+    types.forEach(t => {
+      const dashOffset = C - (C * Math.min(t.pct,100) / 100);
+      const card = document.createElement('div');
+      card.className = 'ring-card';
+      card.innerHTML = `
+        <div class="ring-wrap">
+          <svg class="ring-svg" viewBox="0 0 72 72">
+            <circle class="ring-bg" cx="36" cy="36" r="${R}" stroke="rgba(255,255,255,0.07)"/>
+            <circle class="ring-fill" cx="36" cy="36" r="${R}"
+              stroke="${t.stroke}" stroke-dasharray="${C}"
+              stroke-dashoffset="${C}" id="ring-${t.key}"/>
+          </svg>
+          <div class="ring-center">
+            <span class="ring-pct" style="color:${t.color}">${t.pct.toFixed(0)}%</span>
+            <span class="ring-pct-sub">of draws</span>
+          </div>
+        </div>
+        <div class="ring-info">
+          <p class="ring-type">${t.label}</p>
+          <p class="ring-name" style="color:${t.color}">${t.name}</p>
+          <p class="ring-meta">${t.total.toLocaleString()} total · ${t.unique} unique pairs</p>
+        </div>
+      `;
+      grid.appendChild(card);
+
+      // Animate ring
+      setTimeout(() => {
+        const el = document.getElementById(`ring-${t.key}`);
+        if (el) el.style.strokeDashoffset = dashOffset;
+      }, 200);
     });
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // ② Streaks from recent_trends
+  // ─────────────────────────────────────────────────────────
+  function buildStreaks() {
+    const rt = allData.recent_trends || [];
+    const wrap = document.getElementById('streakContent');
+    if (!rt.length) { wrap.innerHTML = '<p style="color:var(--muted);font-size:13px">No recent trends data.</p>'; return; }
+
+    const types = [
+      { key: 'tens_apart',       label: 'Tens Apart',       color: 'var(--ta-color)', bg: 'var(--ta-bg)', border: 'var(--ta-border)' },
+      { key: 'same_last_digit',  label: 'Same Last Digit',  color: 'var(--sl-color)', bg: 'var(--sl-bg)', border: 'var(--sl-border)' },
+      { key: 'repeating_digit',  label: 'Repeating Digit',  color: 'var(--rd-color)', bg: 'var(--rd-bg)', border: 'var(--rd-border)' },
+    ];
+
+    types.forEach(t => {
+      // Find longest streak and current streak
+      let maxStreak = 0, curStreak = 0, streak = 0;
+      rt.forEach(d => {
+        const has = d[t.key] && d[t.key] !== 'None' && d[t.key] !== 'No' && d[t.key] !== false && d[t.key] !== '' && d[t.key] !== null;
+        if (has) { streak++; maxStreak = Math.max(maxStreak, streak); }
+        else streak = 0;
+      });
+      // Current streak (from end)
+      let cs = 0;
+      for (let i = rt.length - 1; i >= 0; i--) {
+        const has = rt[i][t.key] && rt[i][t.key] !== 'None' && rt[i][t.key] !== 'No' && rt[i][t.key] !== false && rt[i][t.key] !== '' && rt[i][t.key] !== null;
+        if (has) cs++;
+        else break;
+      }
+      // Count of draws with pattern
+      const withPat = rt.filter(d => {
+        const v = d[t.key];
+        return v && v !== 'None' && v !== 'No' && v !== false && v !== '' && v !== null;
+      }).length;
+
+      const card = document.createElement('div');
+      card.style.cssText = `background:var(--s2);border:1px solid ${t.border};border-radius:12px;padding:16px;min-width:200px;flex:1`;
+      card.innerHTML = `
+        <p style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:${t.color};margin-bottom:10px;opacity:0.8">${t.label}</p>
+        <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">
+          <div>
+            <p style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);margin-bottom:3px">LONGEST STREAK</p>
+            <p style="font-size:28px;font-weight:700;color:${t.color};line-height:1">${maxStreak}</p>
+            <p style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted)">consecutive draws</p>
+          </div>
+          <div>
+            <p style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);margin-bottom:3px">CURRENT STREAK</p>
+            <p style="font-size:22px;font-weight:700;color:${cs > 0 ? t.color : 'var(--muted)'};line-height:1">${cs}</p>
+          </div>
+          <div>
+            <p style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);margin-bottom:3px">DRAWS WITH PATTERN</p>
+            <p style="font-size:22px;font-weight:700;color:#fff;line-height:1">${withPat}<span style="font-size:12px;color:var(--muted)">/${rt.length}</span></p>
+          </div>
+        </div>
+      `;
+      wrap.appendChild(card);
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // ③ Co-occurrence matrix
+  // ─────────────────────────────────────────────────────────
+  function buildCoOccurrence() {
+    const rt = allData.recent_trends || [];
+    const n  = rt.length;
+    if (!n) return;
+
+    function has(d, key) {
+      const v = d[key];
+      return v && v !== 'None' && v !== 'No' && v !== false && v !== '' && v !== null;
+    }
+
+    let ta=0, sl=0, rd=0, tasl=0, tard=0, slrd=0, all3=0, none=0;
+    rt.forEach(d => {
+      const T=has(d,'tens_apart'), S=has(d,'same_last_digit'), R=has(d,'repeating_digit');
+      if (T) ta++;
+      if (S) sl++;
+      if (R) rd++;
+      if (T&&S) tasl++;
+      if (T&&R) tard++;
+      if (S&&R) slrd++;
+      if (T&&S&&R) all3++;
+      if (!T&&!S&&!R) none++;
+    });
+
+    const cells = [
+      { label: 'Tens Apart only',          val: ta-tasl-tard+all3,          color: 'var(--ta-color)' },
+      { label: 'Same Last Digit only',     val: sl-tasl-slrd+all3,          color: 'var(--sl-color)' },
+      { label: 'Repeating Digit only',     val: rd-tard-slrd+all3,          color: 'var(--rd-color)' },
+      { label: 'Tens + Same Last',         val: tasl-all3,                  color: '#60a5fa' },
+      { label: 'Tens + Repeating',         val: tard-all3,                  color: '#c084fc' },
+      { label: 'Same + Repeating',         val: slrd-all3,                  color: '#34d399' },
+      { label: 'All 3 Together',           val: all3,                       color: '#fbbf24' },
+      { label: 'No Patterns',             val: none,                        color: 'var(--muted)' },
+    ];
+
+    const grid = document.getElementById('coocGrid');
+    cells.forEach(c => {
+      const pct = n ? (c.val/n*100).toFixed(1) : 0;
+      const cell = document.createElement('div');
+      cell.className = 'cooc-cell';
+      cell.innerHTML = `
+        <p class="cooc-label">${c.label}</p>
+        <p class="cooc-val" style="color:${c.color}">${Math.max(0,c.val)}</p>
+        <p class="cooc-pct">${pct}% of draws</p>
+      `;
+      grid.appendChild(cell);
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // ④ Pattern summary cards
+  // ─────────────────────────────────────────────────────────
+  function buildPatternCards() {
+    const types = [
+      { key:'ta', data: allData.tens_apart_patterns_overall||[],      label:'Tens Apart Pairs',        color:'var(--ta-color)', bar:'#6366f1' },
+      { key:'sl', data: allData.same_last_digit_patterns_overall||[], label:'Same Last Digit Pairs',   color:'var(--sl-color)', bar:'#10b981' },
+      { key:'rd', data: allData.repeating_digit_patterns_overall||[], label:'Repeating Digit Numbers', color:'var(--rd-color)', bar:'#a855f7' },
+    ];
+    const grid = document.getElementById('patternTypeGrid');
+
+    types.forEach(t => {
+      const sorted   = [...t.data].sort((a,b) => b.count - a.count);
+      const maxCount = sorted[0]?.count || 1;
+      const total    = sorted.reduce((s,p)=>s+p.count,0);
+
+      const card = document.createElement('div');
+      card.className = 'pt-card';
+      card.innerHTML = `
+        <div class="pt-card-header">
+          <span class="pt-card-title" style="color:${t.color}">${t.label}</span>
+          <span class="pt-total">${sorted.length} unique · ${total.toLocaleString()}×</span>
+        </div>
+        <div class="pt-card-body" id="ptBody-${t.key}"></div>
+      `;
+      grid.appendChild(card);
+
+      const body = document.getElementById(`ptBody-${t.key}`);
+      sorted.forEach(p => {
+        const patStr = Array.isArray(p.pattern) ? p.pattern : [p.pattern];
+        const barW   = Math.round(p.count / maxCount * 100);
+        const ballsHtml = patStr.map(b => `<span class="wb-sm">${b}</span>`).join(`<span class="conn-sm">·</span>`);
+
+        const row = document.createElement('div');
+        row.className = 'pair-row';
+        row.innerHTML = `
+          <div class="twin-sm">${ballsHtml}</div>
+          <div class="pair-bar-wrap"><div class="pair-bar-fill" style="width:${barW}%;background:${t.bar}"></div></div>
+          <span class="pair-cnt">${p.count}</span>
+        `;
+        body.appendChild(row);
+      });
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // ⑤ Recent trends table
+  // ─────────────────────────────────────────────────────────
+  function buildRecentTrends() {
+    const rt = allData.recent_trends || [];
+    rtAllRows = rt;
+    renderRtTable();
+
+    // Filter buttons
+    document.querySelectorAll('.rt-filter').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.rt-filter').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        rtFilter = btn.dataset.f;
+        rtShowCount = 15;
+        renderRtTable();
+      });
+    });
+
+    document.getElementById('rtShowMore').addEventListener('click', () => {
+      rtShowCount += 15;
+      renderRtTable();
+    });
+  }
+
+  function hasPattern(d, key) {
+    const v = d[key];
+    return v && v !== 'None' && v !== 'No' && v !== false && v !== '' && v !== null;
+  }
+
+  function renderRtTable() {
+    let rows = rtAllRows;
+
+    if (rtFilter === 'ta')    rows = rows.filter(d => hasPattern(d,'tens_apart'));
+    if (rtFilter === 'sl')    rows = rows.filter(d => hasPattern(d,'same_last_digit'));
+    if (rtFilter === 'rd')    rows = rows.filter(d => hasPattern(d,'repeating_digit'));
+    if (rtFilter === 'multi') rows = rows.filter(d => {
+      let c=0;
+      if(hasPattern(d,'tens_apart')) c++;
+      if(hasPattern(d,'same_last_digit')) c++;
+      if(hasPattern(d,'repeating_digit')) c++;
+      return c > 1;
+    });
+    if (rtFilter === 'none')  rows = rows.filter(d =>
+      !hasPattern(d,'tens_apart') && !hasPattern(d,'same_last_digit') && !hasPattern(d,'repeating_digit')
+    );
+
+    const tbody = document.getElementById('rtTableBody');
+    tbody.innerHTML = '';
+    const showMore = document.getElementById('rtShowMore');
+    const displayRows = rows.slice(0, rtShowCount);
+    showMore.style.display = rows.length > rtShowCount ? 'inline-block' : 'none';
+
+    displayRows.forEach(d => {
+      const ta = hasPattern(d,'tens_apart');
+      const sl = hasPattern(d,'same_last_digit');
+      const rd = hasPattern(d,'repeating_digit');
+      const patCount = [ta,sl,rd].filter(Boolean).length;
+
+      // Balls
+      const balls = [1,2,3,4,5].map(i => {
+        const v = d[`Number ${i}`] ?? d[`number_${i}`] ?? d[`num${i}`] ?? '?';
+        return `<span class="wb-ball-rt">${v}</span>`;
+      }).join('');
+
+      const taStr  = ta ? typeof d.tens_apart === 'string' && d.tens_apart.length > 1 ? d.tens_apart : '✓' : '—';
+      const slStr  = sl ? typeof d.same_last_digit === 'string' && d.same_last_digit.length > 1 ? d.same_last_digit : '✓' : '—';
+      const rdStr  = rd ? typeof d.repeating_digit === 'string' && d.repeating_digit.length > 1 ? d.repeating_digit : '✓' : '—';
+
+      const patBadges = patCount === 0
+        ? '<span class="pat-badge pat-none">None</span>'
+        : [ta && '<span class="pat-badge pat-ta">Tens Apart</span>',
+           sl && '<span class="pat-badge pat-sl">Same Digit</span>',
+           rd && '<span class="pat-badge pat-rd">Repeating</span>'].filter(Boolean).join('');
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="td-date">${d['Draw Date'] || d.draw_date || '—'}</td>
+        <td><div class="balls-row">${balls}</div></td>
+        <td><span class="${ta ? 'pat-badge pat-ta' : 'pat-badge pat-none'}">${taStr}</span></td>
+        <td><span class="${sl ? 'pat-badge pat-sl' : 'pat-badge pat-none'}">${slStr}</span></td>
+        <td><span class="${rd ? 'pat-badge pat-rd' : 'pat-badge pat-none'}">${rdStr}</span></td>
+        <td>${patBadges}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    if (!displayRows.length) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:30px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted)">No draws match this filter.</td></tr>`;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // ⑥ Year pills + chart
+  // ─────────────────────────────────────────────────────────
+  function buildYearPills() {
+    const yc   = allData.yearly_chart_data || [];
+    const avail= (allData.available_years || yc.map(d=>d.year)).sort((a,b)=>b-a);
+
+    selectedYears = new Set(avail.map(String));
+    const pillsWrap = document.getElementById('yearPills');
+
+    avail.forEach(yr => {
+      const btn = document.createElement('button');
+      btn.className = 'year-pill active';
+      btn.dataset.year = yr;
+      btn.textContent = yr;
+      btn.addEventListener('click', () => {
+        const y = String(yr);
+        if (selectedYears.has(y)) { selectedYears.delete(y); btn.classList.remove('active'); }
+        else                      { selectedYears.add(y);    btn.classList.add('active'); }
+        renderYearlyChart();
+      });
+      pillsWrap.appendChild(btn);
+    });
+
+    document.getElementById('yearSelectAll').addEventListener('click', () => {
+      avail.forEach(y => { selectedYears.add(String(y)); });
+      document.querySelectorAll('.year-pill').forEach(b => b.classList.add('active'));
+      renderYearlyChart();
+    });
+    document.getElementById('yearSelectNone').addEventListener('click', () => {
+      selectedYears.clear();
+      document.querySelectorAll('.year-pill').forEach(b => b.classList.remove('active'));
+      renderYearlyChart();
+    });
+
+    renderYearlyChart();
+  }
+
+  function renderYearlyChart() {
+    const yc = (allData.yearly_chart_data || [])
+      .filter(d => selectedYears.has(String(d.year)))
+      .sort((a,b) => a.year - b.year);
+
+    if (yearlyChart) { yearlyChart.destroy(); yearlyChart = null; }
+
+    const ctx = document.getElementById('yearlySpecialPatternsChart');
+    if (!ctx || !yc.length) return;
+
+    const labels = yc.map(d => d.year);
+    yearlyChart = new Chart(ctx.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { type:'bar',  label:'Tens Apart %',        data: yc.map(d=>d.tens_apart_draw_percentage),       backgroundColor:'rgba(99,102,241,0.6)',  borderColor:'#6366f1', borderWidth:1, borderRadius:4, yAxisID:'y_pct' },
+          { type:'bar',  label:'Same Last Digit %',   data: yc.map(d=>d.same_last_digit_draw_percentage),  backgroundColor:'rgba(16,185,129,0.6)',   borderColor:'#10b981', borderWidth:1, borderRadius:4, yAxisID:'y_pct' },
+          { type:'bar',  label:'Repeating Digit %',   data: yc.map(d=>d.repeating_digit_draw_percentage),  backgroundColor:'rgba(168,85,247,0.6)',   borderColor:'#a855f7', borderWidth:1, borderRadius:4, yAxisID:'y_pct' },
+          { type:'line', label:'Tens Apart Count',    data: yc.map(d=>d.tens_apart_count),                 borderColor:'rgba(99,102,241,0.8)',       borderWidth:2, pointRadius:3, fill:false, tension:0.3, yAxisID:'y_cnt' },
+          { type:'line', label:'Same Last Digit Count',data:yc.map(d=>d.same_last_digit_count),            borderColor:'rgba(16,185,129,0.8)',       borderWidth:2, pointRadius:3, fill:false, tension:0.3, yAxisID:'y_cnt' },
+          { type:'line', label:'Repeating Digit Count',data:yc.map(d=>d.repeating_digit_count),            borderColor:'rgba(168,85,247,0.8)',       borderWidth:2, pointRadius:3, fill:false, tension:0.3, yAxisID:'y_cnt' },
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false, animation:{ duration:400 },
+        scales: {
+          x: { grid:{color:'rgba(255,255,255,0.03)'}, ticks:{color:'rgba(255,255,255,0.4)',font:{family:'JetBrains Mono',size:10}} },
+          y_pct: { type:'linear', position:'left',  beginAtZero:true, max:100,
+            grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'rgba(255,255,255,0.35)',callback:v=>v+'%'},
+            title:{display:true,text:'% of Draws',color:'rgba(255,255,255,0.2)',font:{size:10}}},
+          y_cnt: { type:'linear', position:'right', beginAtZero:true,
+            grid:{drawOnChartArea:false}, ticks:{color:'rgba(255,255,255,0.3)',precision:0},
+            title:{display:true,text:'Count',color:'rgba(255,255,255,0.2)',font:{size:10}}},
+        },
+        plugins: {
+          legend: { position:'bottom', labels:{color:'rgba(255,255,255,0.45)',font:{family:'JetBrains Mono',size:10},boxWidth:12,padding:14} },
+          tooltip: {
+            backgroundColor:'#0c0d1a', borderColor:'rgba(99,102,241,0.3)', borderWidth:1,
+            titleColor:'rgba(255,255,255,0.7)', bodyColor:'rgba(255,255,255,0.5)', padding:12,
+            titleFont:{family:'JetBrains Mono',size:11},
+            callbacks:{ label: ctx => ` ${ctx.raw}${ctx.dataset.yAxisID==='y_pct'?'%':' draws'}` }
+          }
+        }
+      }
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // ⑧ Yearly detail tabs
+  // ─────────────────────────────────────────────────────────
+  function buildYearlyDetailTabs() {
+    const yd    = (allData.yearly_data || []).sort((a,b) => b.year - a.year);
+    const tabs  = document.getElementById('ydTabs');
+    const panels= document.getElementById('ydPanels');
+
+    if (!yd.length) { panels.innerHTML = '<p style="color:var(--muted);font-size:13px">No yearly data available.</p>'; return; }
+
+    yd.forEach((yearData, i) => {
+      // Tab
+      const tab = document.createElement('button');
+      tab.className = `yd-tab${i===0?' active':''}`;
+      tab.dataset.year = yearData.year;
+      tab.textContent = yearData.year;
+      tabs.appendChild(tab);
+
+      // Panel
+      const panel = document.createElement('div');
+      panel.className = `yd-panel${i===0?' visible':''}`;
+      panel.id = `ydPanel-${yearData.year}`;
+
+      const typeConfigs = [
+        { key:'tens_apart_patterns',      label:'Tens Apart',       color:'var(--ta-color)', bar:'#6366f1' },
+        { key:'same_last_digit_patterns', label:'Same Last Digit',  color:'var(--sl-color)', bar:'#10b981' },
+        { key:'repeating_digit_patterns', label:'Repeating Digit',  color:'var(--rd-color)', bar:'#a855f7' },
+      ];
+
+      panel.innerHTML = `
+        <p style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:14px;letter-spacing:1px">
+          ${yearData.total_draws} draws in ${yearData.year}
+        </p>
+        <div class="yd-type-grid" id="ydGrid-${yearData.year}"></div>
+      `;
+      panels.appendChild(panel);
+
+      // Tab click
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.yd-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.yd-panel').forEach(p => p.classList.remove('visible'));
+        tab.classList.add('active');
+        panel.classList.add('visible');
+      });
+
+      // Build type cards for this year
+      const grid = document.getElementById(`ydGrid-${yearData.year}`);
+      typeConfigs.forEach(tc => {
+        const patterns = yearData[tc.key] || [];
+        const sorted   = [...patterns].sort((a,b)=>b.count-a.count);
+        const maxC     = sorted[0]?.count || 1;
+        const total    = sorted.reduce((s,p)=>s+p.count,0);
+
+        const card = document.createElement('div');
+        card.className = 'yd-type-card';
+
+        // Sort buttons
+        let sortOrder = 'count_desc';
+        card.innerHTML = `
+          <div class="yd-type-header">
+            <span class="yd-type-title" style="color:${tc.color}">${tc.label}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)">${sorted.length} pairs · ${total}×</span>
+          </div>
+          <div class="yd-type-body" id="ydBody-${yearData.year}-${tc.key}">
+            <div class="yd-sort">
+              <button class="yd-sort-btn active" data-sort="count_desc">Most Freq</button>
+              <button class="yd-sort-btn" data-sort="count_asc">Least Freq</button>
+              <button class="yd-sort-btn" data-sort="pattern_asc">Pattern ↑</button>
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
+
+        const body  = document.getElementById(`ydBody-${yearData.year}-${tc.key}`);
+        const sortRow = body.querySelector('.yd-sort');
+
+        function renderYdRows(order) {
+          // Remove existing rows
+          while (body.children.length > 1) body.removeChild(body.lastChild);
+
+          let data = [...sorted];
+          if (order === 'count_asc') data.sort((a,b)=>a.count-b.count);
+          if (order === 'pattern_asc') data.sort((a,b)=>{
+            const pa = Array.isArray(a.pattern)?a.pattern.join(','):String(a.pattern);
+            const pb = Array.isArray(b.pattern)?b.pattern.join(','):String(b.pattern);
+            return pa.localeCompare(pb);
+          });
+
+          data.forEach(p => {
+            const patArr = Array.isArray(p.pattern) ? p.pattern : [p.pattern];
+            const barW   = Math.round(p.count / maxC * 100);
+            const ballsHtml = patArr.map(b=>`<span class="wb-sm">${b}</span>`).join(`<span class="conn-sm">·</span>`);
+            const row = document.createElement('div');
+            row.className = 'pair-row';
+            row.innerHTML = `
+              <div class="twin-sm">${ballsHtml}</div>
+              <div class="pair-bar-wrap"><div class="pair-bar-fill" style="width:${barW}%;background:${tc.bar}"></div></div>
+              <span class="pair-cnt">${p.count}</span>
+            `;
+            body.appendChild(row);
+          });
+        }
+
+        renderYdRows(sortOrder);
+
+        sortRow.querySelectorAll('.yd-sort-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            sortRow.querySelectorAll('.yd-sort-btn').forEach(b=>b.classList.remove('active'));
+            btn.classList.add('active');
+            sortOrder = btn.dataset.sort;
+            renderYdRows(sortOrder);
+          });
+        });
+      });
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // ⑦ AI Analysis
+  // ─────────────────────────────────────────────────────────
+  document.getElementById('aiBtn').addEventListener('click', async function () {
+    const thinking = document.getElementById('aiThinking');
+    const output   = document.getElementById('aiOutput');
+    const narrative= document.getElementById('aiNarrative');
+    const errorEl  = document.getElementById('aiError');
+    const chipsWrap= document.getElementById('aiChips');
+
+    this.disabled = true; this.innerHTML = '⏳ Analysing…';
+    thinking.classList.add('visible');
+    output.classList.remove('visible');
+    errorEl.style.display = 'none';
+    narrative.textContent = ''; chipsWrap.innerHTML = '';
+
+    if (!allData) { errorEl.textContent='Data not loaded yet.'; errorEl.style.display='block'; this.disabled=false; this.innerHTML='◈ Analyse Patterns'; thinking.classList.remove('visible'); return; }
+
+    // Compute summaries to send
+    const rt = allData.recent_trends || [];
+    const n  = rt.length;
+    function hasP(d,k) { const v=d[k]; return v&&v!=='None'&&v!=='No'&&v!==false&&v!==''&&v!==null; }
+    const taCount = rt.filter(d=>hasP(d,'tens_apart')).length;
+    const slCount = rt.filter(d=>hasP(d,'same_last_digit')).length;
+    const rdCount = rt.filter(d=>hasP(d,'repeating_digit')).length;
+
+    // Streaks
+    let taMax=0,slMax=0,rdMax=0,s=0;
+    rt.forEach(d=>{s=hasP(d,'tens_apart')?s+1:0;taMax=Math.max(taMax,s);});
+    s=0; rt.forEach(d=>{s=hasP(d,'same_last_digit')?s+1:0;slMax=Math.max(slMax,s);});
+    s=0; rt.forEach(d=>{s=hasP(d,'repeating_digit')?s+1:0;rdMax=Math.max(rdMax,s);});
+
+    const top5TA = (allData.tens_apart_patterns_overall||[]).sort((a,b)=>b.count-a.count).slice(0,5);
+    const top5SL = (allData.same_last_digit_patterns_overall||[]).sort((a,b)=>b.count-a.count).slice(0,5);
+    const top5RD = (allData.repeating_digit_patterns_overall||[]).sort((a,b)=>b.count-a.count).slice(0,5);
+
+    const yc = allData.yearly_chart_data || [];
+    const lastYr = yc[yc.length-1] || {};
+    const prevYr = yc[yc.length-2] || {};
+
+    try {
+      const res = await fetch('/api/special-patterns-ai-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recent_n: n,
+          ta_recent_count: taCount, ta_pct: n?+(taCount/n*100).toFixed(1):0, ta_streak: taMax,
+          sl_recent_count: slCount, sl_pct: n?+(slCount/n*100).toFixed(1):0, sl_streak: slMax,
+          rd_recent_count: rdCount, rd_pct: n?+(rdCount/n*100).toFixed(1):0, rd_streak: rdMax,
+          top5_tens_apart:       top5TA.map(p=>({ pattern: Array.isArray(p.pattern)?p.pattern.join(', '):p.pattern, count:p.count })),
+          top5_same_last_digit:  top5SL.map(p=>({ pattern: Array.isArray(p.pattern)?p.pattern.join(', '):p.pattern, count:p.count })),
+          top5_repeating_digit:  top5RD.map(p=>({ pattern: Array.isArray(p.pattern)?p.pattern.join(', '):p.pattern, count:p.count })),
+          last_year: lastYr, prev_year: prevYr,
+        })
+      });
+      const data = await res.json();
+      if (data.error) { errorEl.textContent='AI unavailable: '+data.error; errorEl.style.display='block'; }
+      else {
+        (data.insights||[]).forEach(ins => {
+          const c=document.createElement('div'); c.className='ai-chip';
+          c.innerHTML=`<p class="ai-chip-label">${ins.label}</p><div class="ai-chip-val">${ins.value}</div>`;
+          chipsWrap.appendChild(c);
+        });
+        narrative.textContent = data.analysis;
+        output.classList.add('visible');
+      }
+    } catch(e) {
+      errorEl.textContent='Request failed. Please try again.'; errorEl.style.display='block';
+    } finally {
+      thinking.classList.remove('visible');
+      this.disabled=false; this.innerHTML='◈ Analyse Patterns';
+    }
+  });
+
+});
 </script>
 {% endblock %}
