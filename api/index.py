@@ -8373,6 +8373,140 @@ Always reference specific PB numbers and counts."""
 
     except Exception as e:
         traceback.print_exc()
+        return jsonify({'error': str(e)}), 500 
+
+@app.route('/api/sum-trends-ai-analysis', methods=['POST'])
+def sum_trends_ai_analysis():
+    try:
+        payload       = request.get_json()
+        zone_summary  = payload.get('zone_summary', [])
+        top_sums      = payload.get('top_sums', [])
+        dormant_sums  = payload.get('dormant_sums', [])
+        missing_count = payload.get('missing_count', 0)
+        total_appeared= payload.get('total_appeared', 0)
+        min_possible  = payload.get('min_possible', 15)
+        max_possible  = payload.get('max_possible', 345)
+
+        if not zone_summary:
+            return jsonify({'error': 'No data provided'}), 400
+
+        # ── Derive extra stats ─────────────────────────────
+        sorted_zones    = sorted(zone_summary, key=lambda x: -float(x['appeared']))
+        hottest_zone    = sorted_zones[0] if sorted_zones else {}
+        coldest_zone    = sorted_zones[-1] if sorted_zones else {}
+
+        # Dormant zones (oldest last_drawn)
+        def zone_age_days(z):
+            ld = z.get('last_drawn')
+            if not ld or ld in ('N/A', 'None', None): return 9999
+            try:
+                from datetime import date
+                parts = str(ld).split('-')
+                d = date(int(parts[0]), int(parts[1]), int(parts[2]))
+                return (date.today() - d).days
+            except:
+                return 9999
+
+        zones_by_age   = sorted(zone_summary, key=zone_age_days, reverse=True)
+        most_dormant_zone = zones_by_age[0] if zones_by_age else {}
+
+        # Build prompt
+        prompt = f"""You are an expert Powerball sum analyst. Analyse sum trends and gaps across all historical draws.
+
+═══ OVERVIEW ═══
+Theoretical range: {min_possible}–{max_possible}
+Distinct sums appeared: {total_appeared}
+Sums never drawn: {missing_count}
+Coverage: {round(total_appeared/(max_possible-min_possible+1)*100,1)}% of theoretical sums have appeared
+
+═══ ZONE BREAKDOWN ═══
+{chr(10).join(f"  {z['zone']}: {z['appeared']} sums appeared, {z['missing']} missing, avg freq {z['avg_freq']}, last drawn {z['last_drawn']} ({z['pct']}% of all draws)" for z in zone_summary)}
+
+═══ HOTTEST ZONE ═══
+{hottest_zone.get('zone','?')}: {hottest_zone.get('appeared','?')} sums, {hottest_zone.get('pct','?')}% of all draws
+
+═══ MOST DORMANT ZONE ═══
+{most_dormant_zone.get('zone','?')}: last drawn {most_dormant_zone.get('last_drawn','?')}, {most_dormant_zone.get('appeared','?')} sums appeared
+
+═══ TOP 10 ALL-TIME SUMS ═══
+{chr(10).join(f"  Sum {s['sum']}: drawn {s['count']} times" for s in top_sums)}
+
+═══ 5 MOST DORMANT APPEARED SUMS ═══
+{chr(10).join(f"  Sum {s['sum']}: last drawn {s['last_drawn_date']}" for s in dormant_sums)}
+
+Write EXACTLY these 5 sections, each header on its own line:
+
+DOMINANT ZONES
+Which 2 zones account for the most draws? Give their combined percentage. Is the distribution even or skewed?
+
+DORMANCY ALERT
+Name the most dormant zone and the top 3 most overdue individual sums. How long since each appeared?
+
+COVERAGE GAPS
+Comment on the {missing_count} never-drawn sums. Are they clustered in extreme ranges (very low or very high sums) or scattered? What does this suggest about realistic sum ranges?
+
+PEAK SUM ANALYSIS
+Name the top 3 all-time most frequent sums. Are they clustered together or spread? What number range (low/mid/high) do they belong to?
+
+TARGET ZONE RECOMMENDATION
+Based on zone dominance, dormancy patterns, and top sum frequency — give a specific recommended sum RANGE (e.g. "125–165") for the next draw. Justify with 2 specific data points from the analysis above.
+
+End with one NEXT DRAW SUM — a single specific sum recommendation with a one-sentence justification combining dormancy and zone dominance."""
+
+        groq_api_key = os.environ.get('GROQ_API_KEY', '')
+        response = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {groq_api_key}',
+                'Content-Type':  'application/json'
+            },
+            json={
+                'model':       'llama-3.1-8b-instant',
+                'messages':    [{'role': 'user', 'content': prompt}],
+                'max_tokens':  680,
+                'temperature': 0.6
+            },
+            timeout=35
+        )
+
+        result = response.json()
+        if 'error' in result:
+            return jsonify({'error': result['error'].get('message', 'Groq error')}), 500
+
+        analysis = result['choices'][0]['message']['content'].strip()
+
+        # Build insight chips
+        insights = [
+            {
+                'label': '🔥 Hottest Zone',
+                'value': f"{hottest_zone.get('zone','—')} · {hottest_zone.get('pct','—')}% of draws"
+            },
+            {
+                'label': '❄️ Most Dormant Zone',
+                'value': f"{most_dormant_zone.get('zone','—')} · last {most_dormant_zone.get('last_drawn','—')}"
+            },
+            {
+                'label': '📊 Coverage',
+                'value': f"{total_appeared} of {max_possible - min_possible + 1} sums appeared"
+            },
+            {
+                'label': '🚫 Never Drawn',
+                'value': f"{missing_count} sums (gaps in history)"
+            },
+            {
+                'label': '👑 #1 All-Time Sum',
+                'value': f"Sum {top_sums[0]['sum']} · {top_sums[0]['count']}× drawn" if top_sums else '—'
+            },
+            {
+                'label': '⏰ Most Overdue Sum',
+                'value': f"Sum {dormant_sums[0]['sum']} · last {dormant_sums[0]['last_drawn_date']}" if dormant_sums else '—'
+            },
+        ]
+
+        return jsonify({'analysis': analysis, 'insights': insights})
+
+    except Exception as e:
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 initialize_core_data()
