@@ -1,96 +1,475 @@
 {% extends "base.html" %}
 
-{% block title %}Find Results by Sum{% endblock %}
-
-{% block page_heading %}Search Historical Draws by Sum{% endblock %}
+{% block title %}Find Results by Sum — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
-<div class="card p-6 bg-white rounded-lg shadow-lg">
-    <h2 class="text-2xl font-bold mb-4 text-gray-800">Search Historical Draws by Sum</h2>
-    
-    <form action="{{ url_for('find_results_by_sum_route') }}" method="post" class="space-y-4">
-        <div class="form-group">
-            <label for="target_sum" class="block text-gray-700 text-sm font-bold mb-2">Enter Target Sum (15-345):</label>
-            <input type="number" name="target_sum" id="target_sum" min="15" max="345" 
-                   value="{{ target_sum | default('') }}" {# Preserve value after submission #}
-                   class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                   placeholder="e.g., 100">
-        </div>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-        <div class="form-group">
-            <label for="sort_by" class="block text-gray-700 text-sm font-bold mb-2">Sort Results By:</label>
-            <select name="sort_by" id="sort_by" class="shadow border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                <option value="date_desc" {% if selected_sort_by == 'date_desc' %}selected{% endif %}>Draw Date (Newest First)</option>
-                <option value="date_asc" {% if selected_sort_by == 'date_asc' %}selected{% endif %}>Draw Date (Oldest First)</option>
-                <option value="balls_asc" {% if selected_sort_by == 'balls_asc' %}selected{% endif %}>White Balls (Ascending)</option>
-                <option value="balls_desc" {% if selected_sort_by == 'balls_desc' %}selected{% endif %}>White Balls (Descending)</option>
-            </select>
-        </div>
-        <button type="submit" class="btn-primary w-full mt-4">Find Results</button>
-    </form>
+  :root {
+    --bg:     #070a0f;
+    --s1:     #0c1018;
+    --s2:     #111822;
+    --s3:     #18202e;
+    --border: rgba(255,255,255,0.07);
+    --text:   rgba(255,255,255,0.87);
+    --muted:  rgba(255,255,255,0.36);
+    --teal:   #2dd4bf;
+    --green:  #10b981;
+    --blue:   #3b82f6;
+    --amber:  #f59e0b;
+    --orange: #f97316;
+    --red:    #f43f5e;
+  }
 
-    {% if results %}
-        <div class="mt-8">
-            <h3 class="text-xl font-semibold text-gray-800 mb-3">Draws with Sum: {{ target_sum }}</h3>
-            <div class="overflow-x-auto shadow-md rounded-lg">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Draw Date</th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">White Balls</th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Powerball</th>
-                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sum</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        {% for row in results %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ row['Draw Date'] }}</td>
-                            <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
-                                <span class="ball-sm">{{ row['Number 1'] }}</span>
-                                <span class="ball-sm">{{ row['Number 2'] }}</span>
-                                <span class="ball-sm">{{ row['Number 3'] }}</span>
-                                <span class="ball-sm">{{ row['Number 4'] }}</span>
-                                <span class="ball-sm">{{ row['Number 5'] }}</span>
-                            </td>
-                            <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
-                                {# Ensure Powerball key is checked for existence with .get() as it's not always guaranteed by initial Python query for sum #}
-                                <span class="ball-sm powerball-sm">{{ row.get('Powerball', 'N/A') }}</span>
-                            </td>
-                            <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ row['Sum'] }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+  #frs-page * { box-sizing: border-box; }
+  #frs-page {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg); min-height: 100vh;
+    color: var(--text); padding-bottom: 80px;
+  }
+
+  /* ── Hero ── */
+  .frs-hero {
+    position: relative; padding: 52px 24px 40px; text-align: center; overflow: hidden;
+  }
+  .frs-hero::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 50% 50% at 50% 0%, rgba(45,212,191,0.09) 0%, transparent 65%),
+      radial-gradient(ellipse 30% 40% at 20% 70%, rgba(16,185,129,0.05) 0%, transparent 60%),
+      radial-gradient(ellipse 30% 40% at 80% 70%, rgba(249,115,22,0.05) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .frs-hero::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--teal), var(--green), transparent);
+    opacity: 0.3;
+  }
+  .frs-eyebrow {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 3px; text-transform: uppercase;
+    color: var(--teal); margin-bottom: 12px; opacity: 0.8;
+  }
+  .frs-hero h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(32px, 4.5vw, 58px); font-weight: 700; line-height: 1.1; margin: 0 0 12px;
+    background: linear-gradient(135deg, var(--teal) 0%, #fff 50%, var(--amber) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .frs-hero p {
+    font-size: 14px; color: var(--muted); max-width: 480px; margin: 0 auto; line-height: 1.75;
+  }
+
+  /* ── Layout ── */
+  .frs-wrap { max-width: 960px; margin: 0 auto; padding: 0 24px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* ── Card ── */
+  .frs-card {
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 16px; padding: 26px 28px; position: relative; overflow: hidden;
+  }
+  .frs-card-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--teal);
+    margin: 0 0 18px; opacity: 0.8;
+  }
+
+  /* ── Search form ── */
+  .search-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: end;
+  }
+  @media (max-width: 580px) { .search-grid { grid-template-columns: 1fr; } }
+
+  .field-group label {
+    display: block;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px;
+  }
+
+  /* Sum input with gauge */
+  .sum-input-wrap {
+    background: var(--s2); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px; padding: 14px 16px;
+    transition: border-color 0.2s;
+  }
+  .sum-input-wrap:focus-within { border-color: var(--teal-focus, rgba(45,212,191,0.5)); }
+
+  .sum-input-top {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+  }
+
+  /* Big sigma symbol */
+  .sum-sigma {
+    font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700;
+    line-height: 1; flex-shrink: 0; transition: color 0.3s;
+  }
+
+  .frs-input {
+    background: transparent; border: none; outline: none;
+    font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 700;
+    color: var(--text); width: 100%; min-width: 0;
+    -moz-appearance: textfield; letter-spacing: 1px;
+  }
+  .frs-input::-webkit-outer-spin-button,
+  .frs-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .frs-input::placeholder { color: var(--muted); font-weight: 400; font-size: 20px; }
+
+  /* Range gauge bar */
+  .gauge-wrap { position: relative; }
+  .gauge-track {
+    height: 6px; border-radius: 3px;
+    background: linear-gradient(90deg, var(--blue) 0%, var(--teal) 28%, var(--amber) 60%, var(--orange) 80%, var(--red) 100%);
+    opacity: 0.25; margin-bottom: 4px;
+  }
+  .gauge-cursor {
+    position: absolute; top: 0;
+    width: 12px; height: 6px;
+    background: #fff; border-radius: 3px;
+    transform: translateX(-50%);
+    box-shadow: 0 0 8px rgba(255,255,255,0.6);
+    transition: left 0.2s ease, background 0.3s;
+    pointer-events: none;
+  }
+  .gauge-labels {
+    display: flex; justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    color: var(--muted); letter-spacing: 0.5px; margin-top: 2px;
+  }
+
+  /* Sum zone label */
+  .sum-zone {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 1px; text-transform: uppercase;
+    padding: 3px 10px; border-radius: 5px; display: inline-block;
+    margin-top: 8px; transition: all 0.3s;
+  }
+
+  /* Sort select */
+  .frs-select {
+    width: 100%; background: var(--s2);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 12px;
+    padding: 14px 16px; color: var(--text);
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    outline: none; cursor: pointer; transition: border-color 0.2s;
+    -webkit-appearance: none; height: 100%;
+  }
+  .frs-select:focus { border-color: rgba(45,212,191,0.5); }
+  .frs-select option { background: #111822; }
+
+  /* Submit button */
+  .frs-submit-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+  .frs-submit {
+    background: linear-gradient(135deg, var(--teal2, #0d9488), var(--teal));
+    color: #fff; font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+    border: none; border-radius: 10px; padding: 13px 28px;
+    cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 0 20px rgba(45,212,191,0.2);
+  }
+  .frs-submit:hover { transform: translateY(-2px); box-shadow: 0 0 32px rgba(45,212,191,0.4); }
+
+  /* Quick sum chips */
+  .quick-chips {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px;
+  }
+  .quick-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted);
+    align-self: center; white-space: nowrap;
+  }
+  .qchip {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    padding: 4px 10px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--s2);
+    color: var(--muted); transition: all 0.15s; letter-spacing: 0.5px;
+  }
+  .qchip:hover { border-color: rgba(45,212,191,0.4); color: var(--teal); }
+  .qchip.active { background: rgba(45,212,191,0.1); border-color: rgba(45,212,191,0.35); color: var(--teal); }
+
+  /* ── Results ── */
+  .results-meta {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px; margin-bottom: 16px;
+  }
+  .results-title { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 600; color: #fff; }
+  .results-count {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.5px;
+    padding: 5px 12px; border-radius: 20px;
+    background: rgba(45,212,191,0.1); border: 1px solid rgba(45,212,191,0.25); color: var(--teal);
+  }
+
+  /* ── Table ── */
+  .tbl-scroll { overflow-x: auto; border-radius: 10px; }
+  table.frs-table { width: 100%; border-collapse: collapse; min-width: 480px; }
+  table.frs-table thead th {
+    background: var(--s2); padding: 11px 16px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--muted);
+    text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  table.frs-table tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.12s;
+  }
+  table.frs-table tbody tr:hover { background: var(--s2); }
+  table.frs-table tbody tr:last-child { border-bottom: none; }
+  table.frs-table td { padding: 11px 16px; vertical-align: middle; }
+
+  .td-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .balls-row { display: flex; gap: 5px; flex-wrap: wrap; }
+  .wb-ball {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, #e8edf5 0%, #b8c8e0 50%, #8aaac8 100%);
+    color: #0d1829; box-shadow: 0 2px 6px rgba(0,0,0,0.3); flex-shrink: 0;
+    transition: transform 0.15s;
+  }
+  .wb-ball:hover { transform: scale(1.12); }
+  .pb-ball {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, #ff8a80 0%, #ef5350 50%, #b71c1c 100%);
+    color: #fff; box-shadow: 0 2px 6px rgba(244,63,94,0.25); flex-shrink: 0;
+    transition: transform 0.15s;
+  }
+  .pb-ball:hover { transform: scale(1.12); }
+
+  /* Sum badge */
+  .sum-badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700;
+    padding: 4px 12px; border-radius: 7px; white-space: nowrap; display: inline-block;
+  }
+
+  /* Zone colors for badge */
+  .zone-low    { background: rgba(59,130,246,0.12);  border: 1px solid rgba(59,130,246,0.3);  color: var(--blue);   }
+  .zone-mid    { background: rgba(45,212,191,0.12);  border: 1px solid rgba(45,212,191,0.3);  color: var(--teal);   }
+  .zone-high   { background: rgba(245,158,11,0.12);  border: 1px solid rgba(245,158,11,0.3);  color: var(--amber);  }
+  .zone-peak   { background: rgba(249,115,22,0.12);  border: 1px solid rgba(249,115,22,0.3);  color: var(--orange); }
+  .zone-extreme{ background: rgba(244,63,94,0.12);   border: 1px solid rgba(244,63,94,0.3);   color: var(--red);    }
+
+  /* No results */
+  .frs-empty {
+    text-align: center; padding: 48px 20px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--muted); letter-spacing: 1px;
+  }
+</style>
+
+<div id="frs-page">
+  <div class="frs-hero">
+    <p class="frs-eyebrow">∑ Sum Search · Historical Draws</p>
+    <h1>Find Results<br>by Sum</h1>
+    <p>Search all historical Powerball draws by the total sum of the 5 white balls. Valid range: 15–345.</p>
+  </div>
+
+  <div class="frs-wrap">
+
+    <!-- Search card -->
+    <div class="frs-card">
+      <p class="frs-card-title">Search Parameters</p>
+      <form action="{{ url_for('find_results_by_sum_route') }}" method="post" id="frsForm">
+        <div class="search-grid">
+
+          <!-- Sum input with gauge -->
+          <div class="field-group">
+            <label>Target Sum (15–345)</label>
+            <div class="sum-input-wrap" id="sumInputWrap">
+              <div class="sum-input-top">
+                <span class="sum-sigma" id="sumSigma" style="color:var(--muted)">∑</span>
+                <input class="frs-input" type="number" name="target_sum" id="targetSum"
+                       min="15" max="345" placeholder="e.g. 150"
+                       value="{{ target_sum | default('') }}">
+              </div>
+              <div class="gauge-wrap">
+                <div class="gauge-track"></div>
+                <div class="gauge-cursor" id="gaugeCursor"></div>
+              </div>
+              <div class="gauge-labels">
+                <span>15</span><span>90</span><span>175</span><span>260</span><span>345</span>
+              </div>
+              <span class="sum-zone" id="sumZone" style="display:none"></span>
             </div>
+          </div>
+
+          <!-- Sort -->
+          <div class="field-group" style="display:flex;flex-direction:column">
+            <label>Sort Results By</label>
+            <select name="sort_by" class="frs-select" style="flex:1">
+              <option value="date_desc" {% if selected_sort_by == 'date_desc' %}selected{% endif %}>Date — Newest First</option>
+              <option value="date_asc"  {% if selected_sort_by == 'date_asc'  %}selected{% endif %}>Date — Oldest First</option>
+              <option value="balls_asc" {% if selected_sort_by == 'balls_asc' %}selected{% endif %}>White Balls Ascending</option>
+              <option value="balls_desc"{% if selected_sort_by == 'balls_desc'%}selected{% endif %}>White Balls Descending</option>
+            </select>
+          </div>
         </div>
-    {% elif target_sum is not none %} {# Only show if a search was attempted but no results #}
-        <div class="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
-            No draws found with a sum of {{ target_sum }}.
+
+        <!-- Quick pick chips -->
+        <div class="quick-chips" id="quickChips">
+          <span class="quick-label">Quick</span>
+          <span class="qchip" data-sum="75">75</span>
+          <span class="qchip" data-sum="100">100</span>
+          <span class="qchip" data-sum="125">125</span>
+          <span class="qchip" data-sum="150">150 ≈ avg</span>
+          <span class="qchip" data-sum="175">175</span>
+          <span class="qchip" data-sum="200">200</span>
+          <span class="qchip" data-sum="225">225</span>
+          <span class="qchip" data-sum="250">250</span>
         </div>
+
+        <div class="frs-submit-row">
+          <button type="submit" class="frs-submit">∑ Search Draws</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Results card -->
+    {% if results %}
+    <div class="frs-card">
+      <div class="results-meta">
+        <p class="results-title">
+          Draws with sum <span id="resultSumDisplay" style="color:var(--teal)">{{ target_sum }}</span>
+        </p>
+        <span class="results-count">{{ results | length }} draw{{ 's' if results | length != 1 }}</span>
+      </div>
+      <div class="tbl-scroll">
+        <table class="frs-table">
+          <thead>
+            <tr>
+              <th>Draw Date</th>
+              <th>White Balls</th>
+              <th>Powerball</th>
+              <th>Sum</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in results %}
+            <tr>
+              <td class="td-date">{{ row['Draw Date'] }}</td>
+              <td>
+                <div class="balls-row">
+                  <span class="wb-ball">{{ row['Number 1'] }}</span>
+                  <span class="wb-ball">{{ row['Number 2'] }}</span>
+                  <span class="wb-ball">{{ row['Number 3'] }}</span>
+                  <span class="wb-ball">{{ row['Number 4'] }}</span>
+                  <span class="wb-ball">{{ row['Number 5'] }}</span>
+                </div>
+              </td>
+              <td>
+                <span class="pb-ball">{{ row.get('Powerball', 'N/A') }}</span>
+              </td>
+              <td>
+                <span class="sum-badge" id="sumBadge-{{ loop.index }}">{{ row['Sum'] }}</span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% elif target_sum is not none %}
+    <div class="frs-card">
+      <div class="frs-empty">
+        No draws found with a sum of <span style="color:var(--teal)">{{ target_sum }}</span>.
+      </div>
+    </div>
     {% endif %}
 
-    {# Add the small ball styles directly here as they are specific to this page and find_results_by_first_white_ball.html #}
-    <style>
-        .ball-sm {
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-            width: 30px; /* Smaller size */
-            height: 30px; /* Smaller size */
-            background-color: #f0f0f0;
-            border-radius: 50%;
-            border: 1px solid #ccc;
-            font-weight: bold;
-            color: #333;
-            margin: 2px;
-            font-size: 0.8em; /* Smaller font */
-        }
-        .powerball-sm {
-            background-color: #ef4444; /* Red color for powerball */
-            color: white;
-            border-color: #dc2626;
-        }
-    </style>
+  </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const MIN_SUM = 15, MAX_SUM = 345;
+
+  // Zone config
+  const ZONES = [
+    { max: 80,  label: 'Low',     cls: 'zone-low',     color: '#3b82f6', sigma: '#3b82f6' },
+    { max: 130, label: 'Below Avg', cls: 'zone-mid',   color: '#2dd4bf', sigma: '#2dd4bf' },
+    { max: 180, label: 'Average',  cls: 'zone-mid',    color: '#2dd4bf', sigma: '#2dd4bf' },
+    { max: 230, label: 'Above Avg',cls: 'zone-high',   color: '#f59e0b', sigma: '#f59e0b' },
+    { max: 280, label: 'High',     cls: 'zone-peak',   color: '#f97316', sigma: '#f97316' },
+    { max: 345, label: 'Extreme',  cls: 'zone-extreme',color: '#f43f5e', sigma: '#f43f5e' },
+  ];
+
+  function getZone(val) {
+    return ZONES.find(z => val <= z.max) || ZONES[ZONES.length - 1];
+  }
+
+  function updateGauge(val) {
+    const cursor = document.getElementById('gaugeCursor');
+    const sigma  = document.getElementById('sumSigma');
+    const zone   = document.getElementById('sumZone');
+    const wrap   = document.getElementById('sumInputWrap');
+
+    if (!val || isNaN(val) || val < MIN_SUM || val > MAX_SUM) {
+      cursor.style.display = 'none';
+      sigma.style.color    = 'var(--muted)';
+      zone.style.display   = 'none';
+      wrap.style.borderColor = 'rgba(255,255,255,0.12)';
+      return;
+    }
+
+    const pct  = ((val - MIN_SUM) / (MAX_SUM - MIN_SUM)) * 100;
+    const z    = getZone(val);
+
+    cursor.style.display = 'block';
+    cursor.style.left    = pct + '%';
+    cursor.style.background = z.color;
+    cursor.style.boxShadow  = `0 0 10px ${z.color}`;
+
+    sigma.style.color = z.sigma;
+
+    zone.style.display = 'inline-block';
+    zone.className = `sum-zone ${z.cls}`;
+    zone.textContent = `${z.label} zone · sum ${val}`;
+
+    wrap.style.borderColor = z.color + '55';
+  }
+
+  const input = document.getElementById('targetSum');
+  if (input) {
+    input.addEventListener('input', () => updateGauge(parseInt(input.value)));
+    updateGauge(parseInt(input.value)); // init on page load
+  }
+
+  // Quick chips
+  document.querySelectorAll('.qchip').forEach(chip => {
+    const sumVal = parseInt(chip.dataset.sum);
+    // Mark active if matches current
+    if (input && parseInt(input.value) === sumVal) chip.classList.add('active');
+
+    chip.addEventListener('click', () => {
+      if (input) {
+        input.value = sumVal;
+        updateGauge(sumVal);
+        document.querySelectorAll('.qchip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+      }
+    });
+  });
+
+  // Remove active chip if user manually types different value
+  if (input) {
+    input.addEventListener('input', () => {
+      const v = parseInt(input.value);
+      document.querySelectorAll('.qchip').forEach(c => {
+        c.classList.toggle('active', parseInt(c.dataset.sum) === v);
+      });
+    });
+  }
+
+  // Color sum badges in results table
+  document.querySelectorAll('[id^="sumBadge-"]').forEach(badge => {
+    const s = parseInt(badge.textContent);
+    if (!isNaN(s)) {
+      const z = getZone(s);
+      badge.className = `sum-badge ${z.cls}`;
+    }
+  });
+});
+</script>
 {% endblock %}
