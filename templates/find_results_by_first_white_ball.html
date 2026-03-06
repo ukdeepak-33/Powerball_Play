@@ -1,91 +1,330 @@
 {% extends "base.html" %}
 
-{% block title %}Find Results by First White Ball{% endblock %}
-
-{% block page_heading %}Find Results by First White Ball{% endblock %}
+{% block title %}Find by First White Ball — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
-<div class="card p-6 bg-white rounded-lg shadow-lg">
-    <h2 class="text-2xl font-bold mb-4 text-gray-800">Search Historical Draws</h2>
-    
-    <form action="{{ url_for('find_results_by_first_white_ball') }}" method="post" class="space-y-4">
-        <div class="form-group">
-            <label for="white_ball_number" class="block text-gray-700 text-sm font-bold mb-2">Enter First White Ball Number (1-69):</label>
-            <input type="number" name="white_ball_number" id="white_ball_number" min="1" max="69"
-                   value="{{ white_ball_number if white_ball_number is not none else '' }}"
-                   class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-        </div>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-        <div class="form-group">
-            <label for="sort_by" class="block text-gray-700 text-sm font-bold mb-2">Sort Results By:</label>
-            <select name="sort_by" id="sort_by" class="shadow border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                <option value="date_desc" {% if selected_sort_by == 'date_desc' %}selected{% endif %}>Draw Date (Newest First)</option>
-                <option value="date_asc" {% if selected_sort_by == 'date_asc' %}selected{% endif %}>Draw Date (Oldest First)</option>
-                <option value="balls_asc" {% if selected_sort_by == 'balls_asc' %}selected{% endif %}>White Balls (Ascending)</option>
-                <option value="balls_desc" {% if selected_sort_by == 'balls_desc' %}selected{% endif %}>White Balls (Descending)</option>
-            </select>
-        </div>
+  :root {
+    --bg:     #070a0f;
+    --s1:     #0c1018;
+    --s2:     #111822;
+    --s3:     #18202e;
+    --border: rgba(255,255,255,0.07);
+    --text:   rgba(255,255,255,0.87);
+    --muted:  rgba(255,255,255,0.36);
+    --blue:   #3b82f6;
+    --indigo: #6366f1;
+    --cyan:   #22d3ee;
+    --green:  #10b981;
+    --red:    #f43f5e;
+  }
 
-        <button type="submit" class="btn-primary w-full mt-4">Find Results</button>
-    </form>
+  #frb-page * { box-sizing: border-box; }
+  #frb-page {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    color: var(--text);
+    padding-bottom: 80px;
+  }
 
-    {% if results_by_first_white_ball %}
-        <div class="mt-8">
-            <h3 class="text-xl font-semibold text-gray-800 mb-4">Results for First White Ball: {{ white_ball_number }}</h3>
-            <div class="overflow-x-auto">
-                <table class="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
-                    <thead class="bg-gray-100">
-                        <tr>
-                            <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Draw Date</th>
-                            <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">White Balls</th>
-                            <th class="px-4 py-2 border-b-2 border-gray-200 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Powerball</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for result in results_by_first_white_ball %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">{{ result['Draw Date'] }}</td>
-                            <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
-                                {% for i in range(1, 6) %}
-                                    <span class="ball-sm">{{ result['Number ' + i|string] }}</span>
-                                {% endfor %}
-                            </td>
-                            <td class="px-4 py-2 border-b border-gray-200 text-sm text-gray-900">
-                                <span class="ball-sm powerball-sm">{{ result['Powerball'] }}</span>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+  /* ── Hero ── */
+  .frb-hero {
+    position: relative;
+    padding: 52px 24px 40px;
+    text-align: center;
+    overflow: hidden;
+  }
+  .frb-hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 50% 50% at 50% 0%, rgba(59,130,246,0.09) 0%, transparent 65%),
+      radial-gradient(ellipse 30% 40% at 20% 70%, rgba(34,211,238,0.05) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .frb-hero::after {
+    content: '';
+    position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--blue), var(--cyan), transparent);
+    opacity: 0.3;
+  }
+  .frb-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--cyan); margin-bottom: 12px; opacity: 0.8;
+  }
+  .frb-hero h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(32px, 4.5vw, 58px);
+    font-weight: 700; line-height: 1.1; margin: 0 0 12px;
+    background: linear-gradient(135deg, var(--cyan) 0%, #fff 50%, var(--blue) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .frb-hero p {
+    font-size: 14px; color: var(--muted); max-width: 480px; margin: 0 auto; line-height: 1.75;
+  }
+
+  /* ── Layout ── */
+  .frb-wrap {
+    max-width: 960px; margin: 0 auto;
+    padding: 0 24px; display: flex; flex-direction: column; gap: 20px;
+  }
+
+  /* ── Card ── */
+  .frb-card {
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 16px; padding: 26px 28px; position: relative; overflow: hidden;
+  }
+  .frb-card-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--cyan);
+    margin: 0 0 18px; opacity: 0.8;
+  }
+
+  /* ── Search form ── */
+  .search-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 14px; align-items: end;
+  }
+  @media (max-width: 600px) { .search-row { grid-template-columns: 1fr; } }
+
+  .field-group label {
+    display: block;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 8px;
+  }
+
+  /* Number input with ball preview */
+  .ball-input-wrap {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--s2); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px; padding: 10px 14px;
+    transition: border-color 0.2s;
+  }
+  .ball-input-wrap:focus-within { border-color: rgba(34,211,238,0.5); }
+
+  .ball-preview {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, #e8edf5 0%, #b8c8e0 50%, #8aaac8 100%);
+    color: #0d1829;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 2px rgba(255,255,255,0.5);
+    flex-shrink: 0; transition: all 0.2s;
+  }
+  .ball-preview.has-value {
+    box-shadow: 0 0 0 2px rgba(34,211,238,0.5), 0 2px 10px rgba(34,211,238,0.2);
+  }
+
+  .frb-input {
+    background: transparent; border: none; outline: none;
+    font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 600;
+    color: var(--text); width: 100%; min-width: 0;
+    -moz-appearance: textfield;
+  }
+  .frb-input::-webkit-outer-spin-button,
+  .frb-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .frb-input::placeholder { color: var(--muted); font-weight: 400; font-size: 14px; }
+
+  /* Sort select */
+  .frb-select {
+    width: 100%; background: var(--s2);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;
+    padding: 12px 14px; color: var(--text);
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    outline: none; cursor: pointer; transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+  .frb-select:focus { border-color: rgba(34,211,238,0.5); }
+  .frb-select option { background: #111822; }
+
+  /* Submit button */
+  .frb-submit {
+    background: linear-gradient(135deg, #1d4ed8, var(--blue));
+    color: #fff; font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+    border: none; border-radius: 10px; padding: 13px 24px;
+    cursor: pointer; white-space: nowrap;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 0 20px rgba(59,130,246,0.2);
+  }
+  .frb-submit:hover { transform: translateY(-2px); box-shadow: 0 0 32px rgba(59,130,246,0.4); }
+
+  /* ── Results header ── */
+  .results-meta {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px; margin-bottom: 16px;
+  }
+  .results-title {
+    font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 600; color: #fff;
+  }
+  .results-count {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    padding: 5px 12px; border-radius: 20px;
+    background: rgba(34,211,238,0.1); border: 1px solid rgba(34,211,238,0.25);
+    color: var(--cyan); letter-spacing: 0.5px;
+  }
+
+  /* ── Table ── */
+  .tbl-scroll { overflow-x: auto; border-radius: 10px; }
+  table.frb-table {
+    width: 100%; border-collapse: collapse; min-width: 480px;
+  }
+  table.frb-table thead th {
+    background: var(--s2); padding: 11px 16px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--muted);
+    text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  table.frb-table tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.12s;
+  }
+  table.frb-table tbody tr:hover { background: var(--s2); }
+  table.frb-table tbody tr:last-child { border-bottom: none; }
+  table.frb-table td { padding: 11px 16px; vertical-align: middle; }
+
+  .td-date {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); white-space: nowrap;
+  }
+  .balls-row { display: flex; gap: 5px; flex-wrap: wrap; }
+  .wb-ball {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, #e8edf5 0%, #b8c8e0 50%, #8aaac8 100%);
+    color: #0d1829;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.5);
+    flex-shrink: 0; transition: transform 0.15s;
+  }
+  .wb-ball:hover { transform: scale(1.12); }
+  .wb-ball.first-ball {
+    box-shadow: 0 0 0 2px rgba(34,211,238,0.6), 0 2px 8px rgba(34,211,238,0.25);
+  }
+  .pb-ball {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, #ff8a80 0%, #ef5350 50%, #b71c1c 100%);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(244,63,94,0.3);
+    flex-shrink: 0; transition: transform 0.15s;
+  }
+  .pb-ball:hover { transform: scale(1.12); }
+
+  /* Empty / no results */
+  .frb-empty {
+    text-align: center; padding: 40px 20px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--muted); letter-spacing: 1px;
+  }
+
+  /* Flash */
+  .frb-alert {
+    padding: 12px 16px; border-radius: 10px; font-size: 13px;
+    background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.25); color: #fcd34d;
+  }
+</style>
+
+<div id="frb-page">
+  <div class="frb-hero">
+    <p class="frb-eyebrow">⟡ Draw History Search</p>
+    <h1>Find by First<br>White Ball</h1>
+    <p>Search all historical draws where a specific number appeared as the first white ball.</p>
+  </div>
+
+  <div class="frb-wrap">
+
+    <!-- Search card -->
+    <div class="frb-card">
+      <p class="frb-card-title">Search Parameters</p>
+      <form action="{{ url_for('find_results_by_first_white_ball') }}" method="post">
+        <div class="search-row">
+          <div class="field-group">
+            <label>First White Ball (1–69)</label>
+            <div class="ball-input-wrap">
+              <div class="ball-preview{% if white_ball_number is not none %} has-value{% endif %}" id="ballPreview">
+                {{ white_ball_number if white_ball_number is not none else '?' }}
+              </div>
+              <input class="frb-input" type="number" name="white_ball_number" id="ballInput"
+                     min="1" max="69" placeholder="1–69"
+                     value="{{ white_ball_number if white_ball_number is not none else '' }}">
             </div>
+          </div>
+          <div class="field-group">
+            <label>Sort Results By</label>
+            <select name="sort_by" class="frb-select" style="height:60px">
+              <option value="date_desc" {% if selected_sort_by == 'date_desc' %}selected{% endif %}>Date — Newest First</option>
+              <option value="date_asc"  {% if selected_sort_by == 'date_asc'  %}selected{% endif %}>Date — Oldest First</option>
+              <option value="balls_asc" {% if selected_sort_by == 'balls_asc' %}selected{% endif %}>White Balls Ascending</option>
+              <option value="balls_desc"{% if selected_sort_by == 'balls_desc'%}selected{% endif %}>White Balls Descending</option>
+            </select>
+          </div>
+          <button type="submit" class="frb-submit">⟡ Search</button>
         </div>
-    {% elif white_ball_number is not none %} {# Only show this if a search was attempted but no results #}
-        <div class="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
-            No historical draws found where the first white ball is {{ white_ball_number }}.
-        </div>
+      </form>
+    </div>
+
+    <!-- Results card -->
+    {% if results_by_first_white_ball %}
+    <div class="frb-card">
+      <div class="results-meta">
+        <p class="results-title">Results — First Ball: <span style="color:var(--cyan)">{{ white_ball_number }}</span></p>
+        <span class="results-count">{{ results_by_first_white_ball | length }} draws</span>
+      </div>
+      <div class="tbl-scroll">
+        <table class="frb-table">
+          <thead>
+            <tr>
+              <th>Draw Date</th>
+              <th>White Balls</th>
+              <th>Powerball</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for result in results_by_first_white_ball %}
+            <tr>
+              <td class="td-date">{{ result['Draw Date'] }}</td>
+              <td>
+                <div class="balls-row">
+                  {% for i in range(1, 6) %}
+                  <span class="wb-ball{% if i == 1 %} first-ball{% endif %}">{{ result['Number ' + i|string] }}</span>
+                  {% endfor %}
+                </div>
+              </td>
+              <td><span class="pb-ball">{{ result['Powerball'] }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% elif white_ball_number is not none %}
+    <div class="frb-card">
+      <div class="frb-empty">
+        No historical draws found where the first white ball is <span style="color:var(--cyan)">{{ white_ball_number }}</span>.
+      </div>
+    </div>
     {% endif %}
 
-    <style>
-        /* Small ball styling for tables */
-        .ball-sm {
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-            width: 30px; /* Smaller size */
-            height: 30px; /* Smaller size */
-            background-color: #f0f0f0;
-            border-radius: 50%;
-            border: 1px solid #ccc;
-            font-weight: bold;
-            color: #333;
-            margin: 2px;
-            font-size: 0.8em; /* Smaller font */
-        }
-        .powerball-sm {
-            background-color: #ef4444; /* Red color for powerball */
-            color: white;
-            border-color: #dc2626;
-        }
-    </style>
+  </div>
 </div>
+
+<script>
+  const ballInput   = document.getElementById('ballInput');
+  const ballPreview = document.getElementById('ballPreview');
+  if (ballInput && ballPreview) {
+    ballInput.addEventListener('input', () => {
+      const v = ballInput.value;
+      ballPreview.textContent = v || '?';
+      ballPreview.classList.toggle('has-value', !!v);
+    });
+  }
+</script>
 {% endblock %}
