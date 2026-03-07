@@ -1,122 +1,534 @@
-
 {% extends "base.html" %}
 
-{% block title %}Weekday Draw Trends{% endblock %}
-
-{% block page_heading %}Weekday Draw Trends{% endblock %}
+{% block title %}Weekday Draw Trends — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
-<div class="space-y-8 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Understanding Powerball Trends by Draw Day</h2>
-        <p class="text-gray-600 mb-4">
-            This analysis explores various characteristics of white balls drawn on
-            Monday, Wednesday, and Saturday Powerball draws. While each draw is an independent random event,
-            observing historical distributions can be interesting for players.
-        </p>
-        <ul class="list-disc list-inside text-gray-600 space-y-1">
-            <li><span class="font-semibold">Low Numbers:</span> White balls from 1 to 34</li>
-            <li><span class="font-semibold">High Numbers:</span> White balls from 35 to 69</li>
-            <li><span class="font-semibold">Group A Numbers:</span> Numbers historically considered "hot" or significant (3, 5, 6, 7, 9, 11, 15, 16, 18, 21, 23, 24, 27, 31, 32, 33, 36, 42, 44, 45, 48, 50, 51, 54, 55, 60, 66, 69)</li>
-        </ul>
-    </div>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg:   #07090e; --s1: #0c0f18; --s2: #111520; --s3: #171c2a;
+    --border: rgba(255,255,255,0.07); --text: rgba(255,255,255,0.87); --muted: rgba(255,255,255,0.36);
+    /* Day colors */
+    --mon: #3b82f6; --mon-bg: rgba(59,130,246,0.12); --mon-b: rgba(59,130,246,0.35);
+    --wed: #10b981; --wed-bg: rgba(16,185,129,0.12); --wed-b: rgba(16,185,129,0.35);
+    --sat: #f97316; --sat-bg: rgba(249,115,22,0.12);  --sat-b: rgba(249,115,22,0.35);
+    /* Other */
+    --indigo: #6366f1; --violet: #a855f7; --amber: #f59e0b; --red: #f43f5e; --cyan: #22d3ee;
+  }
+
+  #wdt-page * { box-sizing: border-box; }
+  #wdt-page {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg); min-height: 100vh; color: var(--text); padding-bottom: 80px;
+  }
+
+  /* ── Hero ── */
+  .wdt-hero {
+    position: relative; padding: 52px 24px 40px; text-align: center; overflow: hidden;
+  }
+  .wdt-hero::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 40% 50% at 20% 0%, rgba(59,130,246,0.1) 0%, transparent 65%),
+      radial-gradient(ellipse 40% 50% at 80% 0%, rgba(16,185,129,0.08) 0%, transparent 65%),
+      radial-gradient(ellipse 30% 40% at 50% 80%, rgba(249,115,22,0.06) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .wdt-hero::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--mon), var(--wed), var(--sat), transparent);
+    opacity: 0.35;
+  }
+  .wdt-eyebrow {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 3px; text-transform: uppercase; color: var(--cyan); margin-bottom: 12px; opacity: 0.8;
+  }
+  .wdt-hero h1 {
+    font-size: clamp(34px,5vw,64px); font-weight: 700; line-height: 1.08; margin: 0 0 14px;
+    background: linear-gradient(135deg, var(--mon) 0%, #fff 40%, var(--wed) 70%, var(--sat) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .wdt-hero p { font-size: 14px; color: var(--muted); max-width: 540px; margin: 0 auto; line-height: 1.75; }
+
+  /* ── Layout ── */
+  .wdt-wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* ── Card ── */
+  .wdt-card {
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px 26px; position: relative; overflow: hidden;
+  }
+  .wdt-card-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin: 0 0 16px; opacity: 0.7;
+  }
+
+  /* ── Day selector tabs ── */
+  .day-tabs { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+  @media(max-width:580px){ .day-tabs { grid-template-columns: 1fr; } }
+
+  .day-tab {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px 16px; text-align: center;
+    cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden;
+  }
+  .day-tab::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    transition: opacity 0.2s;
+  }
+  .day-tab[data-day="Monday"]::before    { background: var(--mon); }
+  .day-tab[data-day="Wednesday"]::before { background: var(--wed); }
+  .day-tab[data-day="Saturday"]::before  { background: var(--sat); }
+
+  .day-tab:hover:not(.active) { border-color: rgba(255,255,255,0.15); }
+  .day-tab.active[data-day="Monday"]    { background: var(--mon-bg); border-color: var(--mon-b); }
+  .day-tab.active[data-day="Wednesday"] { background: var(--wed-bg); border-color: var(--wed-b); }
+  .day-tab.active[data-day="Saturday"]  { background: var(--sat-bg); border-color: var(--sat-b); }
+
+  .dt-icon  { font-size: 28px; margin-bottom: 8px; line-height: 1; }
+  .dt-name  { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .dt-draws { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
+  .dt-badge {
+    display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    letter-spacing: 1px; padding: 2px 8px; border-radius: 4px; margin-top: 6px;
+  }
+
+  /* ── Cross-day comparison ── */
+  .metric-list { display: flex; flex-direction: column; gap: 14px; }
+  .metric-row { }
+  .metric-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+  }
+  .metric-bars { display: flex; flex-direction: column; gap: 5px; }
+  .mb-row { display: flex; align-items: center; gap: 10px; }
+  .mb-day  {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; min-width: 80px;
+    letter-spacing: 0.5px;
+  }
+  .mb-track { flex: 1; height: 8px; background: var(--s3); border-radius: 4px; }
+  .mb-fill  { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+  .mb-val   { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; color: #fff; min-width: 40px; text-align: right; }
+
+  /* ── Day panel ── */
+  .day-panel { display: none; }
+  .day-panel.visible { display: block; }
+
+  /* Stat chips row */
+  .stat-chips { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 20px; }
+  @media(max-width:700px){ .stat-chips { grid-template-columns: 1fr 1fr; } }
+  .sc-chip { background: var(--s2); border: 1px solid var(--border); border-radius: 12px; padding: 14px 12px; text-align: center; }
+  .sc-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .sc-val   { font-size: 22px; font-weight: 700; line-height: 1; }
+  .sc-note  { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--muted); margin-top: 3px; }
+
+  /* Personality badge */
+  .personality {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 1px;
+    padding: 6px 14px; border-radius: 8px; margin-bottom: 20px;
+  }
+
+  /* Split charts */
+  .splits-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media(max-width:600px){ .splits-grid { grid-template-columns: 1fr; } }
+
+  .split-card { background: var(--s2); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .split-card-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 14px;
+  }
+  .split-bars { display: flex; flex-direction: column; gap: 8px; }
+  .sb-row { display: flex; align-items: center; gap: 10px; }
+  .sb-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text); min-width: 60px; }
+  .sb-track { flex: 1; height: 10px; background: var(--s3); border-radius: 5px; }
+  .sb-fill  { height: 100%; border-radius: 5px; transition: width 0.6s ease; }
+  .sb-count { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; color: #fff; min-width: 28px; text-align: right; }
+
+  /* Group A info box */
+  .group-a-box {
+    background: var(--s2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px; margin-top: 16px;
+  }
+  .group-a-title { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .group-a-balls { display: flex; flex-wrap: wrap; gap: 5px; }
+  .ga-ball {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
+    background: radial-gradient(circle at 35% 35%, #e8edf5 0%, #b8c8e0 50%, #8aaac8 100%);
+    color: #0d1829; flex-shrink: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+
+  /* ── AI Panel ── */
+  .ai-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--mon), var(--wed), var(--sat), transparent);
+    opacity: 0.4;
+  }
+  .ai-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+  .ai-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--cyan); opacity: 0.8; margin-bottom: 3px; }
+  .ai-title   { font-size: 19px; font-weight: 700; color: #fff; margin: 0; }
+  .ai-btn {
+    display: flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, #1d4ed8, var(--mon));
+    color: #fff; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    border: none; border-radius: 10px; padding: 12px 22px;
+    cursor: pointer; white-space: nowrap;
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    box-shadow: 0 0 20px rgba(59,130,246,0.2);
+  }
+  .ai-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 36px rgba(59,130,246,0.45); }
+  .ai-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .ai-thinking { display: none; align-items: center; gap: 10px; padding: 14px 0 4px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: rgba(59,130,246,0.7); letter-spacing: 1px; }
+  .ai-thinking.visible { display: flex; }
+  .ai-dots span { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin: 0 2px; animation: dotB 1.2s infinite; }
+  .ai-dots span:nth-child(1){ background: var(--mon); }
+  .ai-dots span:nth-child(2){ animation-delay: 0.2s; background: var(--wed); }
+  .ai-dots span:nth-child(3){ animation-delay: 0.4s; background: var(--sat); }
+  @keyframes dotB { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1);opacity:1} }
+  .ai-output { display: none; margin-top: 20px; border-top: 1px solid rgba(59,130,246,0.1); padding-top: 20px; }
+  .ai-output.visible { display: block; }
+  .ai-chips { display: grid; grid-template-columns: repeat(auto-fit,minmax(155px,1fr)); gap: 12px; margin-bottom: 20px; }
+  .ai-chip  { background: var(--s2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .ai-chip-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .ai-chip-val   { font-size: 13px; font-weight: 500; color: #fff; line-height: 1.5; }
+  .ai-narrative {
+    background: var(--s2); border: 1px solid rgba(59,130,246,0.12);
+    border-left: 3px solid var(--mon); border-radius: 0 10px 10px 0;
+    padding: 18px 20px; font-size: 14px; line-height: 1.85; color: var(--text); white-space: pre-wrap;
+  }
+  .ai-error { margin-top: 14px; background: rgba(244,63,94,0.08); border: 1px solid rgba(244,63,94,0.25); border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #ff8aaa; }
+  .no-data { text-align: center; padding: 48px 20px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); letter-spacing: 1px; }
+</style>
+
+<div id="wdt-page">
+  <div class="wdt-hero">
+    <p class="wdt-eyebrow">⟡ Draw Day Intelligence · Mon · Wed · Sat</p>
+    <h1>Weekday Draw<br>Trends</h1>
+    <p>How Monday, Wednesday, and Saturday draws differ across low/high splits, odd/even ratios, average sums, Group A presence, and consecutive patterns.</p>
+  </div>
+
+  <div class="wdt-wrap">
 
     {% if weekday_trends %}
-        <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-            <h2 class="text-2xl font-bold mb-4 text-gray-800">Average Ball Counts & Percentages per Draw Day</h2>
-            <div class="overflow-x-auto">
-                <table class="min-w-full bg-white rounded-lg shadow-sm">
-                    <thead>
-                        <tr class="bg-blue-100 text-blue-800 uppercase text-sm leading-normal">
-                            <th class="py-3 px-6 text-left rounded-tl-lg">Draw Day</th>
-                            <th class="py-3 px-6 text-left">Total Draws</th>
-                            <th class="py-3 px-6 text-left">Avg. Low Balls</th>
-                            <th class="py-3 px-6 text-left">Avg. High Balls</th>
-                            <th class="py-3 px-6 text-left">Avg. Odd Balls</th>
-                            <th class="py-3 px-6 text-left">Avg. Even Balls</th>
-                            <th class="py-3 px-6 text-left">Avg. Sum</th>
-                            <th class="py-3 px-6 text-left">Avg. Group A Balls</th>
-                            <th class="py-3 px-6 text-left rounded-tr-lg">Consecutive (%)</th>
-                        </tr>
-                    </thead>
-                    <tbody class="text-gray-700 text-sm font-light">
-                        {% for day in ['Monday', 'Wednesday', 'Saturday'] %}
-                            {% set data = weekday_trends[day] %}
-                            <tr class="border-b border-gray-200 hover:bg-gray-50">
-                                <td class="py-3 px-6 text-left whitespace-nowrap font-medium">{{ day }}</td>
-                                <td class="py-3 px-6 text-left">{{ data.total_draws }}</td>
-                                <td class="py-3 px-6 text-left">{{ data.avg_low_balls }}</td>
-                                <td class="py-3 px-6 text-left">{{ data.avg_high_balls }}</td>
-                                <td class="py-3 px-6 text-left">{{ data.avg_odd_balls }}</td>
-                                <td class="py-3 px-6 text-left">{{ data.avg_even_balls }}</td>
-                                <td class="py-3 px-6 text-left">{{ data.avg_sum }}</td>
-                                <td class="py-3 px-6 text-left">{{ data.avg_group_a_balls }}</td>
-                                <td class="py-3 px-6 text-left">{{ data.consecutive_present_percentage }}%</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+
+    {% set days_data = {
+      'Monday':    weekday_trends.get('Monday',    {}),
+      'Wednesday': weekday_trends.get('Wednesday', {}),
+      'Saturday':  weekday_trends.get('Saturday',  {})
+    } %}
+
+    <!-- ① Day selector tabs -->
+    <div class="wdt-card">
+      <p class="wdt-card-title">Select Draw Day</p>
+      <div class="day-tabs" id="dayTabs">
+        {% for day, icon, abbr in [('Monday','🔵','MON'),('Wednesday','🟢','WED'),('Saturday','🟠','SAT')] %}
+        {% set d = weekday_trends.get(day, {}) %}
+        <div class="day-tab {% if loop.first %}active{% endif %}" data-day="{{ day }}">
+          <div class="dt-icon">{{ icon }}</div>
+          <div class="dt-name">{{ day }}</div>
+          <div class="dt-draws">{{ d.total_draws or 0 }} draws</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- ② Cross-day comparison -->
+    <div class="wdt-card">
+      <p class="wdt-card-title">Cross-Day Metric Comparison</p>
+      <div class="metric-list" id="comparisonMetrics"></div>
+    </div>
+
+    <!-- ③ Day deep-dive panels -->
+    {% for day in ['Monday', 'Wednesday', 'Saturday'] %}
+    {% set d = weekday_trends.get(day, {}) %}
+    {% if d and d.total_draws %}
+    <div class="wdt-card day-panel {% if loop.first %}visible{% endif %}" id="panel-{{ day }}">
+      <p class="wdt-card-title">{{ day }} · Detailed Analysis</p>
+
+      <!-- Personality badge (set by JS) -->
+      <div id="personality-{{ day }}"></div>
+
+      <!-- Stat chips -->
+      <div class="stat-chips">
+        <div class="sc-chip">
+          <p class="sc-label">Total Draws</p>
+          <p class="sc-val" style="color:var(--{{ 'mon' if day=='Monday' else 'wed' if day=='Wednesday' else 'sat' }})">{{ d.total_draws }}</p>
+          <p class="sc-note">historical draws</p>
+        </div>
+        <div class="sc-chip">
+          <p class="sc-label">Avg Sum</p>
+          <p class="sc-val" style="color:#fff">{{ d.avg_sum }}</p>
+          <p class="sc-note">white balls total</p>
+        </div>
+        <div class="sc-chip">
+          <p class="sc-label">Consecutive %</p>
+          <p class="sc-val" style="color:var(--amber)">{{ d.consecutive_present_percentage }}%</p>
+          <p class="sc-note">draws with consec. pair</p>
+        </div>
+        <div class="sc-chip">
+          <p class="sc-label">Avg Group A</p>
+          <p class="sc-val" style="color:var(--violet)">{{ d.avg_group_a_balls }}</p>
+          <p class="sc-note">hot numbers per draw</p>
+        </div>
+        <div class="sc-chip">
+          <p class="sc-label">Avg Low Balls</p>
+          <p class="sc-val" style="color:var(--cyan)">{{ d.avg_low_balls }}</p>
+          <p class="sc-note">balls 1–34</p>
+        </div>
+        <div class="sc-chip">
+          <p class="sc-label">Avg High Balls</p>
+          <p class="sc-val" style="color:var(--red)">{{ d.avg_high_balls }}</p>
+          <p class="sc-note">balls 35–69</p>
+        </div>
+        <div class="sc-chip">
+          <p class="sc-label">Avg Odd Balls</p>
+          <p class="sc-val" style="color:var(--indigo)">{{ d.avg_odd_balls }}</p>
+          <p class="sc-note">odd numbers per draw</p>
+        </div>
+        <div class="sc-chip">
+          <p class="sc-label">Avg Even Balls</p>
+          <p class="sc-val" style="color:var(--green, #10b981)">{{ d.avg_even_balls }}</p>
+          <p class="sc-note">even numbers per draw</p>
+        </div>
+      </div>
+
+      <!-- Split frequency charts -->
+      <div class="splits-grid">
+        <!-- Low/High splits -->
+        <div class="split-card">
+          <p class="split-card-title">Low / High Split Frequency</p>
+          <div class="split-bars" id="lhSplits-{{ day }}">
+            {% set lh_max = d.low_high_splits | map(attribute='count') | max if d.low_high_splits else 1 %}
+            {% for split in d.low_high_splits | sort(attribute='count', reverse=True) %}
+            <div class="sb-row">
+              <span class="sb-label">{{ split.split }}</span>
+              <div class="sb-track">
+                <div class="sb-fill" style="width:{{ (split.count / lh_max * 100) | round }}%;background:var(--{{ 'mon' if day=='Monday' else 'wed' if day=='Wednesday' else 'sat' }})"></div>
+              </div>
+              <span class="sb-count">{{ split.count }}</span>
             </div>
+            {% endfor %}
+          </div>
         </div>
 
-        {% for day in ['Monday', 'Wednesday', 'Saturday'] %}
-            {% set data = weekday_trends[day] %}
-            {% if data.total_draws > 0 %}
-                <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-                    <h3 class="text-2xl font-bold mb-4 text-gray-800">{{ day }} - Detailed Frequencies</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <h4 class="text-lg font-semibold text-gray-700 mb-2">Low/High Split Frequencies</h4>
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full bg-white rounded-lg shadow-sm">
-                                    <thead>
-                                        <tr class="bg-purple-100 text-purple-800 uppercase text-sm leading-normal">
-                                            <th class="py-2 px-4 text-left rounded-tl-lg">Split Type</th>
-                                            <th class="py-2 px-4 text-left rounded-tr-lg">Occurrences</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="text-gray-700 text-sm font-light">
-                                        {% for split in data.low_high_splits %}
-                                        <tr class="border-b border-gray-200 hover:bg-gray-50">
-                                            <td class="py-2 px-4 text-left whitespace-nowrap">{{ split.split }}</td>
-                                            <td class="py-2 px-4 text-left">{{ split.count }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+        <!-- Odd/Even splits -->
+        <div class="split-card">
+          <p class="split-card-title">Odd / Even Split Frequency</p>
+          <div class="split-bars" id="oeSplits-{{ day }}">
+            {% set oe_max = d.odd_even_splits | map(attribute='count') | max if d.odd_even_splits else 1 %}
+            {% for split in d.odd_even_splits | sort(attribute='count', reverse=True) %}
+            <div class="sb-row">
+              <span class="sb-label">{{ split.split }}</span>
+              <div class="sb-track">
+                <div class="sb-fill" style="width:{{ (split.count / oe_max * 100) | round }}%;background:var(--indigo)"></div>
+              </div>
+              <span class="sb-count">{{ split.count }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
 
-                        <div>
-                            <h4 class="text-lg font-semibold text-gray-700 mb-2">Odd/Even Split Frequencies</h4>
-                            <div class="overflow-x-auto">
-                                <table class="min-w-full bg-white rounded-lg shadow-sm">
-                                    <thead>
-                                        <tr class="bg-green-100 text-green-800 uppercase text-sm leading-normal">
-                                            <th class="py-2 px-4 text-left rounded-tl-lg">Split Type</th>
-                                            <th class="py-2 px-4 text-left rounded-tr-lg">Occurrences</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="text-gray-700 text-sm font-light">
-                                        {% for split in data.odd_even_splits %}
-                                        <tr class="border-b border-gray-200 hover:bg-gray-50">
-                                            <td class="py-2 px-4 text-left whitespace-nowrap">{{ split.split }}</td>
-                                            <td class="py-2 px-4 text-left">{{ split.count }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-        {% endfor %}
+      <!-- Group A numbers reference -->
+      <div class="group-a-box">
+        <p class="group-a-title">Group A — Historical Hot Numbers (avg {{ d.avg_group_a_balls }} per draw on {{ day }})</p>
+        <div class="group-a-balls">
+          {% for n in [3,5,6,7,9,11,15,16,18,21,23,24,27,31,32,33,36,42,44,45,48,50,51,54,55,60,66,69] %}
+          <span class="ga-ball">{{ n }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    <!-- ④ AI Analysis -->
+    <div class="wdt-card ai-card">
+      <div class="ai-header">
+        <div>
+          <p class="ai-eyebrow">✦ Groq AI · Day Intelligence</p>
+          <p class="ai-title">Weekday Pattern Analysis</p>
+        </div>
+        <button class="ai-btn" id="aiBtn">◈ Analyse Draw Days</button>
+      </div>
+      <div class="ai-thinking" id="aiThinking"><div class="ai-dots"><span></span><span></span><span></span></div>Comparing Mon · Wed · Sat…</div>
+      <div class="ai-output" id="aiOutput">
+        <div class="ai-chips" id="aiChips"></div>
+        <div class="ai-narrative" id="aiNarrative"></div>
+      </div>
+      <div class="ai-error" id="aiError" style="display:none"></div>
+    </div>
 
     {% else %}
-        <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-            <p class="text-gray-500">No data available for Weekday Draw Trends. Please ensure historical data is loaded.</p>
-        </div>
+    <div class="wdt-card">
+      <div class="no-data">No weekday trend data available. Please ensure historical data is loaded.</div>
+    </div>
     {% endif %}
+
+  </div>
 </div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+  const DAY_COLORS = { Monday: '#3b82f6', Wednesday: '#10b981', Saturday: '#f97316' };
+  const DAY_KEYS   = ['Monday','Wednesday','Saturday'];
+  const DAY_ABBR   = { Monday:'MON', Wednesday:'WED', Saturday:'SAT' };
+
+  // ── All data from Jinja ───────────────────────────────────
+  const allData = {{ weekday_trends | tojson if weekday_trends else '{}' }};
+  if (!Object.keys(allData).length) return;
+
+  // ── Day tab switching ─────────────────────────────────────
+  let activeDay = 'Monday';
+  document.querySelectorAll('.day-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      activeDay = tab.dataset.day;
+      document.querySelectorAll('.day-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelectorAll('.day-panel').forEach(p => p.classList.remove('visible'));
+      const panel = document.getElementById(`panel-${activeDay}`);
+      if (panel) panel.classList.add('visible');
+    });
+  });
+
+  // ── Personality badges ────────────────────────────────────
+  DAY_KEYS.forEach(day => {
+    const d = allData[day];
+    if (!d) return;
+    const wrap = document.getElementById(`personality-${day}`);
+    if (!wrap) return;
+    const col  = DAY_COLORS[day];
+
+    const tags = [];
+    if (parseFloat(d.avg_high_balls) > parseFloat(d.avg_low_balls)) tags.push('High-Number Skew');
+    else tags.push('Low-Number Skew');
+    if (parseFloat(d.avg_odd_balls) > parseFloat(d.avg_even_balls)) tags.push('Odd-Heavy');
+    else tags.push('Even-Heavy');
+    if (parseFloat(d.consecutive_present_percentage) > 50) tags.push('High Consecutive Rate');
+    if (parseFloat(d.avg_group_a_balls) >= 2.5) tags.push('Group A Dominant');
+
+    wrap.innerHTML = tags.map(t =>
+      `<span class="personality" style="background:${col}18;border:1px solid ${col}44;color:${col};margin-right:6px;margin-bottom:10px">⬡ ${t}</span>`
+    ).join('');
+  });
+
+  // ── Cross-day comparison bars ─────────────────────────────
+  const metrics = [
+    { key: 'avg_low_balls',                  label: 'Avg Low Balls (1–34)',      max: 5   },
+    { key: 'avg_high_balls',                 label: 'Avg High Balls (35–69)',    max: 5   },
+    { key: 'avg_odd_balls',                  label: 'Avg Odd Balls',             max: 5   },
+    { key: 'avg_even_balls',                 label: 'Avg Even Balls',            max: 5   },
+    { key: 'avg_sum',                        label: 'Avg White Ball Sum',        max: null },
+    { key: 'avg_group_a_balls',              label: 'Avg Group A Balls',         max: 5   },
+    { key: 'consecutive_present_percentage', label: 'Consecutive Present %',     max: 100 },
+  ];
+
+  const compWrap = document.getElementById('comparisonMetrics');
+  metrics.forEach(m => {
+    const vals = DAY_KEYS.map(day => parseFloat(allData[day]?.[m.key] || 0));
+    const max  = m.max || Math.max(...vals, 1);
+
+    const div = document.createElement('div');
+    div.className = 'metric-row';
+    div.innerHTML = `<p class="metric-label">${m.label}</p><div class="metric-bars"></div>`;
+    const barsWrap = div.querySelector('.metric-bars');
+
+    DAY_KEYS.forEach((day, i) => {
+      const val  = vals[i];
+      const barW = Math.round((val / max) * 100);
+      const col  = DAY_COLORS[day];
+      const row  = document.createElement('div');
+      row.className = 'mb-row';
+      row.innerHTML = `
+        <span class="mb-day" style="color:${col}">${DAY_ABBR[day]}</span>
+        <div class="mb-track"><div class="mb-fill" style="width:${barW}%;background:${col}"></div></div>
+        <span class="mb-val">${val}${m.key === 'consecutive_present_percentage' ? '%' : ''}</span>
+      `;
+      barsWrap.appendChild(row);
+    });
+    compWrap.appendChild(div);
+  });
+
+  // ── AI Analysis ───────────────────────────────────────────
+  document.getElementById('aiBtn').addEventListener('click', async function () {
+    const thinking  = document.getElementById('aiThinking');
+    const output    = document.getElementById('aiOutput');
+    const narrative = document.getElementById('aiNarrative');
+    const errorEl   = document.getElementById('aiError');
+    const chipsWrap = document.getElementById('aiChips');
+
+    this.disabled = true; this.innerHTML = '⏳ Analysing…';
+    thinking.classList.add('visible');
+    output.classList.remove('visible');
+    errorEl.style.display = 'none';
+    narrative.textContent = ''; chipsWrap.innerHTML = '';
+
+    // Find dominant day per metric
+    const bestSum  = DAY_KEYS.reduce((b,d) => parseFloat(allData[d]?.avg_sum||0) > parseFloat(allData[b]?.avg_sum||0) ? d : b, 'Monday');
+    const bestGA   = DAY_KEYS.reduce((b,d) => parseFloat(allData[d]?.avg_group_a_balls||0) > parseFloat(allData[b]?.avg_group_a_balls||0) ? d : b, 'Monday');
+    const bestCons = DAY_KEYS.reduce((b,d) => parseFloat(allData[d]?.consecutive_present_percentage||0) > parseFloat(allData[b]?.consecutive_present_percentage||0) ? d : b, 'Monday');
+    const mostDraws= DAY_KEYS.reduce((b,d) => parseInt(allData[d]?.total_draws||0) > parseInt(allData[b]?.total_draws||0) ? d : b, 'Monday');
+
+    const payload = {
+      days: DAY_KEYS.map(day => ({
+        day,
+        total_draws:                    allData[day]?.total_draws,
+        avg_low_balls:                  allData[day]?.avg_low_balls,
+        avg_high_balls:                 allData[day]?.avg_high_balls,
+        avg_odd_balls:                  allData[day]?.avg_odd_balls,
+        avg_even_balls:                 allData[day]?.avg_even_balls,
+        avg_sum:                        allData[day]?.avg_sum,
+        avg_group_a_balls:              allData[day]?.avg_group_a_balls,
+        consecutive_present_percentage: allData[day]?.consecutive_present_percentage,
+        top_lh_split: (allData[day]?.low_high_splits || []).sort((a,b)=>b.count-a.count)[0],
+        top_oe_split: (allData[day]?.odd_even_splits || []).sort((a,b)=>b.count-a.count)[0],
+      })),
+      best_sum_day:  bestSum,
+      best_ga_day:   bestGA,
+      best_cons_day: bestCons,
+      most_draws_day:mostDraws,
+    };
+
+    try {
+      const res = await fetch('/api/weekday-trends-ai-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        errorEl.textContent = 'AI unavailable: ' + data.error;
+        errorEl.style.display = 'block';
+      } else {
+        (data.insights || []).forEach(ins => {
+          const c = document.createElement('div'); c.className = 'ai-chip';
+          c.innerHTML = `<p class="ai-chip-label">${ins.label}</p><div class="ai-chip-val">${ins.value}</div>`;
+          chipsWrap.appendChild(c);
+        });
+        narrative.textContent = data.analysis;
+        output.classList.add('visible');
+      }
+    } catch(e) {
+      errorEl.textContent = 'Request failed. Ensure /api/weekday-trends-ai-analysis is registered.';
+      errorEl.style.display = 'block';
+    } finally {
+      thinking.classList.remove('visible');
+      this.disabled = false; this.innerHTML = '◈ Analyse Draw Days';
+    }
+  });
+
+});
+</script>
 {% endblock %}
