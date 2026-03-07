@@ -405,11 +405,30 @@
 document.addEventListener('DOMContentLoaded', function () {
 
   // ── Data ─────────────────────────────────────────────────
-  const summaryRaw  = {{ all_boundary_patterns_summary | tojson if all_boundary_patterns_summary else '[]' }};
-  const yearlyRaw   = {{ yearly_data_for_selected_pattern | tojson if yearly_data_for_selected_pattern else '[]' }};
-  const selectedPair= "{{ selected_pair or '' }}";
+  const summaryRaw    = {{ all_boundary_patterns_summary | tojson if all_boundary_patterns_summary else '[]' }};
+  const yearlyRaw     = {{ yearly_data_for_selected_pattern | tojson if yearly_data_for_selected_pattern else '[]' }};
+  const selectedPair  = "{{ selected_pair or '' }}";
+  // Exact strings the backend uses — must match these verbatim on submit
+  const dropdownPairs = {{ boundary_pairs_for_dropdown | tojson if boundary_pairs_for_dropdown else '[]' }};
 
   if (!summaryRaw.length) return;
+
+  // Find the exact dropdown string matching a pattern array [a, b]
+  // Tries comma+space, comma-only, and reversed order
+  function findDropdownStr(patternArr) {
+    const nums = patternArr.map(Number);
+    for (const ds of dropdownPairs) {
+      const parts = ds.split(',').map(s => Number(s.trim()));
+      if (parts.length === nums.length && nums.every(n => parts.includes(n))) return ds;
+    }
+    // Fallbacks in order of likelihood
+    return [
+      patternArr.join(', '),
+      patternArr.join(','),
+      patternArr.map(Number).join(', '),
+      patternArr.map(Number).join(','),
+    ].find(s => dropdownPairs.includes(s)) || patternArr.join(', ');
+  }
 
   // ── Sort by count desc ────────────────────────────────────
   const sorted    = [...summaryRaw].sort((a,b) => b.count - a.count);
@@ -427,15 +446,18 @@ document.addEventListener('DOMContentLoaded', function () {
   // ── Pair cards ────────────────────────────────────────────
   const grid = document.getElementById('pairsGrid');
   sorted.forEach((row, i) => {
-    const pairStr = row.pattern.join(', ');
-    const barW    = Math.round(row.count / maxCount * 100);
-    const isActive= pairStr === selectedPair;
+    // Use the exact backend string so the POST lookup succeeds
+    const submitVal = findDropdownStr(row.pattern);
+    const isActive  = submitVal === selectedPair ||
+                      row.pattern.join(', ') === selectedPair ||
+                      row.pattern.join(',')  === selectedPair;
     const rankCls = i < 3 ? 'rank-hot' : i < Math.ceil(sorted.length/2) ? 'rank-warm' : 'rank-cold';
     const rankTxt = i === 0 ? '🔥 #1' : i === 1 ? '🔥 #2' : i === 2 ? '🔥 #3' : `#${i+1}`;
 
     const card = document.createElement('div');
     card.className = `pair-card${isActive ? ' active' : ''}`;
-    card.dataset.pair = pairStr;
+    card.dataset.pair = submitVal;
+    const barW = Math.round(row.count / maxCount * 100);
     card.innerHTML = `
       <span class="pair-rank ${rankCls}">${rankTxt}</span>
       <div class="twin-balls">
@@ -447,13 +469,80 @@ document.addEventListener('DOMContentLoaded', function () {
       <span class="pair-count">${row.count}×</span>
     `;
     card.addEventListener('click', () => {
-      document.getElementById('hiddenPairInput').value = pairStr;
+      document.getElementById('hiddenPairInput').value = submitVal;
       document.getElementById('pairSelectForm').submit();
     });
     grid.appendChild(card);
   });
 
-  // ── Chart & table (only if pair selected) ────────────────
+  // ── AI button — register BEFORE any early returns ─────────
+  const aiBtn = document.getElementById('aiBtn');
+  if (aiBtn) {
+    aiBtn.addEventListener('click', async function () {
+      if (!yearlyRaw.length) {
+        document.getElementById('aiError').textContent = 'Select a pair first to load yearly data, then analyse.';
+        document.getElementById('aiError').style.display = 'block';
+        return;
+      }
+      const thinking  = document.getElementById('aiThinking');
+      const output    = document.getElementById('aiOutput');
+      const narrative = document.getElementById('aiNarrative');
+      const errorEl   = document.getElementById('aiError');
+      const chipsWrap = document.getElementById('aiChips');
+
+      this.disabled = true; this.innerHTML = '⏳ Analysing…';
+      thinking.classList.add('visible');
+      output.classList.remove('visible');
+      errorEl.style.display = 'none';
+      narrative.textContent = ''; chipsWrap.innerHTML = '';
+
+      const yrs    = yearlyRaw.map(d => d.year);
+      const cnts   = yearlyRaw.map(d => d.draws_with_pattern);
+      const n      = cnts.length;
+      const xm     = (n-1)/2, ym = cnts.reduce((s,v)=>s+v,0)/n;
+      let num2=0, den2=0;
+      cnts.forEach((y,i)=>{ num2+=(i-xm)*(y-ym); den2+=(i-xm)**2; });
+      const slope    = den2 ? +(num2/den2).toFixed(3) : 0;
+      const peakIdx2 = cnts.indexOf(Math.max(...cnts));
+
+      try {
+        const res = await fetch('/api/boundary-pairs-ai-analysis', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            all_pairs:     sorted.map(r => ({ pair: r.pattern.join(', '), count: r.count })),
+            selected_pair: selectedPair,
+            yearly_data:   yearlyRaw,
+            slope,
+            peak_year:  yrs[peakIdx2],
+            peak_count: cnts[peakIdx2],
+            total_occ:  totalOcc,
+          })
+        });
+        const data = await res.json();
+        if (data.error) {
+          errorEl.textContent = 'AI unavailable: ' + data.error;
+          errorEl.style.display = 'block';
+        } else {
+          (data.insights || []).forEach(ins => {
+            const c = document.createElement('div'); c.className = 'ai-chip';
+            c.innerHTML = `<p class="ai-chip-label">${ins.label}</p><div class="ai-chip-val">${ins.value}</div>`;
+            chipsWrap.appendChild(c);
+          });
+          narrative.textContent = data.analysis;
+          output.classList.add('visible');
+        }
+      } catch(e) {
+        errorEl.textContent = 'Request failed — check that /api/boundary-pairs-ai-analysis route is registered in index.py.';
+        errorEl.style.display = 'block';
+      } finally {
+        thinking.classList.remove('visible');
+        this.disabled = false; this.innerHTML = '◈ Analyse Pairs';
+      }
+    });
+  }
+
+  // ── Chart & table (only if yearly data available) ─────────
   if (!yearlyRaw.length || !selectedPair) return;
 
   const years  = yearlyRaw.map(d => d.year);
@@ -603,65 +692,6 @@ document.addEventListener('DOMContentLoaded', function () {
     tbody.appendChild(frag);
   }
 
-  // ── AI Analysis ───────────────────────────────────────────
-  const aiBtn = document.getElementById('aiBtn');
-  if (aiBtn) {
-    aiBtn.addEventListener('click', async function () {
-      const thinking = document.getElementById('aiThinking');
-      const output   = document.getElementById('aiOutput');
-      const narrative= document.getElementById('aiNarrative');
-      const errorEl  = document.getElementById('aiError');
-      const chipsWrap= document.getElementById('aiChips');
-
-      this.disabled = true; this.innerHTML = '⏳ Analysing…';
-      thinking.classList.add('visible');
-      output.classList.remove('visible');
-      errorEl.style.display = 'none';
-      narrative.textContent = ''; chipsWrap.innerHTML = '';
-
-      // Linear regression slope for selected pair
-      const n = counts.length;
-      const xm = (n-1)/2, ym = counts.reduce((s,v)=>s+v,0)/n;
-      let num=0,den=0; counts.forEach((y,i)=>{num+=(i-xm)*(y-ym);den+=(i-xm)**2;});
-      const slope = den ? +(num/den).toFixed(3) : 0;
-
-      try {
-        const res = await fetch('/api/boundary-pairs-ai-analysis', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            all_pairs:     sorted.map(r => ({ pair: r.pattern.join(', '), count: r.count })),
-            selected_pair: selectedPair,
-            yearly_data:   yearlyRaw,
-            slope:         slope,
-            peak_year:     years[peakIdx],
-            peak_count:    counts[peakIdx],
-            total_occ:     totalOcc,
-          })
-        });
-        const data = await res.json();
-
-        if (data.error) {
-          errorEl.textContent = 'AI unavailable: ' + data.error;
-          errorEl.style.display = 'block';
-        } else {
-          (data.insights || []).forEach(ins => {
-            const c = document.createElement('div'); c.className = 'ai-chip';
-            c.innerHTML = `<p class="ai-chip-label">${ins.label}</p><div class="ai-chip-val">${ins.value}</div>`;
-            chipsWrap.appendChild(c);
-          });
-          narrative.textContent = data.analysis;
-          output.classList.add('visible');
-        }
-      } catch(e) {
-        errorEl.textContent = 'Request failed. Please try again.';
-        errorEl.style.display = 'block';
-      } finally {
-        thinking.classList.remove('visible');
-        this.disabled = false; this.innerHTML = '◈ Analyse Pairs';
-      }
-    });
-  }
 
 });
 </script>
