@@ -747,10 +747,20 @@ document.addEventListener('DOMContentLoaded', function () {
       const patCount = [ta,sl,rd].filter(Boolean).length;
 
       // Balls
-      const balls = [1,2,3,4,5].map(i => {
-        const v = d[`Number ${i}`] ?? d[`number_${i}`] ?? d[`num${i}`] ?? '?';
-        return `<span class="wb-ball-rt">${v}</span>`;
-      }).join('');
+      // Backend sends white_balls as an array e.g. [5, 12, 23, 34, 45]
+      let ballNums = [];
+      if (Array.isArray(d.white_balls) && d.white_balls.length) {
+        ballNums = d.white_balls;
+      } else {
+        // fallback: try numbered keys
+        for (let i = 1; i <= 5; i++) {
+          const v = d[`Number ${i}`] ?? d[`number_${i}`] ?? d[`wb${i}`] ?? d[`ball${i}`] ?? null;
+          if (v !== null) ballNums.push(v);
+        }
+      }
+      const balls = ballNums.length
+        ? ballNums.map(v => `<span class="wb-ball-rt">${v}</span>`).join('')
+        : '<span style="color:var(--muted);font-size:11px">N/A</span>';
 
       const taStr  = ta ? typeof d.tens_apart === 'string' && d.tens_apart.length > 1 ? d.tens_apart : '✓' : '—';
       const slStr  = sl ? typeof d.same_last_digit === 'string' && d.same_last_digit.length > 1 ? d.same_last_digit : '✓' : '—';
@@ -764,7 +774,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td class="td-date">${d['Draw Date'] || d.draw_date || '—'}</td>
+        <td class="td-date">${d.draw_date || d['Draw Date'] || d.date || '—'}</td>
         <td><div class="balls-row">${balls}</div></td>
         <td><span class="${ta ? 'pat-badge pat-ta' : 'pat-badge pat-none'}">${taStr}</span></td>
         <td><span class="${sl ? 'pat-badge pat-sl' : 'pat-badge pat-none'}">${slStr}</span></td>
