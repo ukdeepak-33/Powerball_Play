@@ -512,28 +512,75 @@ document.addEventListener('DOMContentLoaded', function () {
     const errorEl   = document.getElementById('aiError');
     const chipsWrap = document.getElementById('aiChips');
 
-    this.disabled=true; this.innerHTML='⏳ Analysing…';
+    this.disabled=true; this.innerHTML='⏳ Scanning All Patterns…';
     thinking.classList.add('visible');
     output.classList.remove('visible');
     errorEl.style.display='none';
     narrative.textContent=''; chipsWrap.innerHTML='';
 
-    // Build top pairs/triplets per year for context
-    const topPerYear = data.slice(0,5).map(d=>({
+    // ── Build FULL all-time ranked lists (top 20) ──────────
+    const allPairsSorted  = Object.entries(allPairsMap).sort((a,b)=>b[1]-a[1]);
+    const allTripsSorted  = Object.entries(allTripsMap).sort((a,b)=>b[1]-a[1]);
+    const top20Pairs      = allPairsSorted.slice(0,20).map(([k,v])=>({pattern:k,count:v}));
+    const top20Triplets   = allTripsSorted.slice(0,20).map(([k,v])=>({pattern:k,count:v}));
+
+    // ── Momentum: compare last 2 years vs prior 3 years ───
+    // data is sorted newest first
+    const recentYrs = [...data].sort((a,b)=>b.year-a.year);
+    const last2     = recentYrs.slice(0,2);
+    const prior3    = recentYrs.slice(2,5);
+
+    // Recent pair/triplet frequency maps
+    const recentPairMap = {}, recentTripMap = {};
+    last2.forEach(d => {
+      d.pairs.forEach(p=>{ const k=p.pattern.join(','); recentPairMap[k]=(recentPairMap[k]||0)+p.count; });
+      d.triplets.forEach(p=>{ const k=p.pattern.join(','); recentTripMap[k]=(recentTripMap[k]||0)+p.count; });
+    });
+    const priorPairMap = {}, priorTripMap = {};
+    prior3.forEach(d => {
+      d.pairs.forEach(p=>{ const k=p.pattern.join(','); priorPairMap[k]=(priorPairMap[k]||0)+p.count; });
+      d.triplets.forEach(p=>{ const k=p.pattern.join(','); priorTripMap[k]=(priorTripMap[k]||0)+p.count; });
+    });
+
+    // Hot (rising) = in top recent but not in prior, or higher rate recently
+    const risingPairs    = Object.entries(recentPairMap)
+      .filter(([k,v]) => v > (priorPairMap[k]||0)/1.5)
+      .sort((a,b)=>b[1]-a[1]).slice(0,5)
+      .map(([k,v])=>({pattern:k, recent:v, prior: priorPairMap[k]||0}));
+
+    const risingTriplets = Object.entries(recentTripMap)
+      .filter(([k,v]) => v > (priorTripMap[k]||0)/1.5)
+      .sort((a,b)=>b[1]-a[1]).slice(0,5)
+      .map(([k,v])=>({pattern:k, recent:v, prior: priorTripMap[k]||0}));
+
+    // Cold (dormant) = was strong historically but absent/weak in last 2 years
+    const coldPairs = allPairsSorted
+      .filter(([k,v]) => v >= 3 && (recentPairMap[k]||0) === 0)
+      .slice(0,5).map(([k,v])=>({pattern:k, allTime:v}));
+
+    const coldTriplets = allTripsSorted
+      .filter(([k,v]) => v >= 2 && (recentTripMap[k]||0) === 0)
+      .slice(0,5).map(([k,v])=>({pattern:k, allTime:v}));
+
+    // ── Per-year top pair + triplet (all years) ────────────
+    const allYearsData = [...data].sort((a,b)=>a.year-b.year).map(d=>({
       year: d.year,
-      top_pair:    d.pairs.sort((a,b)=>b.count-a.count)[0],
-      top_triplet: d.triplets.sort((a,b)=>b.count-a.count)[0],
-      total_unique: d.total_unique_patterns,
+      total_draws_with_patterns: d.total_unique_patterns,
+      top_pair:    [...d.pairs].sort((a,b)=>b.count-a.count).slice(0,3).map(p=>({p:p.pattern.join(','),c:p.count})),
+      top_triplet: [...d.triplets].sort((a,b)=>b.count-a.count).slice(0,3).map(p=>({p:p.pattern.join(','),c:p.count})),
+      pair_count:    d.pairs.length,
+      triplet_count: d.triplets.length,
     }));
 
-    const sortedPairs = Object.entries(allPairsMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
-    const sortedTrips = Object.entries(allTripsMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
-
-    // YoY trend: compare first half avg vs second half avg
-    const half = Math.floor(chartYears.length/2);
+    // ── YoY trend ──────────────────────────────────────────
+    const half     = Math.floor(chartYears.length/2);
     const earlyAvg = totalPats.slice(0,half).reduce((s,v)=>s+v,0) / (half||1);
     const lateAvg  = totalPats.slice(-half).reduce((s,v)=>s+v,0) / (half||1);
     const trend    = lateAvg > earlyAvg ? 'increasing' : lateAvg < earlyAvg ? 'decreasing' : 'stable';
+
+    // ── Pair vs triplet dominance per year ─────────────────
+    const pairDomYears    = allYearsData.filter(d=>d.pair_count > d.triplet_count).length;
+    const tripletDomYears = allYearsData.filter(d=>d.triplet_count >= d.pair_count).length;
 
     try {
       const res = await fetch('/api/grouped-patterns-yearly-ai-analysis', {
@@ -541,32 +588,41 @@ document.addEventListener('DOMContentLoaded', function () {
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
           selected_range: selectedRange,
-          range_min: rangeMin, range_max: rangeMax,
+          range_min: rangeMin,
+          range_max: rangeMax,
           total_years: totalYears,
-          unique_pairs: Object.keys(allPairsMap).length,
-          unique_triplets: Object.keys(allTripsMap).length,
-          peak_year: peakYear.year,
+          unique_pairs_count:    allPairsSorted.length,
+          unique_triplets_count: allTripsSorted.length,
+          peak_year:   peakYear.year,
           peak_unique: peakYear.total_unique_patterns,
           overall_trend: trend,
-          top5_pairs:    sortedPairs.map(([k,v])=>({pattern:k, count:v})),
-          top5_triplets: sortedTrips.map(([k,v])=>({pattern:k, count:v})),
-          recent_years:  topPerYear,
+          pair_dominant_years:    pairDomYears,
+          triplet_dominant_years: tripletDomYears,
+          top20_pairs:     top20Pairs,
+          top20_triplets:  top20Triplets,
+          rising_pairs:    risingPairs,
+          rising_triplets: risingTriplets,
+          cold_pairs:      coldPairs,
+          cold_triplets:   coldTriplets,
+          all_years_data:  allYearsData,
         })
       });
       const d2 = await res.json();
-      if (d2.error) { errorEl.textContent='AI unavailable: '+d2.error; errorEl.style.display='block'; }
-      else {
+      if (d2.error) {
+        errorEl.textContent = 'AI unavailable: ' + d2.error;
+        errorEl.style.display = 'block';
+      } else {
         (d2.insights||[]).forEach(ins=>{
           const c=document.createElement('div'); c.className='ai-chip';
           c.innerHTML=`<p class="ai-chip-label">${ins.label}</p><div class="ai-chip-val">${ins.value}</div>`;
           chipsWrap.appendChild(c);
         });
-        narrative.textContent=d2.analysis;
+        narrative.textContent = d2.analysis;
         output.classList.add('visible');
       }
     } catch(e) {
-      errorEl.textContent='Request failed. Ensure /api/grouped-patterns-yearly-ai-analysis is registered.';
-      errorEl.style.display='block';
+      errorEl.textContent = 'Request failed. Ensure /api/grouped-patterns-yearly-ai-analysis is registered in index.py.';
+      errorEl.style.display = 'block';
     } finally {
       thinking.classList.remove('visible');
       this.disabled=false; this.innerHTML='◈ Analyse Range';
