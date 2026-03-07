@@ -8865,6 +8865,104 @@ Based purely on historical frequency patterns, give a specific number strategy f
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+# ── Paste into index.py ───────────────────────────────────────────────────────
+
+@app.route('/api/grouped-patterns-yearly-ai-analysis', methods=['POST'])
+def grouped_patterns_yearly_ai_analysis():
+    try:
+        p               = request.get_json()
+        selected_range  = p.get('selected_range', '')
+        range_min       = p.get('range_min', 0)
+        range_max       = p.get('range_max', 0)
+        total_years     = p.get('total_years', 0)
+        unique_pairs    = p.get('unique_pairs', 0)
+        unique_triplets = p.get('unique_triplets', 0)
+        peak_year       = p.get('peak_year', '')
+        peak_unique     = p.get('peak_unique', 0)
+        trend           = p.get('overall_trend', 'stable')
+        top5_pairs      = p.get('top5_pairs', [])
+        top5_triplets   = p.get('top5_triplets', [])
+        recent_years    = p.get('recent_years', [])
+
+        if not selected_range:
+            return jsonify({'error': 'No data provided'}), 400
+
+        def fmt_recent(r):
+            tp = r.get('top_pair')
+            tt = r.get('top_triplet')
+            return (
+                f"  {r['year']}: {r['total_unique']} unique patterns | "
+                f"top pair ({tp['pattern'] if tp else 'none'}) ×{tp['count'] if tp else 0} | "
+                f"top triplet ({tt['pattern'] if tt else 'none'}) ×{tt['count'] if tt else 0}"
+            )
+
+        prompt = f"""You are an expert Powerball grouped pattern analyst. Analyse how number pairs and triplets within a specific range have behaved across historical draws.
+
+═══ RANGE CONTEXT ═══
+Selected range: {selected_range} (numbers {range_min}–{range_max})
+Years analysed: {total_years}
+Unique pairs found:    {unique_pairs}
+Unique triplets found: {unique_triplets}
+Peak year: {peak_year} ({peak_unique} unique patterns)
+Overall pattern trend: {trend}
+
+═══ TOP 5 ALL-TIME PAIRS ═══
+{chr(10).join(f"  ({r['pattern']}): {r['count']} times" for r in top5_pairs)}
+
+═══ TOP 5 ALL-TIME TRIPLETS ═══
+{chr(10).join(f"  ({r['pattern']}): {r['count']} times" for r in top5_triplets)}
+
+═══ RECENT YEARS SNAPSHOT ═══
+{chr(10).join(fmt_recent(r) for r in recent_years)}
+
+Write EXACTLY these 4 sections, each header on its own line:
+
+DOMINANT PATTERNS
+Name the single most dominant pair AND triplet within the {selected_range} range. How many times did each appear all-time? Are they related (do they share numbers)?
+
+TREND ANALYSIS
+Is the overall pattern count {trend}? Name the peak year ({peak_year}) and describe how recent years compare to it. Is this range becoming more or less predictable over time?
+
+RANGE CHARACTERISTICS
+What does the {range_min}–{range_max} number range tell us? Are pairs more common than triplets (or vice versa) — and what ratio of unique pairs ({unique_pairs}) to triplets ({unique_triplets}) suggests about draw clustering in this range?
+
+STRATEGY RECOMMENDATION
+Based on the all-time top pairs and triplets, give ONE specific number combination to watch for draws targeting this range. Name the exact pair or triplet, its historical frequency, and whether recent year data supports or weakens this pick."""
+
+        groq_api_key = os.environ.get('GROQ_API_KEY', '')
+        response = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={'Authorization': f'Bearer {groq_api_key}', 'Content-Type': 'application/json'},
+            json={
+                'model': 'llama-3.1-8b-instant',
+                'messages': [{'role': 'user', 'content': prompt}],
+                'max_tokens': 600,
+                'temperature': 0.6
+            },
+            timeout=35
+        )
+
+        result = response.json()
+        if 'error' in result:
+            return jsonify({'error': result['error'].get('message', 'Groq error')}), 500
+
+        analysis = result['choices'][0]['message']['content'].strip()
+
+        insights = [
+            { 'label': '📊 Range',              'value': f"{selected_range} · {range_min}–{range_max}" },
+            { 'label': '📅 Years Covered',       'value': f"{total_years} years of data" },
+            { 'label': '👑 Top All-Time Pair',   'value': f"({top5_pairs[0]['pattern']}) · {top5_pairs[0]['count']}×" if top5_pairs else '—' },
+            { 'label': '👑 Top All-Time Triplet','value': f"({top5_triplets[0]['pattern']}) · {top5_triplets[0]['count']}×" if top5_triplets else '—' },
+            { 'label': '🏆 Peak Year',           'value': f"{peak_year} · {peak_unique} patterns" },
+            { 'label': '📈 Overall Trend',       'value': trend.capitalize() },
+        ]
+
+        return jsonify({'analysis': analysis, 'insights': insights})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 initialize_core_data()
 
 # ── Start the draw-day scheduler ──────────────────────────────
