@@ -1,310 +1,602 @@
 {% extends "base.html" %}
 
-{% block title %}My Jackpot Pick{% endblock %}
-
-{% block page_heading %}My Jackpot Pick & Analysis{% endblock %}
+{% block title %}My Jackpot Pick — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
-<div class="space-y-8 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Select Your Numbers</h2>
-        <p class="text-gray-600 mb-4">Click on the white balls (1-69) to select 5 numbers, and then click on a Powerball (1-26) to select 1 number for your custom pick.</p>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
-        <div class="mb-6">
-            <h3 class="text-lg font-semibold text-gray-700 mb-2">White Balls (1-69)</h3>
-            <div id="whiteBallsContainer" class="flex flex-wrap gap-2 justify-center">
-                {% for i in range(1, 70) %}
-                    <div class="ball" data-type="white" data-number="{{ i }}">{{ i }}</div>
-                {% endfor %}
-            </div>
+  :root {
+    --bg:     #06070d;
+    --s1:     #0b0c17;
+    --s2:     #0f1020;
+    --s3:     #141526;
+    --border: rgba(255,255,255,0.07);
+    --text:   rgba(255,255,255,0.87);
+    --muted:  rgba(255,255,255,0.35);
+    --gold:   #f59e0b;
+    --gold2:  rgba(245,158,11,0.15);
+    --red:    #ef4444;
+    --red2:   rgba(239,68,68,0.15);
+    --green:  #22c55e;
+    --blue:   #60a5fa;
+    --indigo: #818cf8;
+    --cyan:   #22d3ee;
+    --violet: #c084fc;
+  }
+
+  #mjp-page * { box-sizing: border-box; }
+  #mjp-page {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg); min-height: 100vh;
+    color: var(--text); padding-bottom: 80px;
+  }
+
+  /* ── Hero ── */
+  .mjp-hero {
+    position: relative; padding: 48px 24px 36px; text-align: center; overflow: hidden;
+  }
+  .mjp-hero::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 60% 55% at 50% -10%, rgba(245,158,11,0.09) 0%, transparent 65%),
+      radial-gradient(ellipse 30% 30% at 10% 80%,  rgba(192,132,252,0.05) 0%, transparent 60%),
+      radial-gradient(ellipse 30% 30% at 90% 80%,  rgba(96,165,250,0.05) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .mjp-hero::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), rgba(255,255,255,0.3), var(--gold), transparent);
+    opacity: 0.3;
+  }
+  .mjp-eyebrow {
+    font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--gold); margin-bottom: 12px; opacity: 0.8;
+  }
+  .mjp-hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(36px, 5vw, 68px); font-weight: 800;
+    line-height: 1.05; margin: 0 0 12px;
+    background: linear-gradient(135deg, var(--gold) 0%, #fff 45%, var(--violet) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .mjp-hero p { font-size: 13px; color: var(--muted); max-width: 480px; margin: 0 auto; line-height: 1.8; }
+
+  /* ── Layout ── */
+  .mjp-wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; display: flex; flex-direction: column; gap: 18px; }
+
+  /* ── Card ── */
+  .mjp-card {
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 16px; padding: 22px 24px; position: relative; overflow: hidden;
+  }
+  .mjp-section-title {
+    font-size: 9px; letter-spacing: 2.5px; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 16px; display: block;
+  }
+
+  /* ── Preview bar ── */
+  .preview-bar {
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; flex-wrap: wrap; min-height: 64px; padding: 8px;
+  }
+  .preview-slot {
+    width: 54px; height: 54px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 700; flex-shrink: 0;
+    border: 2px dashed rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.15); font-size: 20px;
+    transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
+    position: relative;
+  }
+  .preview-slot.filled-white {
+    border: none;
+    background: radial-gradient(circle at 32% 30%, #f0f4ff 0%, #c8d8ed 45%, #8aaac8 100%);
+    color: #0d1829; font-size: 15px;
+    box-shadow: 0 0 20px rgba(255,255,255,0.15), 0 4px 12px rgba(0,0,0,0.4);
+    transform: scale(1.05);
+  }
+  .preview-slot.filled-pb {
+    border: none;
+    background: radial-gradient(circle at 32% 30%, #ff9a9a 0%, #ef5350 45%, #b71c1c 100%);
+    color: #fff; font-size: 15px;
+    box-shadow: 0 0 24px rgba(239,68,68,0.3), 0 4px 12px rgba(0,0,0,0.4);
+    transform: scale(1.05);
+  }
+  .preview-sep { color: rgba(255,255,255,0.2); font-size: 18px; }
+
+  /* ── Live stats bar ── */
+  .stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+  @media(max-width:600px){ .stats-row { grid-template-columns: 1fr 1fr; } }
+  .stat-chip {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 12px; text-align: center;
+  }
+  .stat-chip-label { font-size: 8px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .stat-chip-val   { font-size: 16px; font-weight: 700; color: #fff; line-height: 1; }
+  .stat-chip-sub   { font-size: 9px; color: var(--muted); margin-top: 2px; }
+
+  /* ── Ball grid ── */
+  .grid-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .grid-label span { flex: 1; height: 1px; background: var(--border); }
+
+  .balls-grid {
+    display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 20px;
+  }
+
+  .mjp-ball {
+    width: 38px; height: 38px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; cursor: pointer; flex-shrink: 0;
+    transition: all 0.15s cubic-bezier(0.34,1.3,0.64,1);
+    user-select: none;
+    background: var(--s2); border: 1px solid rgba(255,255,255,0.09);
+    color: rgba(255,255,255,0.5);
+  }
+  .mjp-ball:hover { border-color: rgba(255,255,255,0.25); color: rgba(255,255,255,0.8); transform: scale(1.12); }
+  .mjp-ball.wb-selected {
+    background: radial-gradient(circle at 32% 30%, #f0f4ff 0%, #c8d8ed 45%, #8aaac8 100%);
+    border: none; color: #0d1829;
+    box-shadow: 0 0 14px rgba(255,255,255,0.2), 0 2px 8px rgba(0,0,0,0.4);
+    transform: scale(1.15);
+  }
+  .mjp-ball.pb-selected {
+    background: radial-gradient(circle at 32% 30%, #ff9a9a 0%, #ef5350 45%, #b71c1c 100%);
+    border: none; color: #fff;
+    box-shadow: 0 0 16px rgba(239,68,68,0.35), 0 2px 8px rgba(0,0,0,0.4);
+    transform: scale(1.15);
+  }
+
+
+  /* ── Action buttons ── */
+  .action-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .btn-gold {
+    font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+    padding: 13px 28px; border-radius: 10px; border: none; cursor: pointer;
+    background: linear-gradient(135deg, #d97706, var(--gold));
+    color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700;
+    transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    box-shadow: 0 0 20px rgba(245,158,11,0.25);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .btn-gold:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 36px rgba(245,158,11,0.45); }
+  .btn-gold:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+  .btn-outline {
+    font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+    padding: 13px 22px; border-radius: 10px; cursor: pointer;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); font-family: 'JetBrains Mono', monospace;
+    transition: all 0.15s;
+  }
+  .btn-outline:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+  .btn-quick {
+    font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+    padding: 13px 22px; border-radius: 10px; cursor: pointer;
+    background: rgba(96,165,250,0.1); border: 1px solid rgba(96,165,250,0.25);
+    color: var(--blue); font-family: 'JetBrains Mono', monospace;
+    transition: all 0.15s; display: flex; align-items: center; gap: 8px;
+  }
+  .btn-quick:hover { background: rgba(96,165,250,0.18); border-color: rgba(96,165,250,0.45); }
+
+  /* ── Toast ── */
+  .mjp-toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    padding: 12px 22px; border-radius: 10px; font-size: 13px;
+    opacity: 0; pointer-events: none; z-index: 999; transition: all 0.3s;
+    white-space: nowrap;
+  }
+  .mjp-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .mjp-toast.success { background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3); color: var(--green); }
+  .mjp-toast.error   { background: rgba(239,68,68,0.1);   border: 1px solid rgba(239,68,68,0.25);  color: #fca5a5; }
+  .mjp-toast.info    { background: rgba(96,165,250,0.1);  border: 1px solid rgba(96,165,250,0.25); color: var(--blue); }
+
+  /* ── Analysis results ── */
+  .results-card { display: none; }
+  .results-card.visible { display: block; }
+
+  /* Loading spinner */
+  .mjp-spinner-wrap { display: flex; align-items: center; gap: 12px; padding: 20px 0; }
+  .mjp-spinner {
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 2px solid rgba(245,158,11,0.15); border-top-color: var(--gold);
+    animation: spin 0.8s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Match tier cards */
+  .tier-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 12px; margin-bottom: 20px; }
+  .tier-card {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px; position: relative; overflow: hidden;
+  }
+  .tier-card.has-match { border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.05); }
+  .tier-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  }
+  .tier-card.tier-jackpot::before { background: linear-gradient(90deg, var(--gold), #fff, var(--gold)); }
+  .tier-card.tier-2::before       { background: var(--gold); }
+  .tier-card.tier-3::before       { background: var(--blue); }
+  .tier-card.tier-4::before       { background: var(--indigo); }
+  .tier-card.tier-5::before       { background: var(--violet); }
+  .tier-card.tier-6::before       { background: var(--cyan); }
+  .tier-card.tier-7::before       { background: var(--green); }
+  .tier-card.tier-8::before       { background: rgba(255,255,255,0.2); }
+
+  .tier-name  { font-size: 11px; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
+  .tier-count { font-size: 28px; font-weight: 700; line-height: 1; color: #fff; margin-bottom: 4px; }
+  .tier-count.hit { color: var(--gold); }
+  .tier-prize { font-size: 10px; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 8px; }
+  .tier-dates { font-size: 10px; color: var(--cyan); line-height: 1.6; }
+
+  /* Last drawn chips */
+  .last-drawn-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .ld-chip {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 12px;
+  }
+  .ld-ball {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700;
+  }
+  .ld-ball.wb { background: radial-gradient(circle at 35% 35%, #f0f4ff 0%, #c8d8ed 45%, #8aaac8 100%); color: #0d1829; }
+  .ld-ball.pb { background: radial-gradient(circle at 35% 35%, #ff9a9a 0%, #ef5350 45%, #b71c1c 100%); color: #fff; }
+  .ld-info { }
+  .ld-label { font-size: 9px; color: var(--muted); margin-bottom: 1px; }
+  .ld-date  { font-size: 11px; font-weight: 600; color: #fff; }
+</style>
+
+<div id="mjp-page">
+  <div class="mjp-hero">
+    <p class="mjp-eyebrow">⟡ Personal Ticket · Pick & Analyse</p>
+    <h1>My Jackpot<br>Pick</h1>
+    <p>Select 5 white balls and 1 Powerball. Analyse against 2 years of history, see your match tiers, and save your lucky numbers.</p>
+  </div>
+
+  <div class="mjp-wrap">
+
+    <!-- ① Live preview + stats -->
+    <div class="mjp-card">
+      <span class="mjp-section-title">Your Selection</span>
+      <div class="preview-bar" id="previewBar">
+        <div class="preview-slot" id="ps1">?</div>
+        <div class="preview-slot" id="ps2">?</div>
+        <div class="preview-slot" id="ps3">?</div>
+        <div class="preview-slot" id="ps4">?</div>
+        <div class="preview-slot" id="ps5">?</div>
+        <div class="preview-sep">+</div>
+        <div class="preview-slot" id="pspb">?</div>
+      </div>
+      <div class="stats-row" id="statsRow">
+        <div class="stat-chip">
+          <p class="stat-chip-label">Sum</p>
+          <p class="stat-chip-val" id="statSum">—</p>
+          <p class="stat-chip-sub">white balls total</p>
         </div>
-
-        <div class="mb-6">
-            <h3 class="text-lg font-semibold text-gray-700 mb-2">Powerball (1-26)</h3>
-            <div id="powerballContainer" class="flex flex-wrap gap-2 justify-center">
-                {% for i in range(1, 27) %}
-                    <div class="ball powerball-ball" data-type="powerball" data-number="{{ i }}">{{ i }}</div>
-                {% endfor %}
-            </div>
+        <div class="stat-chip">
+          <p class="stat-chip-label">Odd / Even</p>
+          <p class="stat-chip-val" id="statOE">—</p>
+          <p class="stat-chip-sub">split</p>
         </div>
-
-        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
-            <button id="analyzePickBtn" class="btn-primary w-full sm:w-auto">Analyze My Pick</button>
-            <button id="saveMyPickBtn" class="btn-primary w-full sm:w-auto">Save My Pick</button>
-            <button id="resetSelectionBtn" class="btn-secondary w-full sm:w-auto">Reset Selection</button>
+        <div class="stat-chip">
+          <p class="stat-chip-label">Low / High</p>
+          <p class="stat-chip-val" id="statLH">—</p>
+          <p class="stat-chip-sub">1–34 / 35–69</p>
         </div>
-
-        <div id="selectedNumbersDisplay" class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200 text-blue-800 text-center font-medium hidden">
-            Selected: <span id="displayWhiteBalls"></span> + <span id="displayPowerball"></span>
+        <div class="stat-chip">
+          <p class="stat-chip-label">Consecutive</p>
+          <p class="stat-chip-val" id="statCons">—</p>
+          <p class="stat-chip-sub">adjacent pairs</p>
         </div>
-
-        {# Flash message display area for saving feedback #}
-        <div id="saveMessage" class="mt-4 p-3 rounded-lg text-sm hidden"></div>
+      </div>
     </div>
 
-    <div id="analysisResults" class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200 mt-8 hidden">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Analysis Results</h2>
-        <div id="loadingIndicator" class="text-center text-blue-600 font-semibold hidden">
-            <svg class="animate-spin h-8 w-8 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p>Analyzing your pick...</p>
-        </div>
+    <!-- ② Ball picker -->
+    <div class="mjp-card">
+      <div class="grid-label">White Balls <span></span> select 5 from 1–69 <span></span></div>
+      <div class="balls-grid" id="whiteBallsContainer">
+        {% for i in range(1, 70) %}
+          <div class="mjp-ball" data-type="white" data-number="{{ i }}">{{ i }}</div>
+        {% endfor %}
+      </div>
 
-        <div id="matchSummary" class="mt-4">
-            <h3 class="text-xl font-semibold text-gray-700 mb-3">Historical Match Summary (Last 2 Years):</h3>
-            <ul class="list-disc list-inside space-y-2 text-gray-700">
-                <!-- Matches will be populated here by JavaScript -->
-            </ul>
-        </div>
+      <div class="grid-label">Powerball <span></span> select 1 from 1–26 <span></span></div>
+      <div class="balls-grid" id="powerballContainer">
+        {% for i in range(1, 27) %}
+          <div class="mjp-ball" data-type="powerball" data-number="{{ i }}">{{ i }}</div>
+        {% endfor %}
+      </div>
 
-        <div id="lastDrawnDates" class="mt-6">
-            <h3 class="text-xl font-semibold text-gray-700 mb-3">Last Drawn Dates for Your Numbers:</h3>
-            <ul class="list-disc list-inside space-y-2 text-gray-700">
-                <!-- Last drawn dates will be populated here by JavaScript -->
-            </ul>
-        </div>
+      <div class="action-row">
+        <button class="btn-gold" id="analyzePickBtn" disabled>⬡ Analyse Pick</button>
+        <button class="btn-gold" id="saveMyPickBtn" disabled style="background:linear-gradient(135deg,#7c3aed,#a855f7);box-shadow:0 0 20px rgba(168,85,247,0.2)">✦ Save Pick</button>
+        <button class="btn-quick" id="quickPickBtn">⚡ Quick Pick</button>
+        <button class="btn-outline" id="resetSelectionBtn">↺ Reset</button>
+      </div>
     </div>
+
+    <!-- ③ Analysis results -->
+    <div class="mjp-card results-card" id="analysisResults">
+      <span class="mjp-section-title">Analysis Results · Last 2 Years</span>
+
+      <div class="mjp-spinner-wrap" id="loadingIndicator" style="display:none">
+        <div class="mjp-spinner"></div>
+        <span style="font-size:12px;color:var(--muted);letter-spacing:1px">Scanning historical draws…</span>
+      </div>
+
+      <div id="resultsContent" style="display:none">
+        <p style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:14px">Match Tier History</p>
+        <div class="tier-grid" id="tierGrid"></div>
+
+        <p style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:20px 0 12px">Last Drawn Date Per Number</p>
+        <div class="last-drawn-grid" id="lastDrawnGrid"></div>
+      </div>
+    </div>
+
+  </div>
 </div>
+
+<div class="mjp-toast" id="mjpToast"></div>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const whiteBallsContainer = document.getElementById('whiteBallsContainer');
-        const powerballContainer = document.getElementById('powerballContainer');
-        const analyzePickBtn = document.getElementById('analyzePickBtn');
-        const saveMyPickBtn = document.getElementById('saveMyPickBtn');
-        const resetSelectionBtn = document.getElementById('resetSelectionBtn');
-        const selectedNumbersDisplay = document.getElementById('selectedNumbersDisplay');
-        const displayWhiteBalls = document.getElementById('displayWhiteBalls');
-        const displayPowerball = document.getElementById('displayPowerball');
-        const analysisResults = document.getElementById('analysisResults');
-        const loadingIndicator = document.getElementById('loadingIndicator');
-        const matchSummary = document.querySelector('#matchSummary ul');
-        const lastDrawnDatesList = document.querySelector('#lastDrawnDates ul');
-        const saveMessageDiv = document.getElementById('saveMessage');
+document.addEventListener('DOMContentLoaded', function () {
 
-        let selectedWhiteBalls = new Set();
-        let selectedPowerball = null;
+  // ── State ───────────────────────────────────────────────
+  let selectedWhite = new Set();
+  let selectedPB    = null;
 
-        const updateDisplay = () => {
-            const sortedWhiteBalls = Array.from(selectedWhiteBalls).sort((a, b) => a - b);
-            displayWhiteBalls.textContent = sortedWhiteBalls.join(', ');
-            displayPowerball.textContent = selectedPowerball !== null ? selectedPowerball : 'N/A';
-            
-            if (sortedWhiteBalls.length > 0 || selectedPowerball !== null) {
-                selectedNumbersDisplay.classList.remove('hidden');
-            } else {
-                selectedNumbersDisplay.classList.add('hidden');
-            }
-        };
+  // ── DOM refs ────────────────────────────────────────────
+  const wbContainer  = document.getElementById('whiteBallsContainer');
+  const pbContainer  = document.getElementById('powerballContainer');
+  const analyzeBtn   = document.getElementById('analyzePickBtn');
+  const saveBtn      = document.getElementById('saveMyPickBtn');
+  const quickBtn     = document.getElementById('quickPickBtn');
+  const resetBtn     = document.getElementById('resetSelectionBtn');
+  const loadingEl    = document.getElementById('loadingIndicator');
+  const resultsCard  = document.getElementById('analysisResults');
+  const resultsContent = document.getElementById('resultsContent');
+  const tierGrid     = document.getElementById('tierGrid');
+  const ldGrid       = document.getElementById('lastDrawnGrid');
 
-        const resetSelection = () => {
-            selectedWhiteBalls.forEach(num => {
-                const ballElement = whiteBallsContainer.querySelector(`.ball[data-number="${num}"]`);
-                if (ballElement) {
-                    ballElement.classList.remove('selected-white');
-                }
-            });
-            if (selectedPowerball !== null) {
-                const powerballElement = powerballContainer.querySelector(`.ball[data-number="${selectedPowerball}"]`);
-                if (powerballElement) {
-                    powerballElement.classList.remove('selected-powerball');
-                }
-            }
-            selectedWhiteBalls.clear();
-            selectedPowerball = null;
-            updateDisplay();
-            analysisResults.classList.add('hidden');
-            matchSummary.innerHTML = ''; // Clear previous analysis
-            lastDrawnDatesList.innerHTML = ''; // Clear previous analysis
-            saveMessageDiv.classList.add('hidden');
-            saveMessageDiv.textContent = '';
-            saveMessageDiv.className = 'mt-4 p-3 rounded-lg text-sm hidden';
-        };
+  // ── Toast ────────────────────────────────────────────────
+  function toast(msg, type='info') {
+    const el = document.getElementById('mjpToast');
+    el.textContent = msg; el.className = `mjp-toast ${type} show`;
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), 3500);
+  }
 
-        // Helper to show messages
-        const showMessage = (message, type) => {
-            saveMessageDiv.textContent = message;
-            saveMessageDiv.classList.remove('hidden');
-            saveMessageDiv.classList.remove('bg-red-100', 'text-red-700', 'border-red-200', 'bg-green-100', 'text-green-700', 'border-green-200');
-            if (type === 'success') {
-                saveMessageDiv.classList.add('bg-green-100', 'text-green-700', 'border', 'border-green-200');
-            } else if (type === 'error') {
-                saveMessageDiv.classList.add('bg-red-100', 'text-red-700', 'border', 'border-red-200');
-            }
-            // Hide message after a few seconds
-            setTimeout(() => {
-                saveMessageDiv.classList.add('hidden');
-                saveMessageDiv.textContent = '';
-                saveMessageDiv.className = 'mt-4 p-3 rounded-lg text-sm hidden';
-            }, 5000);
-        };
+  // ── Live stats update ────────────────────────────────────
+  function updateStats() {
+    const nums  = Array.from(selectedWhite).sort((a,b)=>a-b);
+    const n     = nums.length;
 
+    // Preview slots
+    for (let i = 1; i <= 5; i++) {
+      const slot = document.getElementById(`ps${i}`);
+      if (nums[i-1] !== undefined) {
+        slot.textContent = nums[i-1]; slot.className = 'preview-slot filled-white';
+      } else {
+        slot.textContent = '?'; slot.className = 'preview-slot';
+      }
+    }
+    const pbSlot = document.getElementById('pspb');
+    if (selectedPB) {
+      pbSlot.textContent = selectedPB; pbSlot.className = 'preview-slot filled-pb';
+    } else {
+      pbSlot.textContent = '?'; pbSlot.className = 'preview-slot';
+    }
 
-        // Event listener for white balls
-        whiteBallsContainer.addEventListener('click', (event) => {
-            const target = event.target;
-            if (target.classList.contains('ball') && target.dataset.type === 'white') {
-                const number = parseInt(target.dataset.number);
-                if (selectedWhiteBalls.has(number)) {
-                    selectedWhiteBalls.delete(number);
-                    target.classList.remove('selected-white');
-                } else {
-                    if (selectedWhiteBalls.size < 5) {
-                        selectedWhiteBalls.add(number);
-                        target.classList.add('selected-white');
-                    } else {
-                        // Optionally provide feedback if user tries to select more than 5
-                        // showMessage('You can only select 5 white balls.', 'error');
-                    }
-                }
-                updateDisplay();
-            }
-        });
+    // Stats chips
+    if (n === 0) {
+      document.getElementById('statSum').textContent  = '—';
+      document.getElementById('statOE').textContent   = '—';
+      document.getElementById('statLH').textContent   = '—';
+      document.getElementById('statCons').textContent = '—';
+    } else {
+      const sum  = nums.reduce((s,v)=>s+v,0);
+      const odds = nums.filter(v=>v%2!==0).length;
+      const low  = nums.filter(v=>v<=34).length;
+      // Consecutive pairs
+      let cons = 0;
+      for (let i=0;i<nums.length-1;i++) if (nums[i+1]-nums[i]===1) cons++;
 
-        // Event listener for powerball
-        powerballContainer.addEventListener('click', (event) => {
-            const target = event.target;
-            if (target.classList.contains('ball') && target.dataset.type === 'powerball') {
-                const number = parseInt(target.dataset.number);
-                if (selectedPowerball === number) {
-                    selectedPowerball = null;
-                    target.classList.remove('selected-powerball');
-                } else {
-                    if (selectedPowerball !== null) { // Deselect previous if one was already selected
-                        const prevPowerball = powerballContainer.querySelector(`.ball[data-number="${selectedPowerball}"]`);
-                        if (prevPowerball) {
-                            prevPowerball.classList.remove('selected-powerball');
-                        }
-                    }
-                    selectedPowerball = number;
-                    target.classList.add('selected-powerball');
-                }
-                updateDisplay();
-            }
-        });
+      document.getElementById('statSum').textContent  = n===5 ? sum : `${sum}…`;
+      document.getElementById('statOE').textContent   = `${odds}o / ${n-odds}e`;
+      document.getElementById('statLH').textContent   = `${low}L / ${n-low}H`;
+      document.getElementById('statCons').textContent = cons > 0 ? `${cons} pair${cons>1?'s':''}` : 'None';
+    }
 
-        // Analyze button click
-        analyzePickBtn.addEventListener('click', async () => {
-            if (selectedWhiteBalls.size !== 5 || selectedPowerball === null) {
-                showMessage('Please select exactly 5 white balls and 1 Powerball before analyzing.', 'error');
-                return;
-            }
-
-            analysisResults.classList.remove('hidden');
-            loadingIndicator.classList.remove('hidden');
-            matchSummary.innerHTML = ''; // Clear previous results
-            lastDrawnDatesList.innerHTML = ''; // Clear previous results
-            saveMessageDiv.classList.add('hidden'); // Hide save message during analysis
-
-            const whiteBallsArray = Array.from(selectedWhiteBalls).sort((a, b) => a - b);
-            const powerballNumber = selectedPowerball;
-
-            try {
-                const response = await fetch('/analyze_manual_pick', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        white_balls: whiteBallsArray,
-                        powerball: powerballNumber
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Failed to analyze pick.');
-                }
-
-                const data = await response.json();
-                
-                // Display match summary
-                const summary = data.match_summary;
-                for (const category in summary) {
-                    // EXCLUDE "No Match" category
-                    if (category === "No Match") {
-                        continue; // Skip this iteration if the category is "No Match"
-                    }
-
-                    const count = summary[category].count;
-                    const draws = summary[category].draws;
-                    
-                    let listItemText = `${category}: ${count} time(s)`;
-                    if (count > 0 && draws.length > 0) {
-                        const drawDates = draws.map(d => d.date).join(', ');
-                        listItemText += ` (Last drawn: ${drawDates})`;
-                    }
-                    const li = document.createElement('li');
-                    li.textContent = listItemText;
-                    matchSummary.appendChild(li);
-                }
-
-                // Display last drawn dates for individual numbers
-                const lastDrawnDates = data.last_drawn_dates;
-                for (const numKey in lastDrawnDates) {
-                    const date = lastDrawnDates[numKey];
-                    const li = document.createElement('li');
-                    li.textContent = `${numKey}: ${date}`;
-                    lastDrawnDatesList.appendChild(li);
-                }
-
-            } catch (error) {
-                console.error('Error analyzing pick:', error);
-                const li = document.createElement('li');
-                li.textContent = `Error: ${error.message}. Please try again later.`;
-                li.classList.add('text-red-600');
-                matchSummary.appendChild(li);
-                lastDrawnDatesList.innerHTML = ''; // Clear if error
-            } finally {
-                loadingIndicator.classList.add('hidden');
-            }
-        });
-
-        // Save button click handler
-        saveMyPickBtn.addEventListener('click', async () => {
-            if (selectedWhiteBalls.size !== 5 || selectedPowerball === null) {
-                showMessage('Please select exactly 5 white balls and 1 Powerball to save your pick.', 'error');
-                return;
-            }
-
-            const whiteBallsArray = Array.from(selectedWhiteBalls).sort((a, b) => a - b);
-            const powerballNumber = selectedPowerball;
-
-            try {
-                const response = await fetch('/save_manual_pick', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        white_balls: whiteBallsArray,
-                        powerball: powerballNumber
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    showMessage(data.message, 'success');
-                } else {
-                    showMessage(data.error || 'Failed to save pick.', 'error');
-                }
-            } catch (error) {
-                console.error('Error saving pick:', error);
-                showMessage('An unexpected error occurred while saving your pick. Please try again.', 'error');
-            }
-        });
+    // Button states
+    const ready = selectedWhite.size === 5 && selectedPB !== null;
+    analyzeBtn.disabled = !ready;
+    saveBtn.disabled    = !ready;
 
 
-        resetSelectionBtn.addEventListener('click', resetSelection);
+  }
 
-        // Initial setup
-        updateDisplay();
+  // ── White ball click ─────────────────────────────────────
+  wbContainer.addEventListener('click', e => {
+    const b = e.target.closest('.mjp-ball');
+    if (!b || b.dataset.type !== 'white') return;
+    const n = parseInt(b.dataset.number);
+    if (selectedWhite.has(n)) {
+      selectedWhite.delete(n); b.classList.remove('wb-selected');
+    } else {
+      if (selectedWhite.size >= 5) return;
+      selectedWhite.add(n); b.classList.add('wb-selected');
+    }
+    updateStats();
+  });
+
+  // ── Powerball click ──────────────────────────────────────
+  pbContainer.addEventListener('click', e => {
+    const b = e.target.closest('.mjp-ball');
+    if (!b || b.dataset.type !== 'powerball') return;
+    const n = parseInt(b.dataset.number);
+    if (selectedPB !== null) {
+      pbContainer.querySelector(`[data-number="${selectedPB}"]`)?.classList.remove('pb-selected');
+    }
+    if (selectedPB === n) { selectedPB = null; }
+    else { selectedPB = n; b.classList.add('pb-selected'); }
+    updateStats();
+  });
+
+  // ── Quick Pick ───────────────────────────────────────────
+  quickBtn.addEventListener('click', () => {
+    // Reset first
+    doReset(false);
+
+    // Pick 5 unique whites 1-69
+    const pool = Array.from({length:69},(_,i)=>i+1);
+    const picked = [];
+    while (picked.length < 5) {
+      const idx = Math.floor(Math.random() * pool.length);
+      picked.push(pool.splice(idx,1)[0]);
+    }
+    picked.forEach(n => {
+      selectedWhite.add(n);
+      wbContainer.querySelector(`[data-number="${n}"]`)?.classList.add('wb-selected');
     });
+
+    // Pick 1 PB 1-26
+    selectedPB = Math.floor(Math.random()*26)+1;
+    pbContainer.querySelector(`[data-number="${selectedPB}"]`)?.classList.add('pb-selected');
+
+    updateStats();
+    toast('Quick Pick generated! ⚡', 'info');
+  });
+
+  // ── Reset ────────────────────────────────────────────────
+  function doReset(showToast=true) {
+    selectedWhite.forEach(n => wbContainer.querySelector(`[data-number="${n}"]`)?.classList.remove('wb-selected'));
+    if (selectedPB) pbContainer.querySelector(`[data-number="${selectedPB}"]`)?.classList.remove('pb-selected');
+
+    selectedWhite.clear(); selectedPB = null;
+    resultsCard.classList.remove('visible');
+    updateStats();
+    if (showToast) toast('Selection cleared.', 'info');
+  }
+  resetBtn.addEventListener('click', () => doReset(true));
+
+  // ── Tier config ──────────────────────────────────────────
+  const TIER_CONFIG = {
+    'Jackpot':           { cls:'tier-jackpot', prize:'Jackpot (Match 5+PB)' },
+    'Match 5':           { cls:'tier-2',       prize:'~$1,000,000' },
+    'Match 4 + PB':      { cls:'tier-3',       prize:'~$50,000' },
+    'Match 4':           { cls:'tier-4',       prize:'~$100' },
+    'Match 3 + PB':      { cls:'tier-5',       prize:'~$100' },
+    'Match 3':           { cls:'tier-6',       prize:'~$7' },
+    'Match 2 + PB':      { cls:'tier-7',       prize:'~$7' },
+    'Match 1 + PB':      { cls:'tier-8',       prize:'~$4' },
+    'Match 0 + PB':      { cls:'tier-8',       prize:'~$4' },
+  };
+
+  // ── Analyse ──────────────────────────────────────────────
+  analyzeBtn.addEventListener('click', async () => {
+    const whites = Array.from(selectedWhite).sort((a,b)=>a-b);
+    resultsCard.classList.add('visible');
+    resultsContent.style.display = 'none';
+    loadingEl.style.display = 'flex';
+    tierGrid.innerHTML = '';
+    ldGrid.innerHTML   = '';
+
+    try {
+      const res = await fetch('/analyze_manual_pick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ white_balls: whites, powerball: selectedPB })
+      });
+      if (!res.ok) { const e=await res.json(); throw new Error(e.error||'Analysis failed'); }
+      const data = await res.json();
+
+      // ── Tier cards ──
+      const summary = data.match_summary || {};
+      const ORDER = ['Jackpot','Match 5','Match 4 + PB','Match 4','Match 3 + PB','Match 3','Match 2 + PB','Match 1 + PB','Match 0 + PB'];
+      ORDER.forEach(cat => {
+        const info  = summary[cat];
+        if (!info || cat === 'No Match') return;
+        const count = info.count ?? 0;
+        const draws = info.draws ?? [];
+        const cfg   = TIER_CONFIG[cat] || { cls:'tier-8', prize:'' };
+
+        const card = document.createElement('div');
+        card.className = `tier-card ${cfg.cls}${count>0?' has-match':''}`;
+        const recentDates = draws.slice(0,3).map(d=>d.date||d).join(' · ');
+        card.innerHTML = `
+          <p class="tier-name">${cat}</p>
+          <p class="tier-count${count>0?' hit':''}">${count}</p>
+          <p class="tier-prize">${cfg.prize}</p>
+          ${count>0 && recentDates ? `<p class="tier-dates">${recentDates}</p>` : ''}
+        `;
+        tierGrid.appendChild(card);
+      });
+
+      // ── Last drawn chips ──
+      const ld = data.last_drawn_dates || {};
+      whites.forEach(n => {
+        const date = ld[`White Ball ${n}`] || ld[n] || ld[`Number ${n}`] || '—';
+        const chip = document.createElement('div');
+        chip.className = 'ld-chip';
+        chip.innerHTML = `
+          <div class="ld-ball wb">${n}</div>
+          <div class="ld-info">
+            <p class="ld-label">Last Drawn</p>
+            <p class="ld-date">${date}</p>
+          </div>
+        `;
+        ldGrid.appendChild(chip);
+      });
+      if (selectedPB) {
+        const pbDate = ld[`Powerball ${selectedPB}`] || ld[`PB ${selectedPB}`] || '—';
+        const chip   = document.createElement('div');
+        chip.className = 'ld-chip';
+        chip.innerHTML = `
+          <div class="ld-ball pb">${selectedPB}</div>
+          <div class="ld-info">
+            <p class="ld-label">PB Last Drawn</p>
+            <p class="ld-date">${pbDate}</p>
+          </div>
+        `;
+        ldGrid.appendChild(chip);
+      }
+
+      resultsContent.style.display = 'block';
+    } catch(e) {
+      toast('Analysis failed: ' + e.message, 'error');
+      resultsCard.classList.remove('visible');
+    } finally {
+      loadingEl.style.display = 'none';
+    }
+  });
+
+  // ── Save ─────────────────────────────────────────────────
+  saveBtn.addEventListener('click', async () => {
+    const whites = Array.from(selectedWhite).sort((a,b)=>a-b);
+    saveBtn.disabled = true; saveBtn.innerHTML = '⏳ Saving…';
+    try {
+      const res = await fetch('/save_manual_pick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ white_balls: whites, powerball: selectedPB })
+      });
+      const data = await res.json();
+      if (data.success) toast(data.message || 'Pick saved! ✦', 'success');
+      else toast(data.error || 'Save failed.', 'error');
+    } catch(e) {
+      toast('Save request failed.', 'error');
+    } finally {
+      saveBtn.disabled = false; saveBtn.innerHTML = '✦ Save Pick';
+    }
+  });
+
+  // ── Init ─────────────────────────────────────────────────
+  updateStats();
+});
 </script>
 {% endblock %}
