@@ -2021,6 +2021,7 @@ def save_generated_numbers_to_db(numbers, powerball):
         'number_4': sorted_numbers[3],
         'number_5': sorted_numbers[4],
         'powerball': powerball,
+        'source': source, 
         'generated_date': datetime.now().isoformat()
     }
 
