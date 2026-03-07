@@ -1,637 +1,604 @@
 {% extends "base.html" %}
 
-{% block title %}Generated Numbers History & Analysis{% endblock %}
-
-{% block page_heading %}Your Generated Numbers History & Batch Analysis{% endblock %}
+{% block title %}Scheduler Generated Picks — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
-{# Display Latest Official Draw Results #}
-<div class="card p-6 bg-white rounded-lg shadow-lg mb-8">
-    <h2 class="text-2xl font-bold mb-4 text-gray-800">Latest Official Powerball Draw Result</h2>
-    {% if last_official_draw and last_official_draw['Draw Date'] != 'N/A' %}
-        <div class="flex flex-col sm:flex-row items-center justify-center sm:justify-start space-y-3 sm:space-y-0 sm:space-x-4 mb-4">
-            <span class="text-lg font-semibold text-gray-700">Draw Date: <span class="font-bold text-gray-900">{{ last_official_draw['Draw Date'] }}</span></span>
-            <div class="flex items-center space-x-2">
-                {% for ball in last_official_draw['Numbers'] %}
-                    <span class="ball-large">{{ ball }}</span>
-                {% endfor %}
-                <span class="ball-large powerball-large">{{ last_official_draw['Powerball'] }}</span>
-            </div>
+  :root {
+    --bg:     #050608;
+    --s1:     #090b10;
+    --s2:     #0d1018;
+    --s3:     #111520;
+    --border: rgba(255,255,255,0.06);
+    --text:   rgba(255,255,255,0.87);
+    --muted:  rgba(255,255,255,0.32);
+    --green:  #00e5a0;
+    --green2: rgba(0,229,160,0.1);
+    --green3: rgba(0,229,160,0.25);
+    --amber:  #f59e0b;
+    --amber2: rgba(245,158,11,0.1);
+    --red:    #ef4444;
+    --blue:   #38bdf8;
+    --violet: #a78bfa;
+    --cyan:   #22d3ee;
+  }
+
+  #gnh * { box-sizing: border-box; }
+  #gnh {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg); min-height: 100vh;
+    color: var(--text); padding-bottom: 80px;
+  }
+
+  /* ── Hero ── */
+  .gnh-hero {
+    position: relative; padding: 48px 24px 36px; text-align: center; overflow: hidden;
+  }
+  .gnh-hero::before {
+    content:''; position:absolute; inset:0;
+    background:
+      radial-gradient(ellipse 55% 50% at 50% -5%, rgba(0,229,160,0.08) 0%, transparent 65%),
+      radial-gradient(ellipse 25% 30% at 5%  80%, rgba(56,189,248,0.05) 0%, transparent 60%),
+      radial-gradient(ellipse 25% 30% at 95% 80%, rgba(167,139,250,0.05) 0%, transparent 60%);
+    pointer-events:none;
+  }
+  .gnh-hero::after {
+    content:''; position:absolute; bottom:0; left:0; right:0; height:1px;
+    background:linear-gradient(90deg, transparent, var(--green), rgba(255,255,255,0.2), var(--green), transparent);
+    opacity:0.35;
+  }
+  .gnh-eyebrow {
+    font-size:10px; letter-spacing:3px; text-transform:uppercase;
+    color:var(--green); margin-bottom:10px; opacity:0.8;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .gnh-dot { width:6px; height:6px; border-radius:50%; background:var(--green); animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+  .gnh-hero h1 {
+    font-family:'Rajdhani',sans-serif;
+    font-size:clamp(38px,5.5vw,72px); font-weight:700; line-height:1.05; margin:0 0 12px;
+    background:linear-gradient(135deg, var(--green) 0%, #fff 40%, var(--blue) 80%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  }
+  .gnh-hero p { font-size:12px; color:var(--muted); max-width:480px; margin:0 auto; line-height:1.8; }
+
+  /* ── Layout ── */
+  .gnh-wrap { max-width:1100px; margin:0 auto; padding:0 20px; display:flex; flex-direction:column; gap:16px; }
+
+  /* ── Card ── */
+  .gnh-card { background:var(--s1); border:1px solid var(--border); border-radius:16px; padding:20px 22px; position:relative; overflow:hidden; }
+  .gnh-label { font-size:9px; letter-spacing:2.5px; text-transform:uppercase; color:var(--muted); margin:0 0 14px; display:block; }
+
+  /* ── Stats row ── */
+  .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  @media(max-width:600px){ .stats-row { grid-template-columns:1fr 1fr; } }
+  .stat-chip { background:var(--s2); border:1px solid var(--border); border-radius:10px; padding:12px; text-align:center; }
+  .stat-chip-label { font-size:8px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+  .stat-chip-val   { font-size:20px; font-weight:700; line-height:1; }
+  .stat-chip-sub   { font-size:9px; color:var(--muted); margin-top:3px; }
+
+  /* ── Latest picks banner ── */
+  .latest-banner {
+    border-color:var(--green3);
+    background:linear-gradient(135deg, rgba(0,229,160,0.04) 0%, var(--s1) 60%);
+  }
+  .latest-banner::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    background:linear-gradient(90deg, transparent, var(--green), transparent); opacity:0.6;
+  }
+  .latest-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
+  .latest-date-badge {
+    display:inline-flex; align-items:center; gap:8px;
+    background:var(--green2); border:1px solid var(--green3);
+    border-radius:8px; padding:6px 14px;
+    font-size:11px; color:var(--green); letter-spacing:1px;
+  }
+  .latest-picks-grid { display:flex; flex-direction:column; gap:10px; }
+
+  /* ── Pick row ── */
+  .pick-row {
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    background:var(--s2); border:1px solid var(--border);
+    border-radius:11px; padding:12px 16px;
+    transition:border-color 0.15s;
+  }
+  .pick-row:hover { border-color:rgba(255,255,255,0.12); }
+  .pick-index { font-size:9px; letter-spacing:1px; color:var(--muted); min-width:20px; }
+  .pick-balls { display:flex; gap:6px; align-items:center; flex:1; }
+  .wb {
+    width:36px; height:36px; border-radius:50%; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700;
+    background:radial-gradient(circle at 32% 30%, #f0f4ff 0%, #c8d8ed 45%, #8aaac8 100%);
+    color:#0d1829; box-shadow:0 2px 8px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1);
+    transition:transform 0.15s;
+  }
+  .wb:hover { transform:scale(1.1); }
+  .pb {
+    width:36px; height:36px; border-radius:50%; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700;
+    background:radial-gradient(circle at 32% 30%, #ff9a9a 0%, #ef5350 45%, #b71c1c 100%);
+    color:#fff; box-shadow:0 2px 8px rgba(239,68,68,0.3), 0 0 0 1px rgba(255,100,100,0.2);
+    transition:transform 0.15s;
+  }
+  .pb:hover { transform:scale(1.1); }
+  .ball-sep { color:rgba(255,255,255,0.15); font-size:14px; }
+  .pick-time { font-size:9px; color:var(--muted); letter-spacing:0.5px; white-space:nowrap; }
+  .pick-source {
+    font-size:9px; letter-spacing:1px; padding:3px 8px; border-radius:5px;
+    background:var(--green2); border:1px solid var(--green3); color:var(--green);
+  }
+  .pick-source.manual {
+    background:rgba(56,189,248,0.08); border-color:rgba(56,189,248,0.2); color:var(--blue);
+  }
+  .btn-analyse-pick {
+    font-size:9px; letter-spacing:1px; text-transform:uppercase;
+    padding:5px 12px; border-radius:6px; border:1px solid var(--border);
+    background:transparent; color:var(--muted); cursor:pointer;
+    transition:all 0.15s; white-space:nowrap; margin-left:auto;
+  }
+  .btn-analyse-pick:hover { border-color:rgba(56,189,248,0.3); color:var(--blue); }
+
+  /* ── Compare vs official ── */
+  .compare-bar {
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    margin-top:14px; padding-top:14px; border-top:1px solid var(--border);
+  }
+  .compare-label { font-size:9px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
+  .draw-select {
+    flex:1; min-width:160px; background:var(--s2); border:1px solid var(--border);
+    color:var(--text); font-family:'JetBrains Mono',monospace; font-size:11px;
+    border-radius:8px; padding:8px 12px; outline:none;
+  }
+  .draw-select:focus { border-color:rgba(0,229,160,0.3); }
+  .btn-compare {
+    font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
+    padding:9px 18px; border-radius:8px; border:none; cursor:pointer;
+    background:linear-gradient(135deg, #059669, var(--green));
+    color:#000; font-family:'JetBrains Mono',monospace; font-weight:700;
+    transition:transform 0.15s, box-shadow 0.15s;
+    box-shadow:0 0 16px rgba(0,229,160,0.15);
+  }
+  .btn-compare:hover { transform:translateY(-1px); box-shadow:0 0 24px rgba(0,229,160,0.3); }
+  .btn-compare:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+
+  /* ── Compare results ── */
+  .compare-results { margin-top:14px; display:none; }
+  .compare-results.visible { display:block; }
+  .cr-header { font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
+  .official-balls-row { display:flex; gap:6px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+  .tier-mini-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; }
+  .tier-mini {
+    background:var(--s2); border:1px solid var(--border); border-radius:9px; padding:10px 12px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .tier-mini.hit { border-color:rgba(245,158,11,0.3); background:rgba(245,158,11,0.05); }
+  .tier-mini-name { font-size:10px; color:var(--muted); }
+  .tier-mini-count { font-size:16px; font-weight:700; }
+  .tier-mini-count.nonzero { color:var(--amber); }
+
+  /* ── History timeline ── */
+  .history-section { }
+  .date-group { margin-bottom:12px; }
+  .date-group-hdr {
+    display:flex; align-items:center; gap:12px; cursor:pointer;
+    padding:10px 16px; background:var(--s2); border:1px solid var(--border);
+    border-radius:10px; transition:border-color 0.15s; user-select:none;
+  }
+  .date-group-hdr:hover { border-color:rgba(255,255,255,0.12); }
+  .dg-date { font-size:12px; font-weight:600; color:var(--text); flex:1; }
+  .dg-count { font-size:9px; color:var(--muted); }
+  .dg-chevron { font-size:10px; color:var(--muted); transition:transform 0.2s; }
+  .dg-chevron.open { transform:rotate(180deg); }
+  .date-group-body { display:none; padding:10px 0 0; }
+  .date-group-body.open { display:block; }
+
+  /* ── Individual pick analysis modal-style panel ── */
+  .pick-analysis-panel {
+    display:none; margin-top:8px;
+    background:var(--s3); border:1px solid var(--border); border-radius:10px; padding:14px 16px;
+  }
+  .pick-analysis-panel.open { display:block; }
+  .pa-title { font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
+  .pa-match-list { display:flex; flex-direction:column; gap:6px; }
+  .pa-match-row { display:flex; align-items:center; gap:8px; }
+  .pa-match-label { font-size:11px; color:var(--muted); flex:1; }
+  .pa-match-count { font-size:13px; font-weight:700; min-width:24px; text-align:right; }
+  .pa-match-dates { font-size:9px; color:var(--cyan); margin-left:8px; }
+
+  /* ── Spinner ── */
+  .mini-spinner {
+    display:inline-block; width:14px; height:14px; border-radius:50%;
+    border:2px solid rgba(0,229,160,0.15); border-top-color:var(--green);
+    animation:spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* ── Empty state ── */
+  .empty-state { text-align:center; padding:60px 20px; }
+  .empty-icon { font-size:48px; margin-bottom:16px; opacity:0.3; }
+  .empty-title { font-family:'Rajdhani',sans-serif; font-size:22px; font-weight:700; color:var(--muted); margin-bottom:8px; }
+  .empty-sub { font-size:11px; color:var(--muted); opacity:0.6; }
+
+  /* ── Toast ── */
+  .gnh-toast {
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(12px);
+    padding:11px 20px; border-radius:9px; font-size:12px;
+    opacity:0; pointer-events:none; z-index:999; transition:all 0.25s; white-space:nowrap;
+  }
+  .gnh-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  .gnh-toast.ok  { background:rgba(0,229,160,0.1); border:1px solid rgba(0,229,160,0.25); color:var(--green); }
+  .gnh-toast.err { background:rgba(239,68,68,0.1);  border:1px solid rgba(239,68,68,0.25);  color:#fca5a5; }
+</style>
+
+<div id="gnh">
+
+  <!-- Hero -->
+  <div class="gnh-hero">
+    <p class="gnh-eyebrow"><span class="gnh-dot"></span> Auto Scheduler · Live Picks · History</p>
+    <h1>Generated Picks<br>Command Centre</h1>
+    <p>Every pick the scheduler generates on draw days (Mon / Wed / Sat) is logged here. Compare against official draws, analyse historical match rates.</p>
+  </div>
+
+  <div class="gnh-wrap">
+
+    {% set all_dates = generated_history.keys() | list %}
+    {% set total_picks = namespace(count=0) %}
+    {% for date, picks in generated_history.items() %}
+      {% set total_picks.count = total_picks.count + picks|length %}
+    {% endfor %}
+
+    <!-- ① Stats -->
+    <div class="gnh-card">
+      <span class="gnh-label">Overview</span>
+      <div class="stats-row">
+        <div class="stat-chip">
+          <p class="stat-chip-label">Total Picks</p>
+          <p class="stat-chip-val" style="color:var(--green)">{{ total_picks.count }}</p>
+          <p class="stat-chip-sub">all time</p>
         </div>
-        <p class="text-sm text-gray-600 italic">This is the most recent official draw loaded into your database.</p>
-    {% else %}
-        <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
-            No latest official draw data available. Please ensure historical data is loaded.
+        <div class="stat-chip">
+          <p class="stat-chip-label">Draw Days</p>
+          <p class="stat-chip-val" style="color:var(--blue)">{{ all_dates | length }}</p>
+          <p class="stat-chip-sub">unique dates</p>
         </div>
-    {% endif %}
-</div>
-
-
-<div class="card p-6 bg-white rounded-lg shadow-lg mb-8">
-    <h2 class="text-2xl font-bold mb-4 text-gray-800">Analyze Generated Batches</h2>
-    <p class="text-gray-700 mb-4">
-        Select an official Powerball draw date to compare against. Then, click "Analyze this Batch" within any of your saved generated pick dates to see how well that specific batch would have performed in the selected official draw.
-    </p>
-
-    <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 mb-6">
-        <label for="official-draw-date-select" class="block text-gray-700 font-bold mb-1 sm:mb-0">Select Official Draw Date:</label>
-        <select id="official-draw-date-select" class="shadow appearance-none border rounded-lg py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline flex-grow">
-            {% if official_draw_dates %}
-                {% for date in official_draw_dates %}
-                    <option value="{{ date }}">{{ date }}</option>
-                {% endfor %}
-            {% else %}
-                <option value="">No Official Draws Available</option>
-            {% endif %}
-        </select>
-        <div id="analysis-loading-indicator" class="hidden flex items-center text-blue-500 font-semibold">
-            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Analyzing...
+        <div class="stat-chip">
+          <p class="stat-chip-label">Latest Batch</p>
+          <p class="stat-chip-val" style="color:var(--amber); font-size:14px">{{ all_dates[0] if all_dates else '—' }}</p>
+          <p class="stat-chip-sub">most recent</p>
         </div>
-    </div>
-    
-    <div id="batch-analysis-results" class="hidden mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <h3 class="text-xl font-bold text-blue-800 mb-3">Analysis Results: <span id="analyzed-generated-date"></span> vs. Official Draw on <span id="analyzed-official-date"></span></h3>
-        <p class="text-blue-700 mb-3">Total picks analyzed in this batch: <span id="total-picks-analyzed" class="font-semibold"></span></p>
-        <div id="match-summary-details" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-gray-700">
-            {# Results will be dynamically inserted here #}
+        <div class="stat-chip">
+          <p class="stat-chip-label">Per Session</p>
+          <p class="stat-chip-val" style="color:var(--violet)">{{ (total_picks.count / all_dates|length) | round(1) if all_dates else 0 }}</p>
+          <p class="stat-chip-sub">avg picks/day</p>
         </div>
+      </div>
     </div>
-    <div id="batch-analysis-error-message" class="hidden mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
-        {# Error messages will be dynamically inserted here #}
-    </div>
-</div>
-
-{# New section for Single Pick Analysis Results #}
-<div id="single-pick-analysis-results" class="hidden card p-6 bg-white rounded-lg shadow-lg mb-8">
-    <h2 class="text-2xl font-bold mb-4 text-gray-800">Single Pick Historical Match Analysis</h2>
-    <p class="text-gray-700 mb-3">Analyzing generated pick: 
-        <span id="analyzed-single-white-balls" class="font-semibold flex space-x-1 inline-flex items-center"></span>
-        <span id="analyzed-single-powerball" class="font-semibold inline-flex items-center"></span>
-        against all historical draws.
-    </p>
-    <div id="single-match-summary-details" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-gray-700">
-        {# Results will be dynamically inserted here #}
-    </div>
-</div>
-<div id="single-pick-analysis-loading-indicator" class="hidden flex items-center text-blue-500 font-semibold mt-4 mb-8">
-    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-    </svg>
-    Analyzing Single Pick...
-</div>
-<div id="single-pick-analysis-error-message" class="hidden mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg mb-8">
-    {# Error messages will be dynamically inserted here #}
-</div>
-
-
-<div class="card p-6 bg-white rounded-lg shadow-lg">
-    <h2 class="text-2xl font-bold mb-4 text-gray-800">Saved Generated Picks History</h2>
-    <p class="text-gray-700 mb-4">Below is the historical record of your saved Powerball picks, grouped by the date they were generated.</p>
 
     {% if generated_history %}
-        {# Group data by year and month for display #}
-        {% set grouped_by_year = {} %}
-        {% for date_str, picks_for_date in generated_history.items() %}
-            {# Assuming 'moment' filter is available from Flask-Moment or similar, otherwise use Python datetime in Flask #}
-            {# For simplicity in template, we'll assume a YYYY-MM-DD string and parse it #}
-            {% set year = date_str[0:4] %}
-            {% set month_num = date_str[5:7] %}
-            {% set month_name_map = {
-                "01": "January", "02": "February", "03": "March", "04": "April",
-                "05": "May", "06": "June", "07": "July", "08": "August",
-                "09": "September", "10": "October", "11": "November", "12": "December"
-            } %}
-            {% set month = month_name_map[month_num] %}
-            {% set month_key = date_str[0:7] %} {# YYYY-MM for unique sorting #}
 
-            {% if year not in grouped_by_year %}{% set _ = grouped_by_year.update({year: {}}) %}{% endif %}
-            {% if month_key not in grouped_by_year[year] %}{% set _ = grouped_by_year[year].update({month_key: {'name': month, 'dates': {}}}) %}{% endif %}
-            {% set _ = grouped_by_year[year][month_key]['dates'].update({date_str: picks_for_date}) %}
-        {% endfor %}
+    {% set latest_date = all_dates[0] %}
+    {% set latest_picks = generated_history[latest_date] %}
 
-        {% set sorted_years = grouped_by_year.keys() | sort(reverse=true) %}
+    <!-- ② Latest batch -->
+    <div class="gnh-card latest-banner">
+      <div class="latest-header">
+        <div>
+          <span class="gnh-label">Latest Scheduler Run</span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="latest-date-badge"><span class="gnh-dot"></span> {{ latest_date }}</span>
+            <span style="font-size:10px;color:var(--muted)">{{ latest_picks|length }} picks generated</span>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <p style="font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:4px">NEXT DRAW</p>
+          <p style="font-size:12px;color:var(--text)">Mon · Wed · Sat @ 08:00 ET</p>
+        </div>
+      </div>
 
-        <div id="accordion-container" class="space-y-4">
-            {% for year in sorted_years %}
-                <div class="border border-gray-300 rounded-lg shadow-md overflow-hidden">
-                    <button class="year-toggle w-full flex justify-between items-center p-4 bg-gray-100 hover:bg-gray-200 font-bold text-lg text-gray-800 transition-colors duration-200"
-                            data-target="year-content-{{ year }}">
-                        {{ year }}
-                        <svg class="w-5 h-5 transform transition-transform duration-200 year-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </button>
-                    <div id="year-content-{{ year }}" class="year-content hidden">
-                        {% set sorted_months_keys = grouped_by_year[year].keys() | sort(reverse=true) %}
-                        {% for month_key in sorted_months_keys %}
-                            {% set month_data = grouped_by_year[year][month_key] %}
-                            <div class="border-t border-gray-200">
-                                <button class="month-toggle w-full flex justify-between items-center p-3 bg-white hover:bg-gray-50 font-semibold text-md text-gray-700 transition-colors duration-200 pl-8"
-                                        data-target="month-content-{{ year }}-{{ month_key }}">
-                                    {{ month_data.name }}
-                                    <svg class="w-4 h-4 transform transition-transform duration-200 month-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                                </button>
-                                <div id="month-content-{{ year }}-{{ month_key }}" class="month-content hidden">
-                                    {% set sorted_dates = month_data.dates.keys() | sort(reverse=true) %}
-                                    {# Added Delete Selected Button #}
-                                    <div class="flex justify-end pr-4 pt-2">
-                                        <button class="btn-danger-small delete-picks-button flex items-center px-3 py-1.5 text-xs rounded-md" data-date="{{ date_str }}">
-                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m14 0H5m14 0V5a2 2 0 00-2-2H7a2 2 0 00-2 2v2m14 0h-4m-4 0H5"></path>
-                                            </svg>
-                                            Delete Selected
-                                        </button>
-                                    </div>
-                                    {% for date_str in sorted_dates %}
-                                        <div class="p-4 border-t border-gray-100 bg-gray-50 pl-12">
-                                            <h4 class="font-bold text-gray-800 mb-3 text-sm flex items-center">
-                                                <input type="checkbox" class="form-checkbox h-4 w-4 text-blue-600 rounded mr-2 select-all-day-checkbox" data-date="{{ date_str }}">
-                                                {{ date_str }} ({{ month_data.dates[date_str]|length }} picks)
-                                            </h4>
-                                            <div class="space-y-3">
-                                                {% for pick in month_data.dates[date_str] %}
-                                                    <li class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b pb-3 mb-3 last:border-b-0 last:pb-0 last:mb-0">
-                                                        <div class="flex items-center">
-                                                            {# Checkbox for individual pick #}
-                                                            <input type="checkbox" class="form-checkbox h-4 w-4 text-blue-600 rounded mr-2 generated-pick-checkbox" data-id="{{ pick.id }}" data-date="{{ date_str }}">
-                                                            <span class="text-gray-600 text-sm mb-2 sm:mb-0 sm:mr-4">Generated at: <span class="font-medium text-gray-800">{{ pick.time }}</span></span>
-                                                        </div>
-                                                        <div class="flex items-center space-x-2 flex-wrap justify-center sm:justify-start">
-                                                            {% for ball in pick.white_balls %}
-                                                                <span class="ball-small">{{ ball }}</span>
-                                                            {% endfor %}
-                                                            <span class="ball-small powerball-small">{{ pick.powerball }}</span>
-                                                        </div>
-                                                        <div class="flex space-x-2 mt-3 sm:mt-0">
-                                                            <button type="button" class="btn-primary-small analyze-single-pick-btn" 
-                                                                    data-white-balls="{{ pick.white_balls | join(',') }}" 
-                                                                    data-powerball="{{ pick.powerball }}">
-                                                                Analyze Single Pick
-                                                            </button>
-                                                            <button type="button" class="btn-primary-small analyze-batch-btn bg-purple-600 hover:bg-purple-700" data-generated-date="{{ date_str }}">
-                                                                Analyze This Batch
-                                                            </button>
-                                                        </div>
-                                                    </li>
-                                                {% endfor %}
-                                            </div>
-                                        </div>
-                                    {% endfor %}
-                                </div>
-                            </div>
-                        {% endfor %}
-                    </div>
-                </div>
+      <div class="latest-picks-grid">
+        {% for pick in latest_picks %}
+        <div class="pick-row" id="latest-pick-{{ pick.id }}">
+          <span class="pick-index">#{{ loop.index }}</span>
+          <div class="pick-balls">
+            {% for n in pick.white_balls %}
+              <div class="wb">{{ n }}</div>
             {% endfor %}
+            <span class="ball-sep">+</span>
+            <div class="pb">{{ pick.powerball }}</div>
+          </div>
+          <span class="pick-time">{{ pick.time }}</span>
+          <span class="pick-source">⚙ SCHEDULER</span>
+          <button class="btn-analyse-pick"
+            data-wb="{{ pick.white_balls | join(',') }}"
+            data-pb="{{ pick.powerball }}"
+            data-target="pa-latest-{{ pick.id }}">
+            ⬡ Analyse
+          </button>
         </div>
-    {% else %}
-        <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
-            No generated numbers have been saved yet.
+        <div class="pick-analysis-panel" id="pa-latest-{{ pick.id }}">
+          <p class="pa-title">Historical Match Summary (Last 2 Years)</p>
+          <div class="pa-match-list"></div>
         </div>
-    {% endif %}
-</div>
+        {% endfor %}
+      </div>
 
-{# Custom Confirmation Modal #}
-<div id="confirmationModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 hidden">
-    <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4">
-        <h3 class="text-xl font-bold mb-4 text-gray-800">Confirm Deletion</h3>
-        <p class="text-gray-700 mb-6" id="modalMessage">Are you sure you want to delete the selected pick(s)? This action cannot be undone.</p>
-        <div class="flex justify-end space-x-4">
-            <button id="cancelDeleteBtn" class="btn-secondary">Cancel</button>
-            <button id="confirmDeleteBtn" class="btn-danger">Delete</button>
-        </div>
+      <!-- Compare vs official draw -->
+      <div class="compare-bar">
+        <span class="compare-label">Compare batch vs official draw →</span>
+        <select class="draw-select" id="compareSelect-{{ latest_date | replace('-','') }}">
+          <option value="">Select draw date…</option>
+          {% for d in official_draw_dates %}
+            <option value="{{ d }}">{{ d }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn-compare"
+          data-gen-date="{{ latest_date }}"
+          data-select-id="compareSelect-{{ latest_date | replace('-','') }}"
+          data-result-id="compareResult-{{ latest_date | replace('-','') }}">
+          ⬡ Compare
+        </button>
+      </div>
+      <div class="compare-results" id="compareResult-{{ latest_date | replace('-','') }}"></div>
     </div>
+
+    <!-- ③ Full history -->
+    <div class="gnh-card">
+      <span class="gnh-label">Full History · All Generated Batches</span>
+      <div class="history-section" id="historySection">
+        {% for date, picks in generated_history.items() %}
+        {% if not loop.first %}
+        <div class="date-group">
+          <div class="date-group-hdr" onclick="toggleDateGroup('dg-{{ date | replace('-','') }}', this)">
+            <span class="dg-date">{{ date }}</span>
+            <span class="dg-count">{{ picks|length }} pick{{ 's' if picks|length > 1 else '' }}</span>
+            <span class="dg-chevron">▼</span>
+          </div>
+          <div class="date-group-body" id="dg-{{ date | replace('-','') }}">
+            {% for pick in picks %}
+            <div class="pick-row" style="margin-bottom:8px">
+              <span class="pick-index">#{{ loop.index }}</span>
+              <div class="pick-balls">
+                {% for n in pick.white_balls %}
+                  <div class="wb" style="width:30px;height:30px;font-size:10px">{{ n }}</div>
+                {% endfor %}
+                <span class="ball-sep">+</span>
+                <div class="pb" style="width:30px;height:30px;font-size:10px">{{ pick.powerball }}</div>
+              </div>
+              <span class="pick-time">{{ pick.time }}</span>
+              <button class="btn-analyse-pick"
+                data-wb="{{ pick.white_balls | join(',') }}"
+                data-pb="{{ pick.powerball }}"
+                data-target="pa-hist-{{ pick.id }}">
+                ⬡ Analyse
+              </button>
+            </div>
+            <div class="pick-analysis-panel" id="pa-hist-{{ pick.id }}">
+              <p class="pa-title">Historical Match Summary (Last 2 Years)</p>
+              <div class="pa-match-list"></div>
+            </div>
+            {% endfor %}
+
+            <!-- Compare bar for this date -->
+            <div class="compare-bar">
+              <span class="compare-label">Compare vs →</span>
+              <select class="draw-select" id="compareSelect-{{ date | replace('-','') }}">
+                <option value="">Select draw date…</option>
+                {% for d in official_draw_dates %}
+                  <option value="{{ d }}" {% if d == date %}selected{% endif %}>{{ d }}</option>
+                {% endfor %}
+              </select>
+              <button class="btn-compare"
+                data-gen-date="{{ date }}"
+                data-select-id="compareSelect-{{ date | replace('-','') }}"
+                data-result-id="compareResult-{{ date | replace('-','') }}">
+                ⬡ Compare
+              </button>
+            </div>
+            <div class="compare-results" id="compareResult-{{ date | replace('-','') }}"></div>
+          </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    {% else %}
+    <!-- Empty state -->
+    <div class="gnh-card">
+      <div class="empty-state">
+        <div class="empty-icon">⚙</div>
+        <p class="empty-title">No Picks Generated Yet</p>
+        <p class="empty-sub">The scheduler runs every Monday, Wednesday and Saturday at 08:00 ET.<br>Check back after the next draw day.</p>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
 </div>
 
-{# Custom Toast Popup for messages #}
-<div id="toastPopup" class="toast-popup hidden"></div>
-
-<style>
-    /* Custom styles for balls - keeping yours */
-    .ball-small {
-        display: inline-flex;
-        justify-content: center;
-        align-items: center;
-        width: 30px;
-        height: 30px;
-        background-color: #f0f0f0;
-        border-radius: 50%;
-        border: 2px solid #ccc;
-        font-weight: bold;
-        color: #333;
-        font-size: 0.9em;
-        box-shadow: inset 0 0 3px rgba(0,0,0,0.2);
-    }
-    .powerball-small {
-        background-color: #ef4444; /* Red color for powerball */
-        color: white;
-        border-color: #dc2626;
-    }
-    .ball-large {
-        display: inline-flex;
-        justify-content: center;
-        align-items: center;
-        width: 45px;
-        height: 45px;
-        background-color: #e0e0e0;
-        border-radius: 50%;
-        border: 2px solid #bbb;
-        font-weight: bold;
-        color: #222;
-        font-size: 1.2em;
-        box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
-    }
-    .powerball-large {
-        background-color: #c02a2a; /* Darker red for large powerball */
-        color: white;
-        border-color: #991b1b;
-    }
-    /* Buttons - keeping your primary-small and adding danger for consistency */
-    .btn-primary-small {
-        @apply bg-blue-500 text-white text-xs font-bold py-1.5 px-3 rounded-lg hover:bg-blue-600 focus:outline-none focus:shadow-outline transition duration-200 ease-in-out;
-    }
-    /* New: danger button styles for consistency */
-    .btn-danger {
-        @apply bg-red-500 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-red-600 transition duration-300 ease-in-out transform hover:scale-105;
-    }
-    .btn-danger-small {
-        @apply bg-red-500 text-white font-bold py-1.5 px-3 rounded-md hover:bg-red-600 transition duration-300 ease-in-out;
-    }
-    .btn-secondary {
-        @apply bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-300 transition duration-300 ease-in-out transform hover:scale-105;
-    }
-
-    /* Existing accordion arrow styles */
-    .year-toggle .year-arrow, .month-toggle .month-arrow {
-        transition: transform 0.2s ease-in-out;
-    }
-    .year-toggle[aria-expanded="true"] .year-arrow, .month-toggle[aria-expanded="true"] .month-arrow {
-        transform: rotate(180deg);
-    }
-    /* Hide default details marker */
-    details > summary::-webkit-details-marker {
-        display: none;
-    }
-    details > summary {
-        list-style: none;
-    }
-    details[open] .details-arrow {
-        transform: rotate(180deg);
-    }
-
-    /* Toast notification styling */
-    .toast-popup {
-        position: fixed;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        padding: 12px 20px;
-        border-radius: 8px;
-        font-size: 14px;
-        color: white;
-        opacity: 0;
-        visibility: hidden;
-        transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
-        z-index: 1000;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-    .toast-popup.show {
-        opacity: 1;
-        visibility: visible;
-    }
-    .toast-popup.success {
-        background-color: #28a745; /* Green */
-    }
-    .toast-popup.error {
-        background-color: #dc3545; /* Red */
-    }
-    .toast-popup.info {
-        background-color: #007bff; /* Blue */
-    }
-    .toast-popup.animate-fade-out {
-        animation: fadeOut 0.5s forwards;
-    }
-    @keyframes fadeOut {
-        from { opacity: 1; }
-        to { opacity: 0; }
-    }
-
-    /* Ensure text in balls is readable */
-    .ball-small, .ball-large, .powerball-small, .powerball-large {
-        font-family: 'Inter', sans-serif;
-    }
-</style>
+<div class="gnh-toast" id="gnhToast"></div>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // --- Existing Accordion Logic ---
-        document.querySelectorAll('.year-toggle').forEach(button => {
-            button.addEventListener('click', function() {
-                const targetId = this.dataset.target;
-                const targetContent = document.getElementById(targetId);
-                const isExpanded = targetContent.classList.toggle('hidden');
-                this.setAttribute('aria-expanded', !isExpanded); // ARIA for accessibility
-            });
+document.addEventListener('DOMContentLoaded', function () {
+
+  // ── Toast ─────────────────────────────────────────────────
+  function toast(msg, type='ok') {
+    const el = document.getElementById('gnhToast');
+    el.textContent = msg; el.className = `gnh-toast ${type} show`;
+    clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 3500);
+  }
+
+  // ── Toggle date group ─────────────────────────────────────
+  window.toggleDateGroup = function(id, hdr) {
+    const body    = document.getElementById(id);
+    const chevron = hdr.querySelector('.dg-chevron');
+    if (!body) return;
+    body.classList.toggle('open');
+    chevron.classList.toggle('open');
+  };
+
+  // ── TIER CONFIG for display ───────────────────────────────
+  const TIER_ORDER = [
+    'Match 5 White Balls + Powerball',
+    'Match 5 White Balls Only',
+    'Match 4 White Balls + Powerball',
+    'Match 4 White Balls Only',
+    'Match 3 White Balls + Powerball',
+    'Match 3 White Balls Only',
+    'Match 2 White Balls + Powerball',
+    'Match 1 White Ball + Powerball',
+    'Match Powerball Only',
+  ];
+
+  // ── Individual pick analyse ───────────────────────────────
+  document.querySelectorAll('.btn-analyse-pick').forEach(btn => {
+    btn.addEventListener('click', async function () {
+      const wb     = this.dataset.wb;
+      const pb     = this.dataset.pb;
+      const target = document.getElementById(this.dataset.target);
+      if (!target) return;
+
+      // Toggle
+      if (target.classList.contains('open')) {
+        target.classList.remove('open');
+        this.textContent = '⬡ Analyse';
+        return;
+      }
+
+      this.innerHTML = '<span class="mini-spinner"></span>';
+      target.classList.add('open');
+      const listEl = target.querySelector('.pa-match-list');
+      listEl.innerHTML = '<span class="mini-spinner"></span>';
+
+      try {
+        const res  = await fetch('/analyze_generated_historical_matches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ generated_white_balls: wb, generated_powerball: pb })
         });
+        const data = await res.json();
 
-        document.querySelectorAll('.month-toggle').forEach(button => {
-            button.addEventListener('click', function() {
-                const targetId = this.dataset.target;
-                const targetContent = document.getElementById(targetId);
-                const isExpanded = targetContent.classList.toggle('hidden');
-                this.setAttribute('aria-expanded', !isExpanded); // ARIA for accessibility
-            });
-        });
+        listEl.innerHTML = '';
 
-        // --- New Delete Functionality Elements ---
-        const confirmationModal = document.getElementById('confirmationModal');
-        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
-        const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
-        const modalMessage = document.getElementById('modalMessage');
-        const toastPopup = document.getElementById('toastPopup');
-
-        // --- Custom Toast Popup Function ---
-        function showToast(message, category = 'info') {
-            toastPopup.textContent = message;
-            // Remove previous category classes before adding new ones
-            toastPopup.classList.remove('success', 'error', 'info', 'hidden', 'animate-fade-out');
-            toastPopup.className = `toast-popup show ${category}`; 
-            
-            // Set a timeout to hide the toast
-            setTimeout(() => {
-                toastPopup.classList.remove('show');
-                toastPopup.classList.add('animate-fade-out'); // Add fade-out animation
-                toastPopup.addEventListener('animationend', () => {
-                    toastPopup.classList.add('hidden'); // Fully hide after animation
-                    // Remove all category and animation classes for next use
-                    toastPopup.classList.remove('animate-fade-out', 'success', 'error', 'info');
-                }, { once: true }); // Ensure listener only runs once
-            }, 5000); // Toast disappears after 5 seconds
+        if (!data.success) {
+          listEl.innerHTML = `<span style="font-size:11px;color:#fca5a5">${data.error || 'Error'}</span>`;
+        } else {
+          const summary = data.match_summary || {};
+          let anyHit = false;
+          TIER_ORDER.forEach(tier => {
+            const info  = summary[tier];
+            if (!info) return;
+            const count = info.count || 0;
+            if (count === 0) return;
+            anyHit = true;
+            const dates = (info.draws || []).slice(0,3).map(d => d.date || d).join(' · ');
+            const row   = document.createElement('div');
+            row.className = 'pa-match-row';
+            row.innerHTML = `
+              <span class="pa-match-label">${tier}</span>
+              <span class="pa-match-count" style="color:var(--amber)">${count}×</span>
+              ${dates ? `<span class="pa-match-dates">${dates}</span>` : ''}
+            `;
+            listEl.appendChild(row);
+          });
+          if (!anyHit) {
+            listEl.innerHTML = '<span style="font-size:11px;color:var(--muted)">No matches found in the last 2 years.</span>';
+          }
         }
-
-
-        // --- Modal Control Functions ---
-        function openModal(message) {
-            modalMessage.textContent = message;
-            confirmationModal.classList.remove('hidden');
-        }
-
-        function closeModal() {
-            confirmationModal.classList.add('hidden');
-        }
-
-        cancelDeleteBtn.addEventListener('click', closeModal);
-
-        // --- Delete Logic ---
-
-        // Event listener for "Select All for Day" checkboxes
-        document.querySelectorAll('.select-all-day-checkbox').forEach(checkbox => {
-            checkbox.addEventListener('change', function() {
-                const date = this.dataset.date;
-                const checkboxesInDay = document.querySelectorAll(`.generated-pick-checkbox[data-date="${date}"]`);
-                checkboxesInDay.forEach(pickCheckbox => {
-                    pickCheckbox.checked = this.checked;
-                });
-            });
-        });
-
-        // Event listener for individual generated pick checkboxes (delegated to parent)
-        document.getElementById('accordion-container').addEventListener('change', function(event) {
-            if (event.target.classList.contains('generated-pick-checkbox')) {
-                const changedCheckbox = event.target;
-                const date = changedCheckbox.dataset.date;
-                const selectAllDayCheckbox = document.querySelector(`.select-all-day-checkbox[data-date="${date}"]`);
-                
-                if (selectAllDayCheckbox) {
-                    const checkboxesInDay = document.querySelectorAll(`.generated-pick-checkbox[data-date="${date}"]`);
-                    const allForDaySelected = Array.from(checkboxesInDay).every(cb => cb.checked);
-                    selectAllDayCheckbox.checked = allForDaySelected;
-                }
-            }
-        });
-
-        // Event listener for "Delete Selected" button (per month)
-        document.querySelectorAll('.delete-picks-button').forEach(button => {
-            button.addEventListener('click', function() {
-                const monthDiv = this.closest('.month-content'); // Get the parent month-content div
-                const selectedIds = Array.from(monthDiv.querySelectorAll('.generated-pick-checkbox:checked'))
-                                       .map(cb => cb.dataset.id);
-                
-                if (selectedIds.length === 0) {
-                    showToast("Please select at least one pick to delete in this month.", 'info');
-                    return;
-                }
-
-                openModal(`Are you sure you want to delete ${selectedIds.length} selected pick(s) from this month? This action cannot be undone.`);
-
-                confirmDeleteBtn.onclick = async function() {
-                    closeModal();
-                    try {
-                        const response = await fetch('/api/delete_generated_picks', {
-                            method: 'DELETE',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({ ids: selectedIds }),
-                        });
-
-                        const result = await response.json();
-
-                        if (response.ok) {
-                            showToast(result.message, 'success');
-                            // Reload the page to reflect changes
-                            location.reload(); 
-                        } else {
-                            showToast(result.error || "Failed to delete picks.", 'error');
-                        }
-                    } catch (error) {
-                        console.error('Error deleting generated picks:', error);
-                        showToast('An unexpected error occurred during deletion.', 'error');
-                    }
-                };
-            });
-        });
-
-
-        // --- Existing Analysis Logic (Re-pasted for completeness) ---
-
-        // Elements for Batch Analysis
-        const officialDrawDateSelect = document.getElementById('official-draw-date-select');
-        const analyzeBatchButtons = document.querySelectorAll('.analyze-batch-btn');
-        const batchAnalysisResultsDiv = document.getElementById('batch-analysis-results');
-        const batchAnalysisLoadingIndicator = document.getElementById('analysis-loading-indicator');
-        const batchAnalysisErrorMessage = document.getElementById('batch-analysis-error-message');
-        const analyzedGeneratedDateSpan = document.getElementById('analyzed-generated-date');
-        const analyzedOfficialDateSpan = document.getElementById('analyzed-official-date');
-        const totalPicksAnalyzedSpan = document.getElementById('total-picks-analyzed');
-        const batchMatchSummaryDetailsDiv = document.getElementById('match-summary-details');
-
-        // Elements for Single Pick Analysis
-        const analyzeSinglePickButtons = document.querySelectorAll('.analyze-single-pick-btn');
-        const singlePickAnalysisResultsDiv = document.getElementById('single-pick-analysis-results');
-        const singlePickAnalysisLoadingIndicator = document.getElementById('single-pick-analysis-loading-indicator');
-        const singlePickAnalysisErrorMessage = document.getElementById('single-pick-analysis-error-message');
-        const analyzedSingleWhiteBallsSpan = document.getElementById('analyzed-single-white-balls');
-        const analyzedSinglePowerballSpan = document.getElementById('analyzed-single-powerball');
-        const singleMatchSummaryDetailsDiv = document.getElementById('single-match-summary-details');
-
-        // Initial check for official draw dates to enable/disable batch analysis buttons
-        if (officialDrawDateSelect && (officialDrawDateSelect.options.length === 0 || officialDrawDateSelect.value === "")) {
-            analyzeBatchButtons.forEach(btn => btn.disabled = true);
-        }
-
-        // Function to display match summary (reusable for both batch and single)
-        function displayMatchSummary(summary, targetDiv, totalPicks = 1) {
-            targetDiv.innerHTML = ''; // Clear previous summary
-            let foundMatches = false;
-            for (const key in summary) {
-                if (summary.hasOwnProperty(key)) {
-                    // Exclude "No Match" from display unless all picks are "No Match"
-                    if (key === "No Match") {
-                        continue;
-                    }
-
-                    const count = summary[key].count;
-                    const draws = summary[key].draws;
-                    
-                    if (count > 0) {
-                        foundMatches = true;
-                        const div = document.createElement('div');
-                        div.className = 'bg-blue-100 p-2 rounded-md font-medium';
-                        let listItemText = `<span class="text-blue-900">${key}:</span> <span class="font-bold text-lg text-blue-700">${count}</span>`;
-                        if (draws.length > 0) {
-                            // Display unique draw dates only
-                            const uniqueDrawDates = Array.from(new Set(draws.map(d => d.date))).join(', ');
-                            listItemText += `<span class="text-sm text-gray-600 ml-2">(Last drawn: ${uniqueDrawDates})</span>`;
-                        }
-                        div.innerHTML = listItemText;
-                        targetDiv.appendChild(div);
-                    }
-                }
-            }
-            if (!foundMatches && totalPicks > 0) {
-                 const div = document.createElement('div');
-                 div.className = 'bg-blue-100 p-2 rounded-md font-medium';
-                 div.innerHTML = `<span class="text-blue-900">No Significant Matches Found.</span>`;
-                 targetDiv.appendChild(div);
-            }
-        }
-
-        // Event Listeners for Batch Analysis
-        analyzeBatchButtons.forEach(button => {
-            button.addEventListener('click', async function() {
-                const generatedDate = this.dataset.generatedDate;
-                const officialDrawDate = officialDrawDateSelect.value;
-
-                // Hide other analysis results
-                singlePickAnalysisResultsDiv.classList.add('hidden');
-                singlePickAnalysisErrorMessage.classList.add('hidden');
-
-                // Clear previous results and errors for batch analysis
-                batchAnalysisResultsDiv.classList.add('hidden');
-                batchAnalysisErrorMessage.classList.add('hidden');
-                batchAnalysisErrorMessage.innerHTML = '';
-                batchAnalysisLoadingIndicator.classList.remove('hidden');
-
-                if (!officialDrawDate) {
-                    batchAnalysisErrorMessage.classList.remove('hidden');
-                    batchAnalysisErrorMessage.innerHTML = "Please select an official draw date to analyze against.";
-                    batchAnalysisLoadingIndicator.classList.add('hidden');
-                    return;
-                }
-
-                try {
-                    const response = await fetch('/analyze_batch_vs_official', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            generated_date: generatedDate,
-                            official_draw_date: officialDrawDate
-                        })
-                    });
-
-                    const result = await response.json();
-
-                    if (response.ok && result.success) {
-                        analyzedGeneratedDateSpan.textContent = generatedDate;
-                        analyzedOfficialDateSpan.textContent = officialDrawDate;
-                        totalPicksAnalyzedSpan.textContent = result.total_generated_picks_in_batch;
-                        
-                        displayMatchSummary(result.summary, batchMatchSummaryDetailsDiv, result.total_generated_picks_in_batch);
-                        batchAnalysisResultsDiv.classList.remove('hidden');
-                    } else {
-                        batchAnalysisErrorMessage.classList.remove('hidden');
-                        batchAnalysisErrorMessage.innerHTML = result.error || "An unknown error occurred during batch analysis.";
-                    }
-                } catch (error) {
-                    console.error('Error during batch analysis fetch:', error);
-                    batchAnalysisErrorMessage.classList.remove('hidden');
-                    batchAnalysisErrorMessage.innerHTML = `Failed to connect to analysis server: ${error.message}`;
-                } finally {
-                    batchAnalysisLoadingIndicator.classList.add('hidden');
-                }
-            });
-        });
-
-        // Event Listeners for Single Pick Analysis
-        analyzeSinglePickButtons.forEach(button => {
-            button.addEventListener('click', async function() {
-                const generatedWhiteBalls = this.dataset.whiteBalls;
-                const generatedPowerball = this.dataset.powerball;
-
-                // Hide other analysis results
-                batchAnalysisResultsDiv.classList.add('hidden');
-                batchAnalysisErrorMessage.classList.add('hidden');
-
-                // Clear previous results and errors for single pick analysis
-                singlePickAnalysisResultsDiv.classList.add('hidden');
-                singlePickAnalysisErrorMessage.classList.add('hidden');
-                singlePickAnalysisErrorMessage.innerHTML = '';
-                singlePickAnalysisLoadingIndicator.classList.remove('hidden');
-
-                // Display the pick being analyzed
-                analyzedSingleWhiteBallsSpan.innerHTML = generatedWhiteBalls.split(',').map(num => `<span class="ball-small">${num}</span>`).join('');
-                analyzedSinglePowerballSpan.innerHTML = `<span class="ball-small powerball-small">${generatedPowerball}</span>`;
-
-                try {
-                    const response = await fetch('/analyze_generated_historical_matches', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            generated_white_balls: generatedWhiteBalls,
-                            generated_powerball: generatedPowerball
-                        })
-                    });
-
-                    const result = await response.json();
-
-                    if (response.ok && result.success) {
-                        displayMatchSummary(result.match_summary, singleMatchSummaryDetailsDiv);
-                        singlePickAnalysisResultsDiv.classList.remove('hidden');
-                    } else {
-                        singlePickAnalysisErrorMessage.classList.remove('hidden');
-                        singlePickAnalysisErrorMessage.innerHTML = result.error || "An unknown error occurred during single pick analysis.";
-                    }
-                } catch (error) {
-                    console.error('Error during single pick analysis fetch:', error);
-                    singlePickAnalysisErrorMessage.classList.remove('hidden');
-                    singlePickAnalysisErrorMessage.innerHTML = `Failed to connect to analysis server: ${error.message}`;
-                } finally {
-                    singlePickAnalysisLoadingIndicator.classList.add('hidden');
-                }
-            });
-        });
+      } catch(e) {
+        listEl.innerHTML = `<span style="font-size:11px;color:#fca5a5">Request failed.</span>`;
+      } finally {
+        this.textContent = '✕ Close';
+      }
     });
+  });
+
+  // ── Batch compare vs official ─────────────────────────────
+  document.querySelectorAll('.btn-compare').forEach(btn => {
+    btn.addEventListener('click', async function () {
+      const genDate  = this.dataset.genDate;
+      const selectEl = document.getElementById(this.dataset.selectId);
+      const resultEl = document.getElementById(this.dataset.resultId);
+      const offDate  = selectEl?.value;
+
+      if (!offDate) { toast('Please select an official draw date first.', 'err'); return; }
+
+      this.disabled = true;
+      this.innerHTML = '<span class="mini-spinner"></span>';
+      if (resultEl) { resultEl.innerHTML = ''; resultEl.classList.remove('visible'); }
+
+      try {
+        const res  = await fetch('/analyze_batch_vs_official', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ generated_date: genDate, official_draw_date: offDate })
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+          toast(data.error || 'Compare failed.', 'err');
+          return;
+        }
+
+        const summary = data.summary || {};
+
+        // Find official balls from any draws array
+        let officialBalls = [], officialPB = null;
+        for (const key of TIER_ORDER) {
+          const info = summary[key];
+          if (info && info.draws && info.draws.length > 0) {
+            const d = info.draws[0];
+            officialBalls = d.white_balls || [];
+            officialPB    = d.powerball;
+            break;
+          }
+        }
+
+        // Build result HTML
+        let html = `<p class="cr-header">Official Draw ${offDate} vs ${data.total_generated_picks_in_batch} generated picks</p>`;
+
+        if (officialBalls.length) {
+          html += `<div class="official-balls-row">`;
+          officialBalls.forEach(n => { html += `<div class="wb" style="width:30px;height:30px;font-size:10px">${n}</div>`; });
+          html += `<span class="ball-sep">+</span><div class="pb" style="width:30px;height:30px;font-size:10px">${officialPB}</div>`;
+          html += `</div>`;
+        }
+
+        html += `<div class="tier-mini-grid">`;
+        TIER_ORDER.forEach(tier => {
+          const info  = summary[tier] || { count: 0 };
+          const count = info.count || 0;
+          html += `
+            <div class="tier-mini ${count > 0 ? 'hit' : ''}">
+              <span class="tier-mini-name">${tier.replace('White Balls', 'WB').replace('White Ball', 'WB')}</span>
+              <span class="tier-mini-count ${count > 0 ? 'nonzero' : ''}">${count}</span>
+            </div>`;
+        });
+        html += `</div>`;
+
+        resultEl.innerHTML = html;
+        resultEl.classList.add('visible');
+
+        const totalHits = TIER_ORDER.reduce((s, t) => s + (summary[t]?.count || 0), 0);
+        toast(totalHits > 0 ? `${totalHits} match(es) found! 🎯` : 'No prize matches — keep going!', totalHits > 0 ? 'ok' : 'ok');
+
+      } catch(e) {
+        toast('Compare request failed.', 'err');
+      } finally {
+        this.disabled = false;
+        this.textContent = '⬡ Compare';
+      }
+    });
+  });
+
+});
 </script>
 {% endblock %}
