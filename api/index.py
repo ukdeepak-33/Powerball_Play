@@ -9071,7 +9071,10 @@ initialize_core_data()
 
 # ── Start the draw-day scheduler ──────────────────────────────
 try:
-    from scheduler import init_scheduler
+    try:
+        from api.scheduler import init_scheduler   # Render (runs from repo root)
+    except ImportError:
+        from scheduler import init_scheduler       # local / direct run
     _scheduler = init_scheduler(app)
 except Exception as _sched_err:
     print(f"[SCHEDULER] Warning: could not start scheduler — {_sched_err}")
