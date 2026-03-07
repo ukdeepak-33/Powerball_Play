@@ -9067,6 +9067,127 @@ def grouped_patterns_yearly_ai_analysis():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+# ── Paste into index.py ───────────────────────────────────────────────────────
+
+@app.route('/api/triplets-ai-analysis', methods=['POST'])
+def triplets_ai_analysis():
+    try:
+        p = request.get_json(force=True, silent=True) or {}
+
+        filter_number    = p.get('filter_number')
+        sort_by          = str(p.get('sort_by') or 'most_frequent')
+        total_triplets   = int(p.get('total_triplets') or 0)
+        max_frequency    = int(p.get('max_frequency') or 0)
+        avg_frequency    = str(p.get('avg_frequency') or '0')
+        seen_once        = int(p.get('seen_once') or 0)
+        top10            = list(p.get('top10_triplets') or [])
+        bottom10         = list(p.get('bottom10_triplets') or [])
+        most_recent      = list(p.get('most_recent') or [])
+        overdue          = list(p.get('overdue_triplets') or [])
+
+        def fmt_triplets(items):
+            out = []
+            for i, t in enumerate(items):
+                tri  = t.get('triplet', '?')
+                cnt  = t.get('count', 0)
+                last = t.get('last', '?')
+                out.append("  #%d  (%s): %dx  last seen %s" % (i+1, tri, cnt, last))
+            return "\n".join(out) if out else "  (none)"
+
+        filter_ctx = "Filtered to triplets containing ball #%s." % filter_number if filter_number else "No ball filter applied — showing all triplets."
+        rarity_pct = round(seen_once / total_triplets * 100, 1) if total_triplets else 0
+
+        lines = [
+            "You are an expert Powerball triplet analyst. Analyse all white ball triplets from historical draws.",
+            filter_ctx,
+            "",
+            "DATASET SUMMARY",
+            "Total unique triplets: %s" % total_triplets,
+            "Highest frequency: %sx" % max_frequency,
+            "Average frequency: %sx" % avg_frequency,
+            "Seen only once (rare): %s (%s%%)" % (seen_once, rarity_pct),
+            "",
+            "TOP 10 MOST FREQUENT TRIPLETS",
+            fmt_triplets(top10),
+            "",
+            "BOTTOM 10 (LEAST FREQUENT)",
+            fmt_triplets(bottom10),
+            "",
+            "MOST RECENTLY DRAWN TRIPLETS",
+            fmt_triplets(most_recent),
+            "",
+            "OVERDUE TRIPLETS (high historical count but not seen recently)",
+            fmt_triplets(overdue),
+            "",
+            "Write EXACTLY these 4 sections. Each header on its own line. Use actual triplet numbers in every answer:",
+            "",
+            "DOMINANT TRIPLETS",
+            "Name the top 3 triplets by frequency. For each: exact numbers, count, and last drawn date.",
+            "Are any of them also recently drawn — meaning they are both historically strong AND currently active?",
+            "Flag the single best triplet to watch (strongest frequency + most recent activity).",
+            "",
+            "HOT vs COLD",
+            "From the most recently drawn list — which triplets are surging right now?",
+            "From the overdue list — which high-count triplets have gone quiet and may be due for a return?",
+            "Name at least 2 hot and 2 cold triplets with their exact numbers and counts.",
+            "",
+            "RARITY INSIGHT",
+            "%s out of %s triplets (%s%%) have appeared only once." % (seen_once, total_triplets, rarity_pct),
+            "What does this high/low rarity rate tell us about how clustered or spread out the draws are?",
+            "Is the triplet landscape dominated by a few powerful clusters or broadly random?",
+            "",
+            "NEXT DRAW RECOMMENDATION",
+            "Based on ALL sections above, name ONE triplet to include in the next draw pick.",
+            "Give: (1) exact three numbers, (2) all-time frequency, (3) recent activity status,",
+            "(4) whether it appears in any of the top pairs or co-occurrence patterns (if known).",
+            "Then name ONE backup triplet as an alternative.",
+        ]
+
+        prompt = "\n".join(lines)
+
+        groq_api_key = os.environ.get('GROQ_API_KEY', '')
+        if not groq_api_key:
+            return jsonify({'error': 'GROQ_API_KEY not set'}), 500
+
+        resp = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={'Authorization': 'Bearer ' + groq_api_key, 'Content-Type': 'application/json'},
+            json={
+                'model':       'llama-3.1-8b-instant',
+                'messages':    [{'role': 'user', 'content': prompt}],
+                'max_tokens':  800,
+                'temperature': 0.55,
+            },
+            timeout=40
+        )
+
+        result = resp.json()
+        if 'error' in result:
+            return jsonify({'error': result['error'].get('message', str(result['error']))}), 500
+
+        analysis = result['choices'][0]['message']['content'].strip()
+
+        best       = top10[0]   if top10    else None
+        hot        = most_recent[0] if most_recent else None
+        due        = overdue[0]  if overdue  else None
+
+        insights = [
+            {'label': '📊 Total Triplets',   'value': "%s unique" % total_triplets},
+            {'label': '🔥 Top Frequency',    'value': "%sx appearances" % max_frequency},
+            {'label': '📈 Average',          'value': "%sx per triplet" % avg_frequency},
+            {'label': '❄️ Seen Once',        'value': "%s triplets (%s%%)" % (seen_once, rarity_pct)},
+            {'label': '👑 #1 All-Time',      'value': "(%s) · %sx" % (best.get('triplet','?'), best.get('count',0)) if best else '—'},
+            {'label': '⚡ Most Recent',      'value': "(%s) · %s" % (hot.get('triplet','?'), hot.get('last','?')) if hot else '—'},
+            {'label': '⏰ Overdue Pick',     'value': "(%s) · %sx historical" % (due.get('triplet','?'), due.get('count',0)) if due else '—'},
+            {'label': '🔍 Filter Active',    'value': "Ball #%s" % filter_number if filter_number else 'All triplets'},
+        ]
+
+        return jsonify({'analysis': analysis, 'insights': insights})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 
 initialize_core_data()
 
