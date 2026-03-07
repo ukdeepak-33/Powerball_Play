@@ -295,7 +295,7 @@
       <div class="stat-row">
         <div class="st-chip">
           <p class="st-label">Theoretical Range</p>
-          <p class="st-val" style="color:var(--teal);font-size:20px">{{ min_possible_sum }}–{{ max_possible_sum }}</p>
+          <p class="st-val" style="color:var(--teal);font-size:20px">{{ min_possible_sum or 15 }}–{{ max_possible_sum or 345 }}</p>
           <p class="st-note">min to max possible</p>
         </div>
         <div class="st-chip">
@@ -305,7 +305,7 @@
         </div>
         <div class="st-chip">
           <p class="st-label">Missing Sums</p>
-          <p class="st-val" style="color:var(--red)">{{ missing_sums | length }}</p>
+          <p class="st-val" style="color:var(--red)">{{ (missing_sums | length) if missing_sums else 0 }}</p>
           <p class="st-note">never drawn</p>
         </div>
         <div class="st-chip">
@@ -344,7 +344,7 @@
     <div class="stg-card">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px">
         <p class="stg-card-title" style="margin:0">Sum Coverage Grid</p>
-        <button class="missing-toggle" id="missingToggle">Show Missing ({{ missing_sums | length }})</button>
+        <button class="missing-toggle" id="missingToggle">Show Missing ({{ (missing_sums | length) if missing_sums else 0 }})</button>
       </div>
       <div class="grid-legend">
         <div class="gl-item"><span class="gl-swatch" style="background:rgba(244,63,94,0.3)"></span> Never drawn</div>
@@ -355,7 +355,7 @@
       </div>
       <div class="sum-grid" id="sumGrid"></div>
       <div class="missing-grid" id="missingGrid">
-        {% for s in missing_sums %}
+        {% for s in (missing_sums or []) %}
         <span class="ms-pill">{{ s }}</span>
         {% endfor %}
       </div>
@@ -412,11 +412,11 @@
 document.addEventListener('DOMContentLoaded', function () {
 
   // ── Data ─────────────────────────────────────────────────
-  const appearedRaw     = {{ appeared_sums_details | tojson }};
+  const appearedRaw     = {{ appeared_sums_details | tojson if appeared_sums_details else '[]' }};
   const groupedRaw      = {{ grouped_sums_analysis | tojson if grouped_sums_analysis else '{}' }};
-  const missingRaw      = {{ missing_sums | tojson }};
-  const minPossible     = {{ min_possible_sum }};
-  const maxPossible     = {{ max_possible_sum }};
+  const missingRaw      = {{ missing_sums | tojson if missing_sums else '[]' }};
+  const minPossible     = {{ min_possible_sum or 15 }};
+  const maxPossible     = {{ max_possible_sum or 345 }};
 
   const ZONE_COLORS = ['#38bdf8','#34d399','#a78bfa','#fb923c','#f43f5e','#fbbf24','#06b6d4','#818cf8'];
 
