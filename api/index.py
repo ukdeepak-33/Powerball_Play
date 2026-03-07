@@ -8766,6 +8766,105 @@ Justify each prediction with data from the analysis above."""
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+# ── Paste into index.py with your other API routes ───────────────────────────
+
+@app.route('/api/weekday-trends-ai-analysis', methods=['POST'])
+def weekday_trends_ai_analysis():
+    try:
+        p            = request.get_json()
+        days         = p.get('days', [])
+        best_sum_day = p.get('best_sum_day', '')
+        best_ga_day  = p.get('best_ga_day', '')
+        best_cons_day= p.get('best_cons_day', '')
+        most_draws   = p.get('most_draws_day', '')
+
+        if not days:
+            return jsonify({'error': 'No data provided'}), 400
+
+        def fmt(d):
+            top_lh = d.get('top_lh_split') or {}
+            top_oe = d.get('top_oe_split') or {}
+            return (
+                f"  {d['day']} ({d['total_draws']} draws)\n"
+                f"    Avg Low={d['avg_low_balls']} High={d['avg_high_balls']} "
+                f"Odd={d['avg_odd_balls']} Even={d['avg_even_balls']}\n"
+                f"    Avg Sum={d['avg_sum']}  Group A={d['avg_group_a_balls']}  "
+                f"Consecutive={d['consecutive_present_percentage']}%\n"
+                f"    Top Low/High split: {top_lh.get('split','?')} ({top_lh.get('count','?')} draws)\n"
+                f"    Top Odd/Even split: {top_oe.get('split','?')} ({top_oe.get('count','?')} draws)"
+            )
+
+        prompt = f"""You are an expert Powerball draw-day analyst. Compare Monday, Wednesday, and Saturday draws.
+
+═══ DRAW DAY STATS ═══
+{chr(10).join(fmt(d) for d in days)}
+
+═══ KEY LEADERS ═══
+Highest avg sum:          {best_sum_day}
+Most Group A balls:       {best_ga_day}
+Highest consecutive rate: {best_cons_day}
+Most total draws:         {most_draws}
+
+Write EXACTLY these 5 sections, each header on its own line:
+
+DAY PERSONALITY
+Give each of the 3 days a one-line "personality" based on their stats. For example: "Monday leans low-number and odd-heavy." Be specific with actual numbers.
+
+STATISTICAL DIFFERENCES
+Which metric shows the BIGGEST gap between draw days? Name the metric, the highest and lowest day, and the exact difference. Is any difference large enough to be notable?
+
+SPLIT PATTERN COMPARISON
+Compare the most common Low/High and Odd/Even splits across all 3 days. Do the days favour similar splits or different ones? Name the most common split for each day.
+
+CONSECUTIVE & GROUP A PATTERNS
+Discuss the consecutive pair rates and Group A averages. Which day is most likely to have consecutive numbers in the draw? Which has the most historical hot numbers?
+
+STRATEGY RECOMMENDATION
+Based purely on historical frequency patterns, give a specific number strategy for each draw day. For example: "On Saturdays, favour 3 low + 2 high with an odd-heavy split (3o/2e)." Use actual stats to justify each recommendation."""
+
+        groq_api_key = os.environ.get('GROQ_API_KEY', '')
+        response = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {groq_api_key}',
+                'Content-Type':  'application/json'
+            },
+            json={
+                'model':       'llama-3.1-8b-instant',
+                'messages':    [{'role': 'user', 'content': prompt}],
+                'max_tokens':  700,
+                'temperature': 0.6
+            },
+            timeout=35
+        )
+
+        result = response.json()
+        if 'error' in result:
+            return jsonify({'error': result['error'].get('message', 'Groq error')}), 500
+
+        analysis = result['choices'][0]['message']['content'].strip()
+
+        mon = next((d for d in days if d['day'] == 'Monday'),    {})
+        wed = next((d for d in days if d['day'] == 'Wednesday'), {})
+        sat = next((d for d in days if d['day'] == 'Saturday'),  {})
+
+        insights = [
+            { 'label': '📅 Most Draws',           'value': f"{most_draws} · {next((d['total_draws'] for d in days if d['day']==most_draws), '—')} total" },
+            { 'label': '📊 Highest Avg Sum',       'value': f"{best_sum_day} · {next((d['avg_sum'] for d in days if d['day']==best_sum_day), '—')}" },
+            { 'label': '🔥 Most Group A Balls',    'value': f"{best_ga_day} · {next((d['avg_group_a_balls'] for d in days if d['day']==best_ga_day), '—')} per draw" },
+            { 'label': '🔗 Highest Consecutive %', 'value': f"{best_cons_day} · {next((d['consecutive_present_percentage'] for d in days if d['day']==best_cons_day), '—')}%" },
+            { 'label': '🔵 Monday Low/High',       'value': f"Low {mon.get('avg_low_balls','—')} · High {mon.get('avg_high_balls','—')}" },
+            { 'label': '🟢 Wednesday Low/High',    'value': f"Low {wed.get('avg_low_balls','—')} · High {wed.get('avg_high_balls','—')}" },
+            { 'label': '🟠 Saturday Low/High',     'value': f"Low {sat.get('avg_low_balls','—')} · High {sat.get('avg_high_balls','—')}" },
+            { 'label': '🎯 Best Bet Day',          'value': best_ga_day + ' (most hot numbers per draw)' },
+        ]
+
+        return jsonify({'analysis': analysis, 'insights': insights})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 initialize_core_data()
 
 # ── Start the draw-day scheduler ──────────────────────────────
