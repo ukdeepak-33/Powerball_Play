@@ -8869,113 +8869,154 @@ Based purely on historical frequency patterns, give a specific number strategy f
 @app.route('/api/grouped-patterns-yearly-ai-analysis', methods=['POST'])
 def grouped_patterns_yearly_ai_analysis():
     try:
-        p = request.get_json()
+        p = request.get_json(force=True, silent=True) or {}
 
-        selected_range        = p.get('selected_range', '')
-        range_min             = p.get('range_min', 0)
-        range_max             = p.get('range_max', 0)
-        total_years           = p.get('total_years', 0)
-        unique_pairs_count    = p.get('unique_pairs_count', 0)
-        unique_triplets_count = p.get('unique_triplets_count', 0)
-        peak_year             = p.get('peak_year', '')
-        peak_unique           = p.get('peak_unique', 0)
-        overall_trend         = p.get('overall_trend', 'stable')
-        pair_dom_years        = p.get('pair_dominant_years', 0)
-        triplet_dom_years     = p.get('triplet_dominant_years', 0)
-        top20_pairs           = p.get('top20_pairs', [])
-        top20_triplets        = p.get('top20_triplets', [])
-        rising_pairs          = p.get('rising_pairs', [])
-        rising_triplets       = p.get('rising_triplets', [])
-        cold_pairs            = p.get('cold_pairs', [])
-        cold_triplets         = p.get('cold_triplets', [])
-        all_years_data        = p.get('all_years_data', [])
+        # --- read every key with .get() and a safe default ---
+        selected_range        = str(p.get('selected_range') or 'Unknown')
+        range_min             = int(p.get('range_min') or 0)
+        range_max             = int(p.get('range_max') or 0)
+        total_years           = int(p.get('total_years') or 0)
+        unique_pairs_count    = int(p.get('unique_pairs_count') or 0)
+        unique_triplets_count = int(p.get('unique_triplets_count') or 0)
+        peak_year             = str(p.get('peak_year') or 'N/A')
+        peak_unique           = int(p.get('peak_unique') or 0)
+        overall_trend         = str(p.get('overall_trend') or 'stable')
+        pair_dom_years        = int(p.get('pair_dominant_years') or 0)
+        triplet_dom_years     = int(p.get('triplet_dominant_years') or 0)
+        top20_pairs           = list(p.get('top20_pairs') or [])
+        top20_triplets        = list(p.get('top20_triplets') or [])
+        rising_pairs          = list(p.get('rising_pairs') or [])
+        rising_triplets       = list(p.get('rising_triplets') or [])
+        cold_pairs            = list(p.get('cold_pairs') or [])
+        cold_triplets         = list(p.get('cold_triplets') or [])
+        all_years_data        = list(p.get('all_years_data') or [])
 
-        if not selected_range:
-            return jsonify({'error': 'No data provided'}), 400
+        if selected_range == 'Unknown':
+            return jsonify({'error': 'No range data provided'}), 400
 
-        def fmt_top(items, key='pattern', count_key='count'):
-            return chr(10).join(
-                f"  #{i+1}  ({r[key]}): {r[count_key]}x"
-                for i, r in enumerate(items[:10])
-            ) or '  (none)'
+        # --- safe formatters: every dict access uses .get() ---
+
+        def fmt_top(items, n=10):
+            out = []
+            for i, r in enumerate(items[:n]):
+                out.append("  #%d  (%s): %dx" % (
+                    i + 1,
+                    r.get('pattern', '?'),
+                    r.get('count', 0)
+                ))
+            return "\n".join(out) if out else "  (none)"
 
         def fmt_rising(items):
-            return chr(10).join(
-                f"  ({r['pattern']}): {r['recent']}x recent vs {r['prior']}x prior"
-                for r in items
-            ) or '  (none)'
+            out = []
+            for r in items:
+                out.append("  (%s): %dx recent vs %dx prior" % (
+                    r.get('pattern', '?'),
+                    r.get('recent', 0),
+                    r.get('prior', 0)
+                ))
+            return "\n".join(out) if out else "  (none)"
 
         def fmt_cold(items):
-            return chr(10).join(
-                f"  ({r['pattern']}): {r['allTime']}x all-time but 0 in last 2 years"
-                for r in items
-            ) or '  (none)'
+            out = []
+            for r in items:
+                out.append("  (%s): %dx all-time, 0x in last 2 years" % (
+                    r.get('pattern', '?'),
+                    r.get('allTime', 0)
+                ))
+            return "\n".join(out) if out else "  (none)"
 
         def fmt_year(d):
-            tp = ', '.join(f"({x['p']})x{x['c']}" for x in d['top_pair'])
-            tt = ', '.join(f"({x['p']})x{x['c']}" for x in d['top_triplet'])
-            dom = 'Pairs' if d['pair_count'] > d['triplet_count'] else 'Triplets' if d['triplet_count'] > d['pair_count'] else 'Equal'
-            return f"  {d['year']}: {d['total_draws_with_patterns']} patterns | {dom} dominant | top pairs: {tp} | top triplets: {tt}"
+            yr    = d.get('year', '?')
+            total = d.get('total_draws_with_patterns', d.get('total_unique', d.get('total_unique_patterns', 0)))
+            pc    = d.get('pair_count', 0)
+            tc    = d.get('triplet_count', 0)
+            dom   = 'Pairs' if pc > tc else 'Triplets' if tc > pc else 'Equal'
+            tp    = ', '.join("(%s)x%s" % (x.get('p', '?'), x.get('c', 0)) for x in (d.get('top_pair') or []))  or 'none'
+            tt    = ', '.join("(%s)x%s" % (x.get('p', '?'), x.get('c', 0)) for x in (d.get('top_triplet') or [])) or 'none'
+            return "  %s: %s patterns | %s dominant | pairs: %s | triplets: %s" % (yr, total, dom, tp, tt)
 
-        recent3 = all_years_data[-3:] if len(all_years_data) >= 3 else all_years_data
+        recent3       = all_years_data[-3:] if len(all_years_data) >= 3 else all_years_data
         dominant_type = 'Pairs' if pair_dom_years > triplet_dom_years else 'Triplets'
 
-        prompt = f"""You are an expert Powerball pattern strategist. Analyse ALL historical pairs and triplets within the number range {selected_range} ({range_min}-{range_max}) and give SPECIFIC, ACTIONABLE advice on what to pick.
+        # --- build prompt as a list of strings, joined at the end ---
+        prompt_parts = [
+            "You are an expert Powerball pattern strategist.",
+            "Analyse ALL historical pairs and triplets within number range %s (%s-%s)." % (selected_range, range_min, range_max),
+            "Give SPECIFIC, ACTIONABLE advice — use actual pair/triplet numbers in every section.",
+            "",
+            "RANGE OVERVIEW",
+            "Range: %s (%s-%s)  |  Years of data: %s  |  Trend: %s" % (selected_range, range_min, range_max, total_years, overall_trend),
+            "Unique pairs ever seen: %s  |  Unique triplets ever seen: %s" % (unique_pairs_count, unique_triplets_count),
+            "Peak year: %s (%s patterns)  |  Pair-dominant years: %s/%s  |  Triplet-dominant years: %s/%s" % (
+                peak_year, peak_unique, pair_dom_years, total_years, triplet_dom_years, total_years),
+            "",
+            "TOP 10 ALL-TIME PAIRS",
+            fmt_top(top20_pairs, 10),
+            "",
+            "TOP 10 ALL-TIME TRIPLETS",
+            fmt_top(top20_triplets, 10),
+            "",
+            "RISING PAIRS  (appeared more in last 2 years than prior 3 — hot momentum)",
+            fmt_rising(rising_pairs),
+            "",
+            "RISING TRIPLETS  (hot momentum)",
+            fmt_rising(rising_triplets),
+            "",
+            "COLD PAIRS  (strong historically, zero appearances in last 2 years — overdue)",
+            fmt_cold(cold_pairs),
+            "",
+            "COLD TRIPLETS  (overdue)",
+            fmt_cold(cold_triplets),
+            "",
+            "RECENT 3 YEARS",
+        ]
+        prompt_parts += [fmt_year(d) for d in recent3]
+        prompt_parts += [
+            "",
+            "ALL YEARS (oldest to newest)",
+        ]
+        prompt_parts += [fmt_year(d) for d in all_years_data]
+        prompt_parts += [
+            "",
+            "Write EXACTLY these 5 sections. Put each heading on its own line. Be SPECIFIC — name exact numbers:",
+            "",
+            "PAIRS vs TRIPLETS: WHEN TO USE WHICH",
+            "Based on %s pair-dominant years vs %s triplet-dominant years, which type is more reliable" % (pair_dom_years, triplet_dom_years),
+            "for the %s range RIGHT NOW? Has dominance shifted recently?" % selected_range,
+            "Give a direct verdict: 'Favour [PAIRS/TRIPLETS] for %s because...' — cite specific year counts." % selected_range,
+            "",
+            "TOP PAIR TO PICK",
+            "From the top 20 all-time pairs AND rising pairs, name the SINGLE BEST pair for the next draw from %s." % selected_range,
+            "Give: (1) exact pair numbers, (2) all-time count, (3) rising/cold/neutral status, (4) which years it peaked.",
+            "",
+            "TOP TRIPLET TO PICK",
+            "From the top 20 all-time triplets AND rising triplets, name the SINGLE BEST triplet from %s." % selected_range,
+            "Give: (1) exact triplet numbers, (2) all-time count, (3) momentum status,",
+            "(4) whether any two of those three numbers also appear together in the top pairs (confirms cluster strength).",
+            "",
+            "OVERDUE ALERT",
+            "Name the top 2 cold pairs and top 2 cold triplets that went quiet recently but have strong historical counts.",
+            "For each: give all-time count + approx years since last seen. Rank by urgency.",
+            "",
+            "NEXT DRAW STRATEGY — FINAL VERDICT",
+            "1. PAIR or TRIPLET? — which to use for %s right now and why." % selected_range,
+            "2. PRIMARY PICK: exact numbers (e.g. 'pair (12, 22)' or 'triplet (5, 15, 25)').",
+            "3. BACKUP PICK: one alternative with numbers.",
+            "Justify every choice with data from the sections above.",
+        ]
 
-RANGE OVERVIEW
-Range: {selected_range} ({range_min}-{range_max}) | Years: {total_years} | Trend: {overall_trend}
-Unique pairs: {unique_pairs_count} | Unique triplets: {unique_triplets_count} | Peak year: {peak_year} ({peak_unique} patterns)
-Pair-dominant years: {pair_dom_years}/{total_years} | Triplet-dominant years: {triplet_dom_years}/{total_years}
-
-TOP 10 ALL-TIME PAIRS
-{fmt_top(top20_pairs[:10])}
-
-TOP 10 ALL-TIME TRIPLETS
-{fmt_top(top20_triplets[:10])}
-
-RISING PAIRS (hot momentum - more frequent in last 2 years vs prior 3 years)
-{fmt_rising(rising_pairs)}
-
-RISING TRIPLETS (hot momentum)
-{fmt_rising(rising_triplets)}
-
-COLD PAIRS (strong historically but 0 appearances in last 2 years - overdue)
-{fmt_cold(cold_pairs)}
-
-COLD TRIPLETS (overdue)
-{fmt_cold(cold_triplets)}
-
-RECENT 3 YEARS
-{chr(10).join(fmt_year(d) for d in recent3)}
-
-ALL YEARS DATA
-{chr(10).join(fmt_year(d) for d in all_years_data)}
-
-Write EXACTLY these 5 sections with the header on its own line. Be SPECIFIC - use actual pair/triplet numbers in every answer:
-
-PAIRS vs TRIPLETS: WHEN TO USE WHICH
-Based on {pair_dom_years} pair-dominant years vs {triplet_dom_years} triplet-dominant years — which type is currently more reliable for this range? Has there been a recent shift? Give a direct verdict: "In the current cycle, favour [PAIRS/TRIPLETS] because..." Include exact data to back it up.
-
-TOP PAIR TO PICK
-From all-time top 20 AND rising pairs — name the SINGLE BEST pair for your next pick from {selected_range}. Give: (1) the exact pair numbers, (2) all-time count, (3) momentum status (rising/cold/neutral), (4) which years it peaked. Be decisive — one pair only.
-
-TOP TRIPLET TO PICK
-From all-time top 20 AND rising triplets — name the SINGLE BEST triplet for your next pick from {selected_range}. Give: (1) the exact triplet numbers, (2) all-time count, (3) momentum status, (4) whether those numbers also appear in the top pairs (confirms cluster strength).
-
-OVERDUE ALERT — WATCH THESE
-Name the top 2 cold pairs and top 2 cold triplets with strong historical records that have gone cold. For each, give: all-time count + approximate years absent. Rank them by urgency. Are any statistically due for a comeback?
-
-NEXT DRAW STRATEGY — FINAL VERDICT
-Combine all sections into one clear pick. Tell the player:
-1. PAIR or TRIPLET? (which to use and why for this range right now)
-2. PRIMARY PICK: exact numbers (e.g. "pair (12, 22)" or "triplet (5, 15, 25)")
-3. BACKUP PICK: one alternative if the primary feels wrong
-Justify every choice with specific numbers from the data above."""
+        prompt = "\n".join(prompt_parts)
 
         groq_api_key = os.environ.get('GROQ_API_KEY', '')
-        response = requests.post(
+        if not groq_api_key:
+            return jsonify({'error': 'GROQ_API_KEY not set in environment'}), 500
+
+        resp = requests.post(
             'https://api.groq.com/openai/v1/chat/completions',
-            headers={'Authorization': f'Bearer {groq_api_key}', 'Content-Type': 'application/json'},
+            headers={
+                'Authorization': 'Bearer ' + groq_api_key,
+                'Content-Type':  'application/json',
+            },
             json={
                 'model':       'llama-3.1-8b-instant',
                 'messages':    [{'role': 'user', 'content': prompt}],
@@ -8985,33 +9026,43 @@ Justify every choice with specific numbers from the data above."""
             timeout=40
         )
 
-        result = response.json()
+        result = resp.json()
         if 'error' in result:
-            return jsonify({'error': result['error'].get('message', 'Groq error')}), 500
+            return jsonify({'error': result['error'].get('message', str(result['error']))}), 500
 
         analysis = result['choices'][0]['message']['content'].strip()
 
-        best_rising_pair    = rising_pairs[0]    if rising_pairs    else None
-        best_rising_triplet = rising_triplets[0] if rising_triplets else None
-        most_overdue_pair   = cold_pairs[0]      if cold_pairs      else None
-        most_overdue_trip   = cold_triplets[0]   if cold_triplets   else None
+        brp = rising_pairs[0]    if rising_pairs    else None
+        brt = rising_triplets[0] if rising_triplets else None
+        bcp = cold_pairs[0]      if cold_pairs      else None
+        bct = cold_triplets[0]   if cold_triplets   else None
 
         insights = [
-            { 'label': '📊 Range Analysed',         'value': f"{selected_range} ({range_min}-{range_max})" },
-            { 'label': '🏆 Currently Dominant',      'value': f"{dominant_type} ({max(pair_dom_years,triplet_dom_years)}/{total_years} yrs)" },
-            { 'label': '🔥 Hottest Pair (all-time)', 'value': f"({top20_pairs[0]['pattern']}) · {top20_pairs[0]['count']}x" if top20_pairs else '—' },
-            { 'label': '🔥 Hottest Triplet',         'value': f"({top20_triplets[0]['pattern']}) · {top20_triplets[0]['count']}x" if top20_triplets else '—' },
-            { 'label': '⚡ Rising Pair',             'value': f"({best_rising_pair['pattern']}) · {best_rising_pair['recent']}x recent" if best_rising_pair else 'None detected' },
-            { 'label': '⚡ Rising Triplet',          'value': f"({best_rising_triplet['pattern']}) · {best_rising_triplet['recent']}x recent" if best_rising_triplet else 'None detected' },
-            { 'label': '⏰ Overdue Pair',            'value': f"({most_overdue_pair['pattern']}) · {most_overdue_pair['allTime']}x historical" if most_overdue_pair else 'None' },
-            { 'label': '⏰ Overdue Triplet',         'value': f"({most_overdue_trip['pattern']}) · {most_overdue_trip['allTime']}x historical" if most_overdue_trip else 'None' },
+            {'label': '📊 Range Analysed',
+             'value': "%s (%s-%s)" % (selected_range, range_min, range_max)},
+            {'label': '🏆 Currently Dominant',
+             'value': "%s  (%s/%s yrs)" % (dominant_type, max(pair_dom_years, triplet_dom_years), total_years)},
+            {'label': '🔥 Hottest Pair',
+             'value': "(%s) · %dx" % (top20_pairs[0].get('pattern','?'), top20_pairs[0].get('count',0)) if top20_pairs else '—'},
+            {'label': '🔥 Hottest Triplet',
+             'value': "(%s) · %dx" % (top20_triplets[0].get('pattern','?'), top20_triplets[0].get('count',0)) if top20_triplets else '—'},
+            {'label': '⚡ Rising Pair',
+             'value': "(%s) · %dx recent" % (brp.get('pattern','?'), brp.get('recent',0)) if brp else 'None detected'},
+            {'label': '⚡ Rising Triplet',
+             'value': "(%s) · %dx recent" % (brt.get('pattern','?'), brt.get('recent',0)) if brt else 'None detected'},
+            {'label': '⏰ Overdue Pair',
+             'value': "(%s) · %dx historical" % (bcp.get('pattern','?'), bcp.get('allTime',0)) if bcp else 'None'},
+            {'label': '⏰ Overdue Triplet',
+             'value': "(%s) · %dx historical" % (bct.get('pattern','?'), bct.get('allTime',0)) if bct else 'None'},
         ]
 
         return jsonify({'analysis': analysis, 'insights': insights})
 
     except Exception as e:
+        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
 
 initialize_core_data()
 
