@@ -1,382 +1,639 @@
 {% extends "base.html" %}
 
-{% block title %}Triplet Analysis{% endblock %}
-
-{% block page_heading %}White Ball Triplet Analysis{% endblock %}
-
-{% block head %}
-    {{ super() }}
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        .chart-container {
-            position: relative;
-            height: 450px; /* Adjust height as needed for better visibility */
-            width: 100%;
-            overflow-x: auto; /* Allow horizontal scrolling if many bars */
-        }
-        .loading-spinner {
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top: 4px solid #6366f1; /* Tailwind indigo-500 */
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .ball-sm {
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-            width: 30px; /* Smaller size */
-            height: 30px; /* Smaller size */
-            background-color: #f0f0f0;
-            border-radius: 50%;
-            border: 1px solid #ccc;
-            font-weight: bold;
-            color: #333;
-            margin: 2px;
-            font-size: 0.8em; /* Smaller font */
-            flex-shrink: 0; /* Prevent shrinking in flex container */
-        }
-    </style>
-{% endblock %}
+{% block title %}Triplet Analysis — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
-<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    {# Flash messages display #}
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="flash-messages space-y-3 mb-4">
-                {% for category, message in messages %}
-                    <div class="p-4 rounded-lg shadow-md text-sm {% if category == 'error' %}bg-red-100 text-red-700 border border-red-200{% elif category == 'info' %}bg-blue-100 text-blue-700 border border-blue-200{% else %}bg-green-100 text-green-700 border border-blue-200{% endif %} animate-fade-in">
-                        <p class="font-medium">{{ message }}</p>
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
-    {% endwith %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Top Triplet Frequencies</h2>
-        <p class="text-gray-700 mb-4">This chart displays the frequency of the most common white ball triplets from historical draws.</p>
-        <div class="relative h-96 w-full">
-            <canvas id="tripletFrequencyChart"></canvas>
-            <div id="chartLoadingIndicator" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 hidden">
-                <div class="loading-spinner"></div>
-                <span class="ml-3 text-gray-600">Loading chart data...</span>
-            </div>
-            <div id="chartNoDataMessage" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 text-gray-500 text-lg font-medium hidden">
-                No chart data available for selected filters.
-            </div>
-        </div>
+  :root {
+    --bg:    #040609; --s1: #080c12; --s2: #0c1119; --s3: #101620;
+    --border: rgba(255,255,255,0.065); --text: rgba(255,255,255,0.87); --muted: rgba(255,255,255,0.33);
+    --blue:  #3b82f6; --blue2: rgba(59,130,246,0.12); --blue3: rgba(59,130,246,0.28);
+    --cyan:  #22d3ee; --cyan2: rgba(34,211,238,0.1);
+    --amber: #f59e0b; --amber2: rgba(245,158,11,0.1);
+    --violet:#a78bfa; --green: #34d399; --red: #f87171;
+  }
+
+  #ta-page * { box-sizing: border-box; }
+  #ta-page {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg); min-height: 100vh; color: var(--text); padding-bottom: 80px;
+  }
+
+  /* ── Hero ── */
+  .ta-hero {
+    position: relative; padding: 50px 24px 38px; text-align: center; overflow: hidden;
+  }
+  .ta-hero::before {
+    content:''; position:absolute; inset:0;
+    background:
+      radial-gradient(ellipse 55% 55% at 50% -5%, rgba(59,130,246,0.1) 0%, transparent 65%),
+      radial-gradient(ellipse 25% 30% at 5%  75%, rgba(34,211,238,0.05) 0%, transparent 60%),
+      radial-gradient(ellipse 25% 30% at 95% 75%, rgba(167,139,250,0.05) 0%, transparent 60%);
+    pointer-events:none;
+  }
+  .ta-hero::after {
+    content:''; position:absolute; bottom:0; left:0; right:0; height:1px;
+    background:linear-gradient(90deg, transparent, var(--blue), rgba(255,255,255,0.25), var(--cyan), transparent);
+    opacity:0.3;
+  }
+  .ta-eyebrow { font-size:10px; letter-spacing:3px; text-transform:uppercase; color:var(--blue); margin-bottom:12px; opacity:0.8; }
+  .ta-hero h1 {
+    font-family:'Barlow Condensed',sans-serif;
+    font-size:clamp(44px,6vw,80px); font-weight:800; line-height:1.0; margin:0 0 12px;
+    background:linear-gradient(135deg, var(--blue) 0%, #fff 40%, var(--cyan) 80%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  }
+  .ta-hero p { font-size:12px; color:var(--muted); max-width:480px; margin:0 auto; line-height:1.8; }
+
+  /* ── Layout ── */
+  .ta-wrap { max-width:1180px; margin:0 auto; padding:0 20px; display:flex; flex-direction:column; gap:16px; }
+
+  /* ── Card ── */
+  .ta-card { background:var(--s1); border:1px solid var(--border); border-radius:16px; padding:20px 22px; position:relative; overflow:hidden; }
+  .ta-label { font-size:9px; letter-spacing:2.5px; text-transform:uppercase; color:var(--muted); margin:0 0 14px; display:block; }
+
+  /* ── Stats ── */
+  .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  @media(max-width:580px){ .stats-row{grid-template-columns:1fr 1fr;} }
+  .stat-chip { background:var(--s2); border:1px solid var(--border); border-radius:10px; padding:12px; text-align:center; }
+  .sc-label { font-size:8px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+  .sc-val   { font-size:20px; font-weight:700; line-height:1; }
+  .sc-sub   { font-size:9px; color:var(--muted); margin-top:3px; }
+
+  /* ── Controls ── */
+  .ctrl-row { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+  .ctrl-group { display:flex; flex-direction:column; gap:5px; }
+  .ctrl-label { font-size:8px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
+  .ctrl-input {
+    background:var(--s2); border:1px solid var(--border);
+    color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px;
+    border-radius:9px; padding:9px 14px; outline:none; width:140px;
+    transition:border-color 0.15s;
+  }
+  .ctrl-input:focus { border-color:var(--blue3); }
+  .ctrl-select {
+    background:var(--s2); border:1px solid var(--border);
+    color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px;
+    border-radius:9px; padding:9px 14px; outline:none; cursor:pointer;
+  }
+  .btn-apply {
+    font-size:10px; letter-spacing:1.5px; text-transform:uppercase;
+    padding:10px 22px; border-radius:9px; border:none; cursor:pointer;
+    background:linear-gradient(135deg, #1d4ed8, var(--blue));
+    color:#fff; font-family:'JetBrains Mono',monospace; font-weight:700;
+    transition:transform 0.15s, box-shadow 0.15s;
+    box-shadow:0 0 16px rgba(59,130,246,0.2);
+    display:flex; align-items:center; gap:8px;
+  }
+  .btn-apply:hover { transform:translateY(-1px); box-shadow:0 0 28px rgba(59,130,246,0.4); }
+  .btn-apply:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+  .btn-reset {
+    font-size:10px; letter-spacing:1px; text-transform:uppercase;
+    padding:10px 16px; border-radius:9px; border:1px solid var(--border);
+    background:transparent; color:var(--muted); cursor:pointer;
+    font-family:'JetBrains Mono',monospace; transition:all 0.15s;
+  }
+  .btn-reset:hover { border-color:rgba(255,255,255,0.15); color:var(--text); }
+
+  /* ── Filter pills ── */
+  .sort-pills { display:flex; gap:6px; flex-wrap:wrap; }
+  .sort-pill {
+    font-size:9px; letter-spacing:1px; text-transform:uppercase;
+    padding:6px 14px; border-radius:7px; border:1px solid var(--border);
+    background:transparent; color:var(--muted); cursor:pointer; transition:all 0.12s;
+  }
+  .sort-pill:hover { border-color:rgba(255,255,255,0.15); color:var(--text); }
+  .sort-pill.active { background:var(--blue2); border-color:var(--blue3); color:var(--blue); }
+
+  /* ── Spotlight top 10 ── */
+  .spotlight-list { display:flex; flex-direction:column; gap:6px; }
+  .sp-row {
+    display:flex; align-items:center; gap:10px;
+    background:var(--s2); border:1px solid var(--border);
+    border-radius:10px; padding:9px 14px;
+    transition:border-color 0.12s;
+  }
+  .sp-row:hover { border-color:rgba(255,255,255,0.1); }
+  .sp-rank { font-size:9px; color:var(--muted); min-width:22px; text-align:center; }
+  .sp-balls { display:flex; gap:5px; align-items:center; }
+  .wb3d {
+    width:30px; height:30px; border-radius:50%; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:10px; font-weight:700;
+    background:radial-gradient(circle at 32% 30%, #f0f4ff 0%, #c8d8ed 45%, #8aaac8 100%);
+    color:#0d1829; box-shadow:0 2px 6px rgba(0,0,0,0.35);
+    transition:transform 0.12s;
+  }
+  .wb3d:hover { transform:scale(1.12); }
+  .sp-bar-wrap { flex:1; height:5px; background:rgba(255,255,255,0.05); border-radius:3px; }
+  .sp-bar-fill { height:100%; border-radius:3px; background:var(--blue); transition:width 0.6s ease; }
+  .sp-count { font-size:11px; font-weight:600; color:var(--text); min-width:24px; text-align:right; }
+  .sp-dates { font-size:9px; color:var(--muted); min-width:80px; text-align:right; display:none; }
+  @media(min-width:700px){ .sp-dates { display:block; } }
+
+  /* ── Chart ── */
+  .chart-wrap { position:relative; height:300px; }
+
+  /* ── Table ── */
+  .ta-table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; }
+  thead tr { border-bottom:1px solid var(--border); }
+  thead th {
+    font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--muted);
+    padding:10px 14px; text-align:left; white-space:nowrap;
+  }
+  tbody tr { border-bottom:1px solid rgba(255,255,255,0.03); transition:background 0.1s; }
+  tbody tr:hover { background:var(--s2); }
+  tbody td { padding:9px 14px; font-size:11px; }
+  .td-balls { display:flex; gap:4px; align-items:center; }
+  .td-count { font-weight:700; color:var(--blue); }
+  .td-date  { color:var(--muted); }
+  .td-last  { color:var(--cyan); }
+  .td-bar-cell { min-width:80px; }
+  .td-mini-bar { height:3px; border-radius:2px; background:var(--blue); }
+
+  /* ── Pagination ── */
+  .pag-row { display:flex; align-items:center; justify-content:space-between; margin-top:14px; flex-wrap:wrap; gap:10px; }
+  .pag-info { font-size:10px; color:var(--muted); letter-spacing:0.5px; }
+  .pag-btns { display:flex; gap:6px; }
+  .pag-btn {
+    font-size:9px; letter-spacing:1px; padding:7px 16px; border-radius:7px;
+    border:1px solid var(--border); background:transparent; color:var(--muted);
+    cursor:pointer; transition:all 0.12s; font-family:'JetBrains Mono',monospace;
+  }
+  .pag-btn:hover:not(:disabled) { border-color:rgba(255,255,255,0.15); color:var(--text); }
+  .pag-btn:disabled { opacity:0.3; cursor:not-allowed; }
+  .pag-btn.active { background:var(--blue2); border-color:var(--blue3); color:var(--blue); }
+
+  /* ── Spinner ── */
+  .ta-spinner {
+    display:inline-block; width:20px; height:20px; border-radius:50%;
+    border:2px solid rgba(59,130,246,0.15); border-top-color:var(--blue);
+    animation:spin 0.75s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .loading-row { display:flex; align-items:center; gap:10px; padding:20px 0; font-size:11px; color:var(--muted); }
+
+  /* ── AI panel ── */
+  .ai-card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    background:linear-gradient(90deg, transparent, var(--blue), var(--cyan), var(--violet), transparent);
+    opacity:0.4;
+  }
+  .ai-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px; }
+  .ai-eyebrow { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--blue); opacity:0.8; margin-bottom:3px; }
+  .ai-title   { font-size:18px; font-weight:700; font-family:'Barlow Condensed',sans-serif; letter-spacing:1px; }
+  .ai-btn {
+    display:flex; align-items:center; gap:8px;
+    background:linear-gradient(135deg, #1d4ed8, var(--blue));
+    color:#fff; font-family:'JetBrains Mono',monospace; font-size:10px;
+    letter-spacing:1.5px; text-transform:uppercase;
+    border:none; border-radius:10px; padding:11px 22px; cursor:pointer;
+    font-weight:700; transition:transform 0.15s, box-shadow 0.15s;
+    box-shadow:0 0 18px rgba(59,130,246,0.2);
+  }
+  .ai-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 0 30px rgba(59,130,246,0.45); }
+  .ai-btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+  .ai-thinking { display:none; align-items:center; gap:10px; padding:14px 0 4px; font-size:11px; color:rgba(59,130,246,0.7); letter-spacing:1px; }
+  .ai-thinking.visible { display:flex; }
+  .ai-dots span { display:inline-block; width:6px; height:6px; border-radius:50%; margin:0 2px; animation:dotB 1.2s infinite; }
+  .ai-dots span:nth-child(1){ background:var(--blue); }
+  .ai-dots span:nth-child(2){ animation-delay:0.2s; background:var(--cyan); }
+  .ai-dots span:nth-child(3){ animation-delay:0.4s; background:var(--violet); }
+  @keyframes dotB{0%,80%,100%{transform:scale(0.6);opacity:0.4}40%{transform:scale(1);opacity:1}}
+  .ai-output { display:none; margin-top:18px; border-top:1px solid rgba(59,130,246,0.1); padding-top:18px; }
+  .ai-output.visible { display:block; }
+  .ai-chips { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:18px; }
+  .ai-chip  { background:var(--s2); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
+  .ai-chip-label { font-size:8px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+  .ai-chip-val   { font-size:13px; font-weight:600; color:#fff; line-height:1.4; }
+  .ai-narrative {
+    background:var(--s2); border:1px solid rgba(59,130,246,0.12);
+    border-left:3px solid var(--blue); border-radius:0 10px 10px 0;
+    padding:18px 20px; font-size:13px; line-height:1.9; color:var(--text); white-space:pre-wrap;
+  }
+  .ai-error { margin-top:12px; background:rgba(248,113,113,0.08); border:1px solid rgba(248,113,113,0.2); border-radius:9px; padding:12px 16px; font-size:12px; color:#fca5a5; }
+
+  /* ── Empty ── */
+  .empty-cell { text-align:center; padding:40px; font-size:12px; color:var(--muted); }
+</style>
+
+<div id="ta-page">
+
+  <!-- Hero -->
+  <div class="ta-hero">
+    <p class="ta-eyebrow">⬡ Historical · All Unique Triplets · Forensic Frequency Lab</p>
+    <h1>White Ball<br>Triplet Analysis</h1>
+    <p>Explore every unique three-ball combination found in historical draws. Filter, sort, spot the hottest clusters, and get AI-powered strategic insight.</p>
+  </div>
+
+  <div class="ta-wrap">
+
+    <!-- ① Overview stats (populated after fetch) -->
+    <div class="ta-card">
+      <span class="ta-label">Overview</span>
+      <div class="stats-row" id="statsRow">
+        <div class="stat-chip"><p class="sc-label">Unique Triplets</p><p class="sc-val" id="statTotal" style="color:var(--blue)">—</p><p class="sc-sub">all-time</p></div>
+        <div class="stat-chip"><p class="sc-label">Top Frequency</p><p class="sc-val" id="statMax"   style="color:var(--cyan)">—</p><p class="sc-sub">highest count</p></div>
+        <div class="stat-chip"><p class="sc-label">Avg Frequency</p><p class="sc-val" id="statAvg"   style="color:var(--amber)">—</p><p class="sc-sub">per triplet</p></div>
+        <div class="stat-chip"><p class="sc-label">Seen Once</p>   <p class="sc-val" id="statOnce"  style="color:var(--violet)">—</p><p class="sc-sub">rare triplets</p></div>
+      </div>
     </div>
 
-    {# Detailed Table for ALL Triplets with Filtering, Sorting, and Pagination #}
-    <div class="card p-6 bg-white rounded-lg shadow-lg">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">All Historical Triplets</h2>
-        <p class="text-gray-700 mb-4">A complete list of all unique white ball triplets found in historical draws, with filtering and sorting options.</p>
-        
-        {# Filter & Sort Controls #}
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 items-end">
-            <div>
-                <label for="filterWhiteBall" class="block text-sm font-medium text-gray-700 mb-1">Filter by White Ball (1-69)</label>
-                <input type="number" id="filterWhiteBall" min="1" max="69" placeholder="e.g., 21" class="form-input mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-            </div>
-            <div>
-                <label for="sortBy" class="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
-                <select id="sortBy" class="form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                    <option value="most_frequent">Most Frequent</option>
-                    <option value="least_frequent">Least Frequent</option>
-                    <option value="newest">Newest (Last Drawn)</option>
-                    <option value="oldest">Oldest (First Drawn)</option>
-                </select>
-            </div>
-            <div class="sm:col-span-1">
-                <button id="applyFiltersBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition ease-in-out duration-150">
-                    Apply Filters & Sort
-                </button>
-            </div>
+    <!-- ② Controls -->
+    <div class="ta-card">
+      <span class="ta-label">Filter & Sort</span>
+      <div class="ctrl-row" style="margin-bottom:14px">
+        <div class="ctrl-group">
+          <span class="ctrl-label">Contains Ball (1–69)</span>
+          <input type="number" class="ctrl-input" id="filterInput" min="1" max="69" placeholder="e.g. 21">
         </div>
-
-        <div id="tableLoadingIndicator" class="flex justify-center items-center py-4 hidden">
-            <div class="loading-spinner"></div>
-            <span class="ml-3 text-gray-600">Loading triplets data...</span>
+        <div class="ctrl-group">
+          <span class="ctrl-label">Sort</span>
+          <div class="sort-pills" id="sortPills">
+            <button class="sort-pill active" data-sort="most_frequent">Most Frequent</button>
+            <button class="sort-pill" data-sort="least_frequent">Least Frequent</button>
+            <button class="sort-pill" data-sort="newest">Newest</button>
+            <button class="sort-pill" data-sort="oldest">Oldest</button>
+          </div>
         </div>
-        <div id="errorMessage" class="hidden p-4 rounded-lg shadow-md text-sm bg-red-100 text-red-700 border border-red-200 animate-fade-in mb-4"></div>
-
-        <div class="mb-4 text-gray-700">
-            Total Unique Triplets: <span class="font-bold" id="total-triplets-count">0</span>
+        <div class="ctrl-group" style="flex-direction:row;gap:8px;align-items:flex-end;margin-top:auto">
+          <button class="btn-apply" id="applyBtn">⬡ Apply</button>
+          <button class="btn-reset" id="resetBtn">↺ Reset</button>
         </div>
-
-        <div class="overflow-x-auto shadow-md rounded-lg">
-            <table class="min-w-full divide-y divide-gray-200" id="tripletsTable">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Triplet</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">First Drawn</th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Drawn</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200" id="triplets-table-body">
-                    {# Data will be rendered here by JavaScript #}
-                </tbody>
-            </table>
-        </div>
-
-        {# Pagination Controls #}
-        <div class="flex justify-between items-center mt-6">
-            <button id="prev-page-btn" class="w-24 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-md shadow-sm transition ease-in-out duration-150" disabled>Previous</button>
-            <span class="text-gray-700">Page <span id="current-page">1</span> of <span id="total-pages">1</span></span>
-            <button id="next-page-btn" class="w-24 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition ease-in-out duration-150">Next</button>
-        </div>
+      </div>
+      <div class="loading-row" id="loadingRow" style="display:none">
+        <span class="ta-spinner"></span><span>Fetching triplet data…</span>
+      </div>
+      <div id="errorMsg" style="display:none;font-size:12px;color:#fca5a5;padding:8px 0"></div>
     </div>
+
+    <!-- ③ Top 10 Spotlight -->
+    <div class="ta-card">
+      <span class="ta-label">Top 10 Triplets</span>
+      <div class="spotlight-list" id="spotlightList">
+        <div class="loading-row"><span class="ta-spinner"></span><span>Loading…</span></div>
+      </div>
+    </div>
+
+    <!-- ④ Chart -->
+    <div class="ta-card">
+      <span class="ta-label">Top 30 Frequency Chart</span>
+      <div class="chart-wrap"><canvas id="tripletChart"></canvas></div>
+      <div id="chartEmpty" style="display:none;text-align:center;padding:40px;font-size:12px;color:var(--muted)">No data to display.</div>
+    </div>
+
+    <!-- ⑤ AI Analysis -->
+    <div class="ta-card ai-card">
+      <div class="ai-header">
+        <div>
+          <p class="ai-eyebrow">✦ Groq AI · Triplet Intelligence</p>
+          <p class="ai-title">TRIPLET PATTERN DEEP ANALYSIS</p>
+        </div>
+        <button class="ai-btn" id="aiBtn" disabled>◈ Analyse Triplets</button>
+      </div>
+      <div class="ai-thinking" id="aiThinking">
+        <div class="ai-dots"><span></span><span></span><span></span></div>
+        Scanning all triplet patterns…
+      </div>
+      <div class="ai-output" id="aiOutput">
+        <div class="ai-chips" id="aiChips"></div>
+        <div class="ai-narrative" id="aiNarrative"></div>
+      </div>
+      <div class="ai-error" id="aiError" style="display:none"></div>
+    </div>
+
+    <!-- ⑥ Full Table -->
+    <div class="ta-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+        <span class="ta-label" style="margin:0">All Triplets — <span id="tableCount" style="color:var(--blue)">—</span> results</span>
+        <span style="font-size:9px;color:var(--muted)" id="pageInfo">Page 1 of 1</span>
+      </div>
+      <div class="ta-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Triplet</th>
+              <th>Frequency</th>
+              <th>Bar</th>
+              <th>First Drawn</th>
+              <th>Last Drawn</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr><td colspan="6" class="empty-cell"><span class="ta-spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pag-row">
+        <span class="pag-info" id="pagInfo2"></span>
+        <div class="pag-btns">
+          <button class="pag-btn" id="prevBtn" disabled>← Prev</button>
+          <button class="pag-btn" id="nextBtn" disabled>Next →</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const filterWhiteBallInput = document.getElementById('filterWhiteBall');
-        const sortBySelect = document.getElementById('sortBy');
-        const applyFiltersBtn = document.getElementById('applyFiltersBtn');
-        const tableLoadingIndicator = document.getElementById('tableLoadingIndicator');
-        const chartLoadingIndicator = document.getElementById('chartLoadingIndicator');
-        const errorMessageDiv = document.getElementById('errorMessage');
-        const totalTripletsCountSpan = document.getElementById('total-triplets-count');
-        const tripletsTableBody = document.getElementById('triplets-table-body');
-        const prevPageBtn = document.getElementById('prev-page-btn');
-        const nextPageBtn = document.getElementById('next-page-btn');
-        const currentPageSpan = document.getElementById('current-page');
-        const totalPagesSpan = document.getElementById('total-pages');
-        const chartNoDataMessage = document.getElementById('chartNoDataMessage');
+document.addEventListener('DOMContentLoaded', function () {
 
-        let allTripletsData = []; // This will hold the fetched data
-        let tripletChart; // To hold the Chart.js instance
-        const itemsPerPage = 50; 
-        let currentPage = 1;
+  // ── State ─────────────────────────────────────────────────
+  let allData    = [];
+  let currentPage = 1;
+  const PER_PAGE  = 50;
+  let sortBy      = 'most_frequent';
+  let filterNum   = '';
+  let chartInst   = null;
 
-        async function fetchAndRenderTriplets() {
-            tableLoadingIndicator.classList.remove('hidden');
-            chartLoadingIndicator.classList.remove('hidden');
-            errorMessageDiv.classList.add('hidden');
-            chartNoDataMessage.classList.add('hidden');
+  // ── DOM refs ──────────────────────────────────────────────
+  const filterInput  = document.getElementById('filterInput');
+  const applyBtn     = document.getElementById('applyBtn');
+  const resetBtn     = document.getElementById('resetBtn');
+  const loadingRow   = document.getElementById('loadingRow');
+  const errorMsg     = document.getElementById('errorMsg');
+  const spotList     = document.getElementById('spotlightList');
+  const tableBody    = document.getElementById('tableBody');
+  const tableCount   = document.getElementById('tableCount');
+  const pageInfo     = document.getElementById('pageInfo');
+  const pagInfo2     = document.getElementById('pagInfo2');
+  const prevBtn      = document.getElementById('prevBtn');
+  const nextBtn      = document.getElementById('nextBtn');
+  const aiBtn        = document.getElementById('aiBtn');
 
-            // Clear existing chart and table
-            if (tripletChart) {
-                tripletChart.destroy();
-                tripletChart = null;
-            }
-            tripletsTableBody.innerHTML = '';
-            totalTripletsCountSpan.textContent = '0';
-            currentPageSpan.textContent = '1';
-            totalPagesSpan.textContent = '1';
-            prevPageBtn.disabled = true;
-            nextPageBtn.disabled = true;
-
-
-            const filterNumber = filterWhiteBallInput.value;
-            const sortBy = sortBySelect.value;
-
-            let apiUrl = `/api/triplets_detailed_analysis?sort_by=${sortBy}`;
-            if (filterNumber && filterNumber.trim() !== '') {
-                const num = parseInt(filterNumber);
-                if (isNaN(num) || num < 1 || num > 69) {
-                    errorMessageDiv.textContent = "Please enter a valid white ball number between 1 and 69 for filtering.";
-                    errorMessageDiv.classList.remove('hidden');
-                    tableLoadingIndicator.classList.add('hidden');
-                    chartLoadingIndicator.classList.add('hidden');
-                    chartNoDataMessage.classList.remove('hidden');
-                    return;
-                }
-                apiUrl += `&filter_number=${num}`;
-            }
-
-            try {
-                const response = await fetch(apiUrl);
-                const data = await response.json();
-
-                if (!response.ok || !data.success) {
-                    errorMessageDiv.textContent = data.error || "Failed to fetch triplet data.";
-                    errorMessageDiv.classList.remove('hidden');
-                    chartNoDataMessage.classList.remove('hidden');
-                    return;
-                }
-
-                allTripletsData = data.triplets_data;
-                currentPage = 1; // Reset to first page on new fetch
-
-                renderTripletsTable();
-                renderTripletsChart();
-
-            } catch (error) {
-                console.error('Error fetching/rendering triplets data:', error);
-                errorMessageDiv.textContent = `An error occurred: ${error.message}.`;
-                errorMessageDiv.classList.remove('hidden');
-                chartNoDataMessage.classList.remove('hidden');
-            } finally {
-                tableLoadingIndicator.classList.add('hidden');
-                chartLoadingIndicator.classList.add('hidden');
-            }
-        }
-
-        function renderTripletsTable() {
-            tripletsTableBody.innerHTML = ''; // Clear existing rows
-
-            if (!allTripletsData || allTripletsData.length === 0) {
-                const noDataRow = document.createElement('tr');
-                noDataRow.innerHTML = `<td colspan="4" class="px-6 py-4 text-center text-gray-600">No triplet data available for the selected filters.</td>`;
-                tripletsTableBody.appendChild(noDataRow);
-                totalTripletsCountSpan.textContent = '0';
-                prevPageBtn.disabled = true;
-                nextPageBtn.disabled = true;
-                currentPageSpan.textContent = '1';
-                totalPagesSpan.textContent = '1';
-                return;
-            }
-
-            totalTripletsCountSpan.textContent = allTripletsData.length;
-            const totalPages = Math.ceil(allTripletsData.length / itemsPerPage);
-            currentPageSpan.textContent = currentPage;
-            totalPagesSpan.textContent = totalPages;
-
-            const startIndex = (currentPage - 1) * itemsPerPage;
-            const endIndex = startIndex + itemsPerPage;
-            const tripletsForPage = allTripletsData.slice(startIndex, endIndex);
-
-            tripletsForPage.forEach(triplet_info => {
-                const row = document.createElement('tr');
-                row.className = 'hover:bg-gray-50';
-                const tripletBallsHtml = `
-                    <span class="inline-flex items-center justify-center bg-blue-200 text-blue-800 text-sm font-semibold px-2.5 py-0.5 rounded-full mr-1">
-                        ${triplet_info['triplet'][0]}
-                    </span>
-                    <span class="inline-flex items-center justify-center bg-blue-200 text-blue-800 text-sm font-semibold px-2.5 py-0.5 rounded-full mr-1">
-                        ${triplet_info['triplet'][1]}
-                    </span>
-                    <span class="inline-flex items-center justify-center bg-blue-200 text-blue-800 text-sm font-semibold px-2.5 py-0.5 rounded-full">
-                        ${triplet_info['triplet'][2]}
-                    </span>
-                `;
-                row.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        <div class="flex space-x-1">
-                            ${tripletBallsHtml}
-                        </div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${triplet_info['count']}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${triplet_info['first_drawn_date']}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${triplet_info['last_drawn_date']}</td>
-                `;
-                tripletsTableBody.appendChild(row);
-            });
-
-            prevPageBtn.disabled = currentPage === 1;
-            nextPageBtn.disabled = currentPage === totalPages;
-        }
-
-        function renderTripletsChart() {
-            if (tripletChart) {
-                tripletChart.destroy();
-            }
-
-            if (!allTripletsData || allTripletsData.length === 0) {
-                chartNoDataMessage.classList.remove('hidden');
-                return;
-            }
-
-            // Determine how many top triplets to show in the chart
-            const topN = Math.min(allTripletsData.length, 30); // Show top 30, or fewer if less than 30 unique triplets
-            const chartData = allTripletsData.slice(0, topN);
-
-            const labels = chartData.map(d => d.triplet.join(', '));
-            const data = chartData.map(d => d.count);
-
-            const ctx = document.getElementById('tripletFrequencyChart');
-            if (ctx) {
-                tripletChart = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Frequency',
-                            data: data,
-                            backgroundColor: 'rgba(59, 130, 246, 0.7)', // Tailwind blue-500
-                            borderColor: 'rgba(59, 130, 246, 1)',
-                            borderWidth: 1
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: false
-                            },
-                            tooltip: {
-                                mode: 'index',
-                                intersect: false,
-                                callbacks: {
-                                    title: function(context) {
-                                        return 'Triplet: ' + context[0].label;
-                                    },
-                                    label: function(context) {
-                                        return 'Frequency: ' + context.parsed.y;
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                title: {
-                                    display: true,
-                                    text: 'Number of Occurrences'
-                                }
-                            },
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: 'Triplet Combination'
-                                },
-                                ticks: {
-                                    autoSkip: false,
-                                    maxRotation: 45,
-                                    minRotation: 45
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-        }
-        
-        // Event Listeners for Pagination Buttons
-        prevPageBtn.addEventListener('click', () => {
-            if (currentPage > 1) {
-                currentPage--;
-                renderTripletsTable();
-            }
-        });
-
-        nextPageBtn.addEventListener('click', () => {
-            const totalPages = Math.ceil(allTripletsData.length / itemsPerPage);
-            if (currentPage < totalPages) {
-                currentPage++;
-                renderTripletsTable();
-            }
-        });
-
-        // Event listener for apply filters button
-        applyFiltersBtn.addEventListener('click', fetchAndRenderTriplets);
-
-        // Initial fetch and render when the page loads
-        fetchAndRenderTriplets();
+  // ── Sort pills ────────────────────────────────────────────
+  document.querySelectorAll('.sort-pill').forEach(pill => {
+    pill.addEventListener('click', function () {
+      document.querySelectorAll('.sort-pill').forEach(p => p.classList.remove('active'));
+      this.classList.add('active');
+      sortBy = this.dataset.sort;
     });
+  });
+
+  // ── Ball renderer ─────────────────────────────────────────
+  function ball(n, size=30) {
+    return `<div class="wb3d" style="width:${size}px;height:${size}px;font-size:${size===30?10:9}px">${n}</div>`;
+  }
+
+  // ── Fetch ─────────────────────────────────────────────────
+  async function fetchData() {
+    filterNum = filterInput.value.trim();
+
+    if (filterNum !== '') {
+      const n = parseInt(filterNum);
+      if (isNaN(n) || n < 1 || n > 69) {
+        errorMsg.textContent = 'Enter a valid ball number between 1 and 69.';
+        errorMsg.style.display = 'block'; return;
+      }
+    }
+
+    errorMsg.style.display = 'none';
+    loadingRow.style.display = 'flex';
+    applyBtn.disabled = true; aiBtn.disabled = true;
+    tableBody.innerHTML = `<tr><td colspan="6" class="empty-cell"><span class="ta-spinner"></span></td></tr>`;
+    spotList.innerHTML  = `<div class="loading-row"><span class="ta-spinner"></span><span>Loading…</span></div>`;
+
+    let url = `/api/triplets_detailed_analysis?sort_by=${sortBy}`;
+    if (filterNum) url += `&filter_number=${filterNum}`;
+
+    try {
+      const res  = await fetch(url);
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        errorMsg.textContent = data.error || 'Failed to load triplet data.';
+        errorMsg.style.display = 'block';
+        tableBody.innerHTML = `<tr><td colspan="6" class="empty-cell">Error loading data.</td></tr>`;
+        return;
+      }
+
+      allData     = data.triplets_data || [];
+      currentPage = 1;
+
+      updateStats();
+      renderSpotlight();
+      renderChart();
+      renderTable();
+      aiBtn.disabled = allData.length === 0;
+
+    } catch(e) {
+      errorMsg.textContent = 'Request failed: ' + e.message;
+      errorMsg.style.display = 'block';
+    } finally {
+      loadingRow.style.display = 'none';
+      applyBtn.disabled = false;
+    }
+  }
+
+  // ── Stats ─────────────────────────────────────────────────
+  function updateStats() {
+    const total = allData.length;
+    const max   = total ? Math.max(...allData.map(d => d.count)) : 0;
+    const avg   = total ? (allData.reduce((s,d)=>s+d.count,0)/total).toFixed(1) : 0;
+    const once  = allData.filter(d=>d.count===1).length;
+    document.getElementById('statTotal').textContent = total.toLocaleString();
+    document.getElementById('statMax').textContent   = max;
+    document.getElementById('statAvg').textContent   = avg;
+    document.getElementById('statOnce').textContent  = once.toLocaleString();
+  }
+
+  // ── Spotlight top 10 ──────────────────────────────────────
+  function renderSpotlight() {
+    const top = [...allData].sort((a,b)=>b.count-a.count).slice(0,10);
+    if (!top.length) { spotList.innerHTML = `<p style="font-size:12px;color:var(--muted)">No data.</p>`; return; }
+    const maxC = top[0].count;
+    const medals = ['🥇','🥈','🥉'];
+    spotList.innerHTML = top.map((t,i) => `
+      <div class="sp-row">
+        <span class="sp-rank">${medals[i] || `<span style="font-size:9px;color:var(--muted)">#${i+1}</span>`}</span>
+        <div class="sp-balls">${t.triplet.map(n=>ball(n,30)).join('')}</div>
+        <div class="sp-bar-wrap"><div class="sp-bar-fill" style="width:${Math.round(t.count/maxC*100)}%"></div></div>
+        <span class="sp-count">${t.count}×</span>
+        <span class="sp-dates">${t.last_drawn_date}</span>
+      </div>
+    `).join('');
+  }
+
+  // ── Chart ─────────────────────────────────────────────────
+  function renderChart() {
+    if (chartInst) { chartInst.destroy(); chartInst = null; }
+    const chartEmpty = document.getElementById('chartEmpty');
+
+    const top30 = [...allData].sort((a,b)=>b.count-a.count).slice(0,30);
+    if (!top30.length) { chartEmpty.style.display='block'; return; }
+    chartEmpty.style.display = 'none';
+
+    const labels = top30.map(d => d.triplet.join(', '));
+    const vals   = top30.map(d => d.count);
+    const maxV   = Math.max(...vals);
+
+    chartInst = new Chart(document.getElementById('tripletChart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Frequency',
+          data: vals,
+          backgroundColor: vals.map(v => `rgba(59,130,246,${0.35 + 0.6*(v/maxV)})`),
+          borderColor: 'rgba(59,130,246,0.7)',
+          borderWidth: 1,
+          borderRadius: 4,
+        }]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false, animation:{duration:500},
+        scales:{
+          x:{ grid:{color:'rgba(255,255,255,0.03)'}, ticks:{color:'rgba(255,255,255,0.35)',font:{family:'JetBrains Mono',size:9},maxRotation:50,minRotation:45} },
+          y:{ beginAtZero:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'rgba(255,255,255,0.35)',precision:0} }
+        },
+        plugins:{
+          legend:{ display:false },
+          tooltip:{ backgroundColor:'#080c12', borderColor:'rgba(59,130,246,0.25)', borderWidth:1, titleColor:'rgba(255,255,255,0.6)', bodyColor:'rgba(255,255,255,0.45)', padding:10, titleFont:{family:'JetBrains Mono',size:11},
+            callbacks:{
+              title: ctx => 'Triplet: (' + ctx[0].label + ')',
+              label:  ctx => 'Frequency: ' + ctx.parsed.y + '×'
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // ── Table ─────────────────────────────────────────────────
+  function renderTable() {
+    const total  = allData.length;
+    const pages  = Math.max(1, Math.ceil(total / PER_PAGE));
+    currentPage  = Math.min(currentPage, pages);
+
+    tableCount.textContent = total.toLocaleString();
+    pageInfo.textContent   = `Page ${currentPage} of ${pages}`;
+    pagInfo2.textContent   = `Showing ${Math.min((currentPage-1)*PER_PAGE+1, total)}–${Math.min(currentPage*PER_PAGE, total)} of ${total}`;
+    prevBtn.disabled = currentPage === 1;
+    nextBtn.disabled = currentPage >= pages;
+
+    const slice  = allData.slice((currentPage-1)*PER_PAGE, currentPage*PER_PAGE);
+    const maxC   = allData.length ? Math.max(...allData.map(d=>d.count)) : 1;
+
+    if (!slice.length) {
+      tableBody.innerHTML = `<tr><td colspan="6" class="empty-cell">No triplets found.</td></tr>`;
+      return;
+    }
+
+    const globalOffset = (currentPage - 1) * PER_PAGE;
+    tableBody.innerHTML = slice.map((t, i) => {
+      const rank   = globalOffset + i + 1;
+      const barW   = Math.round(t.count / maxC * 100);
+      const balls  = t.triplet.map(n => ball(n, 26)).join('');
+      return `
+        <tr>
+          <td class="td-date">${rank}</td>
+          <td><div class="td-balls">${balls}</div></td>
+          <td class="td-count">${t.count}×</td>
+          <td class="td-bar-cell"><div class="td-mini-bar" style="width:${barW}%"></div></td>
+          <td class="td-date">${t.first_drawn_date}</td>
+          <td class="td-last">${t.last_drawn_date}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // ── Pagination ────────────────────────────────────────────
+  prevBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderTable(); } });
+  nextBtn.addEventListener('click', () => {
+    const pages = Math.ceil(allData.length / PER_PAGE);
+    if (currentPage < pages) { currentPage++; renderTable(); }
+  });
+
+  // ── Apply / Reset ─────────────────────────────────────────
+  applyBtn.addEventListener('click', fetchData);
+  resetBtn.addEventListener('click', () => {
+    filterInput.value = '';
+    document.querySelectorAll('.sort-pill').forEach(p => p.classList.remove('active'));
+    document.querySelector('.sort-pill[data-sort="most_frequent"]').classList.add('active');
+    sortBy = 'most_frequent';
+    fetchData();
+  });
+  filterInput.addEventListener('keydown', e => { if (e.key === 'Enter') fetchData(); });
+
+  // ── AI ────────────────────────────────────────────────────
+  aiBtn.addEventListener('click', async function () {
+    const thinking  = document.getElementById('aiThinking');
+    const output    = document.getElementById('aiOutput');
+    const narrative = document.getElementById('aiNarrative');
+    const errEl     = document.getElementById('aiError');
+    const chipsWrap = document.getElementById('aiChips');
+
+    this.disabled = true; this.innerHTML = '⏳ Analysing…';
+    thinking.classList.add('visible');
+    output.classList.remove('visible');
+    errEl.style.display = 'none';
+    narrative.textContent = ''; chipsWrap.innerHTML = '';
+
+    const sorted   = [...allData].sort((a,b)=>b.count-a.count);
+    const top10    = sorted.slice(0,10).map(t=>({triplet:t.triplet.join(','), count:t.count, last:t.last_drawn_date}));
+    const bottom10 = sorted.slice(-10).map(t=>({triplet:t.triplet.join(','), count:t.count, last:t.last_drawn_date}));
+    const once     = sorted.filter(d=>d.count===1).length;
+    const maxC     = sorted[0]?.count || 0;
+    const avgC     = sorted.length ? (sorted.reduce((s,d)=>s+d.count,0)/sorted.length).toFixed(1) : 0;
+
+    // Most recent triplets (by last_drawn_date)
+    const recentSort = [...allData].sort((a,b) => new Date(b.last_drawn_date) - new Date(a.last_drawn_date));
+    const top5recent = recentSort.slice(0,5).map(t=>({triplet:t.triplet.join(','), count:t.count, last:t.last_drawn_date}));
+
+    // Overdue: high count but oldest last_drawn
+    const overdue = sorted.filter(d=>d.count>=3).sort((a,b)=>new Date(a.last_drawn_date)-new Date(b.last_drawn_date)).slice(0,5)
+      .map(t=>({triplet:t.triplet.join(','), count:t.count, last:t.last_drawn_date}));
+
+    try {
+      const res  = await fetch('/api/triplets-ai-analysis', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          filter_number:   filterNum || null,
+          sort_by:         sortBy,
+          total_triplets:  allData.length,
+          max_frequency:   maxC,
+          avg_frequency:   avgC,
+          seen_once:       once,
+          top10_triplets:  top10,
+          bottom10_triplets: bottom10,
+          most_recent:     top5recent,
+          overdue_triplets: overdue,
+        })
+      });
+      const d2 = await res.json();
+      if (d2.error) { errEl.textContent = 'AI unavailable: ' + d2.error; errEl.style.display='block'; }
+      else {
+        (d2.insights||[]).forEach(ins=>{
+          const c=document.createElement('div'); c.className='ai-chip';
+          c.innerHTML=`<p class="ai-chip-label">${ins.label}</p><div class="ai-chip-val">${ins.value}</div>`;
+          chipsWrap.appendChild(c);
+        });
+        narrative.textContent = d2.analysis;
+        output.classList.add('visible');
+      }
+    } catch(e) {
+      errEl.textContent = 'Request failed. Register /api/triplets-ai-analysis in index.py.';
+      errEl.style.display = 'block';
+    } finally {
+      thinking.classList.remove('visible');
+      this.disabled = false; this.innerHTML = '◈ Analyse Triplets';
+    }
+  });
+
+  // ── Initial load ──────────────────────────────────────────
+  fetchData();
+});
 </script>
 {% endblock %}
