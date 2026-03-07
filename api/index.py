@@ -8863,83 +8863,126 @@ Based purely on historical frequency patterns, give a specific number strategy f
 
     except Exception as e:
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-# ── Paste into index.py ───────────────────────────────────────────────────────
+        return jsonify({'error': str(e)}), 500# 
+        
 
 @app.route('/api/grouped-patterns-yearly-ai-analysis', methods=['POST'])
 def grouped_patterns_yearly_ai_analysis():
     try:
-        p               = request.get_json()
-        selected_range  = p.get('selected_range', '')
-        range_min       = p.get('range_min', 0)
-        range_max       = p.get('range_max', 0)
-        total_years     = p.get('total_years', 0)
-        unique_pairs    = p.get('unique_pairs', 0)
-        unique_triplets = p.get('unique_triplets', 0)
-        peak_year       = p.get('peak_year', '')
-        peak_unique     = p.get('peak_unique', 0)
-        trend           = p.get('overall_trend', 'stable')
-        top5_pairs      = p.get('top5_pairs', [])
-        top5_triplets   = p.get('top5_triplets', [])
-        recent_years    = p.get('recent_years', [])
+        p = request.get_json()
+
+        selected_range        = p.get('selected_range', '')
+        range_min             = p.get('range_min', 0)
+        range_max             = p.get('range_max', 0)
+        total_years           = p.get('total_years', 0)
+        unique_pairs_count    = p.get('unique_pairs_count', 0)
+        unique_triplets_count = p.get('unique_triplets_count', 0)
+        peak_year             = p.get('peak_year', '')
+        peak_unique           = p.get('peak_unique', 0)
+        overall_trend         = p.get('overall_trend', 'stable')
+        pair_dom_years        = p.get('pair_dominant_years', 0)
+        triplet_dom_years     = p.get('triplet_dominant_years', 0)
+        top20_pairs           = p.get('top20_pairs', [])
+        top20_triplets        = p.get('top20_triplets', [])
+        rising_pairs          = p.get('rising_pairs', [])
+        rising_triplets       = p.get('rising_triplets', [])
+        cold_pairs            = p.get('cold_pairs', [])
+        cold_triplets         = p.get('cold_triplets', [])
+        all_years_data        = p.get('all_years_data', [])
 
         if not selected_range:
             return jsonify({'error': 'No data provided'}), 400
 
-        def fmt_recent(r):
-            tp = r.get('top_pair')
-            tt = r.get('top_triplet')
-            return (
-                f"  {r['year']}: {r['total_unique']} unique patterns | "
-                f"top pair ({tp['pattern'] if tp else 'none'}) ×{tp['count'] if tp else 0} | "
-                f"top triplet ({tt['pattern'] if tt else 'none'}) ×{tt['count'] if tt else 0}"
-            )
+        def fmt_top(items, key='pattern', count_key='count'):
+            return chr(10).join(
+                f"  #{i+1}  ({r[key]}): {r[count_key]}x"
+                for i, r in enumerate(items[:10])
+            ) or '  (none)'
 
-        prompt = f"""You are an expert Powerball grouped pattern analyst. Analyse how number pairs and triplets within a specific range have behaved across historical draws.
+        def fmt_rising(items):
+            return chr(10).join(
+                f"  ({r['pattern']}): {r['recent']}x recent vs {r['prior']}x prior"
+                for r in items
+            ) or '  (none)'
 
-═══ RANGE CONTEXT ═══
-Selected range: {selected_range} (numbers {range_min}–{range_max})
-Years analysed: {total_years}
-Unique pairs found:    {unique_pairs}
-Unique triplets found: {unique_triplets}
-Peak year: {peak_year} ({peak_unique} unique patterns)
-Overall pattern trend: {trend}
+        def fmt_cold(items):
+            return chr(10).join(
+                f"  ({r['pattern']}): {r['allTime']}x all-time but 0 in last 2 years"
+                for r in items
+            ) or '  (none)'
 
-═══ TOP 5 ALL-TIME PAIRS ═══
-{chr(10).join(f"  ({r['pattern']}): {r['count']} times" for r in top5_pairs)}
+        def fmt_year(d):
+            tp = ', '.join(f"({x['p']})x{x['c']}" for x in d['top_pair'])
+            tt = ', '.join(f"({x['p']})x{x['c']}" for x in d['top_triplet'])
+            dom = 'Pairs' if d['pair_count'] > d['triplet_count'] else 'Triplets' if d['triplet_count'] > d['pair_count'] else 'Equal'
+            return f"  {d['year']}: {d['total_draws_with_patterns']} patterns | {dom} dominant | top pairs: {tp} | top triplets: {tt}"
 
-═══ TOP 5 ALL-TIME TRIPLETS ═══
-{chr(10).join(f"  ({r['pattern']}): {r['count']} times" for r in top5_triplets)}
+        recent3 = all_years_data[-3:] if len(all_years_data) >= 3 else all_years_data
+        dominant_type = 'Pairs' if pair_dom_years > triplet_dom_years else 'Triplets'
 
-═══ RECENT YEARS SNAPSHOT ═══
-{chr(10).join(fmt_recent(r) for r in recent_years)}
+        prompt = f"""You are an expert Powerball pattern strategist. Analyse ALL historical pairs and triplets within the number range {selected_range} ({range_min}-{range_max}) and give SPECIFIC, ACTIONABLE advice on what to pick.
 
-Write EXACTLY these 4 sections, each header on its own line:
+RANGE OVERVIEW
+Range: {selected_range} ({range_min}-{range_max}) | Years: {total_years} | Trend: {overall_trend}
+Unique pairs: {unique_pairs_count} | Unique triplets: {unique_triplets_count} | Peak year: {peak_year} ({peak_unique} patterns)
+Pair-dominant years: {pair_dom_years}/{total_years} | Triplet-dominant years: {triplet_dom_years}/{total_years}
 
-DOMINANT PATTERNS
-Name the single most dominant pair AND triplet within the {selected_range} range. How many times did each appear all-time? Are they related (do they share numbers)?
+TOP 10 ALL-TIME PAIRS
+{fmt_top(top20_pairs[:10])}
 
-TREND ANALYSIS
-Is the overall pattern count {trend}? Name the peak year ({peak_year}) and describe how recent years compare to it. Is this range becoming more or less predictable over time?
+TOP 10 ALL-TIME TRIPLETS
+{fmt_top(top20_triplets[:10])}
 
-RANGE CHARACTERISTICS
-What does the {range_min}–{range_max} number range tell us? Are pairs more common than triplets (or vice versa) — and what ratio of unique pairs ({unique_pairs}) to triplets ({unique_triplets}) suggests about draw clustering in this range?
+RISING PAIRS (hot momentum - more frequent in last 2 years vs prior 3 years)
+{fmt_rising(rising_pairs)}
 
-STRATEGY RECOMMENDATION
-Based on the all-time top pairs and triplets, give ONE specific number combination to watch for draws targeting this range. Name the exact pair or triplet, its historical frequency, and whether recent year data supports or weakens this pick."""
+RISING TRIPLETS (hot momentum)
+{fmt_rising(rising_triplets)}
+
+COLD PAIRS (strong historically but 0 appearances in last 2 years - overdue)
+{fmt_cold(cold_pairs)}
+
+COLD TRIPLETS (overdue)
+{fmt_cold(cold_triplets)}
+
+RECENT 3 YEARS
+{chr(10).join(fmt_year(d) for d in recent3)}
+
+ALL YEARS DATA
+{chr(10).join(fmt_year(d) for d in all_years_data)}
+
+Write EXACTLY these 5 sections with the header on its own line. Be SPECIFIC - use actual pair/triplet numbers in every answer:
+
+PAIRS vs TRIPLETS: WHEN TO USE WHICH
+Based on {pair_dom_years} pair-dominant years vs {triplet_dom_years} triplet-dominant years — which type is currently more reliable for this range? Has there been a recent shift? Give a direct verdict: "In the current cycle, favour [PAIRS/TRIPLETS] because..." Include exact data to back it up.
+
+TOP PAIR TO PICK
+From all-time top 20 AND rising pairs — name the SINGLE BEST pair for your next pick from {selected_range}. Give: (1) the exact pair numbers, (2) all-time count, (3) momentum status (rising/cold/neutral), (4) which years it peaked. Be decisive — one pair only.
+
+TOP TRIPLET TO PICK
+From all-time top 20 AND rising triplets — name the SINGLE BEST triplet for your next pick from {selected_range}. Give: (1) the exact triplet numbers, (2) all-time count, (3) momentum status, (4) whether those numbers also appear in the top pairs (confirms cluster strength).
+
+OVERDUE ALERT — WATCH THESE
+Name the top 2 cold pairs and top 2 cold triplets with strong historical records that have gone cold. For each, give: all-time count + approximate years absent. Rank them by urgency. Are any statistically due for a comeback?
+
+NEXT DRAW STRATEGY — FINAL VERDICT
+Combine all sections into one clear pick. Tell the player:
+1. PAIR or TRIPLET? (which to use and why for this range right now)
+2. PRIMARY PICK: exact numbers (e.g. "pair (12, 22)" or "triplet (5, 15, 25)")
+3. BACKUP PICK: one alternative if the primary feels wrong
+Justify every choice with specific numbers from the data above."""
 
         groq_api_key = os.environ.get('GROQ_API_KEY', '')
         response = requests.post(
             'https://api.groq.com/openai/v1/chat/completions',
             headers={'Authorization': f'Bearer {groq_api_key}', 'Content-Type': 'application/json'},
             json={
-                'model': 'llama-3.1-8b-instant',
-                'messages': [{'role': 'user', 'content': prompt}],
-                'max_tokens': 600,
-                'temperature': 0.6
+                'model':       'llama-3.1-8b-instant',
+                'messages':    [{'role': 'user', 'content': prompt}],
+                'max_tokens':  950,
+                'temperature': 0.55,
             },
-            timeout=35
+            timeout=40
         )
 
         result = response.json()
@@ -8948,13 +8991,20 @@ Based on the all-time top pairs and triplets, give ONE specific number combinati
 
         analysis = result['choices'][0]['message']['content'].strip()
 
+        best_rising_pair    = rising_pairs[0]    if rising_pairs    else None
+        best_rising_triplet = rising_triplets[0] if rising_triplets else None
+        most_overdue_pair   = cold_pairs[0]      if cold_pairs      else None
+        most_overdue_trip   = cold_triplets[0]   if cold_triplets   else None
+
         insights = [
-            { 'label': '📊 Range',              'value': f"{selected_range} · {range_min}–{range_max}" },
-            { 'label': '📅 Years Covered',       'value': f"{total_years} years of data" },
-            { 'label': '👑 Top All-Time Pair',   'value': f"({top5_pairs[0]['pattern']}) · {top5_pairs[0]['count']}×" if top5_pairs else '—' },
-            { 'label': '👑 Top All-Time Triplet','value': f"({top5_triplets[0]['pattern']}) · {top5_triplets[0]['count']}×" if top5_triplets else '—' },
-            { 'label': '🏆 Peak Year',           'value': f"{peak_year} · {peak_unique} patterns" },
-            { 'label': '📈 Overall Trend',       'value': trend.capitalize() },
+            { 'label': '📊 Range Analysed',         'value': f"{selected_range} ({range_min}-{range_max})" },
+            { 'label': '🏆 Currently Dominant',      'value': f"{dominant_type} ({max(pair_dom_years,triplet_dom_years)}/{total_years} yrs)" },
+            { 'label': '🔥 Hottest Pair (all-time)', 'value': f"({top20_pairs[0]['pattern']}) · {top20_pairs[0]['count']}x" if top20_pairs else '—' },
+            { 'label': '🔥 Hottest Triplet',         'value': f"({top20_triplets[0]['pattern']}) · {top20_triplets[0]['count']}x" if top20_triplets else '—' },
+            { 'label': '⚡ Rising Pair',             'value': f"({best_rising_pair['pattern']}) · {best_rising_pair['recent']}x recent" if best_rising_pair else 'None detected' },
+            { 'label': '⚡ Rising Triplet',          'value': f"({best_rising_triplet['pattern']}) · {best_rising_triplet['recent']}x recent" if best_rising_triplet else 'None detected' },
+            { 'label': '⏰ Overdue Pair',            'value': f"({most_overdue_pair['pattern']}) · {most_overdue_pair['allTime']}x historical" if most_overdue_pair else 'None' },
+            { 'label': '⏰ Overdue Triplet',         'value': f"({most_overdue_trip['pattern']}) · {most_overdue_trip['allTime']}x historical" if most_overdue_trip else 'None' },
         ]
 
         return jsonify({'analysis': analysis, 'insights': insights})
