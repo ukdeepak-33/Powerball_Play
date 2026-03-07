@@ -2081,7 +2081,7 @@ def get_generated_numbers_history():
 
         while True:
             params = {
-                'select': 'id,generated_date,number_1,number_2,number_3,number_4,number_5,powerball', # Added 'id'
+                'select': 'id,generated_date,number_1,number_2,number_3,number_4,number_5,powerball,source', # Added 'id''source'
                 'order': 'generated_date.desc',
                 'offset': offset,
                 'limit': limit
