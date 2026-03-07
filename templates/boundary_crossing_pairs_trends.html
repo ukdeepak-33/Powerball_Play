@@ -279,8 +279,13 @@
   </div>
 
   <!-- Hidden form for POST submission -->
+  <!-- Real select with exact backend option values — guaranteed match on POST -->
   <form id="pairSelectForm" method="POST" action="{{ url_for('boundary_crossing_pairs_trends_route') }}">
-    <input type="hidden" name="selected_pair" id="hiddenPairInput" value="{{ selected_pair or '' }}">
+    <select name="selected_pair" id="hiddenPairSelect" style="display:none">
+      {% for pair_str in boundary_pairs_for_dropdown %}
+        <option value="{{ pair_str }}" {% if selected_pair == pair_str %}selected{% endif %}>{{ pair_str }}</option>
+      {% endfor %}
+    </select>
   </form>
 
   <div class="bcp-wrap">
@@ -405,29 +410,27 @@
 document.addEventListener('DOMContentLoaded', function () {
 
   // ── Data ─────────────────────────────────────────────────
-  const summaryRaw    = {{ all_boundary_patterns_summary | tojson if all_boundary_patterns_summary else '[]' }};
-  const yearlyRaw     = {{ yearly_data_for_selected_pattern | tojson if yearly_data_for_selected_pattern else '[]' }};
-  const selectedPair  = "{{ selected_pair or '' }}";
-  // Exact strings the backend uses — must match these verbatim on submit
-  const dropdownPairs = {{ boundary_pairs_for_dropdown | tojson if boundary_pairs_for_dropdown else '[]' }};
+  const summaryRaw   = {{ all_boundary_patterns_summary | tojson if all_boundary_patterns_summary else '[]' }};
+  const yearlyRaw    = {{ yearly_data_for_selected_pattern | tojson if yearly_data_for_selected_pattern else '[]' }};
+  const selectedPair = "{{ selected_pair or '' }}";
 
   if (!summaryRaw.length) return;
 
-  // Find the exact dropdown string matching a pattern array [a, b]
-  // Tries comma+space, comma-only, and reversed order
-  function findDropdownStr(patternArr) {
-    const nums = patternArr.map(Number);
-    for (const ds of dropdownPairs) {
-      const parts = ds.split(',').map(s => Number(s.trim()));
-      if (parts.length === nums.length && nums.every(n => parts.includes(n))) return ds;
+  // Get the exact option value for a pattern array by matching against the real <select> options
+  // This is the ONLY guaranteed-correct way — same strings the backend generated
+  const selectEl = document.getElementById('hiddenPairSelect');
+  function findOptionValue(patternArr) {
+    const nums = patternArr.map(Number).sort((a,b)=>a-b);
+    for (const opt of selectEl.options) {
+      // Parse the option value however it is formatted
+      const raw = opt.value;
+      // Extract all numbers from the string
+      const parts = raw.match(/\d+/g);
+      if (!parts) continue;
+      const optNums = parts.map(Number).sort((a,b)=>a-b);
+      if (optNums.length === nums.length && optNums.every((v,i) => v === nums[i])) return opt.value;
     }
-    // Fallbacks in order of likelihood
-    return [
-      patternArr.join(', '),
-      patternArr.join(','),
-      patternArr.map(Number).join(', '),
-      patternArr.map(Number).join(','),
-    ].find(s => dropdownPairs.includes(s)) || patternArr.join(', ');
+    return patternArr.join(', '); // last-resort fallback
   }
 
   // ── Sort by count desc ────────────────────────────────────
@@ -447,7 +450,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const grid = document.getElementById('pairsGrid');
   sorted.forEach((row, i) => {
     // Use the exact backend string so the POST lookup succeeds
-    const submitVal = findDropdownStr(row.pattern);
+    const submitVal = findOptionValue(row.pattern);
     const isActive  = submitVal === selectedPair ||
                       row.pattern.join(', ') === selectedPair ||
                       row.pattern.join(',')  === selectedPair;
@@ -469,7 +472,8 @@ document.addEventListener('DOMContentLoaded', function () {
       <span class="pair-count">${row.count}×</span>
     `;
     card.addEventListener('click', () => {
-      document.getElementById('hiddenPairInput').value = submitVal;
+      // Set the matching option as selected then submit — exact value guaranteed
+      for (const opt of selectEl.options) { opt.selected = (opt.value === submitVal); }
       document.getElementById('pairSelectForm').submit();
     });
     grid.appendChild(card);
