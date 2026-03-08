@@ -1,283 +1,593 @@
 {% extends "base.html" %}
 
-{% block title %}White Ball Gap Analysis{% endblock %}
-
-{% block page_heading %}White Ball Gap Analysis & Trends{% endblock %}
-
-{% block head %}
-    {{ super() }}
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        .chart-container {
-            position: relative;
-            height: 450px; /* Adjust height as needed for better visibility */
-            width: 100%;
-            overflow-x: auto; /* Allow horizontal scrolling if many bars */
-        }
-        .loading-spinner {
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top: 4px solid #6366f1; /* Tailwind indigo-500 */
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        /* Styling for the balls */
-        .ball-display {
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-            width: 2.2rem;
-            height: 2.2rem;
-            border-radius: 50%;
-            background-color: #6366f1; /* Indigo */
-            color: white;
-            font-weight: bold;
-            font-size: 1rem;
-            margin: 0.15rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            flex-shrink: 0;
-        }
-    </style>
-{% endblock %}
+{% block title %}White Ball Gap Analysis — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
-<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    {# Flash messages display #}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg:    #050809; --s1: #090e0f; --s2: #0d1314; --s3: #121819;
+    --border: rgba(255,255,255,0.065); --text: rgba(255,255,255,0.87); --muted: rgba(255,255,255,0.33);
+    --teal:  #14b8a6; --teal2: rgba(20,184,166,0.12); --teal3: rgba(20,184,166,0.28);
+    --amber: #f59e0b; --amber2: rgba(245,158,11,0.12);
+    --red:   #ef4444; --red2:   rgba(239,68,68,0.12);
+    --green: #22c55e; --green2: rgba(34,197,94,0.12);
+    --violet:#a78bfa; --blue: #60a5fa; --cyan: #22d3ee;
+
+    /* Gap colour thresholds */
+    --gap-zero:   rgba(34,197,94,0.6);
+    --gap-small:  rgba(20,184,166,0.6);
+    --gap-medium: rgba(245,158,11,0.6);
+    --gap-large:  rgba(239,68,68,0.65);
+  }
+
+  #wbg * { box-sizing: border-box; }
+  #wbg {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg); min-height:100vh; color: var(--text); padding-bottom:80px;
+  }
+
+  /* ── Hero ── */
+  .wbg-hero {
+    position:relative; padding:50px 24px 36px; text-align:center; overflow:hidden;
+  }
+  .wbg-hero::before {
+    content:''; position:absolute; inset:0;
+    background:
+      radial-gradient(ellipse 55% 55% at 50% -5%, rgba(20,184,166,0.1) 0%, transparent 65%),
+      radial-gradient(ellipse 25% 30% at 5%  75%, rgba(239,68,68,0.05) 0%, transparent 60%),
+      radial-gradient(ellipse 25% 30% at 95% 75%, rgba(245,158,11,0.05) 0%, transparent 60%);
+    pointer-events:none;
+  }
+  .wbg-hero::after {
+    content:''; position:absolute; bottom:0; left:0; right:0; height:1px;
+    background:linear-gradient(90deg, transparent, var(--teal), rgba(255,255,255,0.2), var(--amber), transparent);
+    opacity:0.3;
+  }
+  .wbg-eyebrow { font-size:10px; letter-spacing:3px; text-transform:uppercase; color:var(--teal); margin-bottom:12px; opacity:0.8; }
+  .wbg-hero h1 {
+    font-family:'Bebas Neue',sans-serif;
+    font-size:clamp(52px,7vw,100px); font-weight:400; line-height:0.95; margin:0 0 14px; letter-spacing:2px;
+    background:linear-gradient(135deg, var(--teal) 0%, #fff 40%, var(--amber) 80%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  }
+  .wbg-hero p { font-size:12px; color:var(--muted); max-width:480px; margin:0 auto; line-height:1.8; }
+
+  /* ── Layout ── */
+  .wbg-wrap { max-width:1180px; margin:0 auto; padding:0 20px; display:flex; flex-direction:column; gap:16px; }
+
+  /* ── Card ── */
+  .wbg-card { background:var(--s1); border:1px solid var(--border); border-radius:16px; padding:20px 22px; position:relative; overflow:hidden; }
+  .wbg-label { font-size:9px; letter-spacing:2.5px; text-transform:uppercase; color:var(--muted); margin:0 0 14px; display:block; }
+
+  /* ── Ball picker grid ── */
+  .ball-grid { display:flex; flex-wrap:wrap; gap:5px; justify-content:center; margin-bottom:18px; }
+  .pick-ball {
+    width:34px; height:34px; border-radius:50%; cursor:pointer; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:10px; font-weight:600;
+    background:var(--s2); border:1px solid rgba(255,255,255,0.08);
+    color:rgba(255,255,255,0.45); transition:all 0.14s cubic-bezier(0.34,1.3,0.64,1);
+  }
+  .pick-ball:hover { border-color:rgba(255,255,255,0.22); color:rgba(255,255,255,0.8); transform:scale(1.1); }
+  .pick-ball.selected {
+    background:radial-gradient(circle at 32% 30%, #f0f4ff 0%, #c8d8ed 45%, #8aaac8 100%);
+    border:none; color:#0d1829;
+    box-shadow:0 0 14px rgba(255,255,255,0.2), 0 2px 8px rgba(0,0,0,0.4);
+    transform:scale(1.15);
+  }
+
+  /* ── Year pills ── */
+  .year-pills { display:flex; flex-wrap:wrap; gap:7px; }
+  .year-pill {
+    font-size:11px; letter-spacing:1px; padding:7px 14px; border-radius:8px;
+    border:1px solid var(--border); background:transparent; color:var(--muted);
+    cursor:pointer; transition:all 0.13s;
+  }
+  .year-pill:hover { border-color:rgba(255,255,255,0.15); color:var(--text); }
+  .year-pill.active { background:var(--teal2); border-color:var(--teal3); color:var(--teal); font-weight:700; }
+
+  /* ── Selected display ── */
+  .sel-bar {
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    margin-top:14px; padding-top:14px; border-top:1px solid var(--border);
+  }
+  .sel-ball-lg {
+    width:48px; height:48px; border-radius:50%; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:15px; font-weight:700;
+    background:radial-gradient(circle at 32% 30%, #f0f4ff 0%, #c8d8ed 45%, #8aaac8 100%);
+    color:#0d1829; box-shadow:0 0 18px rgba(255,255,255,0.15), 0 4px 10px rgba(0,0,0,0.4);
+  }
+  .sel-info { flex:1; }
+  .sel-info-title { font-size:12px; color:var(--text); font-weight:600; }
+  .sel-info-sub   { font-size:10px; color:var(--muted); margin-top:2px; }
+  .btn-analyse {
+    font-size:10px; letter-spacing:1.5px; text-transform:uppercase;
+    padding:11px 26px; border-radius:10px; border:none; cursor:pointer;
+    background:linear-gradient(135deg, #0f766e, var(--teal));
+    color:#000; font-family:'JetBrains Mono',monospace; font-weight:700;
+    transition:transform 0.15s, box-shadow 0.15s;
+    box-shadow:0 0 18px rgba(20,184,166,0.2);
+    display:flex; align-items:center; gap:8px;
+  }
+  .btn-analyse:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 0 30px rgba(20,184,166,0.45); }
+  .btn-analyse:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+
+  /* ── Stats chips ── */
+  .stats-row { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+  @media(max-width:640px){ .stats-row { grid-template-columns:1fr 1fr; } }
+  .sc { background:var(--s2); border:1px solid var(--border); border-radius:10px; padding:11px 12px; text-align:center; }
+  .sc-lbl { font-size:8px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+  .sc-val { font-size:18px; font-weight:700; line-height:1; }
+  .sc-sub { font-size:9px; color:var(--muted); margin-top:3px; }
+
+  /* ── Gap legend ── */
+  .legend-row { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
+  .legend-dot { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; }
+  .legend-item { font-size:10px; color:var(--muted); display:flex; align-items:center; }
+
+  /* ── Chart ── */
+  .chart-wrap { position:relative; height:320px; }
+
+  /* ── Table ── */
+  table { width:100%; border-collapse:collapse; }
+  thead tr { border-bottom:1px solid var(--border); }
+  thead th { font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); padding:9px 12px; text-align:left; }
+  tbody tr { border-bottom:1px solid rgba(255,255,255,0.03); transition:background 0.1s; }
+  tbody tr:hover { background:var(--s2); }
+  tbody td { padding:9px 12px; font-size:11px; }
+  .gap-badge {
+    display:inline-block; padding:3px 10px; border-radius:5px;
+    font-size:10px; font-weight:700; letter-spacing:0.5px; min-width:36px; text-align:center;
+  }
+  .gap-zero   { background:var(--green2); color:var(--green); border:1px solid rgba(34,197,94,0.25); }
+  .gap-small  { background:var(--teal2);  color:var(--teal);  border:1px solid rgba(20,184,166,0.25); }
+  .gap-medium { background:var(--amber2); color:var(--amber); border:1px solid rgba(245,158,11,0.25); }
+  .gap-large  { background:var(--red2);   color:var(--red);   border:1px solid rgba(239,68,68,0.25); }
+  .ongoing-badge { background:rgba(167,139,250,0.1); color:var(--violet); border:1px solid rgba(167,139,250,0.25); font-size:9px; padding:2px 8px; border-radius:5px; }
+
+  /* ── AI panel ── */
+  .ai-card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    background:linear-gradient(90deg, transparent, var(--teal), var(--amber), var(--violet), transparent);
+    opacity:0.4;
+  }
+  .ai-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px; }
+  .ai-eyebrow { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--teal); opacity:0.8; margin-bottom:3px; }
+  .ai-title   { font-family:'Bebas Neue',sans-serif; font-size:26px; letter-spacing:1px; margin:0; }
+  .ai-btn {
+    display:flex; align-items:center; gap:8px;
+    background:linear-gradient(135deg, #0f766e, var(--teal));
+    color:#000; font-family:'JetBrains Mono',monospace; font-size:10px;
+    letter-spacing:1.5px; text-transform:uppercase;
+    border:none; border-radius:10px; padding:11px 22px; cursor:pointer;
+    font-weight:700; transition:transform 0.15s, box-shadow 0.15s;
+    box-shadow:0 0 18px rgba(20,184,166,0.2);
+  }
+  .ai-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 0 30px rgba(20,184,166,0.45); }
+  .ai-btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+  .ai-thinking { display:none; align-items:center; gap:10px; padding:14px 0 4px; font-size:11px; color:rgba(20,184,166,0.7); letter-spacing:1px; }
+  .ai-thinking.visible { display:flex; }
+  .ai-dots span { display:inline-block; width:6px; height:6px; border-radius:50%; margin:0 2px; animation:dotB 1.2s infinite; }
+  .ai-dots span:nth-child(1){ background:var(--teal); }
+  .ai-dots span:nth-child(2){ animation-delay:0.2s; background:var(--amber); }
+  .ai-dots span:nth-child(3){ animation-delay:0.4s; background:var(--violet); }
+  @keyframes dotB{0%,80%,100%{transform:scale(0.6);opacity:0.4}40%{transform:scale(1);opacity:1}}
+  .ai-output { display:none; margin-top:18px; border-top:1px solid rgba(20,184,166,0.1); padding-top:18px; }
+  .ai-output.visible { display:block; }
+  .ai-chips { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:10px; margin-bottom:18px; }
+  .ai-chip  { background:var(--s2); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
+  .ai-chip-label { font-size:8px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+  .ai-chip-val   { font-size:13px; font-weight:600; color:#fff; line-height:1.4; }
+  .ai-narrative {
+    background:var(--s2); border:1px solid rgba(20,184,166,0.12);
+    border-left:3px solid var(--teal); border-radius:0 10px 10px 0;
+    padding:18px 20px; font-size:13px; line-height:1.9; color:var(--text); white-space:pre-wrap;
+  }
+  .ai-error { margin-top:12px; background:var(--red2); border:1px solid rgba(239,68,68,0.2); border-radius:9px; padding:12px 16px; font-size:12px; color:#fca5a5; }
+
+  /* spinner */
+  .wbg-spinner { display:inline-block; width:18px; height:18px; border-radius:50%; border:2px solid rgba(20,184,166,0.15); border-top-color:var(--teal); animation:spin 0.75s linear infinite; }
+  @keyframes spin { to{transform:rotate(360deg);} }
+  .loading-row { display:flex; align-items:center; gap:10px; padding:16px 0; font-size:11px; color:var(--muted); }
+
+  /* empty */
+  .empty-state { text-align:center; padding:40px; font-size:12px; color:var(--muted); }
+</style>
+
+<div id="wbg">
+
+  <!-- Hero -->
+  <div class="wbg-hero">
+    <p class="wbg-eyebrow">⬡ Appearance Gaps · Drought Streaks · Frequency Windows</p>
+    <h1>White Ball<br>Gap Analysis</h1>
+    <p>Pick any white ball and a year. See exactly how many draws passed between each appearance — spot droughts, streaks, and patterns over time.</p>
+  </div>
+
+  <div class="wbg-wrap">
+
     {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="flash-messages space-y-3 mb-4">
-                {% for category, message in messages %}
-                    <div class="p-4 rounded-lg shadow-md text-sm {% if category == 'error' %}bg-red-100 text-red-700 border border-red-200{% elif category == 'info' %}bg-blue-100 text-blue-700 border border-blue-200{% else %}bg-green-100 text-green-700 border border-green-200{% endif %} animate-fade-in">
-                        <p class="font-medium">{{ message }}</p>
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
+      {% if messages %}{% for cat,msg in messages %}
+        <div class="wbg-card" style="padding:10px 16px;font-size:13px">{{ msg }}</div>
+      {% endfor %}{% endif %}
     {% endwith %}
 
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">Analyze White Ball Appearance Gaps</h2>
-        
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 items-end">
-            <div>
-                <label for="whiteBallNumber" class="block text-sm font-medium text-gray-700 mb-1">White Ball Number</label>
-                <select id="whiteBallNumber" class="form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                    {% for i in range(1, 70) %}
-                    <option value="{{ i }}" {% if i == 1 %}selected{% endif %}>{{ i }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label for="year" class="block text-sm font-medium text-gray-700 mb-1">Year</label>
-                <select id="year" class="form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                    {% for y in years %}
-                    <option value="{{ y }}" {% if y == current_datetime.year %}selected{% endif %}>{{ y }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="sm:col-span-1">
-                <button id="fetchGapDataBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition ease-in-out duration-150">
-                    Analyze Gaps
-                </button>
-            </div>
+    <!-- ① Ball picker + year -->
+    <div class="wbg-card">
+      <span class="wbg-label">Select White Ball (1–69)</span>
+      <div class="ball-grid" id="ballGrid">
+        {% for i in range(1, 70) %}
+          <div class="pick-ball {% if i == 1 %}selected{% endif %}"
+               data-number="{{ i }}">{{ i }}</div>
+        {% endfor %}
+      </div>
+
+      <span class="wbg-label">Select Year</span>
+      <div class="year-pills" id="yearPills">
+        {% for y in years %}
+          <button class="year-pill {% if y == current_datetime.year %}active{% endif %}"
+                  data-year="{{ y }}">{{ y }}</button>
+        {% endfor %}
+      </div>
+
+      <div class="sel-bar">
+        <div class="sel-ball-lg" id="selBallDisplay">1</div>
+        <div class="sel-info">
+          <p class="sel-info-title">White Ball <span id="selBallNum">1</span></p>
+          <p class="sel-info-sub">Year: <span id="selYearDisplay">{{ current_datetime.year }}</span></p>
         </div>
-
-        <div id="loadingIndicator" class="hidden flex justify-center items-center py-4">
-            <div class="loading-spinner"></div>
-            <span class="ml-3 text-gray-600">Loading gap analysis...</span>
-        </div>
-
-        <div id="errorMessage" class="hidden p-4 rounded-lg shadow-md text-sm bg-red-100 text-red-700 border border-red-200 animate-fade-in"></div>
-
-        <div id="averageGap" class="p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-sm font-medium hidden mb-4"></div>
-
-        <div class="chart-container border border-gray-200 rounded-lg bg-gray-50 p-4">
-            <canvas id="gapBarChart"></canvas>
-            <div id="noDataMessage" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 text-gray-500 text-lg font-medium hidden">
-                Select a number and year to view its gap analysis.
-            </div>
-        </div>
+        <button class="btn-analyse" id="analyseBtn">⬡ Analyse Gaps</button>
+      </div>
     </div>
 
-    <script>
-        const whiteBallNumberSelect = document.getElementById('whiteBallNumber');
-        const yearSelect = document.getElementById('year');
-        const fetchGapDataBtn = document.getElementById('fetchGapDataBtn');
-        const loadingIndicator = document.getElementById('loadingIndicator');
-        const errorMessageDiv = document.getElementById('errorMessage');
-        const gapBarChartCanvas = document.getElementById('gapBarChart');
-        const noDataMessageDiv = document.getElementById('noDataMessage');
-        const averageGapDiv = document.getElementById('averageGap');
+    <!-- ② Stats -->
+    <div class="wbg-card" id="statsCard" style="display:none">
+      <span class="wbg-label" id="statsLabel">Gap Statistics — Ball #1 · 2024</span>
+      <div class="stats-row" id="statsRow"></div>
+    </div>
 
-        let gapChart; // To hold the Chart.js instance
+    <!-- ③ AI Analysis -->
+    <div class="wbg-card ai-card" id="aiCard" style="display:none">
+      <div class="ai-header">
+        <div>
+          <p class="ai-eyebrow">✦ Groq AI · Gap Pattern Analyst</p>
+          <p class="ai-title">GAP INTELLIGENCE</p>
+        </div>
+        <button class="ai-btn" id="aiBtn">◈ Analyse Pattern</button>
+      </div>
+      <div class="ai-thinking" id="aiThinking">
+        <div class="ai-dots"><span></span><span></span><span></span></div>
+        Reading gap patterns…
+      </div>
+      <div class="ai-output" id="aiOutput">
+        <div class="ai-chips" id="aiChips"></div>
+        <div class="ai-narrative" id="aiNarrative"></div>
+      </div>
+      <div class="ai-error" id="aiError" style="display:none"></div>
+    </div>
 
-        async function fetchAndRenderGapData() {
-            errorMessageDiv.classList.add('hidden');
-            noDataMessageDiv.classList.add('hidden');
-            averageGapDiv.classList.add('hidden');
-            loadingIndicator.classList.remove('hidden');
-            
-            if (gapChart) {
-                gapChart.destroy();
-                gapChart = null;
+    <!-- ④ Chart -->
+    <div class="wbg-card" id="chartCard" style="display:none">
+      <span class="wbg-label" id="chartLabel">Gap Length per Appearance</span>
+      <div class="legend-row">
+        <span class="legend-item"><span class="legend-dot" style="background:var(--gap-zero)"></span>0 gap (consecutive)</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--gap-small)"></span>1–3 draws</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--gap-medium)"></span>4–7 draws</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--gap-large)"></span>8+ draws</span>
+      </div>
+      <div class="chart-wrap"><canvas id="gapChart"></canvas></div>
+    </div>
+
+    <!-- ⑤ Table -->
+    <div class="wbg-card" id="tableCard" style="display:none">
+      <span class="wbg-label" id="tableLabel">All Appearances — Draw-by-Draw</span>
+      <div class="loading-row" id="tableLoading" style="display:none">
+        <span class="wbg-spinner"></span><span>Loading gap data…</span>
+      </div>
+      <div id="tableError" style="display:none;font-size:12px;color:#fca5a5;padding:8px 0"></div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Draw Date</th>
+              <th>Draw Index</th>
+              <th>Gap (Draws Missed)</th>
+              <th>Rating</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+  let selectedBall = 1;
+  let selectedYear = {{ current_datetime.year }};
+  let gapChart     = null;
+  let lastGapsData = [];
+
+  // ── Ball picker ───────────────────────────────────────────
+  document.querySelectorAll('.pick-ball').forEach(ball => {
+    ball.addEventListener('click', function () {
+      document.querySelectorAll('.pick-ball').forEach(b => b.classList.remove('selected'));
+      this.classList.add('selected');
+      selectedBall = parseInt(this.dataset.number);
+      document.getElementById('selBallDisplay').textContent = selectedBall;
+      document.getElementById('selBallNum').textContent     = selectedBall;
+    });
+  });
+
+  // ── Year pills ────────────────────────────────────────────
+  document.querySelectorAll('.year-pill').forEach(pill => {
+    pill.addEventListener('click', function () {
+      document.querySelectorAll('.year-pill').forEach(p => p.classList.remove('active'));
+      this.classList.add('active');
+      selectedYear = parseInt(this.dataset.year);
+      document.getElementById('selYearDisplay').textContent = selectedYear;
+    });
+  });
+
+  // ── Gap colour helper ─────────────────────────────────────
+  function gapColour(g, alpha=0.6) {
+    if (g === 0) return `rgba(34,197,94,${alpha})`;
+    if (g <= 3)  return `rgba(20,184,166,${alpha})`;
+    if (g <= 7)  return `rgba(245,158,11,${alpha})`;
+    return `rgba(239,68,68,${alpha})`;
+  }
+  function gapClass(g) {
+    if (g === 0) return 'gap-zero';
+    if (g <= 3)  return 'gap-small';
+    if (g <= 7)  return 'gap-medium';
+    return 'gap-large';
+  }
+  function gapLabel(g) {
+    if (g === 0) return 'None';
+    if (g <= 3)  return 'Short';
+    if (g <= 7)  return 'Medium';
+    return 'Long';
+  }
+
+  // ── Analyse ───────────────────────────────────────────────
+  document.getElementById('analyseBtn').addEventListener('click', fetchGaps);
+
+  async function fetchGaps() {
+    const btn      = document.getElementById('analyseBtn');
+    const loading  = document.getElementById('tableLoading');
+    const errEl    = document.getElementById('tableError');
+
+    btn.disabled = true; btn.innerHTML = '<span class="wbg-spinner"></span>';
+    ['statsCard','aiCard','chartCard','tableCard'].forEach(id => {
+      document.getElementById(id).style.display = 'none';
+    });
+    errEl.style.display = 'none';
+    loading.style.display = 'flex';
+
+    try {
+      const res  = await fetch(`/api/white_ball_gaps?number=${selectedBall}&year=${selectedYear}`);
+      const data = await res.json();
+
+      loading.style.display = 'none';
+
+      if (!res.ok || !data.success) {
+        document.getElementById('tableCard').style.display = 'block';
+        errEl.textContent = data.error || 'No data found.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      lastGapsData = data.gaps_data || [];
+      if (!lastGapsData.length) {
+        document.getElementById('tableCard').style.display = 'block';
+        errEl.textContent = `Ball #${selectedBall} did not appear in ${selectedYear}.`;
+        errEl.style.display = 'block';
+        return;
+      }
+
+      renderStats(lastGapsData);
+      renderChart(lastGapsData);
+      renderTable(lastGapsData);
+
+      ['statsCard','aiCard','chartCard','tableCard'].forEach(id => {
+        document.getElementById(id).style.display = 'block';
+      });
+
+      // Reset AI output
+      document.getElementById('aiOutput').classList.remove('visible');
+      document.getElementById('aiError').style.display = 'none';
+
+      // Update labels
+      const lbl = `Ball #${selectedBall} · ${selectedYear}`;
+      document.getElementById('statsLabel').textContent  = `Gap Statistics — ${lbl}`;
+      document.getElementById('chartLabel').textContent  = `Gap Length per Appearance — ${lbl}`;
+      document.getElementById('tableLabel').textContent  = `All Appearances — ${lbl}`;
+
+    } catch(e) {
+      loading.style.display = 'none';
+      document.getElementById('tableCard').style.display = 'block';
+      errEl.textContent = 'Request failed: ' + e.message;
+      errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.innerHTML = '⬡ Analyse Gaps';
+    }
+  }
+
+  // ── Stats ─────────────────────────────────────────────────
+  function renderStats(gaps) {
+    const realGaps   = gaps.filter(d => d.draw_date !== 'Ongoing').map(d => d.gap);
+    const ongoingEntry = gaps.find(d => d.draw_date === 'Ongoing');
+    const appearances  = realGaps.length;
+    const avg  = appearances ? (realGaps.reduce((s,v)=>s+v,0)/appearances).toFixed(1) : '—';
+    const max  = appearances ? Math.max(...realGaps) : '—';
+    const min  = appearances ? Math.min(...realGaps) : '—';
+    const ongoing = ongoingEntry ? ongoingEntry.gap : 0;
+
+    const chips = [
+      { lbl:'Appearances', val: appearances, sub: 'in year',     col:'var(--teal)' },
+      { lbl:'Avg Gap',     val: avg,         sub:'draws between', col:'var(--amber)' },
+      { lbl:'Max Gap',     val: max,         sub:'longest drought',col:'var(--red)' },
+      { lbl:'Min Gap',     val: min,         sub:'shortest gap',  col:'var(--green)' },
+      { lbl:'Current Gap', val: ongoing,     sub:'draws since last', col:'var(--violet)' },
+    ];
+
+    const row = document.getElementById('statsRow');
+    row.innerHTML = chips.map(c => `
+      <div class="sc">
+        <p class="sc-lbl">${c.lbl}</p>
+        <p class="sc-val" style="color:${c.col}">${c.val}</p>
+        <p class="sc-sub">${c.sub}</p>
+      </div>`).join('');
+  }
+
+  // ── Chart ─────────────────────────────────────────────────
+  function renderChart(gaps) {
+    if (gapChart) { gapChart.destroy(); gapChart = null; }
+
+    const labels = gaps.map((d,i) =>
+      d.draw_date === 'Ongoing' ? 'Current Gap' : d.draw_date
+    );
+    const vals   = gaps.map(d => d.gap);
+
+    gapChart = new Chart(document.getElementById('gapChart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Gap (draws missed)',
+          data:  vals,
+          backgroundColor: vals.map(v => gapColour(v, 0.65)),
+          borderColor:     vals.map(v => gapColour(v, 1.0)),
+          borderWidth: 1, borderRadius: 4,
+        }]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false, animation:{duration:500},
+        scales:{
+          x:{ grid:{color:'rgba(255,255,255,0.03)'}, ticks:{color:'rgba(255,255,255,0.35)',font:{family:'JetBrains Mono',size:9},maxRotation:50,minRotation:45} },
+          y:{ beginAtZero:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'rgba(255,255,255,0.35)',precision:0},
+              title:{display:true,text:'Draws Missed',color:'rgba(255,255,255,0.3)',font:{family:'JetBrains Mono',size:10}} }
+        },
+        plugins:{
+          legend:{ display:false },
+          tooltip:{ backgroundColor:'#090e0f', borderColor:'rgba(20,184,166,0.25)', borderWidth:1,
+            titleColor:'rgba(255,255,255,0.6)', bodyColor:'rgba(255,255,255,0.45)', padding:10,
+            titleFont:{family:'JetBrains Mono',size:11},
+            callbacks:{
+              title: ctx => gaps[ctx[0].dataIndex].draw_date === 'Ongoing' ? 'Current Ongoing Gap' : 'Draw: ' + ctx[0].label,
+              label: ctx => ' Gap: ' + ctx.parsed.y + ' draws missed  (' + gapLabel(ctx.parsed.y) + ')',
+              afterLabel: ctx => {
+                const d = gaps[ctx.dataIndex];
+                return d.draw_date !== 'Ongoing' ? ' Draw index: #' + d.draw_index : ' Ball not yet seen since last appearance';
+              }
             }
-
-            const selectedNumber = whiteBallNumberSelect.value;
-            const selectedYear = yearSelect.value;
-
-            try {
-                const response = await fetch(`/api/white_ball_gaps?number=${selectedNumber}&year=${selectedYear}`);
-                const data = await response.json();
-
-                if (!response.ok || !data.success) {
-                    errorMessageDiv.textContent = data.error || `Failed to fetch gap data for White Ball ${selectedNumber} in ${selectedYear}.`;
-                    errorMessageDiv.classList.remove('hidden');
-                    noDataMessageDiv.classList.remove('hidden');
-                    return;
-                }
-
-                const gapsData = data.gaps_data;
-
-                if (gapsData.length === 0) {
-                    errorMessageDiv.textContent = `No appearance data for White Ball ${selectedNumber} in ${selectedYear}.`;
-                    errorMessageDiv.classList.remove('hidden');
-                    noDataMessageDiv.classList.remove('hidden');
-                    return;
-                }
-
-                const labels = gapsData.map(item => item.draw_date === 'Ongoing' ? `Current Gap` : `${item.draw_date} (Draw #${item.draw_index})`);
-                const gaps = gapsData.map(item => item.gap);
-
-                // Calculate average gap, excluding the initial '0' gap and ongoing gap if it's the only one
-                const relevantGaps = gaps.filter(g => g > 0);
-                const average = relevantGaps.length > 0 ? (relevantGaps.reduce((a, b) => a + b, 0) / relevantGaps.length).toFixed(2) : 'N/A';
-                averageGapDiv.innerHTML = `<strong>Average Gap for White Ball ${selectedNumber} in ${selectedYear}:</strong> ${average} draws.`;
-                averageGapDiv.classList.remove('hidden');
-
-                const ctx = gapBarChartCanvas.getContext('2d');
-                gapChart = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: `Gap Length (Draws Missed)`,
-                            data: gaps,
-                            backgroundColor: (context) => {
-                                const value = context.raw;
-                                if (value === 0) return 'rgba(75, 192, 192, 0.8)'; // Green for 0 gap
-                                if (value <= 3) return 'rgba(54, 162, 235, 0.8)'; // Blue for small gaps
-                                if (value <= 7) return 'rgba(255, 206, 86, 0.8)'; // Yellow for medium gaps
-                                return 'rgba(255, 99, 132, 0.8)'; // Red for large gaps
-                            },
-                            borderColor: (context) => {
-                                const value = context.raw;
-                                if (value === 0) return 'rgba(75, 192, 192, 1)';
-                                if (value <= 3) return 'rgba(54, 162, 235, 1)';
-                                if (value <= 7) return 'rgba(255, 206, 86, 1)';
-                                return 'rgba(255, 99, 132, 1)';
-                            },
-                            borderWidth: 1
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: true,
-                                position: 'top',
-                                labels: {
-                                    font: {
-                                        size: 14,
-                                        family: 'Inter, sans-serif'
-                                    }
-                                }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    title: function(context) {
-                                        return `Appearance on ${gapsData[context[0].dataIndex].draw_date}`;
-                                    },
-                                    label: function(context) {
-                                        let label = 'Gap: ';
-                                        if (context.parsed.y !== null) {
-                                            label += context.parsed.y + ' draws missed';
-                                        }
-                                        return label;
-                                    },
-                                    afterLabel: function(context) {
-                                        const drawIndex = gapsData[context.dataIndex].draw_index;
-                                        if (gapsData[context.dataIndex].draw_date === 'Ongoing') {
-                                            return 'Number last seen before this current gap.';
-                                        }
-                                        return `Draw Index: ${drawIndex}`;
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: 'Draw Appearance (Chronological Order)',
-                                    font: {
-                                        size: 14,
-                                        weight: 'bold',
-                                        family: 'Inter, sans-serif'
-                                    }
-                                },
-                                ticks: {
-                                    autoSkip: true,
-                                    maxRotation: 45,
-                                    minRotation: 45,
-                                    font: {
-                                        family: 'Inter, sans-serif'
-                                    }
-                                }
-                            },
-                            y: {
-                                beginAtZero: true,
-                                title: {
-                                    display: true,
-                                    text: 'Number of Draws Missed (Gap Length)',
-                                    font: {
-                                        size: 14,
-                                        weight: 'bold',
-                                        family: 'Inter, sans-serif'
-                                    }
-                                },
-                                ticks: {
-                                    precision: 0, // Show whole numbers for gaps
-                                    font: {
-                                        family: 'Inter, sans-serif'
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-
-            } catch (error) {
-                console.error('Error fetching/rendering data:', error);
-                errorMessageDiv.textContent = `An error occurred: ${error.message}.`;
-                errorMessageDiv.classList.remove('hidden');
-                noDataMessageDiv.classList.remove('hidden');
-            } finally {
-                loadingIndicator.classList.add('hidden');
-            }
+          }
         }
+      }
+    });
+  }
 
-        fetchGapDataBtn.addEventListener('click', fetchAndRenderGapData);
+  // ── Table ─────────────────────────────────────────────────
+  function renderTable(gaps) {
+    const body = document.getElementById('tableBody');
+    body.innerHTML = gaps.map((d, i) => {
+      const isOngoing = d.draw_date === 'Ongoing';
+      return `
+        <tr>
+          <td style="color:var(--muted)">${i + 1}</td>
+          <td>${isOngoing ? '<span class="ongoing-badge">ONGOING</span>' : d.draw_date}</td>
+          <td style="color:var(--muted)">${isOngoing ? '—' : '#' + d.draw_index}</td>
+          <td><span class="gap-badge ${gapClass(d.gap)}">${d.gap}</span></td>
+          <td style="font-size:10px;color:var(--muted)">${gapLabel(d.gap)}</td>
+        </tr>`;
+    }).join('');
+  }
 
-        // Initial render when the page loads, using default selected values
-        window.onload = function() {
-            fetchAndRenderGapData();
-        };
+  // ── AI ────────────────────────────────────────────────────
+  document.getElementById('aiBtn').addEventListener('click', async function () {
+    const thinking  = document.getElementById('aiThinking');
+    const output    = document.getElementById('aiOutput');
+    const narrative = document.getElementById('aiNarrative');
+    const errEl     = document.getElementById('aiError');
+    const chipsWrap = document.getElementById('aiChips');
 
-    </script>
+    if (!lastGapsData.length) { return; }
+
+    this.disabled = true; this.innerHTML = '⏳ Analysing…';
+    thinking.classList.add('visible');
+    output.classList.remove('visible');
+    errEl.style.display = 'none';
+    narrative.textContent = ''; chipsWrap.innerHTML = '';
+
+    // Build stats for prompt
+    const realGaps    = lastGapsData.filter(d=>d.draw_date!=='Ongoing').map(d=>d.gap);
+    const appearances = realGaps.length;
+    const avg   = appearances ? (realGaps.reduce((s,v)=>s+v,0)/appearances).toFixed(1) : 0;
+    const max   = appearances ? Math.max(...realGaps) : 0;
+    const min   = appearances ? Math.min(...realGaps) : 0;
+    const ongoing = lastGapsData.find(d=>d.draw_date==='Ongoing');
+    const longGaps = realGaps.filter(g=>g>=8).length;
+    const zeroGaps = realGaps.filter(g=>g===0).length;
+
+    // Chronological gaps string
+    const gapSeq = lastGapsData.slice(0,20).map(d =>
+      d.draw_date==='Ongoing' ? `[ONGOING:${d.gap}]` : `${d.draw_date}:gap=${d.gap}`
+    ).join(', ');
+
+    try {
+      const res  = await fetch('/api/white-ball-gap-ai-analysis', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          ball_number:  selectedBall,
+          year:         selectedYear,
+          appearances:  appearances,
+          avg_gap:      avg,
+          max_gap:      max,
+          min_gap:      min,
+          current_gap:  ongoing ? ongoing.gap : 0,
+          long_gaps:    longGaps,
+          zero_gaps:    zeroGaps,
+          gap_sequence: gapSeq,
+          total_entries: lastGapsData.length,
+        })
+      });
+      const d2 = await res.json();
+      if (d2.error) {
+        errEl.textContent = 'AI unavailable: ' + d2.error;
+        errEl.style.display = 'block';
+      } else {
+        (d2.insights||[]).forEach(ins=>{
+          const c=document.createElement('div'); c.className='ai-chip';
+          c.innerHTML=`<p class="ai-chip-label">${ins.label}</p><div class="ai-chip-val">${ins.value}</div>`;
+          chipsWrap.appendChild(c);
+        });
+        narrative.textContent = d2.analysis;
+        output.classList.add('visible');
+      }
+    } catch(e) {
+      errEl.textContent = 'Request failed. Register /api/white-ball-gap-ai-analysis in index.py.';
+      errEl.style.display = 'block';
+    } finally {
+      thinking.classList.remove('visible');
+      this.disabled = false; this.innerHTML = '◈ Analyse Pattern';
+    }
+  });
+
+  // ── Auto-load on page open ────────────────────────────────
+  fetchGaps();
+});
+</script>
 {% endblock %}
