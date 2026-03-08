@@ -6606,8 +6606,9 @@ def api_check_saved_picks():
             powerball = int(pick['powerball'])
             gen_date  = pick['generated_date'][:10]
 
-            matches = check_pick_against_draws_cmn(white_balls, powerball, official_draws, min_matches=2)
+            relevant_draws = [d for d in official_draws if d['draw_date'] > gen_date]
 
+            matches = check_pick_against_draws_cmn(white_balls, powerball, relevant_draws, min_matches=1)
             if matches:
                 results.append({
                     'id':                 pick['id'],
