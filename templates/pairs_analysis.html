@@ -1,265 +1,361 @@
 {% extends "base.html" %}
 
-{% block title %}Powerball Pair Analysis{% endblock %}
-
-{% block page_heading %}White Ball Pair Analysis{% endblock %}
+{% block title %}White Ball Pair Analysis — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
-<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="bg-white rounded-xl shadow-lg p-6">
-        <p class="text-gray-700 text-lg mb-6">
-            Explore white ball pairs by common last digit, by their numerical difference, or by decade. Drawn pairs are marked with a strike-through for easy analysis.
-        </p>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
-        <div class="flex border-b border-gray-200 mb-6">
-            <button id="last-digit-tab-btn" class="py-2 px-4 font-semibold text-gray-600 border-b-2 border-transparent hover:text-indigo-600 hover:border-indigo-600 focus:outline-none transition-colors duration-200">
-                Pairs by Last Digit
-            </button>
-            <button id="difference-tab-btn" class="py-2 px-4 font-semibold text-gray-600 border-b-2 border-transparent hover:text-indigo-600 hover:border-indigo-600 focus:outline-none transition-colors duration-200">
-                Pairs by Difference
-            </button>
-            <button id="decade-tab-btn" class="py-2 px-4 font-semibold text-gray-600 border-b-2 border-transparent hover:text-indigo-600 hover:border-indigo-600 focus:outline-none transition-colors duration-200">
-                Pairs by Decade
-            </button>
-        </div>
+  :root {
+    --bg:    #05060a; --s1: #090b12; --s2: #0d1019; --s3: #111420;
+    --border: rgba(255,255,255,0.065); --text: rgba(255,255,255,0.87); --muted: rgba(255,255,255,0.33);
+    --indigo: #818cf8; --indigo2: rgba(129,140,248,0.12); --indigo3: rgba(129,140,248,0.28);
+    --cyan:   #22d3ee; --cyan2:   rgba(34,211,238,0.1);
+    --amber:  #f59e0b; --amber2:  rgba(245,158,11,0.1);
+    --green:  #34d399; --green2:  rgba(52,211,153,0.1);
+    --red:    #f87171; --violet:  #c084fc; --blue: #60a5fa;
 
-        <div id="last-digit-tab" class="tab-content space-y-8">
-            <div id="last-digit-years-container">
-                <div id="loading-last-digit" class="text-center text-gray-500">
-                    Loading Last-Digit Pair data...
-                </div>
-            </div>
-        </div>
+    /* strike colours */
+    --s1c: rgba(255,255,255,0.55);
+    --s2c: rgba(99,102,241,0.9);
+    --s3c: rgba(239,68,68,0.9);
+    --s4c: rgba(245,158,11,0.9);
+    --s5c: rgba(168,85,247,0.9);
+    --s6c: rgba(20,184,166,0.9);
+  }
 
-        <div id="difference-tab" class="tab-content hidden space-y-8">
-            <div id="difference-years-container">
-                <div id="loading-difference" class="text-center text-gray-500">
-                    Loading Difference Pair data...
-                </div>
-            </div>
+  #pa-page * { box-sizing: border-box; }
+  #pa-page {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg); min-height:100vh; color: var(--text); padding-bottom:80px;
+  }
+
+  /* ── Hero ── */
+  .pa-hero {
+    position:relative; padding:50px 24px 36px; text-align:center; overflow:hidden;
+  }
+  .pa-hero::before {
+    content:''; position:absolute; inset:0;
+    background:
+      radial-gradient(ellipse 55% 55% at 50% -5%, rgba(129,140,248,0.1) 0%, transparent 65%),
+      radial-gradient(ellipse 25% 30% at 5%  75%, rgba(34,211,238,0.05) 0%, transparent 60%),
+      radial-gradient(ellipse 25% 30% at 95% 75%, rgba(192,132,252,0.05) 0%, transparent 60%);
+    pointer-events:none;
+  }
+  .pa-hero::after {
+    content:''; position:absolute; bottom:0; left:0; right:0; height:1px;
+    background:linear-gradient(90deg, transparent, var(--indigo), rgba(255,255,255,0.2), var(--cyan), transparent);
+    opacity:0.3;
+  }
+  .pa-eyebrow { font-size:10px; letter-spacing:3px; text-transform:uppercase; color:var(--indigo); margin-bottom:12px; opacity:0.8; }
+  .pa-hero h1 {
+    font-family:'Syne',sans-serif;
+    font-size:clamp(40px,6vw,80px); font-weight:800; line-height:1.0; margin:0 0 12px;
+    background:linear-gradient(135deg, var(--indigo) 0%, #fff 40%, var(--cyan) 80%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  }
+  .pa-hero p { font-size:12px; color:var(--muted); max-width:520px; margin:0 auto; line-height:1.8; }
+
+  /* ── Layout ── */
+  .pa-wrap { max-width:1280px; margin:0 auto; padding:0 20px; display:flex; flex-direction:column; gap:16px; }
+
+  /* ── Card ── */
+  .pa-card { background:var(--s1); border:1px solid var(--border); border-radius:16px; padding:20px 22px; position:relative; overflow:hidden; }
+  .pa-label { font-size:9px; letter-spacing:2.5px; text-transform:uppercase; color:var(--muted); margin:0 0 14px; display:block; }
+
+  /* ── Tab bar ── */
+  .tab-bar { display:flex; gap:4px; flex-wrap:wrap; }
+  .tab-btn {
+    font-size:10px; letter-spacing:1.5px; text-transform:uppercase;
+    padding:9px 20px; border-radius:9px; border:1px solid var(--border);
+    background:transparent; color:var(--muted); cursor:pointer;
+    font-family:'JetBrains Mono',monospace; transition:all 0.13s;
+  }
+  .tab-btn:hover { border-color:rgba(255,255,255,0.15); color:var(--text); }
+  .tab-btn.active { background:var(--indigo2); border-color:var(--indigo3); color:var(--indigo); font-weight:700; }
+
+  /* ── Hit count legend ── */
+  .legend-row { display:flex; flex-wrap:wrap; gap:14px; margin-bottom:18px; }
+  .leg-item { display:flex; align-items:center; gap:7px; font-size:10px; color:var(--muted); }
+  .leg-swatch { width:34px; height:16px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; }
+
+  /* ── Year accordion ── */
+  .year-list { display:flex; flex-direction:column; gap:8px; }
+
+  .year-block { background:var(--s2); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+  .year-toggle {
+    width:100%; background:none; border:none; cursor:pointer; color:var(--text);
+    font-family:'JetBrains Mono',monospace;
+    display:flex; align-items:center; gap:14px; padding:14px 18px;
+    text-align:left; transition:background 0.12s;
+  }
+  .year-toggle:hover { background:rgba(255,255,255,0.03); }
+  .year-badge {
+    font-family:'Syne',sans-serif; font-size:20px; font-weight:800;
+    color:var(--indigo); min-width:52px;
+  }
+  .year-meta { font-size:10px; color:var(--muted); flex:1; }
+  .year-arrow { font-size:12px; color:var(--muted); transition:transform 0.2s; }
+  .year-block.open .year-arrow { transform:rotate(180deg); }
+
+  .year-body { display:none; padding:16px 18px; border-top:1px solid var(--border); }
+  .year-block.open .year-body { display:block; }
+
+  /* ── Group block ── */
+  .group-block { margin-bottom:18px; }
+  .group-title { font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
+
+  /* ── Pair grid ── */
+  .pair-grid { display:flex; flex-wrap:wrap; gap:5px; }
+  .pair-chip {
+    display:inline-flex; align-items:center; gap:4px;
+    padding:4px 8px; border-radius:6px;
+    font-size:10px; font-weight:500;
+    background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.07);
+    color:rgba(255,255,255,0.4); cursor:default; transition:all 0.1s;
+    white-space:nowrap;
+  }
+  .pair-chip:hover { border-color:rgba(255,255,255,0.12); color:rgba(255,255,255,0.6); }
+
+  /* hit variants */
+  .hit-1 { background:rgba(129,140,248,0.06); border-color:rgba(129,140,248,0.2); color:rgba(129,140,248,0.75); text-decoration:line-through; text-decoration-thickness:1px; }
+  .hit-2 { background:rgba(129,140,248,0.1);  border-color:rgba(129,140,248,0.3); color:rgba(129,140,248,0.9);  text-decoration:line-through; text-decoration-thickness:2px; }
+  .hit-3 { background:rgba(239,68,68,0.1);   border-color:rgba(239,68,68,0.3);   color:rgba(239,68,68,0.9);    text-decoration:line-through; text-decoration-thickness:3px; }
+  .hit-4 { background:rgba(245,158,11,0.1);  border-color:rgba(245,158,11,0.3);  color:rgba(245,158,11,0.9);   text-decoration:line-through; text-decoration-thickness:4px; }
+  .hit-5 { background:rgba(168,85,247,0.1);  border-color:rgba(168,85,247,0.3);  color:rgba(168,85,247,0.9);   text-decoration:line-through; text-decoration-thickness:5px; }
+  .hit-6 { background:rgba(20,184,166,0.1);  border-color:rgba(20,184,166,0.3);  color:rgba(20,184,166,0.9);   text-decoration:line-through; text-decoration-thickness:6px; }
+
+  /* hit count badge */
+  .hit-badge {
+    display:inline-block; padding:1px 5px; border-radius:3px; font-size:8px; font-weight:700;
+    background:rgba(255,255,255,0.1); margin-left:2px; vertical-align:middle;
+  }
+
+  /* ── Loading / error ── */
+  .pa-spinner { display:inline-block; width:18px; height:18px; border-radius:50%; border:2px solid rgba(129,140,248,0.15); border-top-color:var(--indigo); animation:spin 0.75s linear infinite; }
+  @keyframes spin { to{transform:rotate(360deg);} }
+  .loading-row { display:flex; align-items:center; gap:10px; padding:20px; font-size:11px; color:var(--muted); }
+</style>
+
+<div id="pa-page">
+
+  <!-- Hero -->
+  <div class="pa-hero">
+    <p class="pa-eyebrow">⬡ Last Digit · Difference · Decade · Pair Frequency</p>
+    <h1>White Ball<br>Pair Analysis</h1>
+    <p>Explore all possible white ball pairs grouped by last digit, numerical difference, or decade. Drawn pairs are marked with strike-through — thicker lines mean more hits.</p>
+  </div>
+
+  <div class="pa-wrap">
+
+    <!-- ① Tab selector + legend -->
+    <div class="pa-card">
+      <span class="pa-label">Analysis Mode</span>
+      <div class="tab-bar" style="margin-bottom:18px">
+        <button class="tab-btn active" data-tab="last-digit">⬡ By Last Digit</button>
+        <button class="tab-btn"        data-tab="difference">△ By Difference</button>
+        <button class="tab-btn"        data-tab="decade">◫ By Decade</button>
+      </div>
+
+      <span class="pa-label">Hit Count Legend</span>
+      <div class="legend-row">
+        <div class="leg-item">
+          <span class="leg-swatch" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.35)">—</span>
+          0 hits
         </div>
-        
-        <div id="decade-tab" class="tab-content hidden space-y-8">
-            <div id="decade-years-container">
-                <div id="loading-decade" class="text-center text-gray-500">
-                    Loading Decade Pair data...
-                </div>
-            </div>
+        <div class="leg-item">
+          <span class="leg-swatch hit-1">1×</span>1 hit
         </div>
+        <div class="leg-item">
+          <span class="leg-swatch hit-2">2×</span>2 hits
+        </div>
+        <div class="leg-item">
+          <span class="leg-swatch hit-3">3×</span>3 hits
+        </div>
+        <div class="leg-item">
+          <span class="leg-swatch hit-4">4×</span>4 hits
+        </div>
+        <div class="leg-item">
+          <span class="leg-swatch hit-5">5×</span>5 hits
+        </div>
+        <div class="leg-item">
+          <span class="leg-swatch hit-6">6+×</span>6+ hits
+        </div>
+      </div>
     </div>
+
+    <!-- ② Content panel -->
+    <div class="pa-card" id="contentPanel">
+      <div class="loading-row" id="mainLoader">
+        <span class="pa-spinner"></span>
+        <span>Loading pair data…</span>
+      </div>
+      <div id="errorMsg" style="display:none;font-size:12px;color:#fca5a5;padding:10px"></div>
+      <div class="year-list" id="yearList" style="display:none"></div>
+    </div>
+
+  </div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Tab elements
-        const lastDigitTabBtn = document.getElementById('last-digit-tab-btn');
-        const differenceTabBtn = document.getElementById('difference-tab-btn');
-        const decadeTabBtn = document.getElementById('decade-tab-btn');
-        const lastDigitTab = document.getElementById('last-digit-tab');
-        const differenceTab = document.getElementById('difference-tab');
-        const decadeTab = document.getElementById('decade-tab');
+document.addEventListener('DOMContentLoaded', function () {
 
-        // Data containers
-        const lastDigitYearsContainer = document.getElementById('last-digit-years-container');
-        const differenceYearsContainer = document.getElementById('difference-years-container');
-        const decadeYearsContainer = document.getElementById('decade-years-container');
+  // ── State ─────────────────────────────────────────────────
+  let activeTab = 'last-digit';
+  const cache   = {};
 
-        // Data caches to avoid re-fetching
-        let lastDigitData = null;
-        let differenceData = null;
-        let decadeData = null;
+  const ENDPOINTS = {
+    'last-digit': '/api/yearly-pairs-with-draw-counts',
+    'difference': '/api/yearly-difference-pairs-with-draw-counts',
+    'decade':     '/api/yearly-decade-pairs-with-draw-counts',
+  };
 
-        // Function to render the yearly pairs
-        function renderYearlyPairs(container, yearlyData) {
-            container.innerHTML = '';
-            
-            const sortedYears = Object.keys(yearlyData).sort((a, b) => b - a);
+  // ── DOM refs ──────────────────────────────────────────────
+  const mainLoader = document.getElementById('mainLoader');
+  const errorMsg   = document.getElementById('errorMsg');
+  const yearList   = document.getElementById('yearList');
 
-            sortedYears.forEach(year => {
-                const yearData = yearlyData[year];
-                
-                const yearDetails = document.createElement('details');
-                yearDetails.className = 'bg-gray-100 p-4 rounded-lg shadow-sm';
-                
-                const yearSummary = document.createElement('summary');
-                yearSummary.className = 'cursor-pointer font-bold text-xl text-gray-800';
-                yearSummary.textContent = `${year} Pairs Analysis`;
-                yearDetails.appendChild(yearSummary);
-
-                const yearContentDiv = document.createElement('div');
-                yearContentDiv.className = 'mt-4 space-y-6';
-
-                yearData.forEach(group => {
-                    const groupDiv = document.createElement('div');
-                    groupDiv.className = 'mb-4';
-                    
-                    const groupTitle = document.createElement('h3');
-                    groupTitle.className = 'text-lg font-bold text-gray-700 mb-2';
-                    groupTitle.textContent = group.group_name;
-                    groupDiv.appendChild(groupTitle);
-                    
-                    const pairsGrid = document.createElement('div');
-                    pairsGrid.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2';
-
-                    group.pairs.forEach(pairData => {
-                        const pairSpan = document.createElement('span');
-                        pairSpan.className = 'pair-item text-sm text-gray-700';
-                        
-                        if (Array.isArray(pairData.pair) && pairData.pair.length >= 2) {
-                            pairSpan.textContent = `(${pairData.pair[0]}, ${pairData.pair[1]})`;
-                        } else {
-                            pairSpan.textContent = `(${pairData.pair})`;
-                        }
-                        
-                        if (pairData.hit_count > 0) {
-                            let strikeThroughClass = '';
-                            if (pairData.hit_count === 1) {
-                                strikeThroughClass = 'strike-one';
-                            } else if (pairData.hit_count === 2) {
-                                strikeThroughClass = 'strike-two';
-                            } else if (pairData.hit_count === 3) {
-                                strikeThroughClass = 'strike-three';
-                            } else if (pairData.hit_count === 4) {
-                                strikeThroughClass = 'strike-four';
-                            } else if (pairData.hit_count === 5) {
-                                strikeThroughClass = 'strike-five';
-                            } else if (pairData.hit_count >= 6) {
-                                strikeThroughClass = 'strike-six';
-                            }
-                            pairSpan.classList.add(strikeThroughClass);
-                        }
-                        
-                        pairsGrid.appendChild(pairSpan);
-                    });
-
-                    groupDiv.appendChild(pairsGrid);
-                    yearContentDiv.appendChild(groupDiv);
-                });
-                
-                yearDetails.appendChild(yearContentDiv);
-                container.appendChild(yearDetails);
-            });
-        }
-        
-        async function fetchLastDigitData() {
-            if (lastDigitData) {
-                renderYearlyPairs(lastDigitYearsContainer, lastDigitData);
-                return;
-            }
-            try {
-                const response = await fetch('/api/yearly-pairs-with-draw-counts');
-                lastDigitData = await response.json();
-                renderYearlyPairs(lastDigitYearsContainer, lastDigitData);
-            } catch (error) {
-                console.error('Error fetching last-digit pair data:', error);
-                lastDigitYearsContainer.innerHTML = '<p class="text-red-500 text-center">Failed to load last-digit pair data. Please try again later.</p>';
-            }
-        }
-
-        async function fetchDifferenceData() {
-            if (differenceData) {
-                renderYearlyPairs(differenceYearsContainer, differenceData);
-                return;
-            }
-            try {
-                const response = await fetch('/api/yearly-difference-pairs-with-draw-counts');
-                differenceData = await response.json();
-                renderYearlyPairs(differenceYearsContainer, differenceData);
-            } catch (error) {
-                console.error('Error fetching difference pair data:', error);
-                differenceYearsContainer.innerHTML = '<p class="text-red-500 text-center">Failed to load difference pair data. Please try again later.</p>';
-            }
-        }
-
-        async function fetchDecadeData() {
-            if (decadeData) {
-                renderYearlyPairs(decadeYearsContainer, decadeData);
-                return;
-            }
-            try {
-                const response = await fetch('/api/yearly-decade-pairs-with-draw-counts');
-                decadeData = await response.json();
-                renderYearlyPairs(decadeYearsContainer, decadeData);
-            } catch (error) {
-                console.error('Error fetching decade pair data:', error);
-                decadeYearsContainer.innerHTML = '<p class="text-red-500 text-center">Failed to load decade pair data. Please try again later.</p>';
-            }
-        }
-
-        function setActiveTab(tabBtn, tabContent) {
-            lastDigitTabBtn.classList.remove('border-indigo-600', 'text-indigo-600');
-            lastDigitTabBtn.classList.add('border-transparent', 'text-gray-600');
-            differenceTabBtn.classList.remove('border-indigo-600', 'text-indigo-600');
-            differenceTabBtn.classList.add('border-transparent', 'text-gray-600');
-            decadeTabBtn.classList.remove('border-indigo-600', 'text-indigo-600');
-            decadeTabBtn.classList.add('border-transparent', 'text-gray-600');
-            
-            lastDigitTab.classList.add('hidden');
-            differenceTab.classList.add('hidden');
-            decadeTab.classList.add('hidden');
-
-            tabBtn.classList.add('border-indigo-600', 'text-indigo-600');
-            tabBtn.classList.remove('border-transparent', 'text-gray-600');
-            tabContent.classList.remove('hidden');
-        }
-
-        lastDigitTabBtn.addEventListener('click', () => {
-            setActiveTab(lastDigitTabBtn, lastDigitTab);
-            fetchLastDigitData();
-        });
-
-        differenceTabBtn.addEventListener('click', () => {
-            setActiveTab(differenceTabBtn, differenceTab);
-            fetchDifferenceData();
-        });
-
-        decadeTabBtn.addEventListener('click', () => {
-            setActiveTab(decadeTabBtn, decadeTab);
-            fetchDecadeData();
-        });
-        
-        setActiveTab(lastDigitTabBtn, lastDigitTab);
-        fetchLastDigitData();
+  // ── Tab clicks ────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      activeTab = this.dataset.tab;
+      loadTab(activeTab);
     });
+  });
+
+  // ── Pair chip helper ──────────────────────────────────────
+  function hitClass(n) {
+    if (n === 0) return '';
+    if (n === 1) return 'hit-1';
+    if (n === 2) return 'hit-2';
+    if (n === 3) return 'hit-3';
+    if (n === 4) return 'hit-4';
+    if (n === 5) return 'hit-5';
+    return 'hit-6';
+  }
+
+  // ── Render ─────────────────────────────────────────────────
+  function render(data) {
+    yearList.innerHTML = '';
+    const years = Object.keys(data).sort((a,b) => b - a);
+
+    years.forEach((yr, idx) => {
+      const groups = data[yr];
+
+      // Compute year stats
+      let totalPairs = 0, hitPairs = 0;
+      groups.forEach(g => {
+        totalPairs += g.pairs.length;
+        g.pairs.forEach(p => { if (p.hit_count > 0) hitPairs++; });
+      });
+
+      const block = document.createElement('div');
+      block.className = 'year-block' + (idx === 0 ? ' open' : '');
+      block.innerHTML = `
+        <button class="year-toggle" data-yr="${yr}">
+          <span class="year-badge">${yr}</span>
+          <span class="year-meta">
+            ${groups.length} groups · ${totalPairs.toLocaleString()} pairs · 
+            <span style="color:var(--green)">${hitPairs}</span> drawn
+          </span>
+          <span class="year-arrow">▾</span>
+        </button>
+        <div class="year-body"></div>
+      `;
+
+      const body = block.querySelector('.year-body');
+      // Render groups lazily on open
+      block.querySelector('.year-toggle').addEventListener('click', function () {
+        const wasOpen = block.classList.contains('open');
+        // close all
+        document.querySelectorAll('.year-block').forEach(b => b.classList.remove('open'));
+        if (!wasOpen) {
+          block.classList.add('open');
+          if (!body.dataset.rendered) {
+            body.dataset.rendered = '1';
+            renderGroups(body, groups);
+          }
+        }
+      });
+
+      // Pre-render first year
+      if (idx === 0) {
+        body.dataset.rendered = '1';
+        renderGroups(body, groups);
+      }
+
+      yearList.appendChild(block);
+    });
+
+    yearList.style.display = 'flex';
+  }
+
+  function renderGroups(container, groups) {
+    container.innerHTML = groups.map(g => {
+      const pairsHtml = g.pairs.map(p => {
+        const a   = Array.isArray(p.pair) ? p.pair[0] : p.pair;
+        const b   = Array.isArray(p.pair) ? p.pair[1] : p.pair;
+        const cls = hitClass(p.hit_count);
+        const badge = p.hit_count > 0
+          ? `<span class="hit-badge">${p.hit_count}×</span>`
+          : '';
+        return `<span class="pair-chip ${cls}">(${a},${b})${badge}</span>`;
+      }).join('');
+
+      const hitCount = g.pairs.filter(p => p.hit_count > 0).length;
+
+      return `
+        <div class="group-block">
+          <p class="group-title">${g.group_name}
+            <span style="color:var(--muted);font-weight:400"> — ${g.pairs.length} pairs</span>
+            ${hitCount > 0 ? `<span style="color:var(--green);margin-left:8px">${hitCount} drawn</span>` : ''}
+          </p>
+          <div class="pair-grid">${pairsHtml}</div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── Fetch ──────────────────────────────────────────────────
+  async function loadTab(tab) {
+    mainLoader.style.display = 'flex';
+    yearList.style.display = 'none';
+    errorMsg.style.display = 'none';
+
+    if (cache[tab]) {
+      mainLoader.style.display = 'none';
+      render(cache[tab]);
+      return;
+    }
+
+    try {
+      const res  = await fetch(ENDPOINTS[tab]);
+      const data = await res.json();
+
+      if (data.error) {
+        errorMsg.textContent = data.error;
+        errorMsg.style.display = 'block';
+        return;
+      }
+
+      cache[tab] = data;
+      render(data);
+    } catch(e) {
+      errorMsg.textContent = 'Failed to load data: ' + e.message;
+      errorMsg.style.display = 'block';
+    } finally {
+      mainLoader.style.display = 'none';
+    }
+  }
+
+  // ── Init ──────────────────────────────────────────────────
+  loadTab('last-digit');
+});
 </script>
-
-<style>
-    .pair-item {
-        white-space: nowrap;
-    }
-
-    .strike-one {
-        text-decoration: line-through;
-        text-decoration-thickness: 1px;
-    }
-    
-    .strike-two {
-        text-decoration: line-through;
-        text-decoration-thickness: 2px;
-    }
-    
-    .strike-three {
-        text-decoration: line-through;
-        text-decoration-thickness: 3px;
-        color: #ef4444; /* Red for three strikes */
-    }
-
-    .strike-four {
-        text-decoration: line-through;
-        text-decoration-thickness: 4px;
-        color: #eab308; /* Yellow for four strikes */
-    }
-
-    .strike-five {
-        text-decoration: line-through;
-        text-decoration-thickness: 5px;
-        color: #a855f7; /* Purple for five strikes */
-    }
-
-    .strike-six {
-        text-decoration: line-through;
-        text-decoration-thickness: 6px;
-        color: #0d9488; /* Teal for six or more strikes */
-    }
-</style>
 {% endblock %}
