@@ -1,1065 +1,1006 @@
 {% extends "base.html" %}
 
-{% block title %}Powerball Analysis{% endblock %}
-
-{% block page_heading %}Powerball Analytics Hub{% endblock %}
+{% block title %}Powerball Analytics Hub{% endblock %}
+{% block page_heading %}Analytics Hub{% endblock %}
 
 {% block content %}
-<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8"> {# Added max-width and padding for better layout #}
-    {# Flash messages display #}
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="flash-messages space-y-3">
-                {% for category, message in messages %}
-                    <div class="p-4 rounded-lg shadow-md text-sm {% if category == 'error' %}bg-red-100 text-red-700 border border-red-200{% elif category == 'info' %}bg-blue-100 text-blue-700 border border-blue-200{% else %}bg-green-100 text-green-700 border border-green-200{% endif %} animate-fade-in"> {# Enhanced styling and animation #}\
-                        <p class="font-medium">{{ message }}</p>
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
-    {% endwith %}
+<div class="idx-wrap">
 
-    {# Latest Powerball Draw Card #}
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200"> {# Updated rounded and shadow #}
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Latest Powerball Draw</h2>
-        <div class="flex flex-wrap items-center space-x-2 mb-4">
-            <span class="text-gray-600 text-lg font-medium mr-2">Draw Date:</span>
-            <span class="text-blue-700 font-bold text-lg" id="latestDrawDate">{{ last_draw.get('Draw Date', 'N/A') }}</span>
+  {# ── Flash Messages ─────────────────────────────────────── #}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-messages" id="flashContainer" style="margin-bottom:16px">
+        {% for category, message in messages %}
+          <div class="flash-msg {{ category }} animate-fade-in">
+            <span>{{ message }}</span>
+            <button onclick="this.parentElement.remove()" style="margin-left:auto;opacity:0.5;background:none;border:none;color:inherit;cursor:pointer;font-size:14px;">✕</button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  {# ── Hero — Latest Draw ─────────────────────────────────── #}
+  <div class="hero-card">
+    <div class="hero-eyebrow">◈ Latest Draw</div>
+    <div class="hero-date" id="latestDrawDate">{{ last_draw.get('Draw Date', 'N/A') }}</div>
+    <div class="hero-balls">
+      {% for num in last_draw.get('Numbers', []) %}
+        {% if num != 'N/A' %}
+          <div class="h-ball">{{ num }}</div>
+        {% endif %}
+      {% endfor %}
+      <div class="h-sep">+</div>
+      <div class="h-ball h-pb">{{ last_draw.get('Powerball', 'N/A') }}</div>
+    </div>
+    <div class="hero-links">
+      <a href="{{ url_for('historical_data_route') }}" class="hero-link">View History →</a>
+      <a href="{{ url_for('hot_cold_numbers_route') }}" class="hero-link">Hot &amp; Cold →</a>
+      <a href="{{ url_for('frequency_analysis_route') }}" class="hero-link">Frequencies →</a>
+    </div>
+  </div>
+
+  {# ── Generator Tabs ─────────────────────────────────────── #}
+  <div class="gen-tabs-bar">
+    <button class="gen-tab active" data-tab="general">General</button>
+    <button class="gen-tab" data-tab="pair">Pair Strategy</button>
+    <button class="gen-tab" data-tab="groupa">Group A</button>
+    <button class="gen-tab" data-tab="smart">
+      Smart Pick
+      <span class="tab-badge">AI</span>
+    </button>
+    <button class="gen-tab" data-tab="enhanced">
+      Enhanced
+      <span class="tab-badge">AI</span>
+    </button>
+    <button class="gen-tab" data-tab="record">Record Draw</button>
+  </div>
+
+  {# ══════════════════════════════════════════════════════════
+      TAB: General Generator
+     ══════════════════════════════════════════════════════════ #}
+  <div class="gen-panel active" id="tab-general">
+    <div class="panel-header">
+      <div>
+        <div class="panel-eyebrow">◈ Generator</div>
+        <h2 class="panel-title">General Number Generator</h2>
+        <p class="panel-desc">Generate random Powerball numbers with basic criteria filters.</p>
+      </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('generate') }}" class="gen-form">
+      <div class="form-grid-3">
+        <div class="form-group">
+          <label class="form-label">Sets to Generate (1–10)</label>
+          <input type="number" name="num_sets_to_generate" min="1" max="10"
+                 value="{{ num_sets_to_generate if num_sets_to_generate else 1 }}"
+                 class="form-input">
         </div>
-        <div class="flex flex-wrap items-center space-x-2 space-y-2 sm:space-y-0">
-            <span class="text-gray-600 text-lg font-medium">Numbers:</span>
-            {% for num in last_draw.get('Numbers', []) %}
-                {% if num != 'N/A' %}
-                    <span class="flex items-center justify-center w-10 h-10 rounded-full bg-blue-500 text-white text-xl font-bold shadow-md">{{ num }}</span>
-                {% endif %}
+        <div class="form-group">
+          <label class="form-label">White Ball Range</label>
+          <div style="display:flex;gap:8px;">
+            <input type="number" name="white_ball_min" min="1" max="69" value="1" placeholder="Min" class="form-input">
+            <input type="number" name="white_ball_max" min="1" max="69" value="69" placeholder="Max" class="form-input">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Powerball Range</label>
+          <div style="display:flex;gap:8px;">
+            <input type="number" name="powerball_min" min="1" max="26" value="1" placeholder="Min" class="form-input">
+            <input type="number" name="powerball_max" min="1" max="26" value="26" placeholder="Max" class="form-input">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Odd / Even Split</label>
+          <select name="odd_even_choice" class="form-input form-select">
+            <option value="Any" {% if selected_odd_even_choice == "Any" %}selected{% endif %}>Any Split</option>
+            <option value="All Even" {% if selected_odd_even_choice == "All Even" %}selected{% endif %}>All Even</option>
+            <option value="All Odd" {% if selected_odd_even_choice == "All Odd" %}selected{% endif %}>All Odd</option>
+            <option value="3 Even / 2 Odd" {% if selected_odd_even_choice == "3 Even / 2 Odd" %}selected{% endif %}>3 Even / 2 Odd</option>
+            <option value="2 Even / 3 Odd" {% if selected_odd_even_choice == "2 Even / 3 Odd" %}selected{% endif %}>2 Even / 3 Odd</option>
+            <option value="1 Even / 4 Odd" {% if selected_odd_even_choice == "1 Even / 4 Odd" %}selected{% endif %}>1 Even / 4 Odd</option>
+            <option value="4 Even / 1 Odd" {% if selected_odd_even_choice == "4 Even / 1 Odd" %}selected{% endif %}>4 Even / 1 Odd</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sum Range Filter</label>
+          <select name="sum_range_filter" class="form-input form-select">
+            <option value="Any" {% if selected_sum_range == "Any" %}selected{% endif %}>Any Sum</option>
+            {% for label, _ in sum_ranges.items() %}
+              {% if label != "Any" %}
+                <option value="{{ label }}" {% if selected_sum_range == label %}selected{% endif %}>{{ label }}</option>
+              {% endif %}
             {% endfor %}
-            <span class="text-gray-600 text-lg font-medium ml-4">Powerball:</span>
-            <span class="flex items-center justify-center w-10 h-10 rounded-full bg-red-500 text-white text-xl font-bold shadow-md powerball-ball">{{ last_draw.get('Powerball', 'N/A') }}</span>
+          </select>
         </div>
-    </div>
-
-    {# NEW: Record Official Draw Card #}
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Record Official Draw</h2>
-        <p class="text-gray-700 mb-6">Manually enter the latest official Powerball draw results to keep the historical data up-to-date. This will update the main historical database.</p>
-        <form method="POST" action="{{ url_for('save_official_draw_route') }}" class="space-y-4">
-            <div class="form-group">
-                <label for="draw_date" class="block text-gray-700 text-sm font-bold mb-2">Draw Date:</label>
-                <input type="date" id="draw_date" name="draw_date" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
-            </div>
-            <div class="grid grid-cols-5 gap-4">
-                <div class="form-group">
-                    <label for="n1" class="block text-gray-700 text-sm font-bold mb-2">N1:</label>
-                    <input type="number" id="n1" name="n1" min="1" max="69" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
-                </div>
-                <div class="form-group">
-                    <label for="n2" class="block text-gray-700 text-sm font-bold mb-2">N2:</label>
-                    <input type="number" id="n2" name="n2" min="1" max="69" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
-                </div>
-                <div class="form-group">
-                    <label for="n3" class="block text-gray-700 text-sm font-bold mb-2">N3:</label>
-                    <input type="number" id="n3" name="n3" min="1" max="69" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
-                </div>
-                <div class="form-group">
-                    <label for="n4" class="block text-gray-700 text-sm font-bold mb-2">N4:</label>
-                    <input type="number" id="n4" name="n4" min="1" max="69" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
-                </div>
-                <div class="form-group">
-                    <label for="n5" class="block text-gray-700 text-sm font-bold mb-2">N5:</label>
-                    <input type="number" id="n5" name="n5" min="1" max="69" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="pb" class="block text-gray-700 text-sm font-bold mb-2">Powerball:</label>
-                <input type="number" id="pb" name="pb" min="1" max="26" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
-            </div>
-            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition duration-300 ease-in-out w-full sm:w-auto">
-                Record Official Draw
-            </button>
-        </form>
-    </div>
-
-    {# General Number Generator Card #}
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">General Number Generator</h2>
-        <p class="text-gray-700 mb-6">Generate random Powerball numbers based on basic criteria.</p>
-        <form method="POST" action="{{ url_for('generate') }}" class="space-y-4"> 
-            <div class="form-group">
-                <label for="num_sets_to_generate" class="block text-gray-700 text-sm font-bold mb-2">Number of Sets to Generate (1-10):</label>
-                <input type="number" id="num_sets_to_generate" name="num_sets_to_generate" min="1" max="10" value="{{ num_sets_to_generate if num_sets_to_generate else 1 }}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-            </div>
-
-            <div class="form-group">
-                <label for="white_ball_min" class="block text-gray-700 text-sm font-bold mb-2">White Ball Range (Min 1 - Max 69):</label>
-                <div class="flex space-x-4">
-                    <input type="number" id="white_ball_min" name="white_ball_min" min="1" max="69" value="1" placeholder="Min" class="shadow appearance-none border rounded w-1/2 py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    <input type="number" id="white_ball_max" name="white_ball_max" min="1" max="69" value="69" placeholder="Max" class="shadow appearance-none border rounded w-1/2 py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                </div>
-                <p class="text-xs text-gray-500 mt-1">Set the minimum and maximum for white balls (default: 1-69).</p>
-            </div>
-
-            <div class="form-group">
-                <label for="powerball_min" class="block text-gray-700 text-sm font-bold mb-2">Powerball Range (Min 1 - Max 26):</label>
-                <div class="flex space-x-4">
-                    <input type="number" id="powerball_min" name="powerball_min" min="1" max="26" value="1" placeholder="Min" class="shadow appearance-none border rounded w-1/2 py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    <input type="number" id="powerball_max" name="powerball_max" min="1" max="26" value="26" placeholder="Max" class="shadow appearance-none border rounded w-1/2 py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                </div>
-                <p class="text-xs text-gray-500 mt-1">Set the minimum and maximum for the Powerball (default: 1-26).</p>
-            </div>
-
-            <div class="form-group">
-                <label for="excluded_numbers" class="block text-gray-700 text-sm font-bold mb-2">Excluded Numbers (comma-separated):</label>
-                <input type="text" id="excluded_numbers" name="excluded_numbers" placeholder="e.g., 7, 14, 21" value="{{ excluded_numbers if excluded_numbers else '' }}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                <p class="text-xs text-gray-500 mt-1">Numbers to explicitly exclude from generation.</p>
-            </div>
-
-            <div class="form-group">
-                <label for="odd_even_choice" class="block text-gray-700 text-sm font-bold mb-2">Odd/Even Split Preference:</label>
-                <select id="odd_even_choice" name="odd_even_choice" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    <option value="Any" {% if selected_odd_even_choice == "Any" %}selected{% endif %}>Any Split (Random)</option>
-                    <option value="All Even" {% if selected_odd_even_choice == "All Even" %}selected{% endif %}>All Even (5 Even / 0 Odd)</option>
-                    <option value="All Odd" {% if selected_odd_even_choice == "All Odd" %}selected{% endif %}>All Odd (5 Odd / 0 Even)</option>
-                    <option value="3 Even / 2 Odd" {% if selected_odd_even_choice == "3 Even / 2 Odd" %}selected{% endif %}>3 Even / 2 Odd</option>
-                    <option value="2 Even / 3 Odd" {% if selected_odd_even_choice == "2 Even / 3 Odd" %}selected{% endif %}>2 Even / 3 Odd</option>
-                    <option value="1 Even / 4 Odd" {% if selected_odd_even_choice == "1 Even / 4 Odd" %}selected{% endif %}>1 Even / 4 Odd</option>
-                    <option value="4 Even / 1 Odd" {% if selected_odd_even_choice == "4 Even / 1 Odd" %}selected{% endif %}>4 Even / 1 Odd</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label for="sum_range_filter" class="block text-gray-700 text-sm font-bold mb-2">Sum Range Filter:</label>
-                <select id="sum_range_filter" name="sum_range_filter" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    <option value="Any" {% if selected_sum_range == "Any" %}selected{% endif %}>Any Sum</option>
-                    {% for label, _ in sum_ranges.items() %}
-                        {% if label != "Any" %}
-                            <option value="{{ label }}" {% if selected_sum_range == label %}selected{% endif %}>{{ label }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-            </div>
-            
-            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition duration-300 ease-in-out w-full sm:w-auto">
-                Generate Numbers
-            </button>
-        </form>
-
-        {% if generated_sets and generation_type == 'generated' %}
-            <h3 class="text-2xl font-bold mt-8 mb-4 text-gray-800">Generated Picks</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="generalGeneratedPicksList"> {# Added ID here #}
-                {% for pick in generated_sets %}
-                <div class="bg-white p-4 rounded-lg shadow flex items-center justify-between flex-wrap generated-pick-item"
-                     data-white-balls="{{ pick.white_balls | join(',') }}"
-                     data-powerball="{{ pick.powerball }}">
-                    <div class="flex items-center space-x-2 mb-2 md:mb-0">
-                        {% for num in pick.white_balls %}
-                            <span class="ball-sm bg-blue-500 text-white">{{ num }}</span>
-                        {% endfor %}
-                        <span class="ball-sm powerball-ball bg-red-500 text-white ml-2">{{ pick.powerball }}</span>
-                    </div>
-                    <button type="button" class="save-general-pick-btn bg-green-500 hover:bg-green-600 text-white text-sm font-bold py-1 px-3 rounded-lg">Save Pick</button> {# Changed to type="button" #}
-                </div>
-                {% endfor %}
-            </div>
-            <div class="mt-4 p-4 bg-gray-100 rounded-lg text-gray-700 text-sm">
-                <h4 class="font-semibold mb-2">Last Drawn Dates for Your Numbers:</h4>
-                <ul class="list-disc list-inside">
-                    {% for number, date in last_draw_dates.items() %}
-                        <li>{{ number }}: {{ date }}</li>
-                    {% endfor %}
-                </ul>
-            </div>
-            {# NEW: Save All Button for General Generator #}
-            <div class="mt-6 text-center">
-                <button type="button" id="saveAllGeneralPicksBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out">
-                    Save All Generated Picks
-                </button>
-            </div>
-        {% endif %}
-    </div>
-
-    {# User Provided Pair Generator Card #}
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Generate with User Provided Pair</h2>
-        <p class="text-gray-700 mb-6">Start your pick with two specific white balls, and the generator will complete the set with three ascending numbers.</p>
-        <form method="POST" action="{{ url_for('generate_with_user_pair_route') }}" class="space-y-4">
-            <div class="form-group">
-                <label for="user_pair" class="block text-gray-700 text-sm font-bold mb-2">Starting Pair (e.g., 10, 11):</label>
-                <input type="text" id="user_pair" name="user_pair" placeholder="e.g., 18, 19" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
-                <p class="text-xs text-gray-500 mt-1">Enter two white balls, comma-separated. The remaining three will be higher and ascending.</p>
-            </div>
-            <div class="form-group">
-                <label for="excluded_numbers_pair" class="block text-gray-700 text-sm font-bold mb-2">Excluded Numbers (comma-separated):</label>
-                <input type="text" id="excluded_numbers_pair" name="excluded_numbers_pair" placeholder="e.g., 4, 18, 55" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                <p class="text-xs text-gray-500 mt-1">Numbers to explicitly exclude from generation for this strategy.</p>
-            </div>
-            <div class="form-group">
-                <label for="sum_range_filter_pair" class="block text-gray-700 text-sm font-bold mb-2">Sum Range Filter:</label>
-                <select id="sum_range_filter_pair" name="sum_range_filter_pair" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    <option value="Any" {% if selected_sum_range_pair == "Any" %}selected{% endif %}>Any Sum</option>
-                    {% for label, _ in sum_ranges.items() %}
-                        {% if label != "Any" %}
-                            <option value="{{ label }}" {% if selected_sum_range_pair == label %}selected{% endif %}>{{ label }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-            </div>
-            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition duration-300 ease-in-out w-full sm:w-auto">
-                Generate with Pair
-            </button>
-        </form>
-
-        {% if generated_sets and generation_type == 'user_pair' %}
-            <h3 class="text-2xl font-bold mt-8 mb-4 text-gray-800">Generated Pick with Pair</h3>
-            <div class="bg-white p-4 rounded-lg shadow flex items-center justify-between flex-wrap">
-                <div class="flex items-center space-x-2 mb-2 md:mb-0">
-                    {% for num in generated_sets[0].white_balls %}
-                        <span class="ball-sm bg-blue-500 text-white">{{ num }}</span>
-                    {% endfor %}
-                    <span class="ball-sm powerball-ball bg-red-500 text-white ml-2">{{ generated_sets[0].powerball }}</span>
-                </div>
-                <form action="{{ url_for('save_generated_pick_route') }}" method="post" class="ml-auto">
-                    <input type="hidden" name="generated_white_balls" value="{{ generated_sets[0].white_balls | join(',') }}">
-                    <input type="hidden" name="generated_powerball" value="{{ generated_sets[0].powerball }}">
-                    <button type="submit" class="bg-green-500 hover:bg-green-600 text-white text-sm font-bold py-1 px-3 rounded-lg">Save Pick</button>
-                </form>
-            </div>
-            <div class="mt-4 p-4 bg-gray-100 rounded-lg text-gray-700 text-sm">
-                <h4 class="font-semibold mb-2">Last Drawn Dates for Your Numbers:</h4>
-                <ul class="list-disc list-inside">
-                    {% for number, date in last_draw_dates.items() %}
-                        <li>{{ number }}: {{ date }}</li>
-                    {% endfor %}
-                </ul>
-            </div>
-        {% endif %}
-    </div>
-
-    {# Group A Strategy Generator Card #}
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold mb-4 text-gray-800">Generate with Group A Strategy</h2>
-        <p class="text-gray-700 mb-6">Generate numbers ensuring a specific count of balls from a predefined 'Group A' (e.g., frequently drawn numbers).</p>
-        <form method="POST" action="{{ url_for('generate_group_a_strategy_route') }}" class="space-y-4">
-            <div class="form-group">
-                <label for="num_from_group_a" class="block text-gray-700 text-sm font-bold mb-2">Number of Balls from Group A (0-5):</label>
-                <select id="num_from_group_a" name="num_from_group_a" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    {% for i in range(6) %}
-                        <option value="{{ i }}" {% if num_from_group_a is defined and num_from_group_a == i %}selected{% endif %}>{{ i }}</option>
-                    {% endfor %}
-                </select>
-                <p class="text-xs text-gray-500 mt-1">Select how many white balls you want from the predefined Group A: {{ group_a | join(', ') }}.</p>
-            </div>
-            <div class="form-group">
-                <label for="excluded_numbers_group_a" class="block text-gray-700 text-sm font-bold mb-2">Excluded Numbers (comma-separated):</label>
-                <input type="text" id="excluded_numbers_group_a" name="excluded_numbers_group_a" placeholder="e.g., 4, 18, 55" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                <p class="text-xs text-gray-500 mt-1">Numbers to explicitly exclude from generation for this strategy.</p>
-            </div>
-            <div class="form-group">
-                <label for="sum_range_filter_group_a" class="block text-gray-700 text-sm font-bold mb-2">Sum Range Filter:</label>
-                <select id="sum_range_filter_group_a" name="sum_range_filter_group_a" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                    <option value="Any" {% if selected_sum_range_group_a == "Any" %}selected{% endif %}>Any Sum</option>
-                    {% for label, _ in sum_ranges.items() %}
-                        {% if label != "Any" %}
-                            <option value="{{ label }}" {% if selected_sum_range_group_a == label %}selected{% endif %}>{{ label }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="form-group">
-    <label class="block text-gray-700 text-sm font-bold mb-2">Current Month Number Preferences:</label>
-    <div class="flex flex-col space-y-2">
-        <label class="inline-flex items-center">
-            <input type="checkbox" name="current_month_preference" value="five_unpicked_same_freq" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-            <span class="ml-2 text-gray-700">Five unpicked numbers (with two from same frequency, age ≤ 25 draws)</span>
-        </label>
-        <label class="inline-flex items-center">
-            <input type="checkbox" name="current_month_preference" value="one_unpicked_four_picked" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-            <span class="ml-2 text-gray-700">One unpicked number + 4 picked numbers from current month</span>
-        </label>
-        <label class="inline-flex items-center">
-            <input type="checkbox" name="current_month_preference" value="two_unpicked_three_picked" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-            <span class="ml-2 text-gray-700">Two unpicked numbers + 3 picked numbers from current month</span>
-        </label>
-        <label class="inline-flex items-center">
-            <input type="checkbox" name="current_month_preference" value="two_same_frequency" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-            <span class="ml-2 text-gray-700">Two numbers from the same white ball frequency from current year</span>
-        </label>
-    </div>
-    <p class="text-xs text-gray-500 mt-1">Select preferences for including numbers based on current month/year patterns.</p>
-</div>
-            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition duration-300 ease-in-out w-full sm:w-auto">
-                Generate with Group A
-            </button>
-        </form>
-        {% if generated_sets and generation_type == 'group_a_strategy' %}
-            <h3 class="text-2xl font-bold mt-8 mb-4 text-gray-800">Generated Pick with Group A Strategy</h3>
-            <div class="bg-white p-4 rounded-lg shadow flex items-center justify-between flex-wrap">
-                <div class="flex items-center space-x-2 mb-2 md:mb-0">
-                    {% for num in generated_sets[0].white_balls %}
-                        <span class="ball-sm bg-blue-500 text-white">{{ num }}</span>
-                    {% endfor %}
-                    <span class="ball-sm powerball-ball bg-red-500 text-white ml-2">{{ generated_sets[0].powerball }}</span>
-                </div>
-                <form action="{{ url_for('save_multiple_generated_picks_route') }}" method="post" class="ml-auto">
-                    <input type="hidden" name="generated_white_balls" value="{{ generated_sets[0].white_balls | join(',') }}">
-                    <input type="hidden" name="generated_powerball" value="{{ generated_sets[0].powerball }}">
-                    <button type="submit" class="bg-green-500 hover:bg-green-600 text-white text-sm font-bold py-1 px-3 rounded-lg">Save Pick</button>
-                </form>
-            </div>
-            <div class="mt-4 p-4 bg-gray-100 rounded-lg text-gray-700 text-sm">
-                <h4 class="font-semibold mb-2">Last Drawn Dates for Your Numbers:</h4>
-                <ul class="list-disc list-inside">
-                    {% for number, date in last_draw_dates.items() %}
-                        <li>{{ number }}: {{ date }}</li>
-                    {% endfor %}
-                </ul>
-            </div>
-        {% endif %}
-    </div>
-
-    {# Smart Pick Generator Card #}
-<div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-    <h2 class="text-2xl font-bold mb-4 text-gray-800">Smart Pick Generator</h2>
-    <p class="text-gray-700 mb-6">
-        Generate Powerball picks with advanced pattern preferences and constraints.
-    </p>
-
-    <form method="POST" action="{{ url_for('generate_smart_picks_api') }}" class="space-y-4">
         <div class="form-group">
-            <label for="num_smart_sets" class="block text-gray-700 text-sm font-bold mb-2">Number of Picks to Generate (1-5):</label>
-            <input type="number" id="num_smart_sets" name="num_smart_sets" min="1" max="5" value="1" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+          <label class="form-label">Excluded Numbers</label>
+          <input type="text" name="excluded_numbers" placeholder="e.g. 7, 14, 21"
+                 value="{{ excluded_numbers if excluded_numbers else '' }}" class="form-input">
         </div>
-
-        <div class="form-group">
-            <label class="block text-gray-700 text-sm font-bold mb-2">Number Pattern Preferences:</label>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="space-y-2">
-                    <label class="inline-flex items-center">
-                        <input type="checkbox" name="pattern_preference" value="one_unpicked_four_picked" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-                        <span class="ml-2 text-gray-700">1 unpicked + 4 picked (same month)</span>
-                    </label>
-                    <label class="inline-flex items-center">
-                        <input type="checkbox" name="pattern_preference" value="two_unpicked_three_picked" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-                        <span class="ml-2 text-gray-700">2 unpicked + 3 picked (same month)</span>
-                    </label>
-                    <label class="inline-flex items-center">
-                        <input type="checkbox" name="pattern_preference" value="five_unpicked_same_month" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-                        <span class="ml-2 text-gray-700">5 unpicked numbers (same month)</span>
-                    </label>
-                    <label class="inline-flex items-center">
-                        <input type="checkbox" name="pattern_preference" value="four_unpicked_one_picked" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-                        <span class="ml-2 text-gray-700">4 unpicked + 1 picked (same month)</span>
-                    </label>
-                </div>
-                <div class="space-y-2">
-                    <label class="inline-flex items-center">
-                        <input type="checkbox" name="pattern_preference" value="two_same_frequency" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-                        <span class="ml-2 text-gray-700">2 numbers with same frequency</span>
-                    </label>
-                    <label class="inline-flex items-center">
-                        <input type="checkbox" name="pattern_preference" value="three_same_frequency" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-                        <span class="ml-2 text-gray-700">3 numbers with same frequency</span>
-                    </label>
-                    <label class="inline-flex items-center">
-                        <input type="checkbox" name="pattern_preference" value="two_pairs_same_frequency" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-                        <span class="ml-2 text-gray-700">2 pairs from different frequencies</span>
-                    </label>
-                </div>
-            </div>
-            <p class="text-xs text-gray-500 mt-1">Select pattern preferences for number generation.</p>
-        </div>
-
-        <div class="form-group">
-            <label for="group_a_numbers_count" class="block text-gray-700 text-sm font-bold mb-2">Numbers from Group A (0-5):</label>
-            <select id="group_a_numbers_count" name="group_a_numbers_count" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                {% for i in range(6) %}
-                    <option value="{{ i }}">{{ i }} from Group A</option>
-                {% endfor %}
-            </select>
-            <p class="text-xs text-gray-500 mt-1">Select how many balls from Group A: {{ group_a | join(', ') }}</p>
-        </div>
-
-        <div class="form-group">
-            <label for="odd_even_choice_smart" class="block text-gray-700 text-sm font-bold mb-2">Odd/Even Split Preference:</label>
-            <select id="odd_even_choice_smart" name="odd_even_choice_smart" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                <option value="Any">Any Split (Random)</option>
-                <option value="All Even">All Even (5 Even / 0 Odd)</option>
-                <option value="All Odd">All Odd (5 Odd / 0 Even)</option>
-                <option value="3 Even / 2 Odd">3 Even / 2 Odd</option>
-                <option value="2 Even / 3 Odd">2 Even / 3 Odd</option>
-                <option value="1 Even / 4 Odd">1 Even / 4 Odd</option>
-                <option value="4 Even / 1 Odd">4 Even / 1 Odd</option>
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label for="sum_range_filter_smart" class="block text-gray-700 text-sm font-bold mb-2">Sum Range Filter:</label>
-            <select id="sum_range_filter_smart" name="sum_range_filter_smart" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-                <option value="Any">Any Sum</option>
-                {% for label, _ in sum_ranges.items() %}
-                    {% if label != "Any" %}
-                        <option value="{{ label }}">{{ label }}</option>
-                    {% endif %}
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label for="excluded_numbers_smart" class="block text-gray-700 text-sm font-bold mb-2">Excluded Numbers (comma-separated):</label>
-            <input type="text" id="excluded_numbers_smart" name="excluded_numbers_smart" placeholder="e.g., 4, 18, 55" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
-            <p class="text-xs text-gray-500 mt-1">Numbers to explicitly exclude from generation.</p>
-        </div>
-
-        <button id="generatePicksBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition duration-300 ease-in-out">
-           Generate Smart Picks
-        </button>
+      </div>
+      <button type="submit" class="btn-generate">
+        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Generate Numbers
+      </button>
     </form>
 
-    {% if generated_sets and generation_type == 'smart_pick' %}
-        <h3 class="text-2xl font-bold mt-8 mb-4 text-gray-800">Your Smart Picks</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {% for pick in generated_sets %}
-            <div class="bg-white p-4 rounded-lg shadow flex items-center justify-between flex-wrap">
-                <div class="flex items-center space-x-2 mb-2 md:mb-0">
-                    {% for num in pick.white_balls %}
-                        <span class="ball-sm bg-blue-500 text-white">{{ num }}</span>
-                    {% endfor %}
-                    <span class="ball-sm powerball-ball bg-red-500 text-white ml-2">{{ pick.powerball }}</span>
-                </div>
-                <form action="{{ url_for('save_multiple_generated_picks_route') }}" method="post" class="ml-auto">
-                    <input type="hidden" name="generated_white_balls" value="{{ pick.white_balls | join(',') }}">
-                    <input type="hidden" name="generated_powerball" value="{{ pick.powerball }}">
-                    <button type="submit" class="bg-green-500 hover:bg-green-600 text-white text-sm font-bold py-1 px-3 rounded-lg">Save Pick</button>
-                </form>
+    {% if generated_sets and generation_type == 'generated' %}
+      <div class="results-section">
+        <div class="results-header">
+          <div class="results-title">Generated Picks</div>
+          <button type="button" id="saveAllGeneralPicksBtn" class="btn-save-all">Save All</button>
+        </div>
+        <div class="picks-grid" id="generalGeneratedPicksList">
+          {% for pick in generated_sets %}
+            <div class="pick-row generated-pick-item"
+                 data-white-balls="{{ pick.white_balls | join(',') }}"
+                 data-powerball="{{ pick.powerball }}">
+              <div class="pick-balls">
+                {% for num in pick.white_balls %}
+                  <span class="ball-sm" style="background:radial-gradient(circle at 32% 30%,#f0f4ff,#c8d8ed 45%,#8aaac8);color:#0d1829;">{{ num }}</span>
+                {% endfor %}
+                <span class="ball-sm powerball-ball" style="background:radial-gradient(circle at 32% 30%,#ff8a80,#ef5350 50%,#b71c1c);color:#fff;margin-left:6px;">{{ pick.powerball }}</span>
+              </div>
+              <button type="button" class="save-general-pick-btn btn-save-one">Save</button>
             </div>
-            {% endfor %}
+          {% endfor %}
         </div>
-        
         {% if last_draw_dates %}
-        <div class="mt-4 p-4 bg-gray-100 rounded-lg text-gray-700 text-sm">
-            <h4 class="font-semibold mb-2">Last Drawn Dates for Your Numbers:</h4>
-            <ul class="list-disc list-inside">
-                {% for number, date in last_draw_dates.items() %}
-                    <li>{{ number }}: {{ date }}</li>
-                {% endfor %}
-            </ul>
-        </div>
+          <div class="dates-box">
+            <div class="dates-title">Last Drawn Dates</div>
+            <div class="dates-grid">
+              {% for number, date in last_draw_dates.items() %}
+                <div class="date-chip"><span class="date-num">{{ number }}</span><span class="date-val">{{ date }}</span></div>
+              {% endfor %}
+            </div>
+          </div>
         {% endif %}
-        
-        <div class="mt-6 text-center">
-            <form action="{{ url_for('save_multiple_generated_picks_route') }}" method="post">
-                {% for pick in generated_sets %}
-                    <input type="hidden" name="picks" value="{{ {'white_balls': pick.white_balls, 'powerball': pick.powerball} | tojson }}">
-                {% endfor %}
-                <button id="saveAllPicksBtn" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition duration-300 ease-in-out">
-                  Save All Generated Picks
-                </button>    
-            </form>
-        </div>
+      </div>
     {% endif %}
-</div>
+  </div>
 
-<style>
-    /* Add some basic styles for the number balls */
-    .ball-sm {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 36px; /* Slightly smaller */
-        height: 36px;
-        border-radius: 50%;
-        font-size: 0.9rem; /* Adjusted font size */
-        font-weight: bold;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-
-    .powerball-ball {
-        background-color: #ef4444; /* Red-500 */
-    }
-
-    /* Basic fade-in animation for flash messages */
-    @keyframes fade-in {
-        from { opacity: 0; transform: translateY(-10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    .animate-fade-in {
-        animation: fade-in 0.5s ease-out forwards;
-    }
-</style>
-
-{# ═══════════════════════════════════════════════════════════════
-    ENHANCED PICK GENERATOR — Add this card to index.html
-    Place it after the Smart Pick Generator card section
-    ═══════════════════════════════════════════════════════════════ #}
-
-<div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200 mt-8" id="enhanced-generator-card">
-
-    {# ── Header ── #}
-    <div class="flex items-center justify-between mb-2">
-        <h2 class="text-2xl font-bold text-gray-800">⚡ Enhanced Pick Generator</h2>
-        <span class="text-xs bg-indigo-100 text-indigo-700 font-semibold px-3 py-1 rounded-full">AI Powered</span>
-    </div>
-    <p class="text-gray-600 mb-6 text-sm">
-        Generates picks scored by <strong>frequency analysis</strong>, <strong>hot/cold trends</strong>, and <strong>pattern matching</strong>.
-        Each set includes a confidence score and reason for every number picked.
-    </p>
-
-    {# ── Controls ── #}
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-
-        {# Number of sets #}
-        <div>
-            <label class="block text-gray-700 text-sm font-bold mb-2">Number of Sets (1–10)</label>
-            <input type="number" id="enh-num-sets" min="1" max="10" value="3"
-                   class="shadow border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
-        </div>
-
-        {# Strategy #}
-        <div>
-            <label class="block text-gray-700 text-sm font-bold mb-2">Generation Strategy</label>
-            <select id="enh-strategy"
-                    class="shadow border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                <option value="balanced">⚖️ Balanced (hot + cold + frequency)</option>
-                <option value="hot_heavy">🔥 Hot Heavy (favour trending numbers)</option>
-                <option value="cold_heavy">❄️ Cold Heavy (favour due numbers)</option>
-                <option value="pattern_focus">🔢 Pattern Focus (consecutive + spread)</option>
-            </select>
-        </div>
-
-        {# Excluded numbers #}
-        <div>
-            <label class="block text-gray-700 text-sm font-bold mb-2">Exclude Numbers <span class="font-normal text-gray-400">(comma separated)</span></label>
-            <input type="text" id="enh-excluded" placeholder="e.g. 4, 18, 55"
-                   class="shadow border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400">
-        </div>
+  {# ══════════════════════════════════════════════════════════
+      TAB: User Pair Generator
+     ══════════════════════════════════════════════════════════ #}
+  <div class="gen-panel" id="tab-pair">
+    <div class="panel-header">
+      <div>
+        <div class="panel-eyebrow">◈ Strategy</div>
+        <h2 class="panel-title">User Provided Pair</h2>
+        <p class="panel-desc">Start with two specific white balls — the generator completes the set with three ascending numbers.</p>
+      </div>
     </div>
 
-    {# ── Generate button ── #}
-    <button id="enh-generate-btn" onclick="enhGeneratePicks()"
-            class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg transition duration-200 flex items-center gap-2">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M13 10V3L4 14h7v7l9-11h-7z"/>
-        </svg>
-        Generate Enhanced Picks
+    <form method="POST" action="{{ url_for('generate_with_user_pair_route') }}" class="gen-form">
+      <div class="form-grid-3">
+        <div class="form-group">
+          <label class="form-label">Starting Pair</label>
+          <input type="text" name="user_pair" placeholder="e.g. 18, 19" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sum Range Filter</label>
+          <select name="sum_range_filter_pair" class="form-input form-select">
+            <option value="Any" {% if selected_sum_range_pair == "Any" %}selected{% endif %}>Any Sum</option>
+            {% for label, _ in sum_ranges.items() %}
+              {% if label != "Any" %}
+                <option value="{{ label }}" {% if selected_sum_range_pair == label %}selected{% endif %}>{{ label }}</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Excluded Numbers</label>
+          <input type="text" name="excluded_numbers_pair" placeholder="e.g. 4, 18, 55" class="form-input">
+        </div>
+      </div>
+      <button type="submit" class="btn-generate">
+        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Generate with Pair
+      </button>
+    </form>
+
+    {% if generated_sets and generation_type == 'user_pair' %}
+      <div class="results-section">
+        <div class="results-title">Generated Pick</div>
+        <div class="pick-row" style="margin-top:12px;">
+          <div class="pick-balls">
+            {% for num in generated_sets[0].white_balls %}
+              <span class="ball-sm" style="background:radial-gradient(circle at 32% 30%,#f0f4ff,#c8d8ed 45%,#8aaac8);color:#0d1829;">{{ num }}</span>
+            {% endfor %}
+            <span class="ball-sm" style="background:radial-gradient(circle at 32% 30%,#ff8a80,#ef5350 50%,#b71c1c);color:#fff;margin-left:6px;">{{ generated_sets[0].powerball }}</span>
+          </div>
+          <form action="{{ url_for('save_generated_pick_route') }}" method="post" style="margin-left:auto;">
+            <input type="hidden" name="generated_white_balls" value="{{ generated_sets[0].white_balls | join(',') }}">
+            <input type="hidden" name="generated_powerball" value="{{ generated_sets[0].powerball }}">
+            <button type="submit" class="btn-save-one">Save</button>
+          </form>
+        </div>
+        {% if last_draw_dates %}
+          <div class="dates-box">
+            <div class="dates-title">Last Drawn Dates</div>
+            <div class="dates-grid">
+              {% for number, date in last_draw_dates.items() %}
+                <div class="date-chip"><span class="date-num">{{ number }}</span><span class="date-val">{{ date }}</span></div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  {# ══════════════════════════════════════════════════════════
+      TAB: Group A Strategy
+     ══════════════════════════════════════════════════════════ #}
+  <div class="gen-panel" id="tab-groupa">
+    <div class="panel-header">
+      <div>
+        <div class="panel-eyebrow">◈ Strategy</div>
+        <h2 class="panel-title">Group A Strategy</h2>
+        <p class="panel-desc">Generate numbers ensuring a specific count from predefined Group A: <span style="color:var(--amber);">{{ group_a | join(', ') }}</span></p>
+      </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('generate_group_a_strategy_route') }}" class="gen-form">
+      <div class="form-grid-3">
+        <div class="form-group">
+          <label class="form-label">Balls from Group A (0–5)</label>
+          <select name="num_from_group_a" class="form-input form-select">
+            {% for i in range(6) %}
+              <option value="{{ i }}" {% if num_from_group_a is defined and num_from_group_a == i %}selected{% endif %}>{{ i }} from Group A</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sum Range Filter</label>
+          <select name="sum_range_filter_group_a" class="form-input form-select">
+            <option value="Any" {% if selected_sum_range_group_a == "Any" %}selected{% endif %}>Any Sum</option>
+            {% for label, _ in sum_ranges.items() %}
+              {% if label != "Any" %}
+                <option value="{{ label }}" {% if selected_sum_range_group_a == label %}selected{% endif %}>{{ label }}</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Excluded Numbers</label>
+          <input type="text" name="excluded_numbers_group_a" placeholder="e.g. 4, 18, 55" class="form-input">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top:4px;">
+        <label class="form-label">Current Month Preferences</label>
+        <div class="checkbox-grid">
+          <label class="cb-label">
+            <input type="checkbox" name="current_month_preference" value="five_unpicked_same_freq" class="cb-input">
+            <span>Five unpicked (two same freq, age ≤ 25)</span>
+          </label>
+          <label class="cb-label">
+            <input type="checkbox" name="current_month_preference" value="one_unpicked_four_picked" class="cb-input">
+            <span>1 unpicked + 4 picked (current month)</span>
+          </label>
+          <label class="cb-label">
+            <input type="checkbox" name="current_month_preference" value="two_unpicked_three_picked" class="cb-input">
+            <span>2 unpicked + 3 picked (current month)</span>
+          </label>
+          <label class="cb-label">
+            <input type="checkbox" name="current_month_preference" value="two_same_frequency" class="cb-input">
+            <span>Two from same frequency (current year)</span>
+          </label>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-generate">
+        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Generate with Group A
+      </button>
+    </form>
+
+    {% if generated_sets and generation_type == 'group_a_strategy' %}
+      <div class="results-section">
+        <div class="results-title">Generated Pick</div>
+        <div class="pick-row" style="margin-top:12px;">
+          <div class="pick-balls">
+            {% for num in generated_sets[0].white_balls %}
+              <span class="ball-sm" style="background:radial-gradient(circle at 32% 30%,#f0f4ff,#c8d8ed 45%,#8aaac8);color:#0d1829;">{{ num }}</span>
+            {% endfor %}
+            <span class="ball-sm" style="background:radial-gradient(circle at 32% 30%,#ff8a80,#ef5350 50%,#b71c1c);color:#fff;margin-left:6px;">{{ generated_sets[0].powerball }}</span>
+          </div>
+          <form action="{{ url_for('save_multiple_generated_picks_route') }}" method="post" style="margin-left:auto;">
+            <input type="hidden" name="generated_white_balls" value="{{ generated_sets[0].white_balls | join(',') }}">
+            <input type="hidden" name="generated_powerball" value="{{ generated_sets[0].powerball }}">
+            <button type="submit" class="btn-save-one">Save</button>
+          </form>
+        </div>
+        {% if last_draw_dates %}
+          <div class="dates-box">
+            <div class="dates-title">Last Drawn Dates</div>
+            <div class="dates-grid">
+              {% for number, date in last_draw_dates.items() %}
+                <div class="date-chip"><span class="date-num">{{ number }}</span><span class="date-val">{{ date }}</span></div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  {# ══════════════════════════════════════════════════════════
+      TAB: Smart Pick Generator
+     ══════════════════════════════════════════════════════════ #}
+  <div class="gen-panel" id="tab-smart">
+    <div class="panel-header">
+      <div>
+        <div class="panel-eyebrow">◈ AI Strategy</div>
+        <h2 class="panel-title">Smart Pick Generator</h2>
+        <p class="panel-desc">Pattern-aware generation with advanced preference controls and AI scoring.</p>
+      </div>
+      <span class="ai-badge">AI</span>
+    </div>
+
+    <form method="POST" action="{{ url_for('generate_smart_picks_api') }}" class="gen-form">
+      <div class="form-grid-3">
+        <div class="form-group">
+          <label class="form-label">Picks to Generate (1–5)</label>
+          <input type="number" id="num_smart_sets" name="num_smart_sets" min="1" max="5" value="1" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Group A Count (0–5)</label>
+          <select id="group_a_numbers_count" name="group_a_numbers_count" class="form-input form-select">
+            {% for i in range(6) %}
+              <option value="{{ i }}">{{ i }} from Group A</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Odd / Even Split</label>
+          <select id="odd_even_choice_smart" name="odd_even_choice_smart" class="form-input form-select">
+            <option value="Any">Any Split</option>
+            <option value="All Even">All Even</option>
+            <option value="All Odd">All Odd</option>
+            <option value="3 Even / 2 Odd">3 Even / 2 Odd</option>
+            <option value="2 Even / 3 Odd">2 Even / 3 Odd</option>
+            <option value="1 Even / 4 Odd">1 Even / 4 Odd</option>
+            <option value="4 Even / 1 Odd">4 Even / 1 Odd</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sum Range</label>
+          <select id="sum_range_filter_smart" name="sum_range_filter_smart" class="form-input form-select">
+            <option value="Any">Any Sum</option>
+            {% for label, _ in sum_ranges.items() %}
+              {% if label != "Any" %}
+                <option value="{{ label }}">{{ label }}</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Excluded Numbers</label>
+          <input type="text" id="excluded_numbers_smart" name="excluded_numbers_smart" placeholder="e.g. 4, 18, 55" class="form-input">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Pattern Preferences</label>
+        <div class="checkbox-grid">
+          <label class="cb-label"><input type="checkbox" name="pattern_preference" value="one_unpicked_four_picked" class="cb-input"><span>1 unpicked + 4 picked</span></label>
+          <label class="cb-label"><input type="checkbox" name="pattern_preference" value="two_unpicked_three_picked" class="cb-input"><span>2 unpicked + 3 picked</span></label>
+          <label class="cb-label"><input type="checkbox" name="pattern_preference" value="five_unpicked_same_month" class="cb-input"><span>5 unpicked (same month)</span></label>
+          <label class="cb-label"><input type="checkbox" name="pattern_preference" value="four_unpicked_one_picked" class="cb-input"><span>4 unpicked + 1 picked</span></label>
+          <label class="cb-label"><input type="checkbox" name="pattern_preference" id="preference_one_unpicked" value="preference_one_unpicked" class="cb-input"><span>Prioritize 1 unpicked</span></label>
+          <label class="cb-label"><input type="checkbox" name="pattern_preference" id="preference_two_unpicked" value="preference_two_unpicked" class="cb-input"><span>Prioritize 2 unpicked</span></label>
+          <label class="cb-label"><input type="checkbox" name="pattern_preference" id="preference_two_same_frequency" value="two_same_frequency" class="cb-input"><span>2 same frequency</span></label>
+          <label class="cb-label"><input type="checkbox" name="pattern_preference" value="three_same_frequency" class="cb-input"><span>3 same frequency</span></label>
+          <label class="cb-label"><input type="checkbox" name="pattern_preference" value="two_pairs_same_frequency" class="cb-input"><span>2 pairs diff frequencies</span></label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Pattern Prioritization</label>
+        <div class="checkbox-grid">
+          <label class="cb-label"><input type="checkbox" name="pattern_preference" id="prioritize_grouped_patterns" value="prioritize_grouped_patterns" class="cb-input"><span>Prioritize Grouped Patterns</span></label>
+          <label class="cb-label"><input type="checkbox" name="pattern_preference" id="prioritize_special_patterns" value="prioritize_special_patterns" class="cb-input"><span>Prioritize Special Patterns</span></label>
+          <label class="cb-label"><input type="checkbox" name="pattern_preference" id="prioritize_consecutive_patterns" value="prioritize_consecutive_patterns" class="cb-input"><span>Prioritize Consecutive</span></label>
+        </div>
+      </div>
+
+      <button id="generatePicksBtn" type="submit" class="btn-generate">
+        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Generate Smart Picks
+      </button>
+    </form>
+
+    <div id="loadingIndicator" class="hidden loading-row">
+      <div class="loading-dots"><span></span><span></span><span></span></div>
+      Generating picks…
+    </div>
+
+    <div id="smartPicksResults" class="hidden results-section"></div>
+
+    <div id="saveAllSmartPicksActions" class="hidden" style="margin-top:12px;">
+      <button id="saveAllSmartPicksBtn" class="btn-save-all">Save All Smart Picks</button>
+    </div>
+
+    {% if generated_sets and generation_type == 'smart_pick' %}
+      <div class="results-section" style="margin-top:20px;">
+        <div class="results-header">
+          <div class="results-title">Smart Picks</div>
+          <form action="{{ url_for('save_multiple_generated_picks_route') }}" method="post">
+            {% for pick in generated_sets %}
+              <input type="hidden" name="picks" value="{{ {'white_balls': pick.white_balls, 'powerball': pick.powerball} | tojson }}">
+            {% endfor %}
+            <button id="saveAllPicksBtn" type="submit" class="btn-save-all">Save All</button>
+          </form>
+        </div>
+        <div class="picks-grid">
+          {% for pick in generated_sets %}
+            <div class="pick-row generated-pick-item"
+                 data-white-balls="{{ pick.white_balls | join(',') }}"
+                 data-powerball="{{ pick.powerball }}">
+              <div class="pick-balls">
+                {% for num in pick.white_balls %}
+                  <span class="ball-sm" style="background:radial-gradient(circle at 32% 30%,#f0f4ff,#c8d8ed 45%,#8aaac8);color:#0d1829;">{{ num }}</span>
+                {% endfor %}
+                <span class="ball-sm" style="background:radial-gradient(circle at 32% 30%,#ff8a80,#ef5350 50%,#b71c1c);color:#fff;margin-left:6px;">{{ pick.powerball }}</span>
+              </div>
+              <form action="{{ url_for('save_multiple_generated_picks_route') }}" method="post" style="margin-left:auto;">
+                <input type="hidden" name="generated_white_balls" value="{{ pick.white_balls | join(',') }}">
+                <input type="hidden" name="generated_powerball" value="{{ pick.powerball }}">
+                <button type="submit" class="btn-save-one">Save</button>
+              </form>
+            </div>
+          {% endfor %}
+        </div>
+        {% if last_draw_dates %}
+          <div class="dates-box">
+            <div class="dates-title">Last Drawn Dates</div>
+            <div class="dates-grid">
+              {% for number, date in last_draw_dates.items() %}
+                <div class="date-chip"><span class="date-num">{{ number }}</span><span class="date-val">{{ date }}</span></div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  {# ══════════════════════════════════════════════════════════
+      TAB: Enhanced Pick Generator
+     ══════════════════════════════════════════════════════════ #}
+  <div class="gen-panel" id="tab-enhanced">
+    <div class="panel-header">
+      <div>
+        <div class="panel-eyebrow">◈ AI Powered</div>
+        <h2 class="panel-title">Enhanced Pick Generator</h2>
+        <p class="panel-desc">Picks scored by frequency analysis, hot/cold trends and pattern matching. Confidence score on every set.</p>
+      </div>
+      <span class="ai-badge">AI</span>
+    </div>
+
+    <div class="form-grid-3" style="margin-bottom:20px;">
+      <div class="form-group">
+        <label class="form-label">Sets to Generate (1–10)</label>
+        <input type="number" id="enh-num-sets" min="1" max="10" value="3" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Generation Strategy</label>
+        <select id="enh-strategy" class="form-input form-select">
+          <option value="balanced">⚖️ Balanced (hot + cold + frequency)</option>
+          <option value="hot_heavy">🔥 Hot Heavy (favour trending)</option>
+          <option value="cold_heavy">❄️ Cold Heavy (favour due)</option>
+          <option value="pattern_focus">🔢 Pattern Focus (consecutive + spread)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Exclude Numbers</label>
+        <input type="text" id="enh-excluded" placeholder="e.g. 4, 18, 55" class="form-input">
+      </div>
+    </div>
+
+    <button id="enh-generate-btn" onclick="enhGeneratePicks()" class="btn-generate">
+      <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      Generate Enhanced Picks
     </button>
 
-    {# ── Loading ── #}
-    <div id="enh-loading" class="hidden mt-4 flex items-center gap-3 text-indigo-600 text-sm font-medium">
-        <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-        </svg>
-        Analyzing historical data and scoring picks...
+    <div id="enh-loading" class="hidden loading-row" style="margin-top:16px;">
+      <div class="loading-dots"><span></span><span></span><span></span></div>
+      Analysing historical data and scoring picks…
+    </div>
+    <div id="enh-error" class="hidden flash-msg error" style="margin-top:12px;"></div>
+
+    <div id="enh-ai-box" class="hidden ai-box" style="margin-top:16px;">
+      <div class="ai-label">◈ AI Analysis</div>
+      <p id="enh-ai-text" style="font-size:12px;color:rgba(255,255,255,0.7);margin:0;line-height:1.6;"></p>
     </div>
 
-    {# ── Error ── #}
-    <div id="enh-error" class="hidden mt-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm"></div>
+    <div id="enh-results" class="hidden results-section" style="margin-top:20px;">
+      <div class="results-header">
+        <div class="results-title">Generated Picks</div>
+        <button onclick="enhSaveAll()" class="btn-save-all">Save All</button>
+      </div>
+      <div id="enh-picks-list" class="picks-grid" style="display:flex;flex-direction:column;gap:12px;"></div>
+    </div>
+  </div>
 
-    {# ── AI Explanation ── #}
-    <div id="enh-ai-box" class="hidden mt-6 p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
-        <div class="flex items-center gap-2 mb-2">
-            <span class="text-indigo-600 font-bold text-sm">🤖 AI Analysis</span>
+  {# ══════════════════════════════════════════════════════════
+      TAB: Record Official Draw
+     ══════════════════════════════════════════════════════════ #}
+  <div class="gen-panel" id="tab-record">
+    <div class="panel-header">
+      <div>
+        <div class="panel-eyebrow">◈ Database</div>
+        <h2 class="panel-title">Record Official Draw</h2>
+        <p class="panel-desc">Manually enter the latest official Powerball draw results to keep historical data up-to-date.</p>
+      </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('save_official_draw_route') }}" class="gen-form">
+      <div class="form-group" style="max-width:300px;">
+        <label class="form-label">Draw Date</label>
+        <input type="date" id="draw_date" name="draw_date" class="form-input" required>
+      </div>
+      <div class="form-grid-6" style="margin-bottom:16px;">
+        <div class="form-group">
+          <label class="form-label">N1</label>
+          <input type="number" name="n1" min="1" max="69" class="form-input" required>
         </div>
-        <p id="enh-ai-text" class="text-gray-700 text-sm leading-relaxed"></p>
-    </div>
-
-    {# ── Results ── #}
-    <div id="enh-results" class="hidden mt-6 space-y-4">
-        <div class="flex items-center justify-between">
-            <h3 class="text-lg font-bold text-gray-800">Generated Picks</h3>
-            <button onclick="enhSaveAll()"
-                    class="text-sm bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-4 rounded-lg transition">
-                💾 Save All
-            </button>
+        <div class="form-group">
+          <label class="form-label">N2</label>
+          <input type="number" name="n2" min="1" max="69" class="form-input" required>
         </div>
-        <div id="enh-picks-list" class="space-y-4"></div>
-    </div>
+        <div class="form-group">
+          <label class="form-label">N3</label>
+          <input type="number" name="n3" min="1" max="69" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">N4</label>
+          <input type="number" name="n4" min="1" max="69" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">N5</label>
+          <input type="number" name="n5" min="1" max="69" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="color:var(--red);">PB</label>
+          <input type="number" name="pb" min="1" max="26" class="form-input" style="border-color:rgba(239,68,68,0.3);" required>
+        </div>
+      </div>
+      <button type="submit" class="btn-generate" style="background:linear-gradient(135deg,#064e3b,var(--green));">
+        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        Record Official Draw
+      </button>
+    </form>
+  </div>
 
-</div>
+</div>{# end idx-wrap #}
 
-{# ── Styles for Enhanced Generator ── #}
+{# ── Flash container for JS messages ── #}
+<div id="jsFlashContainer" style="position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:340px;"></div>
+
 <style>
-    .enh-ball {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 38px;
-        height: 38px;
-        border-radius: 50%;
-        font-weight: 700;
-        font-size: 14px;
-        color: white;
-        flex-shrink: 0;
-    }
-    .enh-ball-white { background: #3b82f6; }
-    .enh-ball-hot   { background: #ef4444; }
-    .enh-ball-cold  { background: #06b6d4; }
-    .enh-ball-pb    { background: #ef4444; border: 2px solid #b91c1c; }
+/* ── Page wrapper ──────────────────────────────────────── */
+.idx-wrap { max-width:900px; margin:0 auto; padding:24px 20px 48px; display:flex; flex-direction:column; gap:20px; }
 
-    .enh-tag {
-        display: inline-block;
-        font-size: 10px;
-        font-weight: 600;
-        padding: 1px 7px;
-        border-radius: 20px;
-        border: 1px solid;
-        white-space: nowrap;
-    }
-    .enh-tag-hot  { background: rgba(239,68,68,0.1);  color: #dc2626; border-color: #fca5a5; }
-    .enh-tag-cold { background: rgba(6,182,212,0.1);  color: #0891b2; border-color: #a5f3fc; }
-    .enh-tag-freq { background: rgba(99,102,241,0.1); color: #4f46e5; border-color: #c7d2fe; }
-    .enh-tag-pat  { background: rgba(16,185,129,0.1); color: #059669; border-color: #a7f3d0; }
-    .enh-tag-neu  { background: rgba(107,114,128,0.1);color: #4b5563; border-color: #d1d5db; }
+/* ── Hero card ─────────────────────────────────────────── */
+.hero-card {
+  background:var(--s1); border:1px solid var(--border); border-radius:16px;
+  padding:28px 28px 22px; position:relative; overflow:hidden;
+}
+.hero-card::before {
+  content:''; position:absolute; inset:0;
+  background:radial-gradient(ellipse 60% 80% at 80% 50%,rgba(239,68,68,0.06),transparent);
+  pointer-events:none;
+}
+.hero-card::after {
+  content:''; position:absolute; bottom:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg,transparent,rgba(239,68,68,0.5),transparent);
+}
+.hero-eyebrow { font-size:9px; letter-spacing:2.5px; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+.hero-date { font-family:'Syne',sans-serif; font-size:28px; font-weight:800; color:var(--text); margin-bottom:16px; }
+.hero-balls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+.h-ball {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:46px; height:46px; border-radius:50%; font-weight:700; font-size:14px;
+  background:radial-gradient(circle at 32% 30%,#f0f4ff,#c8d8ed 45%,#8aaac8);
+  color:#0d1829; box-shadow:0 3px 10px rgba(0,0,0,0.35);
+  transition:transform 0.18s cubic-bezier(0.34,1.3,0.64,1);
+}
+.h-ball:hover { transform:scale(1.12); }
+.h-pb { background:radial-gradient(circle at 32% 30%,#ff8a80,#ef5350 50%,#b71c1c) !important; color:#fff !important; }
+.h-sep { font-size:20px; color:var(--muted); font-weight:300; padding:0 2px; }
+.hero-links { display:flex; gap:14px; flex-wrap:wrap; }
+.hero-link { font-size:11px; color:var(--muted); text-decoration:none; letter-spacing:0.5px; transition:color 0.12s; }
+.hero-link:hover { color:var(--text); }
 
-    .enh-confidence-bar {
-        height: 6px;
-        border-radius: 3px;
-        background: #e5e7eb;
-        overflow: hidden;
-    }
-    .enh-confidence-fill {
-        height: 100%;
-        border-radius: 3px;
-        transition: width 0.6s ease;
-    }
+/* ── Tab bar ───────────────────────────────────────────── */
+.gen-tabs-bar {
+  display:flex; gap:4px; flex-wrap:wrap;
+  background:var(--s1); border:1px solid var(--border); border-radius:12px;
+  padding:5px;
+}
+.gen-tab {
+  font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.8px;
+  font-weight:600; padding:8px 14px; border-radius:8px; border:1px solid transparent;
+  background:none; color:var(--muted); cursor:pointer; transition:all 0.13s;
+  display:flex; align-items:center; gap:6px;
+}
+.gen-tab:hover { color:var(--text); background:rgba(255,255,255,0.04); }
+.gen-tab.active { background:rgba(255,255,255,0.07); border-color:var(--border); color:var(--text); font-weight:700; }
+.tab-badge {
+  font-size:8px; padding:1px 5px; border-radius:4px; font-weight:700;
+  background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:var(--red);
+}
 
-    .enh-pick-card {
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        overflow: hidden;
-        transition: box-shadow 0.2s;
-    }
-    .enh-pick-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+/* ── Panel ─────────────────────────────────────────────── */
+.gen-panel { display:none; background:var(--s1); border:1px solid var(--border); border-radius:14px; padding:24px; }
+.gen-panel.active { display:block; }
+.panel-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:22px; gap:12px; }
+.panel-eyebrow { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+.panel-title { font-family:'Syne',sans-serif; font-size:20px; font-weight:800; color:var(--text); margin:0 0 5px; }
+.panel-desc { font-size:11px; color:var(--muted); margin:0; line-height:1.5; }
+.ai-badge {
+  flex-shrink:0; font-size:9px; font-weight:700; padding:4px 10px; border-radius:6px;
+  background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.28); color:var(--red);
+  letter-spacing:1px;
+}
+
+/* ── Forms ─────────────────────────────────────────────── */
+.gen-form { margin-bottom:20px; }
+.form-grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:16px; }
+.form-grid-6 { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; }
+@media(max-width:640px) {
+  .form-grid-3 { grid-template-columns:1fr; }
+  .form-grid-6 { grid-template-columns:repeat(3,1fr); }
+}
+
+/* ── Checkboxes ────────────────────────────────────────── */
+.checkbox-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+@media(max-width:500px) { .checkbox-grid { grid-template-columns:1fr; } }
+.cb-label { display:flex; align-items:center; gap:8px; cursor:pointer; padding:8px 10px;
+  border-radius:8px; border:1px solid var(--border); transition:background 0.12s; }
+.cb-label:hover { background:rgba(255,255,255,0.03); }
+.cb-label span { font-size:11px; color:rgba(255,255,255,0.6); }
+.cb-input { width:14px; height:14px; accent-color:var(--red); cursor:pointer; flex-shrink:0; }
+
+/* ── Buttons ───────────────────────────────────────────── */
+.btn-generate {
+  display:inline-flex; align-items:center; gap:8px;
+  font-family:'JetBrains Mono',monospace; font-size:10px;
+  letter-spacing:1.5px; text-transform:uppercase; font-weight:700;
+  padding:11px 24px; border-radius:10px; border:none; cursor:pointer;
+  background:linear-gradient(135deg,#1e3a5f,#3b82f6);
+  color:#fff; transition:transform 0.15s, box-shadow 0.15s;
+  box-shadow:0 0 18px rgba(59,130,246,0.15);
+}
+.btn-generate:hover { transform:translateY(-2px); box-shadow:0 0 28px rgba(59,130,246,0.3); }
+.btn-generate:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
+.btn-save-all {
+  font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:1.2px;
+  text-transform:uppercase; font-weight:700; padding:8px 16px; border-radius:8px;
+  background:rgba(52,211,153,0.12); border:1px solid rgba(52,211,153,0.3);
+  color:var(--green); cursor:pointer; transition:all 0.13s;
+}
+.btn-save-all:hover { background:rgba(52,211,153,0.2); }
+.btn-save-one {
+  font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:1px;
+  text-transform:uppercase; font-weight:600; padding:5px 12px; border-radius:7px;
+  background:rgba(52,211,153,0.1); border:1px solid rgba(52,211,153,0.25);
+  color:var(--green); cursor:pointer; transition:all 0.13s;
+}
+.btn-save-one:hover { background:rgba(52,211,153,0.2); }
+
+/* ── Results ───────────────────────────────────────────── */
+.results-section { margin-top:20px; padding-top:20px; border-top:1px solid var(--border); }
+.results-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.results-title { font-family:'Syne',sans-serif; font-size:16px; font-weight:800; color:var(--text); }
+.picks-grid { display:flex; flex-direction:column; gap:10px; }
+.pick-row {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  background:var(--s2); border:1px solid var(--border); border-radius:10px;
+  padding:12px 14px; transition:border-color 0.12s;
+}
+.pick-row:hover { border-color:rgba(255,255,255,0.1); }
+.pick-balls { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+
+/* ── Dates box ─────────────────────────────────────────── */
+.dates-box { margin-top:16px; background:var(--s2); border:1px solid var(--border); border-radius:10px; padding:14px; }
+.dates-title { font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
+.dates-grid { display:flex; flex-wrap:wrap; gap:6px; }
+.date-chip { display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:6px; padding:4px 10px; }
+.date-num { font-size:11px; font-weight:700; color:var(--text); }
+.date-val { font-size:10px; color:var(--muted); }
+
+/* ── Loading ───────────────────────────────────────────── */
+.loading-row { display:flex; align-items:center; gap:10px; font-size:11px; color:var(--muted); padding:14px 0; }
+.loading-dots { display:flex; gap:4px; }
+.loading-dots span {
+  width:6px; height:6px; border-radius:50%; background:var(--red);
+  animation:ldot 1.2s ease-in-out infinite;
+}
+.loading-dots span:nth-child(2) { animation-delay:.2s; }
+.loading-dots span:nth-child(3) { animation-delay:.4s; }
+@keyframes ldot {
+  0%,80%,100% { transform:scale(0.6); opacity:0.4; }
+  40%          { transform:scale(1);   opacity:1;   }
+}
+
+/* ── AI box ────────────────────────────────────────────── */
+.ai-box { background:rgba(239,68,68,0.05); border:1px solid rgba(239,68,68,0.15); border-radius:10px; padding:14px 16px; }
+.ai-label { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--red); margin-bottom:8px; }
+
+/* ── Enhanced pick cards ───────────────────────────────── */
+.enh-ball {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:34px; height:34px; border-radius:50%; font-weight:700; font-size:12px; flex-shrink:0;
+}
+.enh-ball-white { background:radial-gradient(circle at 32% 30%,#f0f4ff,#c8d8ed 45%,#8aaac8); color:#0d1829; }
+.enh-ball-hot   { background:radial-gradient(circle at 32% 30%,#ff8a80,#ef5350 50%,#b71c1c); color:#fff; }
+.enh-ball-cold  { background:radial-gradient(circle at 32% 30%,#7dd3fc,#38bdf8 50%,#0284c7); color:#fff; }
+.enh-ball-pb    { background:radial-gradient(circle at 32% 30%,#ff8a80,#ef5350 50%,#b71c1c); color:#fff; }
+.enh-tag {
+  display:inline-block; font-size:8px; font-weight:600; padding:1px 6px; border-radius:20px; border:1px solid; white-space:nowrap;
+}
+.enh-tag-hot  { background:rgba(239,68,68,0.1);   color:#dc2626; border-color:#fca5a5; }
+.enh-tag-cold { background:rgba(56,189,248,0.1);  color:#0369a1; border-color:#7dd3fc; }
+.enh-tag-freq { background:rgba(99,102,241,0.1);  color:#4f46e5; border-color:#c7d2fe; }
+.enh-tag-pat  { background:rgba(16,185,129,0.1);  color:#059669; border-color:#a7f3d0; }
+.enh-tag-neu  { background:rgba(107,114,128,0.1); color:#6b7280; border-color:#d1d5db; }
+.enh-pick-card { background:var(--s2); border:1px solid var(--border); border-radius:10px; overflow:hidden; transition:border-color 0.13s; }
+.enh-pick-card:hover { border-color:rgba(255,255,255,0.1); }
+.enh-confidence-bar { height:5px; border-radius:3px; background:rgba(255,255,255,0.07); overflow:hidden; }
+.enh-confidence-fill { height:100%; border-radius:3px; transition:width 0.6s ease; }
+
+/* ── Flash toast (JS) ──────────────────────────────────── */
+.js-toast {
+  padding:12px 16px; border-radius:9px; font-size:11px; font-weight:500;
+  animation:fadeSlide 0.3s ease forwards; display:flex; gap:8px; align-items:center;
+  box-shadow:0 4px 20px rgba(0,0,0,0.4);
+}
+.js-toast.info    { background:#0c1a28; border:1px solid rgba(96,165,250,0.3); color:#93c5fd; }
+.js-toast.error   { background:#1c0a0a; border:1px solid rgba(239,68,68,0.3);  color:#fca5a5; }
+.js-toast.success { background:#071c10; border:1px solid rgba(52,211,153,0.3); color:#6ee7b7; }
 </style>
 
-{# ── JavaScript ── #}
 <script>
-    let enhCurrentSets = [];
+// ─── Tab switching ────────────────────────────────────────
+document.querySelectorAll('.gen-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.gen-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.gen-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
 
-    function enhTagClass(tag) {
-        if (tag.includes('🔥') || tag.includes('Hot'))    return 'enh-tag-hot';
-        if (tag.includes('❄️') || tag.includes('Cold'))   return 'enh-tag-cold';
-        if (tag.includes('frequency'))                     return 'enh-tag-freq';
-        if (tag.includes('Consecutive') || tag.includes('Decade') || tag.includes('pair')) return 'enh-tag-pat';
-        return 'enh-tag-neu';
-    }
+// Auto-open the tab that has results after a form POST
+{% if generated_sets and generation_type == 'generated' %}
+  switchTab('general');
+{% elif generated_sets and generation_type == 'user_pair' %}
+  switchTab('pair');
+{% elif generated_sets and generation_type == 'group_a_strategy' %}
+  switchTab('groupa');
+{% elif generated_sets and generation_type == 'smart_pick' %}
+  switchTab('smart');
+{% endif %}
 
-    function enhBallClass(num, hotNums, coldNums) {
-        if (hotNums.includes(num))  return 'enh-ball enh-ball-hot';
-        if (coldNums.includes(num)) return 'enh-ball enh-ball-cold';
-        return 'enh-ball enh-ball-white';
-    }
+function switchTab(name) {
+  document.querySelectorAll('.gen-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.gen-panel').forEach(p => p.classList.remove('active'));
+  document.querySelector('[data-tab="' + name + '"]').classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
 
-    function enhConfidenceColor(score) {
-        if (score >= 75) return '#10b981'; // green
-        if (score >= 55) return '#f59e0b'; // amber
-        return '#ef4444';                  // red
-    }
+// ─── Toast notification ───────────────────────────────────
+function showToast(message, type='info') {
+  const c = document.getElementById('jsFlashContainer');
+  const t = document.createElement('div');
+  t.className = `js-toast ${type}`;
+  t.innerHTML = `<span>${message}</span><button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:none;color:inherit;cursor:pointer;opacity:0.5;font-size:13px;">✕</button>`;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 5000);
+}
 
-    function enhConfidenceLabel(score) {
-        if (score >= 75) return '⭐ Strong';
-        if (score >= 55) return '✅ Good';
-        if (score >= 40) return '🔵 Fair';
-        return '⚪ Weak';
-    }
+// Legacy alias used by some handlers
+function showFlashMessage(msg, cat) { showToast(msg, cat === 'error' ? 'error' : 'info'); }
 
-    async function enhGeneratePicks() {
-        const numSets  = parseInt(document.getElementById('enh-num-sets').value) || 3;
-        const strategy = document.getElementById('enh-strategy').value;
-        const excluded = document.getElementById('enh-excluded').value
-            .split(',').map(s => s.trim()).filter(s => /^\d+$/.test(s)).map(Number);
-
-        // Reset UI
-        document.getElementById('enh-loading').classList.remove('hidden');
-        document.getElementById('enh-error').classList.add('hidden');
-        document.getElementById('enh-results').classList.add('hidden');
-        document.getElementById('enh-ai-box').classList.add('hidden');
-        document.getElementById('enh-generate-btn').disabled = true;
-
-        try {
-            const res = await fetch('/api/generate_enhanced_picks', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ num_sets: numSets, strategy, excluded_numbers: excluded })
-            });
-            const data = await res.json();
-
-            if (!data.success) {
-                throw new Error(data.error || 'Unknown error');
-            }
-
-            enhCurrentSets = data.sets;
-            enhRenderPicks(data.sets, data.total_draws);
-
-            // Show AI explanation if available
-            if (data.ai_explanation) {
-                document.getElementById('enh-ai-text').textContent = data.ai_explanation;
-                document.getElementById('enh-ai-box').classList.remove('hidden');
-            }
-
-            document.getElementById('enh-results').classList.remove('hidden');
-
-        } catch (err) {
-            document.getElementById('enh-error').textContent = 'Error: ' + err.message;
-            document.getElementById('enh-error').classList.remove('hidden');
-        } finally {
-            document.getElementById('enh-loading').classList.add('hidden');
-            document.getElementById('enh-generate-btn').disabled = false;
-        }
-    }
-
-    function enhRenderPicks(sets, totalDraws) {
-        const container = document.getElementById('enh-picks-list');
-        container.innerHTML = '';
-
-        sets.forEach((pick, idx) => {
-            const color = enhConfidenceColor(pick.confidence_score);
-            const label = enhConfidenceLabel(pick.confidence_score);
-
-            // Build balls HTML
-            let ballsHtml = pick.white_balls.map(n => {
-                const cls  = enhBallClass(n, pick.hot_numbers, pick.cold_numbers);
-                const tags = (pick.reason_tags[String(n)] || []).slice(0, 2)
-                    .map(t => `<span class="enh-tag ${enhTagClass(t)}">${t}</span>`).join('');
-                return `
-                    <div class="flex flex-col items-center gap-1">
-                        <div class="${cls}">${n}</div>
-                        <div class="flex flex-wrap gap-1 justify-center" style="max-width:60px">${tags}</div>
-                    </div>`;
-            }).join('');
-
-            // Powerball
-            ballsHtml += `
-                <div class="flex flex-col items-center gap-1 ml-2">
-                    <div class="enh-ball enh-ball-pb">${pick.powerball}</div>
-                    <div class="flex flex-wrap gap-1 justify-center" style="max-width:60px">
-                        <span class="enh-tag enh-tag-neu">${pick.pb_reason.replace(' PB','')}</span>
-                    </div>
-                </div>`;
-
-            const card = document.createElement('div');
-            card.className = 'enh-pick-card';
-            card.innerHTML = `
-                <div class="p-4">
-                    <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-                        <span class="text-sm font-bold text-gray-500">SET ${idx + 1}</span>
-                        <div class="flex items-center gap-3">
-                            <div style="min-width:140px">
-                                <div class="flex justify-between text-xs text-gray-500 mb-1">
-                                    <span>Confidence</span>
-                                    <span style="color:${color};font-weight:700">${pick.confidence_score}% ${label}</span>
-                                </div>
-                                <div class="enh-confidence-bar">
-                                    <div class="enh-confidence-fill" style="width:${pick.confidence_score}%;background:${color}"></div>
-                                </div>
-                            </div>
-                            <button onclick="enhSaveOne(${idx})"
-                                    class="text-xs bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded-lg transition">
-                                Save
-                            </button>
-                        </div>
-                    </div>
-                    <div class="flex items-start flex-wrap gap-3">${ballsHtml}</div>
-                </div>
-                <div class="px-4 py-2 bg-gray-50 border-t border-gray-100 text-xs text-gray-400">
-                    🔴 Hot number &nbsp;|&nbsp; 🔵 Cold number &nbsp;|&nbsp; 🔵 Regular
-                    &nbsp;&nbsp;·&nbsp;&nbsp; Analyzed against ${totalDraws.toLocaleString()} historical draws
-                </div>`;
-
-            container.appendChild(card);
-        });
-    }
-
-    async function enhSaveOne(idx) {
-        const pick = enhCurrentSets[idx];
-        if (!pick) return;
-        await enhSavePick(pick.white_balls, pick.powerball);
-    }
-
-    async function enhSaveAll() {
-        if (!enhCurrentSets.length) return;
-        for (const pick of enhCurrentSets) {
-            await enhSavePick(pick.white_balls, pick.powerball);
-        }
-        alert(`✅ ${enhCurrentSets.length} picks saved successfully!`);
-    }
-
-    async function enhSavePick(whiteBalls, powerball) {
-        const form = new FormData();
-        form.append('generated_white_balls', whiteBalls.join(','));
-        form.append('generated_powerball', powerball);
-        try {
-            await fetch("{{ url_for('save_multiple_generated_picks_route') }}", {
-                method: 'POST', body: form
-            });
-        } catch (e) {
-            console.error('Save error:', e);
-        }
-    }
-</script>
-
-    
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const generateSmartPicksBtn = document.getElementById('generateSmartPicksBtn');
-        const loadingIndicator = document.getElementById('loadingIndicator');
-        const smartPicksResults = document.getElementById('smartPicksResults');
-        const saveAllSmartPicksActions = document.getElementById('saveAllSmartPicksActions');
-        const flashMessagesDiv = document.querySelector('.flash-messages');
-
-        // NEW: Elements for General Generator "Save All"
-        const generalGeneratedPicksList = document.getElementById('generalGeneratedPicksList');
-        const saveAllGeneralPicksBtn = document.getElementById('saveAllGeneralPicksBtn');
-        const saveAllPicksBtn = document.getElementById('saveAllPicksBtn');
-    if (saveAllPicksBtn) {
-        saveAllPicksBtn.addEventListener('click', async function() {
-            const generatedSetsContainer = document.getElementById('generated-picks-container');
-            const pickElements = generatedSetsContainer.querySelectorAll('.generated-pick-item');
-            
-            if (pickElements.length === 0) {
-                showFlashMessage('No numbers generated to save.', 'error');
-                return;
-            }
-
-            const picksToSave = [];
-            pickElements.forEach(item => {
-                const whiteBallsStr = item.dataset.whiteBalls;
-                const powerballStr = item.dataset.powerball;
-                const whiteBalls = whiteBallsStr.split(',').map(Number);
-                const powerball = Number(powerballStr);
-                picksToSave.push({ white_balls: whiteBalls, powerball: powerball });
-            });
-
-            await saveMultiplePicks(picksToSave);
-        });
-    }
-
-
-        // Function to display flash messages directly in JS
-        function showFlashMessage(message, category) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `p-4 rounded-lg shadow-md text-sm animate-fade-in ${
-                category === 'error' ? 'bg-red-100 text-red-700 border border-red-200' :
-                category === 'info' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
-                'bg-green-100 text-green-700 border border-green-200'
-            }`;
-            messageDiv.innerHTML = `<p class="font-medium">${message}</p>`;
-            
-            // Prepend to the flash messages container
-            if (flashMessagesDiv) {
-                flashMessagesDiv.innerHTML = ''; // Clear previous messages
-                flashMessagesDiv.appendChild(messageDiv);
-            } else {
-                // If the container doesn't exist (e.g., initial page load without messages), create and append
-                const tempFlashContainer = document.createElement('div');
-                tempFlashContainer.className = 'flash-messages space-y-3';
-                document.querySelector('.space-y-8.max-w-6xl.mx-auto.px-4.sm\\:px-6.lg\\:px-8.py-8').prepend(tempFlashContainer);
-                tempFlashContainer.appendChild(messageDiv);
-            }
-
-            setTimeout(() => {
-                messageDiv.remove();
-            }, 5000); // Message disappears after 5 seconds
-        }
-
-        // --- Smart Pick Generator Logic (unchanged) ---
-        generateSmartPicksBtn.addEventListener('click', async function() {
-            const btn = this;
-            btn.disabled = true;
-            btn.textContent = 'Generating...';
-            loadingIndicator.classList.remove('hidden');
-            smartPicksResults.classList.add('hidden'); // Hide previous results
-            saveAllSmartPicksActions.classList.add('hidden'); // Hide save all button
-
-            const numSets = document.getElementById('num_smart_sets').value;
-            // Removed prioritizeMonthlyHot
-            const prioritizeGroupedPatterns = document.getElementById('prioritize_grouped_patterns').checked;
-            const prioritizeSpecialPatterns = document.getElementById('prioritize_special_patterns').checked;
-            const prioritizeConsecutivePatterns = document.getElementById('prioritize_consecutive_patterns').checked;
-            const preferenceOneUnpicked = document.getElementById('preference_one_unpicked').checked;
-            const preferenceTwoUnpicked = document.getElementById('preference_two_unpicked').checked;
-            const preferenceTwoSameFrequency = document.getElementById('preference_two_same_frequency').checked;
-            const groupANumbersCount = document.getElementById('group_a_numbers_count').value;
-            const oddEvenChoiceSmart = document.getElementById('odd_even_choice_smart').value;
-            const sumRangeFilterSmart = document.getElementById('sum_range_filter_smart').value;
-            const excludedNumbersSmart = document.getElementById('excluded_numbers_smart').value;
-            // Removed forceSpecificPatternInput
-
-            const payload = {
-                num_sets_to_generate: parseInt(numSets),
-                prioritize_monthly_hot: false, // Set to false as the field is removed
-                prioritize_grouped_patterns: prioritizeGroupedPatterns,
-                prioritize_special_patterns: prioritizeSpecialPatterns,
-                prioritize_consecutive_patterns: prioritizeConsecutivePatterns,
-                num_from_group_a: parseInt(groupANumbersCount),
-                odd_even_choice: oddEvenChoiceSmart,
-                sum_range_filter: sumRangeFilterSmart,
-                excluded_numbers: excludedNumbersSmart,
-                preference_one_unpicked: preferenceOneUnpicked,
-                preference_two_unpicked: preferenceTwoUnpicked,
-                preference_two_same_frequency: preferenceTwoSameFrequency,
-                force_specific_pattern: '' // Set to empty as the field is removed   
-            };
-
-            try {
-                const response = await fetch('/api/generate_smart_picks', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json' // Crucial: tell the server we're sending JSON
-                    },
-                    body: JSON.stringify(payload) // Convert JavaScript object to JSON string
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    smartPicksResults.innerHTML = '<h3 class="text-3xl font-bold text-white text-center mb-6">Your Smart Picks!</h3>';
-                    if (data.generated_sets && data.generated_sets.length > 0) {
-                        data.generated_sets.forEach(pick => {
-                            const pickHtml = `
-                                <div class="bg-blue-700 p-4 rounded-lg shadow-md flex items-center justify-between flex-wrap generated-pick-item"
-                                     data-white-balls="${pick.white_balls.join(',')}"
-                                     data-powerball="${pick.powerball}">
-                                    <div class="flex items-center space-x-2 mb-2 md:mb-0">
-                                        ${pick.white_balls.map(num => `<span class="ball-sm bg-blue-400 text-white">${num}</span>`).join('')}
-                                        <span class="ball-sm powerball-ball bg-red-400 text-white ml-2">${pick.powerball}</span>
-                                    </div>
-                                    <button type="button" class="save-single-pick-btn bg-green-500 hover:bg-green-600 text-white text-sm font-bold py-1 px-3 rounded-lg">Save Pick</button>
-                                </div>
-                            `;
-                            smartPicksResults.insertAdjacentHTML('beforeend', pickHtml);
-                        });
-
-                        // Add Last Drawn Dates
-                        if (data.last_draw_dates && Object.keys(data.last_draw_dates).length > 0) {
-                            let lastDrawDatesHtml = '<div class="mt-4 p-4 bg-blue-800 rounded-lg text-white text-sm"><h4 class="font-semibold mb-2">Last Drawn Dates:</h4><ul class="list-disc list-inside">';
-                            for (const [number, date] of Object.entries(data.last_draw_dates)) {
-                                lastDrawDatesHtml += `<li>${number}: ${date}</li>`;
-                            }
-                            lastDrawDatesHtml += '</ul></div>';
-                            smartPicksResults.insertAdjacentHTML('beforeend', lastDrawDatesHtml);
-                        }
-
-                        smartPicksResults.classList.remove('hidden');
-                        saveAllSmartPicksActions.classList.remove('hidden');
-
-                        // Attach event listeners to newly created save buttons
-                        document.querySelectorAll('.save-single-pick-btn').forEach(button => {
-                            button.addEventListener('click', function() {
-                                const item = this.closest('.generated-pick-item');
-                                const whiteBalls = item.dataset.whiteBalls.split(',').map(Number);
-                                const powerball = parseInt(item.dataset.powerball);
-                                saveMultiplePicks([{ white_balls: whiteBalls, powerball: powerball }]);
-                            });
-                        });
-
-                    } else {
-                        smartPicksResults.innerHTML = '<p class="text-white text-center">No picks could be generated with the selected criteria. Try adjusting your filters.</p>';
-                        smartPicksResults.classList.remove('hidden');
-                    }
-                } else {
-                    // Handle server-side errors (e.g., ValueError from Flask)
-                    showFlashMessage(data.error || 'An unknown error occurred during generation.', 'error');
-                }
-            } catch (error) {
-                console.error('Error generating smart picks:', error);
-                showFlashMessage(`An unexpected error occurred: ${error.message}`, 'error');
-                smartPicksResults.classList.remove('bg-gradient-to-br', 'from-blue-500', 'to-indigo-600', 'p-8', 'rounded-2xl', 'shadow-xl'); // Remove gradient on error
-                saveAllSmartPicksActions.classList.add('hidden');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Generate Smart Picks';
-                loadingIndicator.classList.add('hidden');
-            }
-        });
-
-        // --- Smart Generated Numbers - Save All Button Logic ---
-        const saveAllSmartPicksBtn = document.getElementById('saveAllSmartPicksBtn');
-        if (saveAllSmartPicksBtn) {
-            saveAllSmartPicksBtn.addEventListener('click', function() {
-                const allSmartPickItems = document.querySelectorAll('#smartPicksResults .generated-pick-item');
-                const picksToSave = [];
-                allSmartPickItems.forEach(item => {
-                    const whiteBallsStr = item.dataset.whiteBalls;
-                    const powerballStr = item.dataset.powerball;
-                    if (whiteBallsStr && powerballStr) {
-                        picksToSave.push({
-                            white_balls: whiteBallsStr.split(',').map(Number),
-                            powerball: Number(powerballStr)
-                        });
-                    }
-                });
-                saveMultiplePicks(picksToSave);
-            });
-        }
-
-        // --- NEW: General Generator Save All Button Logic ---
-        if (saveAllGeneralPicksBtn) {
-            saveAllGeneralPicksBtn.addEventListener('click', function() {
-                const allGeneralPickItems = document.querySelectorAll('#generalGeneratedPicksList .generated-pick-item'); // Use new ID
-                const picksToSave = [];
-                allGeneralPickItems.forEach(item => {
-                    const whiteBallsStr = item.dataset.whiteBalls;
-                    const powerballStr = item.dataset.powerball;
-                    if (whiteBallsStr && powerballStr) {
-                        picksToSave.push({
-                            white_balls: whiteBallsStr.split(',').map(Number),
-                            powerball: Number(powerballStr)
-                        });
-                    }
-                });
-                saveMultiplePicks(picksToSave);
-            });
-        }
-
-       // --- Function to Save Multiple Picks (for both single and all saves) ---
+// ─── Save helpers ─────────────────────────────────────────
 async function saveMultiplePicks(picks) {
-    try {
-        const response = await fetch('/save_multiple_generated_picks', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({picks: picks})
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            showFlashMessage(data.message, 'info');
-        } else {
-            showFlashMessage(data.message || 'Error saving picks.', 'error');
-        }
-    } catch (error) {
-        console.error('Error saving picks:', error);
-        showFlashMessage(`An unexpected error occurred while saving: ${error.message}`, 'error');
-    }
-}
-
-// --- Fix for draw_date element ---
-const drawDateElement = document.getElementById('draw_date');
-if (drawDateElement) {
-    drawDateElement.addEventListener('click', function() {
-        // Add your draw_date click handling logic here
-        console.log('draw_date clicked!');
+  try {
+    const res = await fetch('/save_multiple_generated_picks', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({picks})
     });
-} else {
-    console.warn('Element with ID "draw_date" not found - check your HTML');
+    const data = await res.json();
+    showToast(data.message || (res.ok ? 'Picks saved!' : 'Save failed.'), res.ok ? 'success' : 'error');
+  } catch(e) {
+    showToast('Error saving picks: ' + e.message, 'error');
+  }
 }
 
-// --- Existing save for individual general picks (updated to use saveMultiplePicks) ---
-document.body.addEventListener('click', async function(event) {
-    if (event.target.classList.contains('save-general-pick-btn')) { // Changed class
-        const pickItem = event.target.closest('.generated-pick-item');
-        if (pickItem) {
-            const whiteBallsStr = pickItem.dataset.whiteBalls;
-            const powerballStr = pickItem.dataset.powerball;
-            const whiteBalls = whiteBallsStr.split(',').map(Number);
-            const powerball = Number(powerballStr);
-            saveMultiplePicks([{ white_balls: whiteBalls, powerball: powerball }]);
-        }
+// General generator — individual save
+document.body.addEventListener('click', e => {
+  if (e.target.classList.contains('save-general-pick-btn')) {
+    const item = e.target.closest('.generated-pick-item');
+    if (item) {
+      const wb = item.dataset.whiteBalls.split(',').map(Number);
+      const pb = Number(item.dataset.powerball);
+      saveMultiplePicks([{white_balls:wb, powerball:pb}]);
     }
-}); // <-- This is the closing of the DOMContentLoaded event listener
+  }
+});
+
+// General — Save All
+const saveAllGeneralBtn = document.getElementById('saveAllGeneralPicksBtn');
+if (saveAllGeneralBtn) {
+  saveAllGeneralBtn.addEventListener('click', () => {
+    const items = document.querySelectorAll('#generalGeneratedPicksList .generated-pick-item');
+    const picks = [];
+    items.forEach(item => {
+      picks.push({white_balls: item.dataset.whiteBalls.split(',').map(Number), powerball: Number(item.dataset.powerball)});
+    });
+    saveMultiplePicks(picks);
+  });
+}
+
+// ─── Smart picks (JS-driven, existing logic preserved) ────
+const generatePicksBtn = document.getElementById('generatePicksBtn');
+const loadingIndicator = document.getElementById('loadingIndicator');
+const smartPicksResults = document.getElementById('smartPicksResults');
+const saveAllSmartPicksActions = document.getElementById('saveAllSmartPicksActions');
+
+if (generatePicksBtn) {
+  generatePicksBtn.addEventListener('click', async function(e) {
+    // Only intercept if no native submit needed — use fetch for live results
+    // The form will naturally submit via POST. JS fetch is used on the dedicated smart_pick page.
+    // This block kept for forward compatibility if called from a JS context.
+  });
+}
+
+const saveAllSmartPicksBtn = document.getElementById('saveAllSmartPicksBtn');
+if (saveAllSmartPicksBtn) {
+  saveAllSmartPicksBtn.addEventListener('click', () => {
+    const items = document.querySelectorAll('#smartPicksResults .generated-pick-item');
+    const picks = [];
+    items.forEach(item => {
+      picks.push({white_balls: item.dataset.whiteBalls.split(',').map(Number), powerball: Number(item.dataset.powerball)});
+    });
+    saveMultiplePicks(picks);
+  });
+}
+
+// Save single smart pick (rendered after JS generate)
+document.body.addEventListener('click', e => {
+  if (e.target.classList.contains('save-single-pick-btn')) {
+    const item = e.target.closest('.generated-pick-item');
+    if (item) {
+      saveMultiplePicks([{white_balls: item.dataset.whiteBalls.split(',').map(Number), powerball: Number(item.dataset.powerball)}]);
+    }
+  }
+});
+
+// ─── Enhanced Generator ───────────────────────────────────
+let enhCurrentSets = [];
+
+function enhTagClass(tag) {
+  if (tag.includes('🔥') || tag.includes('Hot'))  return 'enh-tag-hot';
+  if (tag.includes('❄️') || tag.includes('Cold')) return 'enh-tag-cold';
+  if (tag.includes('frequency'))                   return 'enh-tag-freq';
+  if (tag.includes('Consecutive') || tag.includes('Decade') || tag.includes('pair')) return 'enh-tag-pat';
+  return 'enh-tag-neu';
+}
+function enhBallClass(num, hot, cold) {
+  if (hot.includes(num))  return 'enh-ball enh-ball-hot';
+  if (cold.includes(num)) return 'enh-ball enh-ball-cold';
+  return 'enh-ball enh-ball-white';
+}
+function enhConfColor(s) { return s>=75?'#10b981':s>=55?'#f59e0b':'#ef4444'; }
+function enhConfLabel(s) { return s>=75?'⭐ Strong':s>=55?'✅ Good':s>=40?'🔵 Fair':'⚪ Weak'; }
+
+async function enhGeneratePicks() {
+  const numSets  = parseInt(document.getElementById('enh-num-sets').value) || 3;
+  const strategy = document.getElementById('enh-strategy').value;
+  const excluded = document.getElementById('enh-excluded').value
+    .split(',').map(s=>s.trim()).filter(s=>/^\d+$/.test(s)).map(Number);
+
+  document.getElementById('enh-loading').classList.remove('hidden');
+  document.getElementById('enh-error').classList.add('hidden');
+  document.getElementById('enh-results').classList.add('hidden');
+  document.getElementById('enh-ai-box').classList.add('hidden');
+  document.getElementById('enh-generate-btn').disabled = true;
+
+  try {
+    const res  = await fetch('/api/generate_enhanced_picks', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({num_sets:numSets, strategy, excluded_numbers:excluded})
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Unknown error');
+
+    enhCurrentSets = data.sets;
+    enhRenderPicks(data.sets, data.total_draws);
+
+    if (data.ai_explanation) {
+      document.getElementById('enh-ai-text').textContent = data.ai_explanation;
+      document.getElementById('enh-ai-box').classList.remove('hidden');
+    }
+    document.getElementById('enh-results').classList.remove('hidden');
+  } catch(err) {
+    const el = document.getElementById('enh-error');
+    el.textContent = 'Error: ' + err.message;
+    el.classList.remove('hidden');
+  } finally {
+    document.getElementById('enh-loading').classList.add('hidden');
+    document.getElementById('enh-generate-btn').disabled = false;
+  }
+}
+
+function enhRenderPicks(sets, totalDraws) {
+  const container = document.getElementById('enh-picks-list');
+  container.innerHTML = '';
+  sets.forEach((pick, idx) => {
+    const color = enhConfColor(pick.confidence_score);
+    const label = enhConfLabel(pick.confidence_score);
+    let ballsHtml = pick.white_balls.map(n => {
+      const cls  = enhBallClass(n, pick.hot_numbers, pick.cold_numbers);
+      const tags = (pick.reason_tags[String(n)] || []).slice(0,2)
+        .map(t => `<span class="enh-tag ${enhTagClass(t)}">${t}</span>`).join('');
+      return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                <div class="${cls}">${n}</div>
+                <div style="display:flex;flex-wrap:wrap;gap:2px;justify-content:center;max-width:60px;">${tags}</div>
+              </div>`;
+    }).join('');
+    ballsHtml += `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;margin-left:6px;">
+                    <div class="enh-ball enh-ball-pb">${pick.powerball}</div>
+                    <span class="enh-tag enh-tag-neu">${pick.pb_reason.replace(' PB','')}</span>
+                  </div>`;
+
+    const card = document.createElement('div');
+    card.className = 'enh-pick-card';
+    card.innerHTML = `
+      <div style="padding:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <span style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);">Set ${idx+1}</span>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="min-width:130px;">
+              <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-bottom:4px;">
+                <span>Confidence</span>
+                <span style="color:${color};font-weight:700;">${pick.confidence_score}% ${label}</span>
+              </div>
+              <div class="enh-confidence-bar"><div class="enh-confidence-fill" style="width:${pick.confidence_score}%;background:${color};"></div></div>
+            </div>
+            <button onclick="enhSaveOne(${idx})" class="btn-save-one">Save</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;flex-wrap:wrap;gap:10px;">${ballsHtml}</div>
+      </div>
+      <div style="padding:8px 14px;background:rgba(255,255,255,0.02);border-top:1px solid var(--border);font-size:9px;color:var(--muted);">
+        🔴 Hot &nbsp;|&nbsp; 🔵 Cold &nbsp;|&nbsp; ⚪ Regular &nbsp;·&nbsp; ${totalDraws.toLocaleString()} draws analysed
+      </div>`;
+    container.appendChild(card);
+  });
+}
+
+async function enhSaveOne(idx) {
+  const pick = enhCurrentSets[idx];
+  if (!pick) return;
+  await enhSavePick(pick.white_balls, pick.powerball);
+}
+async function enhSaveAll() {
+  if (!enhCurrentSets.length) return;
+  for (const pick of enhCurrentSets) await enhSavePick(pick.white_balls, pick.powerball);
+  showToast(`${enhCurrentSets.length} picks saved!`, 'success');
+}
+async function enhSavePick(wb, pb) {
+  const form = new FormData();
+  form.append('generated_white_balls', wb.join(','));
+  form.append('generated_powerball', pb);
+  try {
+    await fetch("{{ url_for('save_multiple_generated_picks_route') }}", {method:'POST', body:form});
+  } catch(e) { console.error('Save error:', e); }
+}
 </script>
 {% endblock %}
