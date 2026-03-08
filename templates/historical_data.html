@@ -1,284 +1,693 @@
 {% extends "base.html" %}
 
-{% block title %}Historical Powerball Data{% endblock %}
-
-{% block page_heading %}Historical Draw Results with Year-Specific Frequency Analysis{% endblock %}
+{% block title %}Historical Draw Results — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
-<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    
-    <div class="flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-4 bg-white p-6 rounded-xl shadow-lg">
-        <div class="flex items-center space-x-2 w-full">
-            <label for="primary-year-select" class="text-gray-700 font-medium">Select Year:</label>
-            <select id="primary-year-select" name="year" class="form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                {% for year in available_years %}
-                    <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        
-        <div class="flex items-center space-x-2 w-full">
-            <label for="compare-year-select" class="text-gray-700 font-medium">Compare with:</label>
-            <select id="compare-year-select" name="compare_year" class="form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                <option value="">(None)</option>
-                {% for year in available_years %}
-                    <option value="{{ year }}">{{ year }}</option>
-                {% endfor %}
-            </select>
-        </div>
-    </div>
-
-    <!-- Historical Draws Table with Year-Specific Frequency -->
-    <div class="bg-white rounded-xl shadow-lg p-6">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">Historical Draws for {{ selected_year }} with Frequency Analysis</h2>
-        
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th id="draw-date-header" scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer">
-                            Draw Date
-                            <span id="sort-indicator" class="ml-2">▼</span>
-                           </th>
-                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">White Balls</th>
-                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Powerball</th>
-                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency At Time of Draw</th> 
-                    </tr>
-                </thead>
-               <tbody id="draw-results-container" class="bg-white divide-y divide-gray-200">
-                   {% for draw in historical_draws %}
-                    <tr class="hover:bg-gray-50 transition-colors duration-200">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ draw.date }}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex space-x-1">
-                                {% for ball in draw.white_balls %}
-                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 text-sm font-bold text-gray-700">
-                                    {{ ball }}
-                                </span>
-                                {% endfor %}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex space-x-1">
-                                {% for ball in draw.white_balls %}
-                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-sm font-bold text-blue-700 frequency-display" 
-                                      data-ball="{{ ball }}" data-date="{{ draw.date }}">
-                                    ?
-                                </span>
-                                {% endfor %}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-500 text-sm font-bold text-white">
-                                {{ draw.powerball }}
-                            </span>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        
-        {% if not historical_draws %}
-        <div class="text-center py-8 text-gray-500">
-            <p>No draw data available for {{ selected_year }}</p>
-        </div>
-        {% endif %}
-    </div>
-
-    <!-- Year Frequency Summary -->
-    <div id="year-frequency-summary" class="bg-white rounded-xl shadow-lg p-6">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">Year {{ selected_year }} - White Ball Frequency Summary</h2>
-        <div id="year-frequencies" class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 text-center">
-            <!-- Will be populated by JavaScript -->
-        </div>
-    </div>
-
-    <!-- Comparison Section -->
-    <div id="comparison-section" class="hidden bg-white rounded-xl shadow-lg p-6">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">Year Comparison: <span id="year1-display"></span> vs <span id="year2-display"></span></h2>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div>
-                <h3 class="text-lg font-semibold text-gray-700 mb-4"><span id="compare-year1-display"></span> Frequency Summary</h3>
-                <div id="comparison-year1-frequencies" class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 text-center mb-6"></div>
-                
-                <h3 class="text-lg font-semibold text-gray-700 mb-4"><span id="compare-year1-display"></span> Sample Draws</h3>
-                <div id="comparison-year1-draws" class="space-y-4"></div>
-            </div>
-            
-            <div>
-                <h3 class="text-lg font-semibold text-gray-700 mb-4"><span id="compare-year2-display"></span> Frequency Summary</h3>
-                <div id="comparison-year2-frequencies" class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 text-center mb-6"></div>
-                
-                <h3 class="text-lg font-semibold text-gray-700 mb-4"><span id="compare-year2-display"></span> Sample Draws</h3>
-                <div id="comparison-year2-draws" class="space-y-4"></div>
-            </div>
-        </div>
-    </div>
-
-</div>
-
 <style>
-    .frequency-ball {
-        display: inline-flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        width: 50px;
-        height: 65px;
-        border-radius: 12px;
-        background-color: #f3f4f6;
-        color: #374151;
-        font-weight: bold;
-        font-size: 1rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        transition: all 0.2s ease-in-out;
-    }
-    
-    .frequency-display {
-        position: relative;
-        cursor: help;
-    }
-    
-    .frequency-display:hover::after {
-        content: attr(data-frequency);
-        position: absolute;
-        bottom: -25px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #000;
-        color: white;
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-size: 10px;
-        white-space: nowrap;
-        z-index: 10;
-    }
-    
-    .comparison-draw {
-        border: 2px solid #e5e7eb;
-        border-radius: 8px;
-        padding: 12px;
-        background: #f9fafb;
-    }
-    
-    .comparison-draw:hover {
-        border-color: #3b82f6;
-        background: #eff6ff;
-    }
-    
-    .high-frequency { background-color: #d1fae5; color: #065f46; }
-    .medium-frequency { background-color: #fef3c7; color: #92400e; }
-    .low-frequency { background-color: #fee2e2; color: #b91c1c; }
-  
+  @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg:    #060508; --s1: #0b090e; --s2: #0f0d13; --s3: #131118;
+    --border: rgba(255,255,255,0.065); --text: rgba(255,255,255,0.87); --muted: rgba(255,255,255,0.33);
+    --rose:   #fb7185; --rose2: rgba(251,113,133,0.12); --rose3: rgba(251,113,133,0.28);
+    --blue:   #60a5fa; --blue2: rgba(96,165,250,0.12);
+    --green:  #34d399; --green2: rgba(52,211,153,0.1);
+    --amber:  #f59e0b; --amber2: rgba(245,158,11,0.1);
+    --violet: #a78bfa; --violet2: rgba(167,139,250,0.1);
+    --cyan:   #22d3ee;
+
+    /* year colour slots */
+    --y1: #fb7185; --y1b: rgba(251,113,133,0.12); --y1b3: rgba(251,113,133,0.28);
+    --y2: #60a5fa; --y2b: rgba(96,165,250,0.12);  --y2b3: rgba(96,165,250,0.28);
+    --y3: #34d399; --y3b: rgba(52,211,153,0.1);   --y3b3: rgba(52,211,153,0.25);
+  }
+
+  #hd-page * { box-sizing:border-box; }
+  #hd-page {
+    font-family:'JetBrains Mono',monospace;
+    background:var(--bg); min-height:100vh; color:var(--text); padding-bottom:80px;
+  }
+
+  /* ── Hero ── */
+  .hd-hero { position:relative; padding:50px 24px 36px; text-align:center; overflow:hidden; }
+  .hd-hero::before {
+    content:''; position:absolute; inset:0;
+    background:
+      radial-gradient(ellipse 55% 55% at 50% -5%, rgba(251,113,133,0.09) 0%, transparent 65%),
+      radial-gradient(ellipse 25% 30% at 5%  75%, rgba(96,165,250,0.05) 0%, transparent 60%),
+      radial-gradient(ellipse 25% 30% at 95% 75%, rgba(52,211,153,0.05) 0%, transparent 60%);
+    pointer-events:none;
+  }
+  .hd-hero::after {
+    content:''; position:absolute; bottom:0; left:0; right:0; height:1px;
+    background:linear-gradient(90deg,transparent,var(--rose),rgba(255,255,255,0.2),var(--blue),transparent);
+    opacity:0.3;
+  }
+  .hd-eyebrow { font-size:10px; letter-spacing:3px; text-transform:uppercase; color:var(--rose); margin-bottom:12px; opacity:0.8; }
+  .hd-hero h1 {
+    font-family:'Archivo Black',sans-serif;
+    font-size:clamp(40px,5.5vw,76px); font-weight:900; line-height:1.0; margin:0 0 12px;
+    background:linear-gradient(135deg,var(--rose) 0%,#fff 40%,var(--blue) 80%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  }
+  .hd-hero p { font-size:12px; color:var(--muted); max-width:520px; margin:0 auto; line-height:1.8; }
+
+  /* ── Layout ── */
+  .hd-wrap { max-width:1300px; margin:0 auto; padding:0 20px; display:flex; flex-direction:column; gap:16px; }
+
+  /* ── Card ── */
+  .hd-card { background:var(--s1); border:1px solid var(--border); border-radius:16px; padding:20px 22px; position:relative; overflow:hidden; }
+  .hd-label { font-size:9px; letter-spacing:2.5px; text-transform:uppercase; color:var(--muted); margin:0 0 14px; display:block; }
+
+  /* ── Year selectors ── */
+  .year-row { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  @media(max-width:640px){ .year-row{grid-template-columns:1fr;} }
+
+  .yr-group { display:flex; flex-direction:column; gap:6px; }
+  .yr-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .yr-label-row { display:flex; align-items:center; gap:8px; font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
+  .yr-select {
+    background:var(--s2); border:1px solid var(--border);
+    color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px;
+    border-radius:9px; padding:9px 12px; outline:none; cursor:pointer; width:100%;
+    transition:border-color 0.15s;
+  }
+  .yr-select:focus { border-color:rgba(255,255,255,0.15); }
+  .yr-select.y1 { border-color:var(--y1b3); }
+  .yr-select.y2 { border-color:var(--y2b3); }
+  .yr-select.y3 { border-color:var(--y3b3); }
+
+  .btn-load {
+    margin-top:16px; font-size:10px; letter-spacing:1.5px; text-transform:uppercase;
+    padding:11px 28px; border-radius:10px; border:none; cursor:pointer;
+    background:linear-gradient(135deg,#9f1239,var(--rose));
+    color:#fff; font-family:'JetBrains Mono',monospace; font-weight:700;
+    transition:transform 0.15s,box-shadow 0.15s; box-shadow:0 0 18px rgba(251,113,133,0.2);
+  }
+  .btn-load:hover { transform:translateY(-2px); box-shadow:0 0 30px rgba(251,113,133,0.4); }
+
+  /* ── Stats overview ── */
+  .stats-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  @media(max-width:540px){ .stats-row{grid-template-columns:1fr 1fr;} }
+  .sc { background:var(--s2); border:1px solid var(--border); border-radius:10px; padding:12px 14px; text-align:center; }
+  .sc-lbl { font-size:8px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+  .sc-val { font-size:18px; font-weight:700; line-height:1; }
+  .sc-sub { font-size:9px; color:var(--muted); margin-top:3px; }
+
+  /* ── Frequency heatmap ── */
+  .freq-grid { display:flex; flex-wrap:wrap; gap:5px; }
+  .freq-ball {
+    width:38px; height:48px; border-radius:8px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:2px; cursor:default;
+    border:1px solid rgba(255,255,255,0.07); transition:transform 0.1s;
+    font-size:11px;
+  }
+  .freq-ball:hover { transform:scale(1.1); }
+  .freq-num  { font-weight:700; font-size:10px; line-height:1; }
+  .freq-cnt  { font-size:8px; line-height:1; }
+  .fq-zero   { background:rgba(255,255,255,0.03); color:var(--muted); }
+  .fq-low    { background:rgba(96,165,250,0.12);  color:var(--blue);   border-color:rgba(96,165,250,0.2); }
+  .fq-mid    { background:rgba(245,158,11,0.12);  color:var(--amber);  border-color:rgba(245,158,11,0.2); }
+  .fq-high   { background:rgba(52,211,153,0.14);  color:var(--green);  border-color:rgba(52,211,153,0.25); }
+  .fq-hot    { background:rgba(251,113,133,0.14); color:var(--rose);   border-color:rgba(251,113,133,0.25); }
+
+  /* ── Compare columns ── */
+  .compare-grid { display:grid; gap:16px; }
+  .compare-grid.cols-1 { grid-template-columns:1fr; }
+  .compare-grid.cols-2 { grid-template-columns:1fr 1fr; }
+  .compare-grid.cols-3 { grid-template-columns:1fr 1fr 1fr; }
+  @media(max-width:900px){ .compare-grid.cols-3,.compare-grid.cols-2 { grid-template-columns:1fr; } }
+
+  .yr-col-hdr {
+    display:flex; align-items:center; gap:10px; margin-bottom:14px;
+    padding-bottom:12px; border-bottom:1px solid var(--border);
+  }
+  .yr-col-badge {
+    font-family:'Archivo Black',sans-serif; font-size:20px; font-weight:900;
+  }
+  .yr-col-meta { font-size:10px; color:var(--muted); }
+
+  /* ── Draws table ── */
+  .draws-table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; }
+  thead tr { border-bottom:1px solid var(--border); }
+  thead th {
+    font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--muted);
+    padding:8px 10px; text-align:left; white-space:nowrap; cursor:pointer; user-select:none;
+  }
+  thead th:hover { color:var(--text); }
+  tbody tr { border-bottom:1px solid rgba(255,255,255,0.03); transition:background 0.1s; }
+  tbody tr:hover { background:var(--s2); }
+  tbody td { padding:7px 10px; font-size:11px; vertical-align:middle; }
+
+  /* ── Balls ── */
+  .wb3d {
+    width:28px; height:28px; border-radius:50%; flex-shrink:0;
+    display:inline-flex; align-items:center; justify-content:center;
+    font-size:9px; font-weight:700;
+    background:radial-gradient(circle at 32% 30%,#f0f4ff 0%,#c8d8ed 45%,#8aaac8 100%);
+    color:#0d1829; box-shadow:0 1px 5px rgba(0,0,0,0.3);
+    transition:transform 0.1s;
+  }
+  .wb3d:hover { transform:scale(1.15); }
+  .pb3d {
+    width:28px; height:28px; border-radius:50%; flex-shrink:0;
+    display:inline-flex; align-items:center; justify-content:center;
+    font-size:9px; font-weight:700;
+    background:radial-gradient(circle at 32% 30%,#ff8a80 0%,#ef5350 50%,#b71c1c 100%);
+    color:#fff; box-shadow:0 1px 5px rgba(0,0,0,0.35);
+  }
+  .balls-row { display:flex; gap:3px; align-items:center; flex-wrap:nowrap; }
+
+  /* ── Freq inline chips ── */
+  .fq-row { display:flex; gap:3px; align-items:center; }
+  .fq-chip {
+    display:inline-flex; flex-direction:column; align-items:center;
+    width:30px; height:34px; border-radius:6px; font-size:8px; justify-content:center; gap:1px;
+    border:1px solid rgba(255,255,255,0.07);
+  }
+  .fq-chip .n { font-size:9px; font-weight:700; line-height:1; }
+  .fq-chip .c { font-size:7px; line-height:1; }
+
+  /* Sort indicator */
+  .sort-asc::after  { content:' ▲'; color:var(--rose); }
+  .sort-desc::after { content:' ▼'; color:var(--rose); }
+
+  /* ── AI panel ── */
+  .ai-card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    background:linear-gradient(90deg,transparent,var(--rose),var(--blue),var(--green),transparent);
+    opacity:0.45;
+  }
+  .ai-header { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px; }
+  .ai-eyebrow { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--rose); opacity:0.8; margin-bottom:3px; }
+  .ai-title { font-family:'Archivo Black',sans-serif; font-size:20px; margin:0; }
+  .ai-year-badge { background:var(--rose2); border:1px solid var(--rose3); color:var(--rose); font-size:11px; padding:3px 10px; border-radius:6px; font-family:'JetBrains Mono',monospace; font-weight:400; }
+  .ai-btn {
+    display:flex; align-items:center; gap:8px;
+    background:linear-gradient(135deg,#9f1239,var(--rose));
+    color:#fff; font-family:'JetBrains Mono',monospace; font-size:10px;
+    letter-spacing:1.5px; text-transform:uppercase;
+    border:none; border-radius:10px; padding:11px 22px; cursor:pointer;
+    font-weight:700; transition:transform 0.15s,box-shadow 0.15s;
+    box-shadow:0 0 18px rgba(251,113,133,0.2);
+  }
+  .ai-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 0 32px rgba(251,113,133,0.45); }
+  .ai-btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+  .ai-thinking { display:none; align-items:center; gap:10px; padding:14px 0 4px; font-size:11px; color:rgba(251,113,133,0.7); letter-spacing:1px; }
+  .ai-thinking.visible { display:flex; }
+  .ai-dots span { display:inline-block; width:6px; height:6px; border-radius:50%; margin:0 2px; animation:dotB 1.2s infinite; }
+  .ai-dots span:nth-child(1){ background:var(--rose); }
+  .ai-dots span:nth-child(2){ animation-delay:0.2s; background:var(--blue); }
+  .ai-dots span:nth-child(3){ animation-delay:0.4s; background:var(--green); }
+  @keyframes dotB{0%,80%,100%{transform:scale(0.6);opacity:0.4}40%{transform:scale(1);opacity:1}}
+  .ai-output { display:none; margin-top:18px; border-top:1px solid rgba(251,113,133,0.1); padding-top:18px; }
+  .ai-output.visible { display:block; }
+  .ai-chips { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:10px; margin-bottom:18px; }
+  .ai-chip  { background:var(--s2); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
+  .ai-chip-label { font-size:8px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+  .ai-chip-val   { font-size:13px; font-weight:600; color:#fff; line-height:1.4; }
+  .ai-narrative {
+    background:var(--s2); border:1px solid rgba(251,113,133,0.12);
+    border-left:3px solid var(--rose); border-radius:0 10px 10px 0;
+    padding:18px 20px; font-size:13px; line-height:1.9; color:var(--text); white-space:pre-wrap;
+  }
+  .ai-error { margin-top:12px; background:rgba(248,113,113,0.08); border:1px solid rgba(248,113,113,0.2); border-radius:9px; padding:12px 16px; font-size:12px; color:#fca5a5; }
+
+  /* ── Spinner ── */
+  .hd-spinner { display:inline-block; width:18px; height:18px; border-radius:50%; border:2px solid rgba(251,113,133,0.15); border-top-color:var(--rose); animation:spin 0.75s linear infinite; }
+  @keyframes spin { to{transform:rotate(360deg);} }
+  .loading-row { display:flex; align-items:center; gap:10px; padding:20px; font-size:11px; color:var(--muted); }
+
+  /* ── Pagination ── */
+  .pag-row { display:flex; align-items:center; justify-content:space-between; margin-top:12px; flex-wrap:wrap; gap:8px; }
+  .pag-info { font-size:9px; color:var(--muted); }
+  .pag-btns { display:flex; gap:6px; }
+  .pag-btn {
+    font-size:9px; letter-spacing:1px; padding:6px 14px; border-radius:7px;
+    border:1px solid var(--border); background:transparent; color:var(--muted);
+    cursor:pointer; transition:all 0.12s; font-family:'JetBrains Mono',monospace;
+  }
+  .pag-btn:hover:not(:disabled) { border-color:rgba(255,255,255,0.15); color:var(--text); }
+  .pag-btn:disabled { opacity:0.3; cursor:not-allowed; }
 </style>
 
+<div id="hd-page">
+
+  <!-- Hero -->
+  <div class="hd-hero">
+    <p class="hd-eyebrow">📅 Historical Results · Frequency Analysis · Year Comparison</p>
+    <h1>Historical<br>Draw Results</h1>
+    <p>Browse every Powerball draw by year, see live frequency analysis as you scroll, and compare up to three years side by side.</p>
+  </div>
+
+  <div class="hd-wrap">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}{% for cat,msg in messages %}
+        <div class="hd-card" style="font-size:13px">{{ msg }}</div>
+      {% endfor %}{% endif %}
+    {% endwith %}
+
+    <!-- ① Year Selectors -->
+    <div class="hd-card">
+      <span class="hd-label">Select Years to Compare (up to 3)</span>
+      <div class="year-row">
+        <div class="yr-group">
+          <div class="yr-label-row"><span class="yr-dot" style="background:var(--y1)"></span>Year 1 (Primary)</div>
+          <select class="yr-select y1" id="sel1">
+            <option value="">— None —</option>
+            {% for y in available_years %}
+              <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="yr-group">
+          <div class="yr-label-row"><span class="yr-dot" style="background:var(--y2)"></span>Year 2 (Compare)</div>
+          <select class="yr-select y2" id="sel2">
+            <option value="" selected>— None —</option>
+            {% for y in available_years %}
+              <option value="{{ y }}">{{ y }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="yr-group">
+          <div class="yr-label-row"><span class="yr-dot" style="background:var(--y3)"></span>Year 3 (Compare)</div>
+          <select class="yr-select y3" id="sel3">
+            <option value="" selected>— None —</option>
+            {% for y in available_years %}
+              <option value="{{ y }}">{{ y }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <button class="btn-load" id="loadBtn">⬡ Load Results</button>
+      </div>
+    </div>
+
+    <!-- ② Frequency Heatmaps (one per year) -->
+    <div id="heatmapSection" style="display:none">
+      <div class="compare-grid" id="heatmapGrid"></div>
+    </div>
+
+    <!-- ③ AI Analysis -->
+    <div id="aiSection" style="display:none">
+      <div class="hd-card ai-card">
+        <div class="ai-header">
+          <div>
+            <p class="ai-eyebrow">✦ Groq AI · Historical Pattern Intelligence</p>
+            <p class="ai-title">DRAW HISTORY ANALYSIS <span class="ai-year-badge" id="aiYearBadge"></span></p>
+          </div>
+          <button class="ai-btn" id="aiBtn">◈ Analyse Years</button>
+        </div>
+        <div class="ai-thinking" id="aiThinking">
+          <div class="ai-dots"><span></span><span></span><span></span></div>
+          <span id="aiThinkingText">Scanning draw history…</span>
+        </div>
+        <div class="ai-output" id="aiOutput">
+          <div class="ai-chips" id="aiChips"></div>
+          <div class="ai-narrative" id="aiNarrative"></div>
+        </div>
+        <div class="ai-error" id="aiError" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- ④ Draws comparison -->
+    <div id="drawsSection" style="display:none">
+      <div class="hd-card">
+        <span class="hd-label" id="drawsSectionLabel">Draw Results</span>
+        <div class="loading-row" id="drawsLoading" style="display:none">
+          <span class="hd-spinner"></span><span>Loading draws…</span>
+        </div>
+        <div class="compare-grid" id="drawsGrid"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const primaryYearSelect = document.getElementById('primary-year-select');
-        const drawResultsContainer = document.getElementById('draw-results-container');
-        const drawDateHeader = document.getElementById('draw-date-header');
-        const sortIndicator = document.getElementById('sort-indicator');
+document.addEventListener('DOMContentLoaded', function () {
 
-        let historical_draws = [];
-        let sortOrder = 'desc'; // Initial sort order is descending
+  const sel1 = document.getElementById('sel1');
+  const sel2 = document.getElementById('sel2');
+  const sel3 = document.getElementById('sel3');
+  const loadBtn = document.getElementById('loadBtn');
 
-        async function fetchAndRenderData(year) {
-            try {
-                const response = await fetch(`/api/draws/${year}`);
-                const data = await response.json();
-                historical_draws = data.draws;
-                
-                sortDraws(historical_draws); // Sort data before rendering
-                renderDrawsWithFrequencies(historical_draws);
-            } catch (error) {
-                console.error('Error fetching data:', error);
-                drawResultsContainer.innerHTML = '<p class="text-red-500">Error loading draw data. Please try again later.</p>';
-            }
-        }
+  const PER_PAGE = 50;
+  const yearData  = {};   // cache: year → draws array
+  const yearFreq  = {};   // cache: year → freq map {1..69: count}
 
-        function sortDraws(draws) {
-            draws.sort((a, b) => {
-                const dateA = new Date(a.draw_date);
-                const dateB = new Date(b.draw_date);
-                
-                if (sortOrder === 'asc') {
-                    return dateA - dateB;
-                } else {
-                    return dateB - dateA;
-                }
-            });
-            // Update the sort indicator
-            sortIndicator.textContent = sortOrder === 'asc' ? '▲' : '▼';
-        }
+  // ── Clean draw_date ───────────────────────────────────────
+  // Strips "00:00:00 GMT+0000 (UTC)" etc — keeps YYYY-MM-DD
+  function cleanDate(raw) {
+    if (!raw) return '—';
+    // If it's already short (YYYY-MM-DD) return as-is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(raw))) return raw;
+    // Parse and reformat
+    const d = new Date(raw);
+    if (isNaN(d)) return String(raw).split(' ')[0].split('T')[0];
+    const y  = d.getUTCFullYear();
+    const mo = String(d.getUTCMonth()+1).padStart(2,'0');
+    const dy = String(d.getUTCDate()).padStart(2,'0');
+    return `${y}-${mo}-${dy}`;
+  }
 
-        function renderDrawsWithFrequencies(draws) {
-            drawResultsContainer.innerHTML = '';
-            const ballFrequencies = {};
+  // ── Freq class ────────────────────────────────────────────
+  function fqClass(count, max) {
+    if (count === 0) return 'fq-zero';
+    const r = count / max;
+    if (r < 0.25) return 'fq-low';
+    if (r < 0.55) return 'fq-mid';
+    if (r < 0.80) return 'fq-high';
+    return 'fq-hot';
+  }
 
-            for (let i = 1; i <= 69; i++) {
-                ballFrequencies[i] = 0;
-            }
+  // ── Fetch one year ────────────────────────────────────────
+  async function fetchYear(yr) {
+    if (yearData[yr]) return yearData[yr];
+    const res  = await fetch('/api/draws/' + yr);
+    const data = await res.json();
+    const draws = (data.draws || []).map(d => ({
+      draw_date:   cleanDate(d.draw_date),
+      white_balls: typeof d.white_balls === 'string'
+        ? d.white_balls.split(',').map(Number)
+        : d.white_balls,
+      powerball: d.powerball,
+    }));
+    // Sort newest first
+    draws.sort((a,b) => b.draw_date.localeCompare(a.draw_date));
+    yearData[yr] = draws;
 
-            draws.forEach(draw => {
-                const drawDate = draw.draw_date;
-                const whiteBalls = draw.white_balls.split(',').map(Number);
-                const powerball = draw.powerball;
+    // Build freq map
+    const freq = {};
+    for (let i = 1; i <= 69; i++) freq[i] = 0;
+    draws.forEach(d => d.white_balls.forEach(b => freq[b]++));
+    yearFreq[yr] = freq;
 
-                whiteBalls.forEach(ball => {
-                    if (ballFrequencies.hasOwnProperty(ball)) {
-                        ballFrequencies[ball]++;
-                    }
-                });
-                
-                const row = document.createElement('tr');
-                row.className = 'bg-white border-b hover:bg-gray-50';
-                row.innerHTML = `
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${drawDate}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="flex space-x-2 justify-center">
-                            ${whiteBalls.map(ball => `<span class="white-ball">${ball}</span>`).join('')}
-                        </div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="powerball">${powerball}</span>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="frequency-row flex space-x-2 justify-center">
-                            ${whiteBalls.map(number => {
-                                const frequency = ballFrequencies[number];
-                                return `<div class="frequency-ball flex-col items-center justify-center data-ball="${number}">
-                                    <span class="text-lg font-bold">${number}</span>
-                                    <span class="text-sm">${frequency}</span>
-                                </div>`;
-                            }).join('')}
-                        </div>
-                    </td>
-                `;
-                drawResultsContainer.appendChild(row);
-            });
-        }
+    return draws;
+  }
 
-        // Event listener for changing the year
-        primaryYearSelect.addEventListener('change', function () {
-            const selectedYear = this.value;
-            sortOrder = 'desc'; // Reset sort order when changing year
-            fetchAndRenderData(selectedYear);
+  // ── Render heatmap for one year ───────────────────────────
+  function renderHeatmap(yr, col) {
+    const freq  = yearFreq[yr] || {};
+    const max   = Math.max(...Object.values(freq), 1);
+    const yCol  = ['var(--y1)','var(--y2)','var(--y3)'][col];
+
+    const balls = Array.from({length:69},(_,i)=>i+1).map(n => {
+      const c  = freq[n] || 0;
+      const fc = fqClass(c, max);
+      return `<div class="freq-ball ${fc}" title="Ball ${n}: ${c} times">
+        <span class="freq-num">${n}</span>
+        <span class="freq-cnt">${c}</span>
+      </div>`;
+    }).join('');
+
+    const draws = yearData[yr] || [];
+    const total = draws.length;
+    const top5  = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,5).map(e=>e[0]).join(', ');
+
+    return `
+      <div class="hd-card">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+          <span style="font-family:'Archivo Black',sans-serif;font-size:24px;color:${yCol}">${yr}</span>
+          <span style="font-size:10px;color:var(--muted)">${total} draws · Top: ${top5}</span>
+        </div>
+        <span class="hd-label">White Ball Frequency Heatmap</span>
+        <div class="freq-grid">${balls}</div>
+        <div class="stats-row" style="margin-top:14px">
+          <div class="sc"><p class="sc-lbl">Draws</p><p class="sc-val" style="color:${yCol}">${total}</p></div>
+          <div class="sc"><p class="sc-lbl">Most Drawn</p><p class="sc-val" style="color:var(--green);font-size:13px">${Object.entries(freq).sort((a,b)=>b[1]-a[1])[0]?.[0] || '—'}  ×${Object.entries(freq).sort((a,b)=>b[1]-a[1])[0]?.[1] || 0}</p></div>
+          <div class="sc"><p class="sc-lbl">Least Drawn</p><p class="sc-val" style="color:var(--muted);font-size:13px">${Object.entries(freq).filter(e=>e[1]>0).sort((a,b)=>a[1]-b[1])[0]?.[0] || '—'}</p></div>
+        </div>
+      </div>`;
+  }
+
+  // ── Render draws table for one year ───────────────────────
+  function renderDrawsCol(yr, col, allYearDraws) {
+    const draws  = yearData[yr] || [];
+    const freq   = yearFreq[yr] || {};
+    const max    = Math.max(...Object.values(freq), 1);
+    const yCol   = ['var(--y1)','var(--y2)','var(--y3)'][col];
+
+    let page   = 1;
+    let sortDir = 'desc'; // newest first
+    let sortedDraws = [...draws];
+
+    const uid = `col${col}_${yr}`;
+
+    function rebuildTable() {
+      const tbody = document.getElementById(`tb_${uid}`);
+      const pInfo = document.getElementById(`pi_${uid}`);
+      const pInfo2 = document.getElementById(`pi2_${uid}`);
+      if (!tbody) return;
+
+      const total = sortedDraws.length;
+      const pages = Math.max(1, Math.ceil(total / PER_PAGE));
+      page = Math.min(page, pages);
+      const slice = sortedDraws.slice((page-1)*PER_PAGE, page*PER_PAGE);
+
+      // Running freq at-draw-time (cumulative)
+      const running = {};
+      for (let i = 1; i <= 69; i++) running[i] = 0;
+
+      // For running freq, we need to track from oldest to newest
+      // Build chronological index of this page slice
+      // We pre-compute cumulative for the full sorted list up to each draw
+      const cumul = {};
+      for (let i = 1; i <= 69; i++) cumul[i] = 0;
+      const chronoDraws = [...sortedDraws].reverse(); // oldest first
+
+      // Map draw_date → cumulative freq at that point
+      const freqAtDraw = {};
+      chronoDraws.forEach(d => {
+        const snap = {...cumul};
+        d.white_balls.forEach(b => cumul[b]++);
+        freqAtDraw[d.draw_date] = snap;
+      });
+
+      tbody.innerHTML = slice.map((d, i) => {
+        const rank = (page-1)*PER_PAGE + i + 1;
+        const fAt  = freqAtDraw[d.draw_date] || {};
+        const balls = d.white_balls.map(n => `<span class="wb3d">${n}</span>`).join('');
+        const fChips = d.white_balls.map(n => {
+          const c  = (fAt[n] || 0);
+          const fc = fqClass(c, max);
+          return `<div class="fq-chip ${fc}"><span class="n">${n}</span><span class="c">${c}</span></div>`;
+        }).join('');
+        return `
+          <tr>
+            <td style="color:var(--muted)">${rank}</td>
+            <td>${d.draw_date}</td>
+            <td><div class="balls-row">${balls}<span style="margin:0 3px;color:var(--muted)">+</span><span class="pb3d">${d.powerball}</span></div></td>
+            <td><div class="fq-row">${fChips}</div></td>
+          </tr>`;
+      }).join('');
+
+      if (pInfo)  pInfo.textContent  = `${total} draws · page ${page} of ${pages}`;
+      if (pInfo2) pInfo2.textContent = `${(page-1)*PER_PAGE+1}–${Math.min(page*PER_PAGE,total)} of ${total}`;
+
+      const prevB = document.getElementById(`prev_${uid}`);
+      const nextB = document.getElementById(`next_${uid}`);
+      if (prevB) prevB.disabled = page <= 1;
+      if (nextB) nextB.disabled = page >= pages;
+    }
+
+    const html = `
+      <div>
+        <div class="yr-col-hdr">
+          <span class="yr-col-badge" style="color:${yCol}">${yr}</span>
+          <span class="yr-col-meta" id="pi_${uid}"></span>
+        </div>
+        <div class="draws-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th class="th-date-${uid}" data-uid="${uid}" style="cursor:pointer">Date <span id="sort_${uid}">▼</span></th>
+                <th>Balls</th>
+                <th>Freq at Draw</th>
+              </tr>
+            </thead>
+            <tbody id="tb_${uid}"></tbody>
+          </table>
+        </div>
+        <div class="pag-row">
+          <span class="pag-info" id="pi2_${uid}"></span>
+          <div class="pag-btns">
+            <button class="pag-btn" id="prev_${uid}" disabled>← Prev</button>
+            <button class="pag-btn" id="next_${uid}">Next →</button>
+          </div>
+        </div>
+      </div>`;
+
+    // Return html and a setup function (called after DOM insertion)
+    return {
+      html,
+      setup: () => {
+        rebuildTable();
+
+        document.getElementById(`prev_${uid}`).addEventListener('click', () => {
+          if (page > 1) { page--; rebuildTable(); }
+        });
+        document.getElementById(`next_${uid}`).addEventListener('click', () => {
+          const pages = Math.ceil(sortedDraws.length / PER_PAGE);
+          if (page < pages) { page++; rebuildTable(); }
         });
 
-        // Event listener for clicking the Draw Date header
-        drawDateHeader.addEventListener('click', function () {
-            sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-            sortDraws(historical_draws);
-            renderDrawsWithFrequencies(historical_draws);
+        // Sort by date
+        document.querySelector(`.th-date-${uid}`).addEventListener('click', () => {
+          sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+          document.getElementById(`sort_${uid}`).textContent = sortDir === 'desc' ? '▼' : '▲';
+          sortedDraws = [...sortedDraws].reverse();
+          page = 1;
+          rebuildTable();
         });
+      }
+    };
+  }
 
-        // Initial load for the currently selected year
-        const initialYear = primaryYearSelect.value;
-        if (initialYear) {
-            fetchAndRenderData(initialYear);
-        }
+  // ── Main load ─────────────────────────────────────────────
+  loadBtn.addEventListener('click', async function () {
+    const years = [sel1.value, sel2.value, sel3.value].filter(Boolean);
+    if (!years.length) return;
+
+    this.disabled = true; this.innerHTML = '<span class="hd-spinner" style="width:14px;height:14px;border-top-color:#fff"></span> Loading…';
+
+    document.getElementById('drawsLoading').style.display = 'flex';
+    document.getElementById('heatmapSection').style.display = 'none';
+    document.getElementById('drawsSection').style.display   = 'none';
+
+    try {
+      await Promise.all(years.map(yr => fetchYear(yr)));
+
+      // ── Heatmaps ──
+      const heatmapGrid = document.getElementById('heatmapGrid');
+      heatmapGrid.className = `compare-grid cols-${years.length}`;
+      heatmapGrid.innerHTML = years.map((yr, i) => renderHeatmap(yr, i)).join('');
+      document.getElementById('heatmapSection').style.display = 'block';
+
+      // ── Draws ──
+      const drawsGrid  = document.getElementById('drawsGrid');
+      drawsGrid.className = `compare-grid cols-${years.length}`;
+
+      const colData = years.map((yr, i) => renderDrawsCol(yr, i));
+      drawsGrid.innerHTML = colData.map(c => c.html).join('');
+      colData.forEach(c => c.setup());
+
+      document.getElementById('drawsSection').style.display = 'block';
+      document.getElementById('drawsLoading').style.display = 'none';
+      document.getElementById('drawsSectionLabel').textContent =
+        `Draw Results — ${years.join(' vs ')}`;
+
+      // Show AI section + update badge
+      document.getElementById('aiSection').style.display = 'block';
+      document.getElementById('aiYearBadge').textContent = years.join(' vs ');
+      document.getElementById('aiOutput').classList.remove('visible');
+      document.getElementById('aiError').style.display = 'none';
+      document.getElementById('aiChips').innerHTML = '';
+      document.getElementById('aiNarrative').textContent = '';
+
+    } catch(e) {
+      document.getElementById('drawsLoading').style.display = 'none';
+      console.error(e);
+    } finally {
+      this.disabled = false; this.innerHTML = '⬡ Load Results';
+    }
+  });
+
+  // ── AI Analysis ───────────────────────────────────────────
+  document.getElementById('aiBtn').addEventListener('click', async function () {
+    const years = [sel1.value, sel2.value, sel3.value].filter(Boolean);
+    if (!years.length) return;
+
+    const thinking  = document.getElementById('aiThinking');
+    const output    = document.getElementById('aiOutput');
+    const narrative = document.getElementById('aiNarrative');
+    const errEl     = document.getElementById('aiError');
+    const chipsWrap = document.getElementById('aiChips');
+    const thinkTxt  = document.getElementById('aiThinkingText');
+
+    this.disabled = true; this.innerHTML = '⏳ Analysing…';
+    thinking.classList.add('visible');
+    output.classList.remove('visible');
+    errEl.style.display = 'none';
+    chipsWrap.innerHTML = ''; narrative.textContent = '';
+    thinkTxt.textContent = years.length > 1
+      ? `Comparing ${years.join(' vs ')}…`
+      : `Scanning ${years[0]} draw history…`;
+
+    // Build per-year summaries
+    const yearSummaries = years.map(yr => {
+      const freq  = yearFreq[yr] || {};
+      const draws = yearData[yr] || [];
+      const sorted = Object.entries(freq).filter(e => e[1] > 0).sort((a,b) => b[1]-a[1]);
+      const top5  = sorted.slice(0,5).map(e => `#${e[0]}(${e[1]}x)`).join(', ');
+      const bot5  = sorted.slice(-5).map(e => `#${e[0]}(${e[1]}x)`).join(', ');
+      const total = draws.length;
+      const pbFreq = {};
+      draws.forEach(d => { pbFreq[d.powerball] = (pbFreq[d.powerball]||0)+1; });
+      const topPB = Object.entries(pbFreq).sort((a,b)=>b[1]-a[1]).slice(0,3).map(e=>`#${e[0]}(${e[1]}x)`).join(', ');
+      // Avg sum
+      const avgSum = draws.length
+        ? (draws.reduce((s,d)=>s+d.white_balls.reduce((a,b)=>a+b,0),0)/draws.length).toFixed(1)
+        : '—';
+      // Consecutive pair count
+      let consecDraws = 0;
+      draws.forEach(d => {
+        const wb = [...d.white_balls].sort((a,b)=>a-b);
+        for (let i=0;i<wb.length-1;i++) if (wb[i+1]-wb[i]===1) { consecDraws++; break; }
+      });
+      return `YEAR ${yr}: ${total} draws | Hot: ${top5} | Cold: ${bot5} | Top PB: ${topPB} | Avg sum: ${avgSum} | Consec pair draws: ${consecDraws}`;
     });
+
+    // Cross-year comparison extra
+    let compareCtx = '';
+    if (years.length > 1) {
+      compareCtx = '\nCROSS-YEAR COMPARISON REQUESTED: identify which numbers shifted from hot to cold or cold to hot across years, and highlight key differences.';
+    }
+
+    try {
+      const res = await fetch('/api/historical-draws-ai-analysis', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          years,
+          year_summaries: yearSummaries,
+          compare_mode: years.length > 1,
+          compare_context: compareCtx,
+        })
+      });
+      const d2 = await res.json();
+      if (d2.error) {
+        errEl.textContent = 'AI unavailable: ' + d2.error;
+        errEl.style.display = 'block';
+      } else {
+        (d2.insights||[]).forEach(ins => {
+          const c = document.createElement('div'); c.className = 'ai-chip';
+          c.innerHTML = `<p class="ai-chip-label">${ins.label}</p><div class="ai-chip-val">${ins.value}</div>`;
+          chipsWrap.appendChild(c);
+        });
+        narrative.textContent = d2.analysis;
+        output.classList.add('visible');
+      }
+    } catch(e) {
+      errEl.textContent = 'Request failed. Add /api/historical-draws-ai-analysis to index.py.';
+      errEl.style.display = 'block';
+    } finally {
+      thinking.classList.remove('visible');
+      this.disabled = false; this.innerHTML = '◈ Analyse Years';
+    }
+  });
+
+  // ── Auto-load on open ─────────────────────────────────────
+  if (sel1.value) loadBtn.click();
+});
 </script>
 {% endblock %}
