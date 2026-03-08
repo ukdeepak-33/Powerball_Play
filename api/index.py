@@ -9299,6 +9299,129 @@ def white_ball_gap_ai_analysis():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+# ── Paste into index.py ───────────────────────────────────────────────────────
+
+@app.route('/api/historical-draws-ai-analysis', methods=['POST'])
+def historical_draws_ai_analysis():
+    try:
+        p = request.get_json(force=True, silent=True) or {}
+
+        years          = list(p.get('years') or [])
+        year_summaries = list(p.get('year_summaries') or [])
+        compare_mode   = bool(p.get('compare_mode', False))
+        compare_ctx    = str(p.get('compare_context') or '')
+
+        if not years or not year_summaries:
+            return jsonify({'error': 'No year data provided'}), 400
+
+        yr_str = ', '.join(str(y) for y in years)
+
+        lines = [
+            "You are a Powerball historical draw analyst.",
+            "Use ONLY the statistics provided below. Do not invent numbers or reference your own knowledge.",
+            "",
+            "HISTORICAL DRAW DATA:",
+        ]
+        for s in year_summaries:
+            lines.append("  " + s)
+
+        if compare_ctx:
+            lines.append(compare_ctx)
+
+        lines += [
+            "",
+            "Write EXACTLY these sections. Use the actual numbers from the data above:",
+            "",
+            "YEAR SUMMARY" if not compare_mode else "CROSS-YEAR OVERVIEW",
+        ]
+
+        if compare_mode:
+            lines += [
+                f"Compare {yr_str} side by side.",
+                "Which year had the highest draw volume? Which had the hottest numbers?",
+                "Name at least 2 numbers that were consistently hot across all years.",
+                "Name at least 2 numbers that shifted from hot in one year to cold in another.",
+                "",
+                "HOT & COLD SHIFT",
+                "For each pair of adjacent years, identify the biggest frequency movers.",
+                "Which ball gained the most appearances? Which fell the most?",
+                "Is there a clear cyclical pattern in any ball's appearance rate?",
+            ]
+        else:
+            lines += [
+                f"Summarise {years[0] if years else 'this year'}'s draw history.",
+                "Which 3 white balls dominated? Which 3 were coldest?",
+                "Was the average sum high or low for Powerball (typical range is 130–200)?",
+                "How often did consecutive pairs appear vs historical norms (~65%)?",
+            ]
+
+        lines += [
+            "",
+            "POWERBALL INSIGHT",
+            "Which Powerballs appeared most? Are there any that appear across multiple years?",
+            "Is there any Powerball that is significantly overdue based on the data?",
+            "",
+            "NEXT DRAW RECOMMENDATION",
+            "Based strictly on the data above, name:",
+            "  (1) 2 white balls that are hot and likely to continue",
+            "  (2) 2 white balls that are cold but historically strong — potential bounce-backs",
+            "  (3) 1 Powerball pick with reasoning",
+            "Give exact numbers. Be direct.",
+        ]
+
+        prompt = "\n".join(lines)
+
+        GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+        if not GROQ_API_KEY:
+            return jsonify({'error': 'GROQ_API_KEY not set'}), 500
+
+        resp = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={'Authorization': 'Bearer ' + GROQ_API_KEY, 'Content-Type': 'application/json'},
+            json={
+                'model':       'llama-3.1-8b-instant',
+                'messages':    [{'role': 'user', 'content': prompt}],
+                'max_tokens':  800,
+                'temperature': 0.55,
+            },
+            timeout=40
+        )
+
+        result = resp.json()
+        if 'error' in result:
+            return jsonify({'error': result['error'].get('message', str(result['error']))}), 500
+
+        analysis = result['choices'][0]['message']['content'].strip()
+
+        # Build insight chips from year summaries
+        insights = []
+        for i, (yr, summ) in enumerate(zip(years, year_summaries)):
+            # Parse total draws from summary string
+            import re
+            draws_m = re.search(r'(\d+) draws', summ)
+            total   = draws_m.group(1) if draws_m else '—'
+            hot_m   = re.search(r'Hot: ([^|]+)', summ)
+            hot     = hot_m.group(1).strip().split(',')[0] if hot_m else '—'
+            pb_m    = re.search(r'Top PB: ([^|]+)', summ)
+            pb      = pb_m.group(1).strip().split(',')[0] if pb_m else '—'
+            sum_m   = re.search(r'Avg sum: ([\d.]+)', summ)
+            avg_sum = sum_m.group(1) if sum_m else '—'
+            labels  = ['🔴 Year 1','🔵 Year 2','🟢 Year 3']
+            insights += [
+                {'label': f'{labels[i] if i < 3 else "Year"} · {yr}', 'value': f'{total} draws'},
+                {'label': f'🔥 {yr} Hottest',  'value': hot},
+                {'label': f'⚡ {yr} Top PB',   'value': pb},
+                {'label': f'∑ {yr} Avg Sum',   'value': avg_sum},
+            ]
+            if not compare_mode:
+                break  # Single year: only show 4 chips
+
+        return jsonify({'analysis': analysis, 'insights': insights})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 
 initialize_core_data()
 
