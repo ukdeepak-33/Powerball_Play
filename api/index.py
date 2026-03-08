@@ -6598,28 +6598,33 @@ def api_check_saved_picks():
             return jsonify({'error': 'Could not load official draw data.'}), 500
 
         results = []
-        for pick in saved_picks:
-            white_balls = sorted([
-                int(pick['number_1']), int(pick['number_2']), int(pick['number_3']),
-                int(pick['number_4']), int(pick['number_5'])
-            ])
-            powerball = int(pick['powerball'])
-            gen_date  = pick['generated_date'][:10]
+for pick in saved_picks:
+    white_balls = sorted([
+        int(pick['number_1']), int(pick['number_2']), int(pick['number_3']),
+        int(pick['number_4']), int(pick['number_5'])
+    ])
+    powerball = int(pick['powerball'])
+    gen_date  = pick['generated_date'][:10]
 
-            relevant_draws = [d for d in official_draws if d['draw_date'] > gen_date]
+    # Only check draws that happened AFTER this pick was generated
+    relevant_draws = [d for d in official_draws if d['draw_date'] > gen_date]
 
-            matches = check_pick_against_draws_cmn(white_balls, powerball, relevant_draws, min_matches=1)
-            if matches:
-                results.append({
-                    'id':                 pick['id'],
-                    'generated_date':     gen_date,
-                    'white_balls':        white_balls,
-                    'powerball':          powerball,
-                    'match_count':        len(matches),
-                    'best_white_matches': matches[0]['white_matches'] if matches else 0,
-                    'best_pb_match':      matches[0]['powerball_match'] if matches else False,
-                    'matches':            matches
-                })
+    matches = check_pick_against_draws_cmn(white_balls, powerball, relevant_draws, min_matches=2)
+    matches = [m for m in matches if m['white_matches'] >= 2 or m['powerball_match']]
+
+    # Always include the pick — matches may be empty (means no wins yet)
+    results.append({
+        'id':                 pick['id'],
+        'generated_date':     gen_date,
+        'white_balls':        white_balls,
+        'powerball':          powerball,
+        'source':             pick.get('source', 'manual'),
+        'match_count':        len(matches),
+        'best_white_matches': matches[0]['white_matches'] if matches else 0,
+        'best_pb_match':      matches[0]['powerball_match'] if matches else False,
+        'matches':            matches   # empty list = no wins yet
+    })
+        
 
         results.sort(key=lambda x: (-x['best_white_matches'], -int(x['best_pb_match'])))
 
