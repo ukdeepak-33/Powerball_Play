@@ -9526,6 +9526,102 @@ def powerball_frequency_ai_analysis():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+# ── Paste into index.py ───────────────────────────────────────────────────────
+
+@app.route('/api/smart-pick-ai-analysis', methods=['POST'])
+def smart_pick_ai_analysis():
+    try:
+        p = request.get_json(force=True, silent=True) or {}
+
+        picks         = list(p.get('picks') or [])
+        picks_summary = str(p.get('picks_summary') or '')
+        strategy      = str(p.get('strategy') or 'rule_based')
+        num_sets      = int(p.get('num_sets') or len(picks))
+
+        if not picks:
+            return jsonify({'error': 'No picks provided'}), 400
+
+        # Compute quick stats for chips
+        all_wb   = [n for s in picks for n in s.get('white_balls', [])]
+        all_pb   = [s.get('powerball') for s in picks]
+        sums     = [sum(s.get('white_balls', [])) for s in picks]
+        avg_sum  = round(sum(sums) / len(sums), 1) if sums else 0
+        wb_set   = sorted(set(all_wb))
+        overlap  = max(len(all_wb) - len(wb_set), 0)
+
+        # Count odds/evens
+        odd_count  = sum(1 for n in all_wb if n % 2 != 0)
+        even_count = len(all_wb) - odd_count
+
+        strategy_lbl = 'Rule-Based Statistical' if strategy == 'rule_based' else 'ML-Based VAE'
+
+        prompt = f"""You are a Powerball pick analyst. Evaluate the following generated picks and give actionable insight.
+
+GENERATED PICKS ({num_sets} sets, {strategy_lbl} method):
+{picks_summary}
+
+QUICK STATS:
+  Average white ball sum: {avg_sum} (typical winning range is 130–200)
+  Sum range across picks: {min(sums)} to {max(sums)}
+  Unique white balls used: {len(wb_set)} across all picks
+  Repeated numbers (overlap): {overlap}
+  Odd/Even split across all picks: {odd_count} odd / {even_count} even
+  Powerballs chosen: {all_pb}
+
+Write EXACTLY these 3 sections using the data above:
+
+PICK QUALITY ASSESSMENT
+Rate the overall quality of these picks. Are the sums in the optimal zone (130-200)?
+Is the odd/even balance favorable? Name the strongest pick and the weakest with reasoning.
+
+PATTERN ANALYSIS  
+Are any white balls repeated across picks — if so, is that a strength (conviction play) or a weakness (lack of diversity)?
+Do any picks share numbers that historically trend together?
+Comment on Powerball selection — are they diversified or clustered?
+
+RECOMMENDATION
+Which single pick would you play if you could only choose one? Give the exact pick and why.
+Name one change you'd make to improve the weakest pick (e.g., swap a specific number).
+Give a one-line verdict: STRONG SET / DECENT SET / NEEDS ADJUSTMENT."""
+
+        GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+        if not GROQ_API_KEY:
+            return jsonify({'error': 'GROQ_API_KEY not set'}), 500
+
+        resp = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={'Authorization': 'Bearer ' + GROQ_API_KEY, 'Content-Type': 'application/json'},
+            json={
+                'model':       'llama-3.1-8b-instant',
+                'messages':    [{'role': 'user', 'content': prompt}],
+                'max_tokens':  700,
+                'temperature': 0.55,
+            },
+            timeout=40
+        )
+
+        result = resp.json()
+        if 'error' in result:
+            return jsonify({'error': result['error'].get('message', str(result['error']))}), 500
+
+        analysis = result['choices'][0]['message']['content'].strip()
+
+        insights = [
+            {'label': '🎯 Picks Generated',   'value': f'{num_sets} sets'},
+            {'label': '📊 Avg Sum',            'value': f'{avg_sum}'},
+            {'label': '🔢 Sum Range',          'value': f'{min(sums)}–{max(sums)}'},
+            {'label': '⚡ Unique WB Used',     'value': f'{len(wb_set)} balls'},
+            {'label': '🔁 Number Overlap',     'value': f'{overlap} repeats'},
+            {'label': '⚖️ Odd/Even',           'value': f'{odd_count}O / {even_count}E'},
+            {'label': '🔴 Mode',               'value': strategy_lbl},
+        ]
+
+        return jsonify({'analysis': analysis, 'insights': insights})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 
 initialize_core_data()
 
