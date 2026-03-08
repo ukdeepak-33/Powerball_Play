@@ -93,7 +93,6 @@ def run_draw_day_simulation():
     # ── Step 4: Save each combo to Supabase ─────────────────
     saved = 0
     for wb, pb in combos:
-        success, msg = save_generated_numbers_to_db(wb, pb)
         success, msg = save_generated_numbers_to_db(wb, pb, source='scheduler')
         status = "✅ Saved" if success else f"⚠️  Skip ({msg})"
         log(f"  {status}: {wb} + PB {pb}")
