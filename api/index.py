@@ -1299,9 +1299,9 @@ def calculate_yearly_difference_pair_hits():
                     "hit_count": hit_count
                 })
             group['pairs'] = updated_pairs
-            yearly_pairs_data[year_key] = static_pairs_data
-        return yearly_pairs_data
-        
+        yearly_pairs_data[year_key] = static_pairs_data  # ← moved out of inner loop
+    return yearly_pairs_data                              # ← moved out of outer loop
+    
 def calculate_yearly_last_digit_pair_hits():
     global df
     if df.empty:
