@@ -9203,6 +9203,102 @@ def triplets_ai_analysis():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+# ── Paste into index.py ───────────────────────────────────────────────────────
+
+@app.route('/api/white-ball-gap-ai-analysis', methods=['POST'])
+def white_ball_gap_ai_analysis():
+    try:
+        p = request.get_json(force=True, silent=True) or {}
+
+        ball_number   = int(p.get('ball_number') or 0)
+        year          = str(p.get('year') or 'all')
+        appearances   = int(p.get('appearances') or 0)
+        avg_gap       = str(p.get('avg_gap') or '0')
+        max_gap       = int(p.get('max_gap') or 0)
+        min_gap       = int(p.get('min_gap') or 0)
+        current_gap   = int(p.get('current_gap') or 0)
+        long_gaps     = int(p.get('long_gaps') or 0)
+        zero_gaps     = int(p.get('zero_gaps') or 0)
+        gap_sequence  = str(p.get('gap_sequence') or '')
+        total_entries = int(p.get('total_entries') or 0)
+
+        long_pct  = round(long_gaps / appearances * 100, 1) if appearances else 0
+        zero_pct  = round(zero_gaps / appearances * 100, 1) if appearances else 0
+
+        lines = [
+            "You are a Powerball gap analyst. Analyse the appearance gap data for a single white ball number.",
+            "Use ONLY the data provided below. Do not invent numbers.",
+            "",
+            f"BALL: #{ball_number}   YEAR: {year}",
+            f"Appearances: {appearances}",
+            f"Average gap: {avg_gap} draws between appearances",
+            f"Longest gap (drought): {max_gap} draws",
+            f"Shortest gap: {min_gap} draws",
+            f"Current ongoing gap: {current_gap} draws since last appearance",
+            f"Long gaps (8+ draws missed): {long_gaps} out of {appearances} ({long_pct}%)",
+            f"Zero gaps (appeared in back-to-back draws): {zero_gaps} ({zero_pct}%)",
+            "",
+            "CHRONOLOGICAL GAP SEQUENCE (up to 20 most recent):",
+            gap_sequence,
+            "",
+            "Write EXACTLY these 3 sections:",
+            "",
+            "GAP PROFILE",
+            f"Is Ball #{ball_number} consistent (low avg gap, low variance) or erratic (high variance, long droughts)?",
+            f"Is an average of {avg_gap} draws typical or unusual for Powerball? Explain what it means practically.",
+            "",
+            "DROUGHT ALERT",
+            f"The current ongoing gap is {current_gap} draws.",
+            f"Given the historical max drought of {max_gap} and average of {avg_gap}, is this ball overdue?",
+            "Should a player include or avoid this ball in the next draw? Give a direct recommendation.",
+            "",
+            "PATTERN INSIGHT",
+            "Based on the chronological gap sequence, does this ball show any clustering (appears in bursts) or even spacing?",
+            "Name the most notable pattern visible in the sequence data.",
+        ]
+
+        prompt = "\n".join(lines)
+
+        GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+        if not GROQ_API_KEY:
+            return jsonify({'error': 'GROQ_API_KEY not set'}), 500
+
+        resp = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={'Authorization': 'Bearer ' + GROQ_API_KEY, 'Content-Type': 'application/json'},
+            json={
+                'model':       'llama-3.1-8b-instant',
+                'messages':    [{'role': 'user', 'content': prompt}],
+                'max_tokens':  600,
+                'temperature': 0.55,
+            },
+            timeout=40
+        )
+
+        result = resp.json()
+        if 'error' in result:
+            return jsonify({'error': result['error'].get('message', str(result['error']))}), 500
+
+        analysis = result['choices'][0]['message']['content'].strip()
+
+        overdue_status = 'Overdue' if current_gap > float(avg_gap) else 'Within Range'
+        drought_risk   = 'HIGH' if long_pct > 30 else ('MEDIUM' if long_pct > 15 else 'LOW')
+
+        insights = [
+            {'label': f'⚾ Ball #{ball_number} · {year}',  'value': f'{appearances} appearances'},
+            {'label': '📊 Avg Gap',                         'value': f'{avg_gap} draws'},
+            {'label': '🌵 Longest Drought',                 'value': f'{max_gap} draws'},
+            {'label': '⚡ Current Gap',                     'value': f'{current_gap} draws — {overdue_status}'},
+            {'label': '🔴 Long Gap Rate',                   'value': f'{long_pct}% — {drought_risk} risk'},
+            {'label': '✅ Back-to-Back Rate',               'value': f'{zero_pct}% of appearances'},
+        ]
+
+        return jsonify({'analysis': analysis, 'insights': insights})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 
 initialize_core_data()
 
