@@ -1,355 +1,686 @@
 {% extends "base.html" %}
 
-{% block title %}Smart Pick Generator{% endblock %}
-
-{% block page_heading %}Smart Pick Generator with Advanced ML Insights{% endblock %}
-
-{% block head %}
-    {{ super() }}
-    <style>
-        .ball {
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background-color: #6366f1; /* Indigo */
-            color: white;
-            font-weight: bold;
-            font-size: 1.1rem;
-            margin: 0.25rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            flex-shrink: 0;
-        }
-        /* This class makes the Powerball red */
-        .powerball {
-            background-color: #ef4444; /* Red */
-        }
-        .loading-spinner {
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top: 4px solid #6366f1;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
-{% endblock %}
+{% block title %}Smart Pick Generator — Powerball Analytics{% endblock %}
+{% block page_heading %}{% endblock %}
 
 {% block content %}
-<div class="space-y-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    {# Flash messages display #}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg:#040509; --s1:#080b10; --s2:#0c1016; --s3:#10141c;
+    --border:rgba(255,255,255,0.065); --text:rgba(255,255,255,0.87); --muted:rgba(255,255,255,0.33);
+    --violet:#a78bfa; --violet2:rgba(167,139,250,0.12); --violet3:rgba(167,139,250,0.28);
+    --teal:#14b8a6; --teal2:rgba(20,184,166,0.1); --teal3:rgba(20,184,166,0.28);
+    --amber:#f59e0b; --amber2:rgba(245,158,11,0.1);
+    --green:#34d399; --green2:rgba(52,211,153,0.1);
+    --red:#f87171; --red2:rgba(248,113,113,0.1);
+    --blue:#60a5fa; --blue2:rgba(96,165,250,0.1);
+    --rose:#fb7185;
+  }
+
+  #spg * { box-sizing:border-box; }
+  #spg {
+    font-family:'JetBrains Mono',monospace;
+    background:var(--bg); min-height:100vh; color:var(--text); padding-bottom:80px;
+  }
+
+  /* ── Hero ── */
+  .spg-hero { position:relative; padding:50px 24px 36px; text-align:center; overflow:hidden; }
+  .spg-hero::before {
+    content:''; position:absolute; inset:0;
+    background:
+      radial-gradient(ellipse 55% 55% at 50% -5%, rgba(167,139,250,0.12) 0%, transparent 65%),
+      radial-gradient(ellipse 25% 30% at 5%  75%, rgba(20,184,166,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 25% 30% at 95% 75%, rgba(245,158,11,0.05) 0%, transparent 60%);
+    pointer-events:none;
+  }
+  .spg-hero::after {
+    content:''; position:absolute; bottom:0; left:0; right:0; height:1px;
+    background:linear-gradient(90deg,transparent,var(--violet),rgba(255,255,255,0.2),var(--teal),transparent);
+    opacity:0.3;
+  }
+  .spg-eyebrow { font-size:10px; letter-spacing:3px; text-transform:uppercase; color:var(--violet); margin-bottom:12px; opacity:0.8; }
+  .spg-hero h1 {
+    font-family:'Rajdhani',sans-serif;
+    font-size:clamp(42px,6vw,82px); font-weight:700; line-height:1.0; margin:0 0 12px; letter-spacing:2px;
+    background:linear-gradient(135deg,var(--violet) 0%,#fff 40%,var(--teal) 80%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  }
+  .spg-hero p { font-size:12px; color:var(--muted); max-width:520px; margin:0 auto; line-height:1.8; }
+
+  /* ── Wrap ── */
+  .spg-wrap { max-width:1100px; margin:0 auto; padding:0 20px; display:flex; flex-direction:column; gap:14px; }
+
+  /* ── Card ── */
+  .spg-card { background:var(--s1); border:1px solid var(--border); border-radius:16px; padding:22px 24px; position:relative; overflow:hidden; }
+  .spg-lbl { font-size:9px; letter-spacing:2.5px; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:14px; }
+
+  /* ── Strategy pills ── */
+  .strategy-pills { display:flex; gap:8px; flex-wrap:wrap; }
+  .strat-pill {
+    display:flex; align-items:center; gap:10px; cursor:pointer;
+    background:var(--s2); border:1px solid var(--border); border-radius:12px;
+    padding:12px 18px; transition:all 0.13s; flex:1; min-width:180px;
+  }
+  .strat-pill:hover { border-color:rgba(255,255,255,0.12); }
+  .strat-pill.active-rule   { border-color:var(--violet3); background:var(--violet2); }
+  .strat-pill.active-vae    { border-color:var(--teal3);   background:var(--teal2);   }
+  .strat-pill input[type=radio] { display:none; }
+  .strat-icon { font-size:20px; flex-shrink:0; }
+  .strat-name { font-size:12px; font-weight:700; }
+  .strat-desc { font-size:9px; color:var(--muted); margin-top:2px; }
+
+  /* ── Form elements ── */
+  .form-grid  { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media(max-width:580px){ .form-grid { grid-template-columns:1fr; } }
+  .form-group { display:flex; flex-direction:column; gap:6px; }
+  .form-lbl   { font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
+  .spg-input, .spg-select {
+    background:var(--s2); border:1px solid var(--border); color:var(--text);
+    font-family:'JetBrains Mono',monospace; font-size:12px;
+    border-radius:9px; padding:10px 14px; outline:none; transition:border-color 0.15s; width:100%;
+  }
+  .spg-input:focus, .spg-select:focus { border-color:rgba(255,255,255,0.18); }
+  .spg-input::placeholder { color:var(--muted); }
+  .spg-select option { background:#0c1016; }
+
+  /* ── Section divider ── */
+  .section-div { border-top:1px solid var(--border); margin:16px 0; padding-top:16px; }
+  .section-title { font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:var(--violet); margin-bottom:12px; }
+
+  /* ── Checkbox / toggle pills ── */
+  .check-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:8px; }
+  .check-pill {
+    display:flex; align-items:center; gap:10px; cursor:pointer;
+    background:var(--s2); border:1px solid var(--border); border-radius:9px;
+    padding:10px 14px; transition:all 0.12s; user-select:none;
+  }
+  .check-pill:hover { border-color:rgba(255,255,255,0.12); }
+  .check-pill input { display:none; }
+  .check-box {
+    width:16px; height:16px; border-radius:4px; border:1px solid var(--border);
+    flex-shrink:0; display:flex; align-items:center; justify-content:center;
+    transition:all 0.12s;
+  }
+  .check-pill.checked { border-color:var(--violet3); background:var(--violet2); }
+  .check-pill.checked .check-box { background:var(--violet); border-color:var(--violet); }
+  .check-label { font-size:10px; line-height:1.4; }
+
+  /* ── Generate button ── */
+  .btn-gen {
+    width:100%; margin-top:16px;
+    font-family:'Rajdhani',sans-serif; font-size:18px; font-weight:700; letter-spacing:2px;
+    padding:16px; border-radius:12px; border:none; cursor:pointer;
+    background:linear-gradient(135deg,#4c1d95,var(--violet));
+    color:#fff; transition:transform 0.15s,box-shadow 0.15s;
+    box-shadow:0 0 24px rgba(167,139,250,0.2);
+    display:flex; align-items:center; justify-content:center; gap:10px;
+  }
+  .btn-gen:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 0 36px rgba(167,139,250,0.4); }
+  .btn-gen:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+  .btn-gen.mode-vae { background:linear-gradient(135deg,#0f766e,var(--teal)); box-shadow:0 0 24px rgba(20,184,166,0.2); }
+  .btn-gen.mode-vae:hover:not(:disabled) { box-shadow:0 0 36px rgba(20,184,166,0.4); }
+
+  /* ── Spinner ── */
+  .spg-spin { width:18px; height:18px; border-radius:50%; border:2px solid rgba(255,255,255,0.2); border-top-color:#fff; animation:spin 0.75s linear infinite; flex-shrink:0; }
+  @keyframes spin { to{transform:rotate(360deg);} }
+
+  /* ── Pick cards ── */
+  .picks-list { display:flex; flex-direction:column; gap:10px; margin-top:16px; }
+  .pick-card {
+    background:var(--s2); border:1px solid var(--border); border-radius:12px;
+    padding:14px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    transition:border-color 0.12s;
+  }
+  .pick-card:hover { border-color:rgba(255,255,255,0.1); }
+  .pick-num { font-size:9px; color:var(--muted); min-width:20px; }
+  .pick-balls { display:flex; gap:5px; align-items:center; flex:1; flex-wrap:wrap; }
+  .wb {
+    width:34px; height:34px; border-radius:50%;
+    background:radial-gradient(circle at 32% 30%,#f0f4ff 0%,#c8d8ed 45%,#8aaac8 100%);
+    display:inline-flex; align-items:center; justify-content:center;
+    font-size:10px; font-weight:700; color:#0d1829;
+    box-shadow:0 2px 6px rgba(0,0,0,0.35); transition:transform 0.1s; flex-shrink:0;
+  }
+  .wb:hover { transform:scale(1.12); }
+  .pb {
+    width:34px; height:34px; border-radius:50%;
+    background:radial-gradient(circle at 32% 30%,#ff8a80 0%,#ef5350 50%,#b71c1c 100%);
+    display:inline-flex; align-items:center; justify-content:center;
+    font-size:10px; font-weight:700; color:#fff;
+    box-shadow:0 2px 6px rgba(0,0,0,0.4); flex-shrink:0;
+  }
+  .pick-sep { color:var(--muted); font-size:12px; }
+  .pick-btns { display:flex; gap:6px; }
+  .btn-sm {
+    font-size:9px; letter-spacing:1px; text-transform:uppercase;
+    padding:7px 14px; border-radius:7px; cursor:pointer;
+    font-family:'JetBrains Mono',monospace; transition:all 0.12s; border:1px solid;
+  }
+  .btn-save-one  { background:var(--teal2);   border-color:var(--teal3);   color:var(--teal); }
+  .btn-save-one:hover  { background:rgba(20,184,166,0.2); }
+
+  /* ── Save All ── */
+  .btn-save-all {
+    width:100%; margin-top:12px;
+    font-size:10px; letter-spacing:1.5px; text-transform:uppercase;
+    padding:12px; border-radius:10px; border:1px solid var(--violet3);
+    background:var(--violet2); color:var(--violet); cursor:pointer;
+    font-family:'JetBrains Mono',monospace; font-weight:700; transition:all 0.13s;
+  }
+  .btn-save-all:hover { background:rgba(167,139,250,0.2); }
+
+  /* ── Last draw dates ── */
+  .dates-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:8px; }
+  .date-chip {
+    background:var(--s2); border:1px solid var(--border); border-radius:8px;
+    padding:10px 12px; font-size:10px;
+  }
+  .date-ball { font-weight:700; color:var(--violet); }
+  .date-val  { color:var(--muted); margin-top:2px; }
+
+  /* ── ML info banner ── */
+  .ml-banner {
+    background:var(--teal2); border:1px solid var(--teal3);
+    border-radius:9px; padding:12px 16px; font-size:11px; color:var(--teal);
+    margin-bottom:12px; display:flex; align-items:center; gap:8px;
+  }
+
+  /* ── AI Panel ── */
+  .ai-card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    background:linear-gradient(90deg,transparent,var(--violet),var(--teal),transparent);
+    opacity:0.45;
+  }
+  .ai-hdr { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+  .ai-eyebrow { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--violet); opacity:0.8; margin-bottom:3px; }
+  .ai-title  { font-family:'Rajdhani',sans-serif; font-size:22px; font-weight:700; letter-spacing:1px; margin:0; }
+  .ai-btn {
+    display:flex; align-items:center; gap:8px;
+    background:linear-gradient(135deg,#4c1d95,var(--violet));
+    color:#fff; font-family:'JetBrains Mono',monospace; font-size:10px;
+    letter-spacing:1.5px; text-transform:uppercase;
+    border:none; border-radius:10px; padding:11px 22px; cursor:pointer;
+    font-weight:700; transition:transform 0.15s,box-shadow 0.15s;
+    box-shadow:0 0 18px rgba(167,139,250,0.2);
+  }
+  .ai-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 0 32px rgba(167,139,250,0.45); }
+  .ai-btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+  .ai-thinking { display:none; align-items:center; gap:10px; padding:14px 0 4px; font-size:11px; color:rgba(167,139,250,0.7); letter-spacing:1px; }
+  .ai-thinking.on { display:flex; }
+  .ai-dots span { display:inline-block; width:6px; height:6px; border-radius:50%; margin:0 2px; animation:dotB 1.2s infinite; }
+  .ai-dots span:nth-child(1){ background:var(--violet); }
+  .ai-dots span:nth-child(2){ animation-delay:0.2s; background:var(--teal); }
+  .ai-dots span:nth-child(3){ animation-delay:0.4s; background:var(--amber); }
+  @keyframes dotB{0%,80%,100%{transform:scale(0.6);opacity:0.4}40%{transform:scale(1);opacity:1}}
+  .ai-output { display:none; margin-top:18px; border-top:1px solid rgba(167,139,250,0.1); padding-top:18px; }
+  .ai-output.on { display:block; }
+  .ai-chips { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:18px; }
+  .ai-chip  { background:var(--s2); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
+  .ai-chip-lbl { font-size:8px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+  .ai-chip-val { font-size:13px; font-weight:600; color:#fff; line-height:1.4; }
+  .ai-narrative {
+    background:var(--s2); border:1px solid rgba(167,139,250,0.12);
+    border-left:3px solid var(--violet); border-radius:0 10px 10px 0;
+    padding:18px 20px; font-size:13px; line-height:1.9; color:var(--text); white-space:pre-wrap;
+  }
+  .ai-err { margin-top:12px; background:var(--red2); border:1px solid rgba(248,113,113,0.2); border-radius:9px; padding:12px 16px; font-size:12px; color:var(--red); }
+
+  /* ── Toast ── */
+  .spg-toast {
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
+    padding:12px 22px; border-radius:10px; font-size:12px; font-weight:600;
+    opacity:0; transition:all 0.25s; z-index:200; pointer-events:none;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .spg-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  .spg-toast.success { background:#064e3b; border:1px solid rgba(52,211,153,0.3); color:var(--green); }
+  .spg-toast.error   { background:#450a0a; border:1px solid rgba(248,113,113,0.3); color:var(--red); }
+  .spg-toast.info    { background:var(--s1); border:1px solid var(--border); color:var(--muted); }
+</style>
+
+<div id="spg">
+
+  <!-- Hero -->
+  <div class="spg-hero">
+    <p class="spg-eyebrow">◈ Rule-Based · ML-Assisted · AI-Powered</p>
+    <h1>Smart Pick<br>Generator</h1>
+    <p>Generate Powerball picks using rule-based statistical filters or ML-based generation. Fine-tune with odd/even splits, sum zones, group patterns, and monthly trends.</p>
+  </div>
+
+  <div class="spg-wrap">
+
     {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="flash-messages space-y-3 mb-4">
-                {% for category, message in messages %}
-                    <div class="p-4 rounded-lg shadow-md text-sm {% if category == 'error' %}bg-red-100 text-red-700 border border-red-200{% elif category == 'info' %}bg-blue-100 text-blue-700 border border-blue-200{% else %}bg-green-100 text-green-700 border border-green-200{% endif %} animate-fade-in">
-                        <p class="font-medium">{{ message }}</p>
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
+      {% if messages %}{% for cat,msg in messages %}
+        <div class="spg-card" style="font-size:12px;color:var(--muted)">{{ msg }}</div>
+      {% endfor %}{% endif %}
     {% endwith %}
 
-    <div class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">Generate Your Smart Picks</h2>
-        
-        <form id="smartPickForm" class="space-y-6">
-            {# Generation Strategy Selection #}
-            <div class="mb-4">
-                <label class="block text-xl font-semibold text-gray-800 mb-2">Choose Generation Strategy</label>
-                <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
-                    <label class="inline-flex items-center">
-                        <input type="radio" name="generation_strategy" value="rule_based" class="form-radio text-indigo-600 h-5 w-5" checked>
-                        <span class="ml-2 text-gray-700 font-medium">Rule-Based Smart Pick</span>
-                    </label>
-                    <label class="inline-flex items-center">
-                        <input type="radio" name="generation_strategy" value="vae_based" class="form-radio text-indigo-600 h-5 w-5">
-                        <span class="ml-2 text-gray-700 font-medium">ML-Based Smart Pick (VAE-like)</span>
-                    </label>
-                </div>
-            </div>
+    <!-- ── Strategy + Common ── -->
+    <div class="spg-card">
+      <span class="spg-lbl">Generation Mode</span>
+      <div class="strategy-pills" id="stratPills">
+        <label class="strat-pill active-rule" data-val="rule_based">
+          <input type="radio" name="strategy" value="rule_based" checked>
+          <span class="strat-icon">⚙️</span>
+          <div>
+            <p class="strat-name">Rule-Based</p>
+            <p class="strat-desc">Statistical filters + pattern priorities</p>
+          </div>
+        </label>
+        <label class="strat-pill" data-val="vae_based">
+          <input type="radio" name="strategy" value="vae_based">
+          <span class="strat-icon">🧠</span>
+          <div>
+            <p class="strat-name">ML-Based (VAE)</p>
+            <p class="strat-desc">Machine-learning assisted generation</p>
+          </div>
+        </label>
+      </div>
 
-            {# Common Filters for both strategies #}
-            <div>
-                <label for="num_sets_to_generate" class="block text-sm font-medium text-gray-700 mb-1">Number of Picks to Generate (1-10)</label>
-                <input type="number" id="num_sets_to_generate" name="num_sets_to_generate" min="1" max="10" value="1" class="form-input mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-            </div>
-
-            <div>
-                <label for="excluded_numbers" class="block text-sm font-medium text-gray-700 mb-1">Exclude Specific Numbers (comma-separated)</label>
-                <input type="text" id="excluded_numbers" name="excluded_numbers" placeholder="e.g., 4, 18, 55" class="form-input mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-            </div>
-
-            {# Rule-Based Specific Filters (conditionally visible) #}
-            <div id="ruleBasedFilters" class="space-y-6 border-t border-gray-200 pt-6 mt-6">
-                <p class="text-lg font-semibold text-gray-800">Rule-Based Specific Filters</p>
-                <div>
-                    <label for="num_from_group_a" class="block text-sm font-medium text-gray-700 mb-1">Numbers from Group-A (0-5)</label>
-                    <input type="number" id="num_from_group_a" name="num_from_group_a" min="0" max="5" value="2" class="form-input mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                    <p class="text-xs text-gray-500 mt-1">Group-A numbers are: {{ group_a | join(', ') }}</p>
-                </div>
-
-                <div>
-                    <label for="odd_even_choice" class="block text-sm font-medium text-gray-700 mb-1">Odd/Even Split</label>
-                    <select id="odd_even_choice" name="odd_even_choice" class="form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                        <option value="Any">Any Split</option>
-                        <option value="All Even">All Even (5E/0O)</option>
-                        <option value="All Odd">All Odd (0E/5O)</option>
-                        <option value="4 Even / 1 Odd">4 Even / 1 Odd</option>
-                        <option value="1 Even / 4 Odd">1 Even / 4 Odd</option>
-                        <option value="3 Even / 2 Odd">3 Even / 2 Odd</option>
-                        <option value="2 Even / 3 Odd">2 Even / 3 Odd</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label for="sum_range_filter" class="block text-sm font-medium text-gray-700 mb-1">Sum of White Balls Range</label>
-                    <select id="sum_range_filter" name="sum_range_filter" class="form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                        {% for label, _ in sum_ranges.items() %}
-                        <option value="{{ label }}">{{ label }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                {# Pattern Prioritization Checkboxes #}
-                <div class="mt-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Prioritize Based On:</label>
-                    <div class="flex flex-wrap gap-x-4 gap-y-2">
-                        <label class="inline-flex items-center">
-                            <input type="checkbox" id="prioritize_monthly_hot" name="prioritize_monthly_hot" class="form-checkbox text-indigo-600 h-4 w-4">
-                            <span class="ml-2 text-sm text-gray-700">Monthly Hot Numbers</span>
-                        </label>
-                        <label class="inline-flex items-center">
-                            <input type="checkbox" id="prioritize_grouped_patterns" name="prioritize_grouped_patterns" class="form-checkbox text-indigo-600 h-4 w-4">
-                            <span class="ml-2 text-sm text-gray-700">Grouped Patterns (e.g., 10s, 20s)</span>
-                        </label>
-                        <label class="inline-flex items-center">
-                            <input type="checkbox" id="prioritize_special_patterns" name="prioritize_special_patterns" class="form-checkbox text-indigo-600 h-4 w-4">
-                            <span class="ml-2 text-sm text-gray-700">Special Patterns (e.g., Tens Apart)</span>
-                        </label>
-                        <label class="inline-flex items-center">
-                            <input type="checkbox" id="prioritize_consecutive_patterns" name="prioritize_consecutive_patterns" class="form-checkbox text-indigo-600 h-4 w-4">
-                            <span class="ml-2 text-sm text-gray-700">Consecutive Patterns</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div>
-                    <label for="force_specific_pattern" class="block text-sm font-medium text-gray-700 mb-1">Force Specific Pattern (2 or 3 numbers, comma-separated)</label>
-                    <input type="text" id="force_specific_pattern" name="force_specific_pattern" placeholder="e.g., 1, 2, 3 or 10, 20" class="form-input mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                    <p class="text-xs text-gray-500 mt-1">If specified, 2 or 3 of these numbers will be included. Must be unique and not excluded.</p>
-                </div>
-            </div>
-
-            <button type="submit" id="generatePicksBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition ease-in-out duration-150 flex items-center justify-center">
-                <span id="buttonText">Generate Smart Picks</span>
-                <div id="loadingSpinner" class="loading-spinner ml-3 hidden"></div>
-            </button>
-        </form>
+      <div class="section-div">
+        <div class="form-grid">
+          <div class="form-group">
+            <span class="form-lbl">Picks to Generate (1–10)</span>
+            <input class="spg-input" id="numSets" type="number" min="1" max="10" value="3">
+          </div>
+          <div class="form-group">
+            <span class="form-lbl">Exclude Numbers (comma-separated)</span>
+            <input class="spg-input" id="excludeNums" placeholder="e.g. 4, 18, 55">
+          </div>
+        </div>
+      </div>
     </div>
 
-    {# Generated Picks Display #}
-    <div id="generatedPicksSection" class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200 hidden">
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">Your Generated Picks</h2>
-        <div id="generatedPicksContainer" class="space-y-6">
-            {# Generated picks will be injected here by JavaScript #}
+    <!-- ── Rule-Based Filters ── -->
+    <div class="spg-card" id="ruleCard">
+      <span class="spg-lbl">Rule-Based Filters</span>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <span class="form-lbl">Numbers from Group-A (0–5)</span>
+          <input class="spg-input" id="numGroupA" type="number" min="0" max="5" value="2">
+          <span style="font-size:9px;color:var(--muted);margin-top:4px">Group-A: {{ group_a | join(', ') }}</span>
         </div>
-        <div class="flex justify-end mt-6 space-x-4">
-            <button id="saveAllPicksBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition ease-in-out duration-150">
-                Save All Generated Picks
-            </button>
+        <div class="form-group">
+          <span class="form-lbl">Odd / Even Split</span>
+          <select class="spg-select" id="oddEven">
+            <option value="Any">Any Split</option>
+            <option value="All Even">All Even (5E/0O)</option>
+            <option value="All Odd">All Odd (0E/5O)</option>
+            <option value="4 Even / 1 Odd">4 Even / 1 Odd</option>
+            <option value="1 Even / 4 Odd">1 Even / 4 Odd</option>
+            <option value="3 Even / 2 Odd">3 Even / 2 Odd</option>
+            <option value="2 Even / 3 Odd">2 Even / 3 Odd</option>
+          </select>
         </div>
+        <div class="form-group">
+          <span class="form-lbl">Sum Zone</span>
+          <select class="spg-select" id="sumRange">
+            {% for label in sum_ranges.keys() %}
+            <option value="{{ label }}" {% if label == 'Zone C (130-159)' %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <span class="form-lbl">Force Numbers in Pick (2–3)</span>
+          <input class="spg-input" id="forcePattern" placeholder="e.g. 10, 20 or 1, 2, 3">
+        </div>
+      </div>
+
+      <!-- Prioritize checkboxes -->
+      <div class="section-div">
+        <p class="section-title">Prioritize Patterns</p>
+        <div class="check-grid" id="prioritizeChecks">
+          <label class="check-pill" data-key="prioritize_monthly_hot">
+            <input type="checkbox">
+            <div class="check-box"></div>
+            <span class="check-label">🔥 Monthly Hot Numbers</span>
+          </label>
+          <label class="check-pill" data-key="prioritize_grouped_patterns">
+            <input type="checkbox">
+            <div class="check-box"></div>
+            <span class="check-label">⬡ Grouped Patterns (10s, 20s…)</span>
+          </label>
+          <label class="check-pill" data-key="prioritize_special_patterns">
+            <input type="checkbox">
+            <div class="check-box"></div>
+            <span class="check-label">✦ Special Patterns (Tens Apart)</span>
+          </label>
+          <label class="check-pill" data-key="prioritize_consecutive_patterns">
+            <input type="checkbox">
+            <div class="check-box"></div>
+            <span class="check-label">↔ Consecutive Pairs</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Monthly preference checkboxes -->
+      <div class="section-div">
+        <p class="section-title">Monthly Frequency Preferences</p>
+        <div class="check-grid" id="prefChecks">
+          <label class="check-pill" data-key="preference_one_unpicked">
+            <input type="checkbox">
+            <div class="check-box"></div>
+            <span class="check-label">1 Unpicked + 4 Picked (this month)</span>
+          </label>
+          <label class="check-pill" data-key="preference_two_unpicked">
+            <input type="checkbox">
+            <div class="check-box"></div>
+            <span class="check-label">2 Unpicked + 3 Picked (this month)</span>
+          </label>
+          <label class="check-pill" data-key="preference_two_same_frequency">
+            <input type="checkbox">
+            <div class="check-box"></div>
+            <span class="check-label">2 Same Frequency (this year)</span>
+          </label>
+          <label class="check-pill" data-key="preference_five_unpicked">
+            <input type="checkbox">
+            <div class="check-box"></div>
+            <span class="check-label">5 Unpicked Same Freq (this year)</span>
+          </label>
+        </div>
+      </div>
     </div>
 
-    {# Last Draw Dates Display #}
-    <div id="lastDrawDatesSection" class="card p-6 bg-white rounded-xl shadow-lg border border-gray-200 hidden">
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">Last Drawn Dates for Your Numbers</h2>
-        <div id="lastDrawDatesContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {# Last drawn dates will be injected here by JavaScript #}
-        </div>
+    <!-- ── Generate Button ── -->
+    <button class="btn-gen" id="genBtn">
+      <span id="btnTxt">◈ Generate Smart Picks</span>
+      <div class="spg-spin" id="btnSpin" style="display:none"></div>
+    </button>
+
+    <!-- ── Results ── -->
+    <div class="spg-card" id="resultsCard" style="display:none">
+      <span class="spg-lbl" id="resultsLbl">Generated Picks</span>
+      <div id="mlBanner" class="ml-banner" style="display:none">
+        🧠 <span id="mlBannerText"></span>
+      </div>
+      <div class="picks-list" id="picksList"></div>
+      <button class="btn-save-all" id="saveAllBtn">💾 Save All Picks</button>
     </div>
+
+    <!-- ── Last Draw Dates ── -->
+    <div class="spg-card" id="datesCard" style="display:none">
+      <span class="spg-lbl">Last Drawn Dates for Most Recent Pick</span>
+      <div class="dates-grid" id="datesGrid"></div>
+    </div>
+
+    <!-- ── AI Analysis ── -->
+    <div class="spg-card ai-card" id="aiCard" style="display:none">
+      <div class="ai-hdr">
+        <div>
+          <p class="ai-eyebrow">✦ Groq AI · Pick Intelligence</p>
+          <p class="ai-title">SMART PICK ANALYSIS</p>
+        </div>
+        <button class="ai-btn" id="aiBtn">◈ Analyse My Picks</button>
+      </div>
+      <div class="ai-thinking" id="aiThinking">
+        <div class="ai-dots"><span></span><span></span><span></span></div>
+        Evaluating picks against historical patterns…
+      </div>
+      <div class="ai-output" id="aiOutput">
+        <div class="ai-chips" id="aiChips"></div>
+        <div class="ai-narrative" id="aiNarrative"></div>
+      </div>
+      <div class="ai-err" id="aiErr" style="display:none"></div>
+    </div>
+
+  </div>
 </div>
 
+<!-- Toast -->
+<div class="spg-toast" id="toast"></div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const smartPickForm = document.getElementById('smartPickForm');
-        const generatePicksBtn = document.getElementById('generatePicksBtn');
-        const buttonText = document.getElementById('buttonText');
-        const loadingSpinner = document.getElementById('loadingSpinner');
-        const generatedPicksSection = document.getElementById('generatedPicksSection');
-        const generatedPicksContainer = document.getElementById('generatedPicksContainer');
-        const lastDrawDatesSection = document.getElementById('lastDrawDatesSection');
-        const lastDrawDatesContainer = document.getElementById('lastDrawDatesContainer');
-        const saveAllPicksBtn = document.getElementById('saveAllPicksBtn');
-        const generationStrategyRadios = document.querySelectorAll('input[name="generation_strategy"]');
-        const ruleBasedFilters = document.getElementById('ruleBasedFilters');
+document.addEventListener('DOMContentLoaded', function () {
 
-        let currentGeneratedSets = []; // Store the current generated sets for saving
+  let currentSets = [];
 
-        // Function to toggle visibility of rule-based filters
-        function toggleRuleBasedFilters() {
-            const selectedStrategy = document.querySelector('input[name="generation_strategy"]:checked').value;
-            if (selectedStrategy === 'rule_based') {
-                ruleBasedFilters.classList.remove('hidden');
-            } else {
-                ruleBasedFilters.classList.add('hidden');
-            }
-        }
+  // ── Toast ─────────────────────────────────────────────────
+  function toast(msg, type='info') {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.className = 'spg-toast ' + type;
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), 3500);
+  }
 
-        // Add event listeners to strategy radios
-        generationStrategyRadios.forEach(radio => {
-            radio.addEventListener('change', toggleRuleBasedFilters);
-        });
-
-        // Initial call to set visibility based on default selected radio
-        toggleRuleBasedFilters();
-
-
-        smartPickForm.addEventListener('submit', async function(event) {
-            event.preventDefault(); // Prevent default form submission
-
-            buttonText.textContent = 'Generating...';
-            loadingSpinner.classList.remove('hidden');
-            generatePicksBtn.disabled = true;
-            generatedPicksSection.classList.add('hidden');
-            lastDrawDatesSection.classList.add('hidden');
-            generatedPicksContainer.innerHTML = '';
-            lastDrawDatesContainer.innerHTML = '';
-            currentGeneratedSets = []; // Clear previous sets
-
-            const numSets = document.getElementById('num_sets_to_generate').value;
-            const excludedNumbers = document.getElementById('excluded_numbers').value;
-            const selectedStrategy = document.querySelector('input[name="generation_strategy"]:checked').value;
-
-            let apiUrl = '';
-            let payload = {
-                num_sets: parseInt(numSets),
-                excluded_numbers: excludedNumbers
-            };
-
-            if (selectedStrategy === 'rule_based') {
-                apiUrl = '/generate_smart_picks_route'; // Your existing Flask route for rule-based
-                payload.num_from_group_a = document.getElementById('num_from_group_a').value;
-                payload.odd_even_choice = document.getElementById('odd_even_choice').value;
-                payload.sum_range_filter = document.getElementById('sum_range_filter').value;
-                payload.prioritize_monthly_hot = document.getElementById('prioritize_monthly_hot').checked;
-                payload.prioritize_grouped_patterns = document.getElementById('prioritize_grouped_patterns').checked;
-                payload.prioritize_special_patterns = document.getElementById('prioritize_special_patterns').checked;
-                payload.prioritize_consecutive_patterns = document.getElementById('prioritize_consecutive_patterns').checked;
-                payload.force_specific_pattern = document.getElementById('force_specific_pattern').value;
-            } else if (selectedStrategy === 'vae_based') {
-                apiUrl = '/api/generate_vae_picks'; // New VAE-like API endpoint
-                // Excluded numbers and num_sets are still passed
-            }
-
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                const result = await response.json();
-
-                if (response.ok && result.success) {
-                    currentGeneratedSets = result.generated_sets;
-                    generatedPicksContainer.innerHTML = ''; // Clear existing
-                    result.generated_sets.forEach(pick => {
-                        const pickDiv = document.createElement('div');
-                        pickDiv.className = 'flex flex-wrap items-center justify-center sm:justify-start bg-gray-50 p-4 rounded-lg shadow-sm';
-                        const whiteBallsHtml = pick.white_balls.map(ball => `<span class="ball">${ball}</span>`).join('');
-                        
-                        // --- FIX FOR RED POWERBALL HERE ---
-                        pickDiv.innerHTML = `
-                            <div class="flex items-center mb-2 sm:mb-0 sm:mr-4">
-                                ${whiteBallsHtml}
-                                <span class="ball powerball">${pick.powerball}</span>
-                            </div>
-                        `;
-                        // --- END FIX ---
-
-                        generatedPicksContainer.appendChild(pickDiv);
-                    });
-                    generatedPicksSection.classList.remove('hidden');
-
-                    lastDrawDatesContainer.innerHTML = ''; // Clear existing
-                    if (result.last_draw_dates && Object.keys(result.last_draw_dates).length > 0) {
-                        for (const [number, date] of Object.entries(result.last_draw_dates)) {
-                            const dateDiv = document.createElement('div');
-                            dateDiv.className = 'bg-gray-50 p-3 rounded-lg text-sm text-gray-700';
-                            dateDiv.innerHTML = `<strong>${number}:</strong> ${date}`;
-                            lastDrawDatesContainer.appendChild(dateDiv);
-                        }
-                        lastDrawDatesSection.classList.remove('hidden');
-                    } else {
-                        lastDrawDatesContainer.innerHTML = '<p class="text-gray-500">No last drawn date info available.</p>';
-                        lastDrawDatesSection.classList.remove('hidden');
-                    }
-
-                    // Display ML model info if available
-                    if (selectedStrategy === 'vae_based' && result.ml_model_info) {
-                        const mlInfoDiv = document.createElement('div');
-                        mlInfoDiv.className = 'mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-sm font-medium';
-                        mlInfoDiv.textContent = result.ml_model_info;
-                        generatedPicksContainer.prepend(mlInfoDiv); // Add to top of generated picks
-                    }
-
-
-                } else {
-                    alert(result.error || 'An unknown error occurred during generation.');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Failed to connect to the server or an unexpected error occurred.');
-            } finally {
-                buttonText.textContent = 'Generate Smart Picks';
-                loadingSpinner.classList.add('hidden');
-                generatePicksBtn.disabled = false;
-            }
-        });
-
-        // Event listener for saving all generated picks
-        saveAllPicksBtn.addEventListener('click', async function() {
-            if (currentGeneratedSets.length === 0) {
-                alert('No picks to save.');
-                return;
-            }
-
-            // Prepare picks for the /save_multiple_generated_picks endpoint
-            const picksToSave = currentGeneratedSets.map(pick => ({
-                white_balls: pick.white_balls,
-                powerball: pick.powerball
-            }));
-
-            try {
-                const response = await fetch('/save_multiple_generated_picks', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ picks: picksToSave })
-                });
-
-                const result = await response.json();
-
-                if (response.ok && result.success) {
-                    alert(result.message);
-                } else {
-                    alert(result.message || result.error || 'Failed to save picks.');
-                }
-            } catch (error) {
-                console.error('Error saving picks:', error);
-                alert('Failed to connect to the server or an unexpected error occurred while saving picks.');
-            }
-        });
+  // ── Strategy pill toggle ──────────────────────────────────
+  const pills = document.querySelectorAll('.strat-pill');
+  pills.forEach(pill => {
+    pill.addEventListener('click', function () {
+      pills.forEach(p => { p.classList.remove('active-rule','active-vae'); });
+      const val = this.dataset.val;
+      this.classList.add(val === 'rule_based' ? 'active-rule' : 'active-vae');
+      this.querySelector('input').checked = true;
+      document.getElementById('ruleCard').style.display = val === 'rule_based' ? 'block' : 'none';
+      const btn = document.getElementById('genBtn');
+      btn.classList.toggle('mode-vae', val === 'vae_based');
+      document.getElementById('btnTxt').textContent = val === 'vae_based'
+        ? '🧠 Generate ML Picks' : '◈ Generate Smart Picks';
     });
+  });
+
+  // ── Checkbox pills ────────────────────────────────────────
+  document.querySelectorAll('.check-pill').forEach(pill => {
+    pill.addEventListener('click', function () {
+      const cb = this.querySelector('input');
+      cb.checked = !cb.checked;
+      this.classList.toggle('checked', cb.checked);
+    });
+  });
+
+  function getChecked(containerId) {
+    const result = {};
+    document.querySelectorAll(`#${containerId} .check-pill`).forEach(pill => {
+      result[pill.dataset.key] = pill.querySelector('input').checked;
+    });
+    return result;
+  }
+
+  // ── Generate ──────────────────────────────────────────────
+  document.getElementById('genBtn').addEventListener('click', async function () {
+    const strategy = document.querySelector('input[name="strategy"]:checked').value;
+    const numSets  = parseInt(document.getElementById('numSets').value) || 1;
+    const excludeRaw = document.getElementById('excludeNums').value.trim();
+
+    this.disabled = true;
+    document.getElementById('btnTxt').textContent = 'Generating…';
+    document.getElementById('btnSpin').style.display = 'block';
+    document.getElementById('resultsCard').style.display = 'none';
+    document.getElementById('datesCard').style.display = 'none';
+    document.getElementById('aiCard').style.display = 'none';
+    currentSets = [];
+
+    let apiUrl, payload;
+
+    if (strategy === 'rule_based') {
+      apiUrl = '/generate_smart_picks_route';
+      payload = {
+        num_sets_to_generate: numSets,                           // ✅ correct field name
+        excluded_numbers: excludeRaw,
+        num_from_group_a: parseInt(document.getElementById('numGroupA').value) || 0,
+        odd_even_choice:  document.getElementById('oddEven').value,
+        sum_range_filter: document.getElementById('sumRange').value,
+        force_specific_pattern: document.getElementById('forcePattern').value.trim(),
+        ...getChecked('prioritizeChecks'),
+        ...getChecked('prefChecks'),
+      };
+    } else {
+      apiUrl = '/api/generate_advanced_picks';                    // ✅ correct VAE route
+      payload = {
+        num_sets_to_generate: numSets,
+        excluded_numbers: excludeRaw,
+        generation_strategy: 'vae_based',
+      };
+    }
+
+    try {
+      const res  = await fetch(apiUrl, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+
+      if (!data.success) { toast(data.error||'Generation failed.','error'); return; }
+
+      currentSets = data.generated_sets || [];
+
+      // ML banner
+      const banner = document.getElementById('mlBanner');
+      if (strategy === 'vae_based' && data.ml_model_info) {
+        document.getElementById('mlBannerText').textContent = data.ml_model_info;
+        banner.style.display = 'flex';
+      } else { banner.style.display = 'none'; }
+
+      // Build pick cards
+      const list = document.getElementById('picksList');
+      list.innerHTML = '';
+      currentSets.forEach((pick, i) => {
+        const div = document.createElement('div');
+        div.className = 'pick-card';
+        div.dataset.wb = pick.white_balls.join(',');
+        div.dataset.pb = pick.powerball;
+        const balls = pick.white_balls.map(n => `<div class="wb">${n}</div>`).join('');
+        div.innerHTML = `
+          <span class="pick-num">#${i+1}</span>
+          <div class="pick-balls">${balls}<span class="pick-sep">+</span><div class="pb">${pick.powerball}</div></div>
+          <div class="pick-btns">
+            <button class="btn-sm btn-save-one save-one-btn">💾 Save</button>
+          </div>`;
+        list.appendChild(div);
+      });
+
+      document.getElementById('resultsLbl').textContent = `${currentSets.length} Pick${currentSets.length===1?'':'s'} Generated — ${strategy === 'vae_based' ? 'ML Mode' : 'Rule-Based'}`;
+      document.getElementById('resultsCard').style.display = 'block';
+
+      // Last draw dates
+      const dates = data.last_draw_dates || {};
+      const dg = document.getElementById('datesGrid');
+      dg.innerHTML = '';
+      if (Object.keys(dates).length) {
+        for (const [k,v] of Object.entries(dates)) {
+          const chip = document.createElement('div'); chip.className='date-chip';
+          chip.innerHTML=`<div class="date-ball">${k}</div><div class="date-val">${v}</div>`;
+          dg.appendChild(chip);
+        }
+        document.getElementById('datesCard').style.display = 'block';
+      }
+
+      // Show AI panel
+      document.getElementById('aiCard').style.display = 'block';
+      document.getElementById('aiOutput').classList.remove('on');
+      document.getElementById('aiErr').style.display = 'none';
+
+      toast(`${currentSets.length} pick${currentSets.length===1?'':'s'} generated!`,'success');
+
+    } catch(e) {
+      toast('Request failed: '+e.message,'error');
+    } finally {
+      this.disabled = false;
+      document.getElementById('btnTxt').textContent =
+        document.querySelector('input[name="strategy"]:checked').value === 'vae_based'
+          ? '🧠 Generate ML Picks' : '◈ Generate Smart Picks';
+      document.getElementById('btnSpin').style.display = 'none';
+    }
+  });
+
+  // ── Save individual ───────────────────────────────────────
+  document.getElementById('picksList').addEventListener('click', async function (e) {
+    if (!e.target.classList.contains('save-one-btn')) return;
+    const card = e.target.closest('.pick-card');
+    const wb   = card.dataset.wb.split(',').map(Number);
+    const pb   = Number(card.dataset.pb);
+    await saveOne(wb, pb, e.target);
+  });
+
+  async function saveOne(wb, pb, btn) {
+    if (btn) { btn.disabled=true; btn.textContent='Saving…'; }
+    try {
+      const res = await fetch('/save_manual_pick',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({white_balls:wb, powerball:pb})
+      });
+      const d = await res.json();
+      toast(d.success?(d.message||'Saved!'):(d.error||'Error')
+        , d.success?'success':'error');
+    } catch(e){ toast('Save failed.','error'); }
+    finally { if(btn){ btn.disabled=false; btn.textContent='💾 Save'; } }
+  }
+
+  // ── Save All ──────────────────────────────────────────────
+  document.getElementById('saveAllBtn').addEventListener('click', async function () {
+    if (!currentSets.length) { toast('No picks to save.','info'); return; }
+    this.disabled=true; this.textContent='Saving…';
+    try {
+      const res = await fetch('/save_multiple_generated_picks',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({picks: currentSets.map(s=>({white_balls:s.white_balls,powerball:s.powerball}))})
+      });
+      const d = await res.json();
+      toast(d.success?(d.message||'All picks saved!'):(d.message||'Error saving.')
+        , d.success?'success':'error');
+    } catch(e){ toast('Save failed.','error'); }
+    finally{ this.disabled=false; this.textContent='💾 Save All Picks'; }
+  });
+
+  // ── AI Analysis ───────────────────────────────────────────
+  document.getElementById('aiBtn').addEventListener('click', async function () {
+    if (!currentSets.length) { toast('Generate picks first.','info'); return; }
+
+    const thinking  = document.getElementById('aiThinking');
+    const output    = document.getElementById('aiOutput');
+    const narrative = document.getElementById('aiNarrative');
+    const errEl     = document.getElementById('aiErr');
+    const chipsWrap = document.getElementById('aiChips');
+
+    this.disabled=true; this.innerHTML='⏳ Analysing…';
+    thinking.classList.add('on');
+    output.classList.remove('on');
+    errEl.style.display='none';
+    chipsWrap.innerHTML=''; narrative.textContent='';
+
+    const strategy = document.querySelector('input[name="strategy"]:checked').value;
+    const picksText = currentSets.map((s,i)=>
+      `Pick #${i+1}: White Balls [${s.white_balls.join(', ')}] + Powerball ${s.powerball} | Sum: ${s.white_balls.reduce((a,b)=>a+b,0)}`
+    ).join('\n');
+
+    try {
+      const res = await fetch('/api/smart-pick-ai-analysis',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          picks: currentSets,
+          picks_summary: picksText,
+          strategy,
+          num_sets: currentSets.length,
+        })
+      });
+      const d = await res.json();
+      if (d.error) {
+        errEl.textContent = 'AI unavailable: ' + d.error;
+        errEl.style.display='block';
+      } else {
+        (d.insights||[]).forEach(ins => {
+          const c = document.createElement('div'); c.className='ai-chip';
+          c.innerHTML=`<p class="ai-chip-lbl">${ins.label}</p><div class="ai-chip-val">${ins.value}</div>`;
+          chipsWrap.appendChild(c);
+        });
+        narrative.textContent = d.analysis;
+        output.classList.add('on');
+      }
+    } catch(e) {
+      errEl.textContent = 'Request failed. Add /api/smart-pick-ai-analysis to index.py.';
+      errEl.style.display='block';
+    } finally {
+      thinking.classList.remove('on');
+      this.disabled=false; this.innerHTML='◈ Analyse My Picks';
+    }
+  });
+});
 </script>
 {% endblock %}
