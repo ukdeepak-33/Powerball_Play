@@ -6733,13 +6733,28 @@ def analyze_consecutive_trends_ai():
             f"Do not mention your knowledge cutoff. Do not add information beyond what is provided."
         )
 
-        ai_text, error = call_groq(prompt)  # ← only ONE call
+        GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+        if not GROQ_API_KEY:
+            return jsonify({"error": "GROQ_API_KEY not set"}), 500
 
-        if error:
-            return jsonify({"error": error}), 500
+        response = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={'Authorization': f'Bearer {GROQ_API_KEY}', 'Content-Type': 'application/json'},
+            json={
+                'model': 'llama-3.1-8b-instant',
+                'messages': [{'role': 'user', 'content': prompt}],
+                'max_tokens': 300,
+                'temperature': 0.6,
+            },
+            timeout=30
+        )
+        result = response.json()
+        if 'error' in result:
+            return jsonify({"error": result['error'].get('message', 'Groq error')}), 500
 
+        ai_text = result['choices'][0]['message']['content'].strip()
         return jsonify({"summary": ai_text})
-
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
