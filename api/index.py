@@ -9422,6 +9422,110 @@ def historical_draws_ai_analysis():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+# ── Paste into index.py ───────────────────────────────────────────────────────
+
+@app.route('/api/powerball-frequency-ai-analysis', methods=['POST'])
+def powerball_frequency_ai_analysis():
+    try:
+        p = request.get_json(force=True, silent=True) or {}
+
+        total_draws    = int(p.get('total_draws') or 0)
+        avg_per_ball   = float(p.get('avg_per_ball') or 0)
+        max_draws      = int(p.get('max_draws') or 0)
+        min_draws      = int(p.get('min_draws') or 0)
+        top5           = str(p.get('top5_powerballs') or '')
+        bot5           = str(p.get('bottom5_powerballs') or '')
+        hot_pbs        = str(p.get('hot_powerballs') or '')
+        cold_pbs       = str(p.get('cold_powerballs') or '')
+        all_freq       = str(p.get('all_frequencies') or '')
+        selected_pb    = p.get('selected_pb')
+
+        spread = max_draws - min_draws
+        spread_pct = round(spread / avg_per_ball * 100, 1) if avg_per_ball else 0
+
+        sel_ctx = f"\nUSER HAS SELECTED: Powerball #{selected_pb} for focused analysis. Give extra attention to this ball." if selected_pb else ""
+
+        lines = [
+            "You are a Powerball frequency analyst. Use ONLY the data below — do not invent numbers.",
+            "",
+            "POWERBALL FREQUENCY DATA (all 26 balls):",
+            f"  Total draws across all PBs: {total_draws}",
+            f"  Average draws per PB: {avg_per_ball}",
+            f"  Highest frequency: {max_draws}",
+            f"  Lowest frequency:  {min_draws}",
+            f"  Spread (max-min):  {spread} draws ({spread_pct}% of avg)",
+            f"  TOP 5 most drawn: {top5}",
+            f"  BOTTOM 5 least drawn: {bot5}",
+            f"  HOT balls (15%+ above avg): {hot_pbs or 'none'}",
+            f"  COLD balls (15%+ below avg): {cold_pbs or 'none'}",
+            f"  Full frequency list: {all_freq}",
+            sel_ctx,
+            "",
+            "Write EXACTLY these 3 sections using the real numbers above:",
+            "",
+            "FREQUENCY DOMINANCE",
+            "Which Powerballs lead the pack? Are the top draws significantly above average?",
+            f"A spread of {spread_pct}% means the distribution is {'highly uneven — some balls dominate' if spread_pct > 30 else 'relatively balanced'}.",
+            "Name the top 3 and explain what their lead means for players.",
+            "",
+            "HOT vs COLD POWERBALLS",
+            f"Hot balls (above avg by 15%+): {hot_pbs or 'none identified'}",
+            f"Cold balls (below avg by 15%+): {cold_pbs or 'none identified'}",
+            "Are any cold balls historically strong — potentially overdue for a return?",
+            "Name 2 hot and 2 cold with exact frequencies.",
+            "",
+            "NEXT DRAW RECOMMENDATION",
+            "Based strictly on frequency data above, name:",
+            "  (1) Your #1 Powerball pick — most likely based on hot trend",
+            "  (2) A contrarian pick — cold ball due for a comeback",
+            "  (3) One to avoid — consistently underperforming",
+            "Give exact PB numbers and frequencies. Be direct and specific.",
+        ]
+
+        prompt = "\n".join(lines)
+
+        GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+        if not GROQ_API_KEY:
+            return jsonify({'error': 'GROQ_API_KEY not set'}), 500
+
+        resp = requests.post(
+            'https://api.groq.com/openai/v1/chat/completions',
+            headers={'Authorization': 'Bearer ' + GROQ_API_KEY, 'Content-Type': 'application/json'},
+            json={
+                'model':       'llama-3.1-8b-instant',
+                'messages':    [{'role': 'user', 'content': prompt}],
+                'max_tokens':  600,
+                'temperature': 0.55,
+            },
+            timeout=40
+        )
+
+        result = resp.json()
+        if 'error' in result:
+            return jsonify({'error': result['error'].get('message', str(result['error']))}), 500
+
+        analysis = result['choices'][0]['message']['content'].strip()
+
+        hot_list  = [x.strip() for x in hot_pbs.split(',') if x.strip()]
+        cold_list = [x.strip() for x in cold_pbs.split(',') if x.strip()]
+
+        insights = [
+            {'label': '🔴 Total PB Draws',    'value': f'{total_draws:,}'},
+            {'label': '📊 Avg per Ball',       'value': f'{avg_per_ball}×'},
+            {'label': '🔥 Hottest PB',         'value': top5.split(',')[0].strip() if top5 else '—'},
+            {'label': '❄️ Coldest PB',         'value': bot5.split(',')[0].strip() if bot5 else '—'},
+            {'label': '⚡ Hot Balls',           'value': f'{len(hot_list)} balls above avg'},
+            {'label': '🌵 Cold Balls',          'value': f'{len(cold_list)} balls below avg'},
+            {'label': '📐 Spread',             'value': f'{spread} draws ({spread_pct}%)'},
+            {'label': '🎯 Focused PB',         'value': f'PB #{selected_pb}' if selected_pb else 'None selected'},
+        ]
+
+        return jsonify({'analysis': analysis, 'insights': insights})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 
 initialize_core_data()
 
