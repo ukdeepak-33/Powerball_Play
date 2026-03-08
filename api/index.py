@@ -1990,7 +1990,7 @@ def save_manual_draw_to_db(draw_date, n1, n2, n3, n4, n5, pb):
         print(f"Failed to insert manual draw. Status: {insert_response.status_code}, Response: {insert_response.text}")
         return False, f"Error saving official draw: {insert_response.status_code} - {insert_response.text}"
 
-def save_generated_numbers_to_db(numbers, powerball):
+def save_generated_numbers_to_db(numbers, powerball, source='manual'):
     """Saves a generated Powerball combination to Supabase."""
     url = f"{SUPABASE_PROJECT_URL}/rest/v1/{GENERATED_NUMBERS_TABLE_NAME}"
     headers = _get_supabase_headers(is_service_key=True)
@@ -4397,7 +4397,7 @@ def save_multiple_generated_picks_route():
                     if not (all(1 <= n <= 69 for n in white_balls) and 1 <= powerball <= 26):
                         errors.append(f"Numbers out of range: {white_balls} PB:{powerball}")
                         continue
-                    success, message = save_generated_numbers_to_db(white_balls, powerball)
+                    success, message = save_generated_numbers_to_db(white_balls, powerball, source='manual')
                     if success:
                         saved_count += 1
                     else:
@@ -4430,7 +4430,7 @@ def save_multiple_generated_picks_route():
                 flash("Numbers out of valid range.", 'error')
                 return redirect(url_for('index'))
 
-            success, message = save_generated_numbers_to_db(white_balls, powerball)
+            success, message = save_generated_numbers_to_db(white_balls, powerball, source='manual')
             flash(message, 'info' if success else 'error')
             return redirect(url_for('index'))
 
@@ -4477,7 +4477,7 @@ def save_multiple_smart_picks_route():
                 failed_count += 1
                 continue
             
-            success, message = save_generated_numbers_to_db(white_balls, powerball)
+            success, message = save_generated_numbers_to_db(white_balls, powerball, source='manual')
             if success:
                 saved_count += 1
                 messages.append(f"Saved: {', '.join(map(str, white_balls))} + {powerball}")
@@ -5293,7 +5293,7 @@ def save_manual_pick_route():
         white_balls = sorted([int(n) for n in white_balls])
         powerball = int(powerball)
 
-        success, message = save_generated_numbers_to_db(white_balls, powerball)
+        success, message = save_generated_numbers_to_db(white_balls, powerball, source='manual')
 
         if success:
             return jsonify({"success": True, "message": message})
@@ -6868,7 +6868,7 @@ def save_generated_pick_route():
             flash("White balls must be between 1-69 and Powerball between 1-26 for saving.", 'error')
             return redirect(url_for('index'))
 
-        success, message = save_generated_numbers_to_db(white_balls, powerball)
+        success, message = save_generated_numbers_to_db(white_balls, powerball, source='manual')
         if success:
             flash(message, 'info')
         else:
