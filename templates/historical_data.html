@@ -467,9 +467,8 @@ document.addEventListener('DOMContentLoaded', function () {
       // Map draw_date → cumulative freq at that point
       const freqAtDraw = {};
       chronoDraws.forEach(d => {
-        const snap = {...cumul};
         d.white_balls.forEach(b => cumul[b]++);
-        freqAtDraw[d.draw_date] = snap;
+        freqAtDraw[d.draw_date] = {...cumul};
       });
 
       tbody.innerHTML = slice.map((d, i) => {
