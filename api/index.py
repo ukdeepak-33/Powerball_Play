@@ -6769,7 +6769,43 @@ def generate_smart_picks_route():
         traceback.print_exc()
         return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
         
+# ── Add this route to index.py ──────────────────────────────
+# Place alongside the other page routes
 
+@app.route('/last-digit-analysis')
+def last_digit_analysis_route():
+    """Same Last Digit Analysis — fetches all draws from Supabase."""
+    try:
+        raw_draws = get_all_official_draws()
+
+        # Transform to the format the JS expects:
+        # { date: "YYYY-MM-DD", numbers: [n1,n2,n3,n4,n5], powerball: pb }
+        draws = []
+        for d in raw_draws:
+            try:
+                draws.append({
+                    'date':      d['draw_date'],
+                    'numbers':   [
+                        int(d['Number 1']), int(d['Number 2']), int(d['Number 3']),
+                        int(d['Number 4']), int(d['Number 5'])
+                    ],
+                    'powerball': int(d['Powerball'])
+                })
+            except (KeyError, ValueError, TypeError):
+                continue
+
+        # Sort ascending by date so JS year/month grouping works correctly
+        draws.sort(key=lambda x: x['date'])
+
+        return render_template(
+            'last_digit_analysis.html',
+            draws_json=json.dumps(draws)
+        )
+
+    except Exception as e:
+        traceback.print_exc()
+        flash(f"Error loading draw data: {e}", 'error')
+        return redirect(url_for('index'))
 
 
 
