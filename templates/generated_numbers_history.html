@@ -491,24 +491,64 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!data.success) {
           listEl.innerHTML = `<span style="font-size:11px;color:#fca5a5">${data.error || 'Error'}</span>`;
         } else {
-          const summary = data.match_summary || {};
+          const summary  = data.match_summary || {};
+          const pickWBs  = new Set(wb.split(',').map(Number));
           let anyHit = false;
+
           TIER_ORDER.forEach(tier => {
             const info  = summary[tier];
             if (!info) return;
             const count = info.count || 0;
             if (count === 0) return;
             anyHit = true;
-            const dates = (info.draws || []).slice(0,3).map(d => d.date || d).join(' · ');
-            const row   = document.createElement('div');
-            row.className = 'pa-match-row';
-            row.innerHTML = `
-              <span class="pa-match-label">${tier}</span>
-              <span class="pa-match-count" style="color:var(--amber)">${count}×</span>
-              ${dates ? `<span class="pa-match-dates">${dates}</span>` : ''}
+
+            // ── Tier header ──────────────────────────────────────
+            const hdr = document.createElement('div');
+            hdr.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:12px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,0.06);';
+            hdr.innerHTML = `
+              <span style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);flex:1;">${tier}</span>
+              <span style="font-size:12px;font-weight:700;color:var(--amber)">${count}×</span>
             `;
-            listEl.appendChild(row);
+            listEl.appendChild(hdr);
+
+            // ── Per-draw rows (up to 5 most recent) ──────────────
+            (info.draws || []).slice(0, 5).forEach(draw => {
+              const matchedSet = new Set(draw.matched_whites || []);
+              const pbHit      = draw.powerball_match;
+
+              // White balls
+              const ballsHtml = (draw.white_balls || []).map(n => {
+                const hit = matchedSet.has(n);
+                const bg  = hit
+                  ? 'radial-gradient(circle at 32% 30%,#fde68a 0%,#f59e0b 50%,#b45309 100%)'
+                  : 'radial-gradient(circle at 32% 30%,#f0f4ff 0%,#c8d8ed 45%,#8aaac8 100%)';
+                const clr  = hit ? '#1c1000' : '#0d1829';
+                const glow = hit ? 'box-shadow:0 0 8px rgba(245,158,11,0.55),0 1px 4px rgba(0,0,0,0.3);' : 'opacity:0.35;';
+                return `<div style="width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;background:${bg};color:${clr};flex-shrink:0;${glow}">${n}</div>`;
+              }).join('');
+
+              // Powerball
+              const pbBg   = pbHit
+                ? 'radial-gradient(circle at 32% 30%,#fde68a 0%,#f59e0b 50%,#b45309 100%)'
+                : 'radial-gradient(circle at 32% 30%,#ff9a9a 0%,#ef5350 45%,#b71c1c 100%)';
+              const pbClr  = pbHit ? '#1c1000' : '#fff';
+              const pbGlow = pbHit ? 'box-shadow:0 0 8px rgba(245,158,11,0.55);' : 'opacity:0.35;';
+              const pbHtml = `<div style="width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;background:${pbBg};color:${pbClr};flex-shrink:0;${pbGlow}">${draw.powerball}</div>`;
+
+              const drawRow = document.createElement('div');
+              drawRow.style.cssText = 'display:flex;align-items:center;gap:6px;padding:5px 0;flex-wrap:wrap;';
+              drawRow.innerHTML = `
+                <span style="font-size:9px;color:var(--muted);min-width:76px;flex-shrink:0;">${draw.date}</span>
+                <div style="display:flex;gap:3px;align-items:center;">
+                  ${ballsHtml}
+                  <span style="color:rgba(255,255,255,0.12);font-size:11px;margin:0 1px;">+</span>
+                  ${pbHtml}
+                </div>
+              `;
+              listEl.appendChild(drawRow);
+            });
           });
+
           if (!anyHit) {
             listEl.innerHTML = '<span style="font-size:11px;color:var(--muted)">No matches found in the last 2 years.</span>';
           }
