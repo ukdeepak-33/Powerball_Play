@@ -1,5 +1,5 @@
 import pandas as pd
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, make_response
 import random
 from itertools import combinations
 import math
@@ -4164,6 +4164,18 @@ def index():
                            num_sets_to_generate=1
                           )
 
+
+@app.route('/manifest.json')
+def manifest():
+    return app.send_static_file('manifest.json')
+
+@app.route('/service-worker.js')
+def service_worker():
+    response = make_response(app.send_static_file('service-worker.js'))
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['Content-Type']  = 'application/javascript'
+    return response
+    
 @app.route('/generate', methods=['POST'])
 def generate():
     if df.empty:
