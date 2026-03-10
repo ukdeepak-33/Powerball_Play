@@ -4753,31 +4753,43 @@ def co_occurrence_analysis_route():
 @app.route('/powerball_position_frequency')
 def powerball_position_frequency_route():
     try:
-        url = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
+        url     = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
         headers = _get_supabase_headers(is_service_key=False)
-        response = requests.get(url, headers=headers, params={
-            'select': 'Draw Date,Number 1,Number 2,Number 3,Number 4,Number 5,Powerball',
-            'order':  'Draw Date.asc',
-            'limit':  '2000'
-        })
-        draws = []
-        for row in response.json():
-            try:
-                draws.append({
-                    'date':      row['Draw Date'],
-                    'numbers':   [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
-                                  int(row['Number 4']), int(row['Number 5'])],
-                    'powerball': int(row['Powerball'])
-                })
-            except (KeyError, ValueError, TypeError):
-                continue
+        draws   = []
+        offset  = 0
+        batch   = 1000
+
+        while True:
+            response = requests.get(url, headers=headers, params={
+                'select': 'Draw Date,Number 1,Number 2,Number 3,Number 4,Number 5,Powerball',
+                'order':  'Draw Date.asc',
+                'limit':  str(batch),
+                'offset': str(offset)
+            })
+            rows = response.json()
+            if not rows:
+                break
+            for row in rows:
+                try:
+                    draws.append({
+                        'date':      row['Draw Date'],
+                        'numbers':   [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                                      int(row['Number 4']), int(row['Number 5'])],
+                        'powerball': int(row['Powerball'])
+                    })
+                except (KeyError, ValueError, TypeError):
+                    continue
+            if len(rows) < batch:
+                break          # last page — no more rows
+            offset += batch
+
         return render_template('powerball_position_frequency.html',
                                draws_json=json.dumps(draws))
     except Exception as e:
         traceback.print_exc()
         flash(f"Error loading draw data: {e}", 'error')
         return redirect(url_for('index'))
-
+        
 @app.route('/powerball_frequency_by_year')
 def powerball_frequency_by_year_route():
     yearly_pb_freq_data, years = get_cached_analysis('yearly_pb_freq', get_powerball_frequency_by_year, df)
