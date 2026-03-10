@@ -234,6 +234,14 @@
       ::-webkit-scrollbar-track { background:transparent; }
       ::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:2px; }
     </style>
+
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#040608">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="PB Analytics">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    
 </head>
 <body>
 
@@ -460,6 +468,16 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 </script>
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js')
+            .then(reg => console.log('[PWA] Service worker registered:', reg.scope))
+            .catch(err => console.warn('[PWA] Service worker failed:', err));
+        });
+      }
+    </script>
 {% endblock %}
 </body>
 </html>
