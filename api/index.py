@@ -4750,32 +4750,33 @@ def co_occurrence_analysis_route():
                            co_occurrence_data=co_occurrence_data,
                            max_co_occurrence=max_co_occurrence)
 
-@@app.route('/powerball_position_frequency')
+@app.route('/powerball_position_frequency')
 def powerball_position_frequency_route():
-    powerball_position_data = get_cached_analysis('powerball_position_frequency', get_powerball_position_frequency, df)
-
-    url = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
-    headers = _get_supabase_headers(is_service_key=False)
-    response = requests.get(url, headers=headers, params={
-        'select': 'Draw Date,Number 1,Number 2,Number 3,Number 4,Number 5,Powerball',
-        'order':  'Draw Date.asc',
-        'limit':  '2000'
-    })
-    draws = []
-    for row in response.json():
-        try:
-            draws.append({
-                'date':      row['Draw Date'],
-                'numbers':   [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
-                              int(row['Number 4']), int(row['Number 5'])],
-                'powerball': int(row['Powerball'])
-            })
-        except (KeyError, ValueError, TypeError):
-            continue
-
-    return render_template('powerball_position_frequency.html',
-                           powerball_position_data=powerball_position_data,
-                           draws_json=json.dumps(draws))
+    try:
+        url = f"{SUPABASE_PROJECT_URL}/rest/v1/{SUPABASE_TABLE_NAME}"
+        headers = _get_supabase_headers(is_service_key=False)
+        response = requests.get(url, headers=headers, params={
+            'select': 'Draw Date,Number 1,Number 2,Number 3,Number 4,Number 5,Powerball',
+            'order':  'Draw Date.asc',
+            'limit':  '2000'
+        })
+        draws = []
+        for row in response.json():
+            try:
+                draws.append({
+                    'date':      row['Draw Date'],
+                    'numbers':   [int(row['Number 1']), int(row['Number 2']), int(row['Number 3']),
+                                  int(row['Number 4']), int(row['Number 5'])],
+                    'powerball': int(row['Powerball'])
+                })
+            except (KeyError, ValueError, TypeError):
+                continue
+        return render_template('powerball_position_frequency.html',
+                               draws_json=json.dumps(draws))
+    except Exception as e:
+        traceback.print_exc()
+        flash(f"Error loading draw data: {e}", 'error')
+        return redirect(url_for('index'))
 
 @app.route('/powerball_frequency_by_year')
 def powerball_frequency_by_year_route():
