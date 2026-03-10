@@ -1,0 +1,60 @@
+# ═══════════════════════════════════════════════════════════════
+# PWA SETUP — Powerball Analytics Hub
+# ═══════════════════════════════════════════════════════════════
+# Apply these 3 changes to complete the PWA setup.
+# ───────────────────────────────────────────────────────────────
+
+
+# ── CHANGE 1: base.html ────────────────────────────────────────
+# Add these lines inside <head>, just before </head>
+
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#040608">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="PB Analytics">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+
+# Then add this just before </body> in base.html:
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js')
+            .then(reg => console.log('[PWA] Service worker registered:', reg.scope))
+            .catch(err => console.warn('[PWA] Service worker failed:', err));
+        });
+      }
+    </script>
+
+
+# ── CHANGE 2: index.py — serve manifest + service worker ───────
+# Add these two routes anywhere in index.py (near the top routes)
+
+@app.route('/manifest.json')
+def manifest():
+    return app.send_static_file('manifest.json')
+
+@app.route('/service-worker.js')
+def service_worker():
+    response = make_response(app.send_static_file('service-worker.js'))
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['Content-Type']  = 'application/javascript'
+    return response
+
+# NOTE: make sure 'make_response' is imported at the top of index.py:
+# from flask import Flask, render_template, request, jsonify, redirect,
+#                   url_for, flash, make_response
+
+
+# ── CHANGE 3: file structure ───────────────────────────────────
+# Add these files to your project:
+#
+#   static/
+#     manifest.json          ← the manifest.json file
+#     service-worker.js      ← the service-worker.js file
+#     icons/
+#       icon-192.png         ← downloaded from icon_generator.html
+#       icon-512.png         ← downloaded from icon_generator.html
+#
+# That's it. Commit everything and push to Render.
