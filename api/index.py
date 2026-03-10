@@ -2235,7 +2235,9 @@ def check_generated_against_history(generated_white_balls, generated_powerball, 
         results["summary"][category]["draws"].append({
             "date": historical_draw_date,
             "white_balls": historical_white_balls,
-            "powerball": historical_powerball
+            "powerball": historical_powerball,
+            "matched_whites": sorted(list(gen_white_set.intersection(hist_white_set))),
+            "powerball_match": bool(powerball_match)
         })
 
     for category in results["summary"]:
