@@ -4157,6 +4157,11 @@ def index():
                            num_sets_to_generate=1
                           )
 
+@app.route('/ping')
+def ping():
+    return 'ok', 200
+
+
 @app.route('/generate', methods=['POST'])
 def generate():
     if df.empty:
@@ -4692,6 +4697,7 @@ def simulate_multiple_draws_route():
                            simulated_powerball_freq=[],
                            num_simulations=100,
                            selected_odd_even_choice="Any")
+    
 @app.route('/number_age_distribution')
 def number_age_distribution_route():
     if df.empty:
