@@ -4169,6 +4169,11 @@ def index():
 def manifest():
     return app.send_static_file('manifest.json')
 
+
+@app.route('/ping')
+def ping():
+    return 'ok', 200
+
 @app.route('/service-worker.js')
 def service_worker():
     response = make_response(app.send_static_file('service-worker.js'))
