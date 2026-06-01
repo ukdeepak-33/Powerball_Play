@@ -21,7 +21,7 @@ DRAW_TZ = pytz.timezone('US/Eastern')
 SIM_DRAW_COUNT = 500
 
 # ── How many combinations to save per run ───────────────────
-COMBOS_TO_SAVE = 3
+COMBOS_TO_SAVE = 5
 
 
 def run_draw_day_simulation():
