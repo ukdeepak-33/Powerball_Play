@@ -7217,6 +7217,140 @@ def generate_last_digit_smart_pick_route():
 
 
 
+@app.route('/debug_last_digit_smart_pick', methods=['GET'])
+def debug_last_digit_smart_pick_route():
+    try:
+        group_size = int(request.args.get('group_size', 2))
+ 
+        if df.empty:
+            return jsonify({'error': 'df is empty on this worker.'}), 500
+ 
+        analysis = analyze_last_digit_patterns_current_year(df)
+        if not analysis:
+            return jsonify({'error': 'analyze_last_digit_patterns_current_year returned None.'}), 500
+ 
+        strongest = analysis['groups'][analysis['strongest_last_digit']]
+        seed_numbers = _select_last_digit_seed_numbers(strongest, group_size)
+        seed_group_a_count = sum(1 for n in seed_numbers if n in group_a)
+ 
+        # ---- Replay the exact same attempt loop generate_smart_picks runs,
+        # ---- but tally WHY each attempt is rejected instead of giving up silently.
+        fail_reasons = defaultdict(int)
+        success_count = 0
+        max_attempts = 500  # smaller than 5000, just enough to see the pattern
+ 
+        excluded_numbers = []
+        num_from_group_a = seed_group_a_count
+        odd_even_choice = 'Any'
+        sum_range_tuple = None
+        force_specific_pattern = seed_numbers
+ 
+        for _ in range(max_attempts):
+            candidate_white_balls = []
+            candidate_powerball = random.randint(GLOBAL_POWERBALL_RANGE[0], GLOBAL_POWERBALL_RANGE[1])
+            remaining_to_pick = 5
+            temp_excluded = set(excluded_numbers)
+ 
+            if force_specific_pattern:
+                candidate_white_balls.extend(force_specific_pattern)
+                temp_excluded.update(force_specific_pattern)
+                remaining_to_pick -= len(force_specific_pattern)
+ 
+            if remaining_to_pick < 0:
+                fail_reasons['remaining_negative'] += 1
+                continue
+ 
+            available_pool = [n for n in range(GLOBAL_WHITE_BALL_RANGE[0], GLOBAL_WHITE_BALL_RANGE[1] + 1)
+                              if n not in temp_excluded and n not in candidate_white_balls]
+ 
+            if len(available_pool) < remaining_to_pick:
+                fail_reasons['pool_too_small'] += 1
+                continue
+ 
+            current_group_a_count = sum(1 for num in candidate_white_balls if num in group_a)
+            needed_from_group_a = num_from_group_a - current_group_a_count
+ 
+            if needed_from_group_a > 0:
+                possible_group_a_from_pool = [n for n in available_pool if n in group_a]
+                if len(possible_group_a_from_pool) < needed_from_group_a:
+                    fail_reasons['not_enough_group_a_in_pool'] += 1
+                    continue
+                try:
+                    selected_group_a = random.sample(possible_group_a_from_pool, needed_from_group_a)
+                    candidate_white_balls.extend(selected_group_a)
+                    remaining_to_pick -= needed_from_group_a
+                    available_pool = [n for n in available_pool if n not in selected_group_a]
+                except ValueError:
+                    fail_reasons['sample_error_group_a'] += 1
+                    continue
+            elif needed_from_group_a < 0:
+                fail_reasons['needed_from_group_a_negative'] += 1
+                continue
+ 
+            if remaining_to_pick > 0:
+                if len(available_pool) < remaining_to_pick:
+                    fail_reasons['pool_too_small_2'] += 1
+                    continue
+                try:
+                    random_fill = random.sample(available_pool, remaining_to_pick)
+                    candidate_white_balls.extend(random_fill)
+                except ValueError:
+                    fail_reasons['sample_error_fill'] += 1
+                    continue
+ 
+            if len(set(candidate_white_balls)) != 5:
+                fail_reasons['duplicate_numbers'] += 1
+                continue
+ 
+            candidate_white_balls = sorted(candidate_white_balls)
+ 
+            even_count = sum(1 for num in candidate_white_balls if num % 2 == 0)
+            odd_count = 5 - even_count
+            if odd_even_choice != "Any":
+                fail_reasons['odd_even_not_any'] += 1
+                continue
+ 
+            if sum_range_tuple and not (sum_range_tuple[0] <= sum(candidate_white_balls) <= sum_range_tuple[1]):
+                fail_reasons['sum_range'] += 1
+                continue
+ 
+            if check_exact_match(candidate_white_balls):
+                fail_reasons['exact_match'] += 1
+                continue
+ 
+            try:
+                last_draw_data = get_last_draw(df)
+                if not last_draw_data.empty and last_draw_data.get('Draw Date') != 'N/A':
+                    last_white_balls_list = [int(last_draw_data['Number 1']), int(last_draw_data['Number 2']),
+                                              int(last_draw_data['Number 3']), int(last_draw_data['Number 4']),
+                                              int(last_draw_data['Number 5'])]
+                    if set(candidate_white_balls) == set(last_white_balls_list) and candidate_powerball == int(last_draw_data['Powerball']):
+                        fail_reasons['last_draw_match'] += 1
+                        continue
+            except Exception as inner_e:
+                fail_reasons[f'get_last_draw_exception: {inner_e}'] += 1
+                continue
+ 
+            success_count += 1
+ 
+        return jsonify({
+            'seed_numbers': seed_numbers,
+            'seed_group_a_count': seed_group_a_count,
+            'strongest_digit': strongest['last_digit'],
+            'strongest_numbers': strongest['numbers'],
+            'attempts_run': max_attempts,
+            'success_count': success_count,
+            'fail_reasons': dict(fail_reasons)
+        })
+ 
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e), 'trace': traceback.format_exc()}), 500
+ 
+
+
+
+
 @app.route('/save_generated_pick', methods=['POST'])
 def save_generated_pick_route():
     try:
