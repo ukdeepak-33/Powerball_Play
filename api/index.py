@@ -1012,6 +1012,36 @@ Be concise and factual. Do not make promises about winning.
 
     return None
 
+def call_groq(prompt, max_tokens=300, temperature=0.4):
+    """
+    Generic Groq call. Returns (text, error) — text is None if error is set.
+    """
+    GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+    if not GROQ_API_KEY:
+        return None, "GROQ_API_KEY not configured on the server."
+ 
+    try:
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.1-8b-instant",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": max_tokens,
+                "temperature": temperature
+            },
+            timeout=15
+        )
+        if response.status_code == 200:
+            return response.json()['choices'][0]['message']['content'].strip(), None
+        return None, f"Groq API returned status {response.status_code}"
+    except Exception as e:
+        return None, f"Groq request failed: {e}"
+
+
 def initialize_core_data():
     """Initializes and loads all core data from Supabase and performs initial analyses."""
     global df, last_draw, historical_white_ball_sets, white_ball_co_occurrence_lookup, last_analysis_cache_update
@@ -1371,6 +1401,157 @@ def get_pairs_by_last_digit():
         })
         
     return pairs_data
+
+
+def analyze_last_digit_patterns_current_year(df_source, target_year=None):
+    """
+    For each last-digit group (0-9), computes how often 2+ numbers from that
+    group appeared together in a single draw during `target_year`.
+    Defaults target_year to the current calendar year, falling back to the
+    most recent year actually present in the data (e.g. early January before
+    that year's first draw is loaded).
+ 
+    Returns:
+        {
+          'year': 2026,
+          'strongest_last_digit': 7,
+          'groups': {
+              7: {
+                  'last_digit': 7,
+                  'numbers': [7, 17, 27, 37, 47, 57, 67],
+                  'draws_with_match': 19,
+                  'total_draws': 58,
+                  'hit_rate_percent': 32.8,
+                  'draws_since_last_match': 4,
+                  'top_pair': {'pair': [27, 47], 'hit_count': 6}
+              },
+              ...
+          }
+        }
+        or None if there's no data to analyze.
+    """
+    if df_source.empty:
+        return None
+ 
+    df_local = df_source.copy()
+    if 'Draw Date_dt' not in df_local.columns or not pd.api.types.is_datetime64_any_dtype(df_local['Draw Date_dt']):
+        df_local['Draw Date_dt'] = pd.to_datetime(df_local['Draw Date'], errors='coerce')
+        df_local = df_local.dropna(subset=['Draw Date_dt'])
+ 
+    available_years = sorted(df_local['Draw Date_dt'].dt.year.unique())
+    if not available_years:
+        return None
+ 
+    if target_year is None:
+        current_calendar_year = datetime.now().year
+        target_year = current_calendar_year if current_calendar_year in available_years else available_years[-1]
+ 
+    year_df = df_local[df_local['Draw Date_dt'].dt.year == target_year].sort_values('Draw Date_dt')
+    if year_df.empty:
+        return None
+ 
+    digit_groups = defaultdict(list)
+    for n in range(GLOBAL_WHITE_BALL_RANGE[0], GLOBAL_WHITE_BALL_RANGE[1] + 1):
+        digit_groups[n % 10].append(n)
+ 
+    total_draws = len(year_df)
+    draws_desc = year_df.sort_values('Draw Date_dt', ascending=False)
+ 
+    group_stats = {}
+    for digit, numbers in digit_groups.items():
+        if len(numbers) < 2:
+            continue
+ 
+        pair_hit_counts = defaultdict(int)
+        draws_with_match = 0
+ 
+        for _, row in year_df.iterrows():
+            white_balls = sorted(int(row[f'Number {i}']) for i in range(1, 6))
+            matches = [n for n in white_balls if n % 10 == digit]
+            if len(matches) >= 2:
+                draws_with_match += 1
+                for pair in combinations(matches, 2):
+                    pair_hit_counts[pair] += 1
+ 
+        # Draws since the group last produced a match, walking back from the
+        # most recent draw.
+        streak = 0
+        for _, row in draws_desc.iterrows():
+            white_balls = sorted(int(row[f'Number {i}']) for i in range(1, 6))
+            matches = [n for n in white_balls if n % 10 == digit]
+            if len(matches) >= 2:
+                break
+            streak += 1
+ 
+        top_pair = None
+        if pair_hit_counts:
+            pair_tuple, count = max(pair_hit_counts.items(), key=lambda kv: kv[1])
+            top_pair = {'pair': list(pair_tuple), 'hit_count': int(count)}
+ 
+        hit_rate = round((draws_with_match / total_draws) * 100, 1) if total_draws else 0.0
+ 
+        group_stats[digit] = {
+            'last_digit': digit,
+            'numbers': numbers,
+            'draws_with_match': int(draws_with_match),
+            'total_draws': int(total_draws),
+            'hit_rate_percent': hit_rate,
+            'draws_since_last_match': int(streak),
+            'top_pair': top_pair
+        }
+ 
+    if not group_stats:
+        return None
+ 
+    strongest_digit = max(group_stats.values(), key=lambda g: g['hit_rate_percent'])['last_digit']
+ 
+    # Overall base rate: % of draws where ANY last-digit group had 2+ numbers,
+    # regardless of which digit. With only 10 possible last digits and 5 balls
+    # drawn, this is a birthday-paradox effect — it tends to run high (60%+)
+    # for almost every year, independent of any single "hot" digit. This is
+    # the honest justification for seeding a same-last-digit pair at all;
+    # the per-group hit rate above only decides WHICH digit to use.
+    draws_with_any_match = 0
+    for _, row in year_df.iterrows():
+        white_balls = [int(row[f'Number {i}']) for i in range(1, 6)]
+        digit_counts = defaultdict(int)
+        for n in white_balls:
+            digit_counts[n % 10] += 1
+        if any(c >= 2 for c in digit_counts.values()):
+            draws_with_any_match += 1
+    overall_hit_rate = round((draws_with_any_match / total_draws) * 100, 1) if total_draws else 0.0
+ 
+    return {
+        'year': int(target_year),
+        'strongest_last_digit': int(strongest_digit),
+        'overall_same_last_digit_hit_rate': overall_hit_rate,
+        'overall_draws_with_match': int(draws_with_any_match),
+        'overall_total_draws': int(total_draws),
+        'groups': group_stats
+    }
+
+def _select_last_digit_seed_numbers(group_stat, group_size):
+    """
+    Chooses `group_size` numbers from a last-digit group to seed a smart
+    pick. Prefers the numbers from that group's most frequent same-last-digit
+    pair, then fills any remaining slots randomly from the rest of the group.
+    """
+    numbers = group_stat['numbers']
+    top_pair = group_stat.get('top_pair')
+ 
+    seed = list(top_pair['pair']) if top_pair else []
+ 
+    if len(seed) >= group_size:
+        return seed[:group_size]
+ 
+    remaining_needed = group_size - len(seed)
+    remaining_pool = [n for n in numbers if n not in seed]
+    remaining_needed = min(remaining_needed, len(remaining_pool))
+ 
+    if remaining_needed > 0:
+        seed.extend(random.sample(remaining_pool, remaining_needed))
+ 
+    return seed[:group_size]
 
 def calculate_yearly_decade_pair_hits():
     """
@@ -6881,6 +7062,194 @@ def save_generated_pick_route():
     except Exception as e:
         flash(f"An error occurred while saving generated numbers: {e}", 'error')
     return redirect(url_for('index'))
+
+
+@app.route('/api/last_digit_analysis', methods=['GET'])
+def last_digit_analysis_api():
+    """Pure-stats endpoint (no AI) powering the analyzer panel."""
+    try:
+        analysis = analyze_last_digit_patterns_current_year(df)
+        if not analysis:
+            return jsonify({'success': False, 'error': 'No data available for analysis.'}), 404
+ 
+        groups_payload = [
+            {
+                'last_digit': g['last_digit'],
+                'numbers': g['numbers'],
+                'hit_rate_percent': g['hit_rate_percent'],
+                'draws_with_match': g['draws_with_match'],
+                'total_draws': g['total_draws'],
+                'draws_since_last_match': g['draws_since_last_match'],
+                'top_pair': g['top_pair']
+            }
+            for g in sorted(analysis['groups'].values(), key=lambda x: -x['hit_rate_percent'])
+        ]
+ 
+        return jsonify({
+            'success': True,
+            'year': analysis['year'],
+            'strongest_last_digit': analysis['strongest_last_digit'],
+            'overall_same_last_digit_hit_rate': analysis['overall_same_last_digit_hit_rate'],
+            'overall_draws_with_match': analysis['overall_draws_with_match'],
+            'overall_total_draws': analysis['overall_total_draws'],
+            'groups': groups_payload
+        })
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+ 
+ 
+@app.route('/api/last_digit_analysis_ai', methods=['POST'])
+def last_digit_analysis_ai():
+    """AI narration of the strongest same-last-digit group, grounded only in real stats."""
+    try:
+        analysis = analyze_last_digit_patterns_current_year(df)
+        if not analysis:
+            return jsonify({'error': 'No data available for analysis.'}), 404
+ 
+        strongest = analysis['groups'][analysis['strongest_last_digit']]
+        top_pair_text = (
+            f"{strongest['top_pair']['pair']} ({strongest['top_pair']['hit_count']} times)"
+            if strongest['top_pair'] else "no repeated pair recorded"
+        )
+ 
+        prompt = (
+            f"You are a lottery data analyst. Use ONLY the data below — do not use outside "
+            f"knowledge or invent any numbers.\n\n"
+            f"DATA FOR {analysis['year']}:\n"
+            f"- Overall: {analysis['overall_draws_with_match']} of {analysis['overall_total_draws']} "
+            f"draws ({analysis['overall_same_last_digit_hit_rate']}%) had AT LEAST TWO numbers "
+            f"sharing a last digit, regardless of which digit.\n"
+            f"- The specific digit this happened with most often: numbers ending in "
+            f"{strongest['last_digit']} {strongest['numbers']}, in {strongest['draws_with_match']} "
+            f"of {strongest['total_draws']} draws ({strongest['hit_rate_percent']}%)\n"
+            f"- Most frequent pair within that group: {top_pair_text}\n"
+            f"- Draws since that group last matched: {strongest['draws_since_last_match']}\n\n"
+            f"TASK: In 2-3 simple sentences, explain what this means for a Powerball player. "
+            f"Make clear the high overall rate is expected with only 10 possible last digits and "
+            f"5 numbers drawn (a birthday-paradox effect), not a sign that one digit is 'due'. "
+            f"Do not promise winning numbers or guarantee outcomes."
+        )
+ 
+        ai_text, error = call_groq(prompt, max_tokens=220)
+        if error:
+            return jsonify({'error': error}), 500
+ 
+        return jsonify({
+            'summary': ai_text,
+            'strongest_last_digit': strongest['last_digit'],
+            'overall_same_last_digit_hit_rate': analysis['overall_same_last_digit_hit_rate']
+        })
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+ 
+ 
+@app.route('/generate_last_digit_smart_pick', methods=['POST'])
+def generate_last_digit_smart_pick_route():
+    """
+    Generates a smart pick that deliberately seeds 2 or 3 numbers from the
+    current year's strongest same-last-digit group, then fills the rest
+    using your existing generate_smart_picks() logic. Also returns a Groq
+    explanation grounded in the real seed stats.
+    """
+    if df.empty:
+        return jsonify({'success': False, 'error': 'Historical data not loaded.'}), 500
+ 
+    try:
+        data = request.get_json() or {}
+        group_size = int(data.get('group_size', 2))
+        if group_size not in (2, 3):
+            return jsonify({'success': False, 'error': 'group_size must be 2 or 3.'}), 400
+ 
+        excluded_numbers_input = data.get('excluded_numbers', '')
+        excluded_numbers = (
+            [int(n.strip()) for n in excluded_numbers_input.split(',') if n.strip().isdigit()]
+            if excluded_numbers_input else []
+        )
+ 
+        analysis = analyze_last_digit_patterns_current_year(df)
+        if not analysis:
+            return jsonify({'success': False, 'error': 'No data available for analysis.'}), 404
+ 
+        strongest = analysis['groups'][analysis['strongest_last_digit']]
+        seed_numbers = _select_last_digit_seed_numbers(strongest, group_size)
+        seed_numbers = [n for n in seed_numbers if n not in excluded_numbers]
+ 
+        if len(seed_numbers) < 2:
+            return jsonify({
+                'success': False,
+                'error': 'Not enough eligible numbers left in the strongest group after exclusions.'
+            }), 400
+ 
+        generated_sets = generate_smart_picks(
+            df_source=df,
+            num_sets=1,
+            excluded_numbers=excluded_numbers,
+            num_from_group_a=0,
+            odd_even_choice='Any',
+            sum_range_tuple=None,
+            prioritize_monthly_hot=False,
+            prioritize_grouped_patterns=False,
+            prioritize_special_patterns=False,
+            prioritize_consecutive_patterns=False,
+            force_specific_pattern=seed_numbers
+        )
+ 
+        if not generated_sets:
+            return jsonify({'success': False, 'error': 'Could not generate a pick with this seed.'}), 500
+ 
+        pick = generated_sets[0]
+ 
+        top_pair_text = (
+            f"{strongest['top_pair']['pair']} ({strongest['top_pair']['hit_count']} times)"
+            if strongest['top_pair'] else "no repeated pair recorded"
+        )
+        prompt = (
+            f"You are a lottery data analyst. Use ONLY the data below — do not use outside "
+            f"knowledge or invent any numbers.\n\n"
+            f"GENERATED PICK: white balls {pick['white_balls']}, powerball {pick['powerball']}\n"
+            f"SEEDED NUMBERS (chosen for sharing last digit {strongest['last_digit']}): {seed_numbers}\n"
+            f"DATA FOR {analysis['year']}:\n"
+            f"- Overall: {analysis['overall_draws_with_match']} of {analysis['overall_total_draws']} "
+            f"draws ({analysis['overall_same_last_digit_hit_rate']}%) had at least two numbers "
+            f"sharing a last digit, regardless of which digit.\n"
+            f"- Digit {strongest['last_digit']} specifically did this in {strongest['draws_with_match']} "
+            f"of {strongest['total_draws']} draws ({strongest['hit_rate_percent']}%), the highest of "
+            f"any single digit this year.\n"
+            f"- Most frequent pair in this group: {top_pair_text}\n"
+            f"- Draws since this group last matched: {strongest['draws_since_last_match']}\n\n"
+            f"TASK: In 2-3 sentences, explain why the seeded numbers were chosen. Make clear the "
+            f"pick leans on how common same-last-digit pairs are overall, not that digit "
+            f"{strongest['last_digit']} is 'due' or guaranteed. Do not promise winning numbers."
+        )
+        ai_text, ai_error = call_groq(prompt, max_tokens=200)
+ 
+        return jsonify({
+            'success': True,
+            'white_balls': pick['white_balls'],
+            'powerball': pick['powerball'],
+            'confidence_score': pick.get('confidence_score'),
+            'seed_last_digit': strongest['last_digit'],
+            'seed_numbers': seed_numbers,
+            'seed_stats': {
+                'hit_rate_percent': strongest['hit_rate_percent'],
+                'draws_with_match': strongest['draws_with_match'],
+                'total_draws': strongest['total_draws'],
+                'draws_since_last_match': strongest['draws_since_last_match'],
+                'top_pair': strongest['top_pair'],
+                'overall_same_last_digit_hit_rate': analysis['overall_same_last_digit_hit_rate']
+            },
+            'ai_explanation': ai_text if not ai_error else None,
+            'ai_error': ai_error
+        })
+ 
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
+
 
 
 
