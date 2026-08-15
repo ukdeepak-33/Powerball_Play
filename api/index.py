@@ -1530,6 +1530,7 @@ def analyze_last_digit_patterns_current_year(df_source, target_year=None):
         'groups': group_stats
     }
 
+
 def _select_last_digit_seed_numbers(group_stat, group_size):
     """
     Chooses `group_size` numbers from a last-digit group to seed a smart
@@ -1552,6 +1553,22 @@ def _select_last_digit_seed_numbers(group_stat, group_size):
         seed.extend(random.sample(remaining_pool, remaining_needed))
  
     return seed[:group_size]
+ 
+ 
+def _select_weighted_random_digit_group(groups):
+    """
+    Picks a last-digit group at random, weighted by that digit's hit rate
+    this year. Higher hit rate = more likely to be picked, but every digit
+    (0-9) has a nonzero chance every time this is called — avoids always
+    seeding the same "strongest" digit on every generation.
+    """
+    digits = list(groups.keys())
+    # +1 baseline weight so a digit with 0% hit rate can still occasionally
+    # be picked, instead of being permanently locked out.
+    weights = [groups[d]['hit_rate_percent'] + 1 for d in digits]
+    chosen_digit = random.choices(digits, weights=weights, k=1)[0]
+    return groups[chosen_digit]
+
 
 def calculate_yearly_decade_pair_hits():
     """
@@ -7135,16 +7152,25 @@ def generate_last_digit_smart_pick_route():
         if not analysis:
             return jsonify({'success': False, 'error': 'No data available for analysis.'}), 404
  
-        strongest = analysis['groups'][analysis['strongest_last_digit']]
-        seed_numbers = _select_last_digit_seed_numbers(strongest, group_size)
+        # Weighted random pick across all 10 digits (not always the single
+        # "strongest" one) so repeated generations vary, while still leaning
+        # toward digits with a stronger track record this year.
+        chosen_group = _select_weighted_random_digit_group(analysis['groups'])
+        seed_numbers = _select_last_digit_seed_numbers(chosen_group, group_size)
         seed_numbers = [n for n in seed_numbers if n not in excluded_numbers]
  
         if len(seed_numbers) < 2:
             return jsonify({
                 'success': False,
-                'error': 'Not enough eligible numbers left in the strongest group after exclusions.'
+                'error': 'Not enough eligible numbers left in the chosen group after exclusions.'
             }), 400
-
+ 
+        # group_a is a fixed list defined elsewhere in this file. num_from_group_a
+        # tells generate_smart_picks exactly how many of the 5 final numbers must
+        # come from it. Since our seed numbers are already forced into the pick,
+        # we must count how many of THEM are already in group_a and pass that
+        # count along — hardcoding 0 here would contradict a seed number that
+        # happens to be in group_a and make every attempt fail.
         seed_group_a_count = sum(1 for n in seed_numbers if n in group_a)
  
         generated_sets = generate_smart_picks(
@@ -7167,26 +7193,25 @@ def generate_last_digit_smart_pick_route():
         pick = generated_sets[0]
  
         top_pair_text = (
-            f"{strongest['top_pair']['pair']} ({strongest['top_pair']['hit_count']} times)"
-            if strongest['top_pair'] else "no repeated pair recorded"
+            f"{chosen_group['top_pair']['pair']} ({chosen_group['top_pair']['hit_count']} times)"
+            if chosen_group['top_pair'] else "no repeated pair recorded"
         )
         prompt = (
             f"You are a lottery data analyst. Use ONLY the data below — do not use outside "
             f"knowledge or invent any numbers.\n\n"
             f"GENERATED PICK: white balls {pick['white_balls']}, powerball {pick['powerball']}\n"
-            f"SEEDED NUMBERS (chosen for sharing last digit {strongest['last_digit']}): {seed_numbers}\n"
+            f"SEEDED NUMBERS (chosen for sharing last digit {chosen_group['last_digit']}): {seed_numbers}\n"
             f"DATA FOR {analysis['year']}:\n"
             f"- Overall: {analysis['overall_draws_with_match']} of {analysis['overall_total_draws']} "
             f"draws ({analysis['overall_same_last_digit_hit_rate']}%) had at least two numbers "
             f"sharing a last digit, regardless of which digit.\n"
-            f"- Digit {strongest['last_digit']} specifically did this in {strongest['draws_with_match']} "
-            f"of {strongest['total_draws']} draws ({strongest['hit_rate_percent']}%), the highest of "
-            f"any single digit this year.\n"
+            f"- Digit {chosen_group['last_digit']} specifically did this in {chosen_group['draws_with_match']} "
+            f"of {chosen_group['total_draws']} draws ({chosen_group['hit_rate_percent']}%) this year.\n"
             f"- Most frequent pair in this group: {top_pair_text}\n"
-            f"- Draws since this group last matched: {strongest['draws_since_last_match']}\n\n"
-            f"TASK: In 2-3 sentences, explain why the seeded numbers were chosen. Make clear the "
-            f"pick leans on how common same-last-digit pairs are overall, not that digit "
-            f"{strongest['last_digit']} is 'due' or guaranteed. Do not promise winning numbers."
+            f"- Draws since this group last matched: {chosen_group['draws_since_last_match']}\n\n"
+            f"TASK: In 2-3 sentences, explain why the seeded numbers were chosen. Make clear this "
+            f"digit was picked at random, weighted toward stronger historical rates — not that it's "
+            f"the single best digit or that it's 'due'. Do not promise winning numbers."
         )
         ai_text, ai_error = call_groq(prompt, max_tokens=200)
  
@@ -7195,14 +7220,14 @@ def generate_last_digit_smart_pick_route():
             'white_balls': pick['white_balls'],
             'powerball': pick['powerball'],
             'confidence_score': pick.get('confidence_score'),
-            'seed_last_digit': strongest['last_digit'],
+            'seed_last_digit': chosen_group['last_digit'],
             'seed_numbers': seed_numbers,
             'seed_stats': {
-                'hit_rate_percent': strongest['hit_rate_percent'],
-                'draws_with_match': strongest['draws_with_match'],
-                'total_draws': strongest['total_draws'],
-                'draws_since_last_match': strongest['draws_since_last_match'],
-                'top_pair': strongest['top_pair'],
+                'hit_rate_percent': chosen_group['hit_rate_percent'],
+                'draws_with_match': chosen_group['draws_with_match'],
+                'total_draws': chosen_group['total_draws'],
+                'draws_since_last_match': chosen_group['draws_since_last_match'],
+                'top_pair': chosen_group['top_pair'],
                 'overall_same_last_digit_hit_rate': analysis['overall_same_last_digit_hit_rate']
             },
             'ai_explanation': ai_text if not ai_error else None,
@@ -7214,6 +7239,7 @@ def generate_last_digit_smart_pick_route():
     except Exception as e:
         traceback.print_exc()
         return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
+
 
 
 
