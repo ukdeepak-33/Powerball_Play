@@ -291,6 +291,144 @@
                 padding: 8px 5px;
             }
         }
+
+        /* ===== AI Same-Last-Digit panels ===== */
+        .ai-panel {
+            background: linear-gradient(135deg, #f3e8ff 0%, #e0d4fb 100%);
+            border: 2px solid #8b5cf6;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(139,92,246,0.15);
+        }
+        .ai-panel-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #5b21b6;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .ai-stat-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .ai-stat-box {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .ai-stat-box .value {
+            font-size: 26px;
+            font-weight: bold;
+            color: #7c3aed;
+        }
+        .ai-stat-box .label {
+            font-size: 13px;
+            color: #6c757d;
+            margin-top: 4px;
+        }
+        .ai-summary-text {
+            background: white;
+            border-radius: 10px;
+            padding: 15px 18px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #333;
+            margin-top: 10px;
+        }
+        .ai-toggle-group {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            align-items: center;
+        }
+        .ai-toggle-group label {
+            font-weight: 600;
+            color: #5b21b6;
+            margin-right: 5px;
+        }
+        .ai-toggle-btn {
+            padding: 8px 18px;
+            border: 2px solid #8b5cf6;
+            background: white;
+            color: #8b5cf6;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        .ai-toggle-btn.active {
+            background: #8b5cf6;
+            color: white;
+        }
+        .ai-generate-btn {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            color: white;
+            padding: 12px 26px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            box-shadow: 0 4px 8px rgba(124,58,237,0.3);
+            transition: all 0.3s ease;
+        }
+        .ai-generate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(124,58,237,0.4);
+        }
+        .ai-generate-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .ai-pick-result {
+            margin-top: 18px;
+            background: white;
+            border-radius: 12px;
+            padding: 18px;
+            display: none;
+        }
+        .ai-pick-numbers {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .ai-pick-ball {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 15px;
+            color: white;
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        }
+        .ai-pick-ball.seed {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            box-shadow: 0 0 0 3px rgba(139,92,246,0.3);
+        }
+        .ai-pick-ball.pb {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+        .ai-loading-text {
+            color: #7c3aed;
+            font-style: italic;
+            font-size: 14px;
+        }
+        .ai-error-text {
+            color: #dc3545;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -306,7 +444,51 @@
             </div>
             <button class="download-btn" onclick="downloadExcel()">📊 Download Complete Excel Report</button>
         </div>
-        
+
+        <div class="ai-panel">
+            <div class="ai-panel-title">🤖 AI Same-Last-Digit Analyzer</div>
+            <div id="ai-analyzer-loading" class="ai-loading-text">Loading analysis…</div>
+            <div id="ai-analyzer-content" style="display:none;">
+                <div class="ai-stat-row">
+                    <div class="ai-stat-box">
+                        <div class="value" id="ai-overall-rate">--</div>
+                        <div class="label">of draws had ANY same-last-digit pair</div>
+                    </div>
+                    <div class="ai-stat-box">
+                        <div class="value" id="ai-strongest-digit">--</div>
+                        <div class="label">most common digit this year</div>
+                    </div>
+                    <div class="ai-stat-box">
+                        <div class="value" id="ai-digit-rate">--</div>
+                        <div class="label">hit rate for that digit</div>
+                    </div>
+                </div>
+                <div class="ai-summary-text" id="ai-summary-text">Generating AI summary…</div>
+            </div>
+            <div id="ai-analyzer-error" class="ai-error-text" style="display:none;"></div>
+        </div>
+
+        <div class="ai-panel">
+            <div class="ai-panel-title">🎯 AI Smart Pick — Same Last Digit Aware</div>
+            <p style="color:#5b21b6; font-size:14px; margin-bottom:10px;">
+                Seeds numbers from the strongest same-last-digit group, then fills the rest using your existing smart-pick logic.
+            </p>
+            <div class="ai-toggle-group">
+                <label>Numbers sharing a digit:</label>
+                <button class="ai-toggle-btn active" id="ai-toggle-2" onclick="setGroupSize(2)">2</button>
+                <button class="ai-toggle-btn" id="ai-toggle-3" onclick="setGroupSize(3)">3</button>
+            </div>
+            <button class="ai-generate-btn" id="ai-generate-btn" onclick="generateLastDigitSmartPick()">
+                ✨ Generate AI Smart Pick
+            </button>
+            <div id="ai-pick-loading" class="ai-loading-text" style="display:none; margin-top:12px;">Generating pick…</div>
+            <div id="ai-pick-error" class="ai-error-text" style="display:none; margin-top:12px;"></div>
+            <div class="ai-pick-result" id="ai-pick-result">
+                <div class="ai-pick-numbers" id="ai-pick-numbers"></div>
+                <div class="ai-summary-text" id="ai-pick-explanation"></div>
+            </div>
+        </div>
+
         <div class="content">
             <div class="stats" id="stats">
                 <!-- Stats will be populated by JavaScript -->
@@ -665,9 +847,105 @@
             XLSX.writeFile(wb, `Powerball_Same_Last_Digit_Analysis_${minYear}-${maxYear}.xlsx`);
         }
 
+        // ===== AI Same-Last-Digit panels =====
+        let aiGroupSize = 2;
+
+        function setGroupSize(size) {
+            aiGroupSize = size;
+            document.getElementById('ai-toggle-2').classList.toggle('active', size === 2);
+            document.getElementById('ai-toggle-3').classList.toggle('active', size === 3);
+        }
+
+        async function loadLastDigitAnalyzer() {
+            const loadingEl = document.getElementById('ai-analyzer-loading');
+            const contentEl = document.getElementById('ai-analyzer-content');
+            const errorEl = document.getElementById('ai-analyzer-error');
+
+            try {
+                const res = await fetch('/api/last_digit_analysis');
+                const data = await res.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Analysis unavailable.');
+                }
+
+                document.getElementById('ai-overall-rate').textContent = data.overall_same_last_digit_hit_rate + '%';
+                document.getElementById('ai-strongest-digit').textContent = 'Ends in ' + data.strongest_last_digit;
+                const strongestGroup = data.groups.find(g => g.last_digit === data.strongest_last_digit);
+                document.getElementById('ai-digit-rate').textContent = (strongestGroup ? strongestGroup.hit_rate_percent : '--') + '%';
+
+                loadingEl.style.display = 'none';
+                contentEl.style.display = 'block';
+
+                // Fetch the AI narration separately so the stats render immediately
+                // without waiting on the (slower) Groq call.
+                const aiRes = await fetch('/api/last_digit_analysis_ai', { method: 'POST' });
+                const aiData = await aiRes.json();
+                document.getElementById('ai-summary-text').textContent =
+                    aiData.summary || aiData.error || 'AI summary unavailable right now.';
+
+            } catch (err) {
+                loadingEl.style.display = 'none';
+                errorEl.style.display = 'block';
+                errorEl.textContent = 'Could not load analyzer: ' + err.message;
+            }
+        }
+
+        async function generateLastDigitSmartPick() {
+            const btn = document.getElementById('ai-generate-btn');
+            const loadingEl = document.getElementById('ai-pick-loading');
+            const errorEl = document.getElementById('ai-pick-error');
+            const resultEl = document.getElementById('ai-pick-result');
+
+            btn.disabled = true;
+            loadingEl.style.display = 'block';
+            errorEl.style.display = 'none';
+            resultEl.style.display = 'none';
+
+            try {
+                const res = await fetch('/generate_last_digit_smart_pick', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ group_size: aiGroupSize })
+                });
+                const data = await res.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Could not generate a pick.');
+                }
+
+                const numbersEl = document.getElementById('ai-pick-numbers');
+                numbersEl.innerHTML = '';
+                data.white_balls.forEach(n => {
+                    const ball = document.createElement('div');
+                    ball.className = 'ai-pick-ball' + (data.seed_numbers.includes(n) ? ' seed' : '');
+                    ball.textContent = n;
+                    numbersEl.appendChild(ball);
+                });
+                const pbBall = document.createElement('div');
+                pbBall.className = 'ai-pick-ball pb';
+                pbBall.textContent = data.powerball;
+                numbersEl.appendChild(pbBall);
+
+                document.getElementById('ai-pick-explanation').textContent =
+                    data.ai_explanation || data.ai_error ||
+                    `Seeded ${data.seed_numbers.join(', ')} (last digit ${data.seed_last_digit}), the strongest same-last-digit group this year.`;
+
+                resultEl.style.display = 'block';
+
+            } catch (err) {
+                errorEl.style.display = 'block';
+                errorEl.textContent = err.message;
+            } finally {
+                btn.disabled = false;
+                loadingEl.style.display = 'none';
+            }
+        }
+
         // Initialize the application
         generateYearTabs();
         displayData(currentYear);
+        loadLastDigitAnalyzer();
     </script>
 </body>
 </html>
