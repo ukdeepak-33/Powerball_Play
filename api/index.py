@@ -6899,8 +6899,6 @@ def analyze_consecutive_trends_ai():
 
 
 
-
-
 @app.route('/generate_smart_picks_route', methods=['POST'])
 def generate_smart_picks_route():
     if df.empty:
@@ -7029,41 +7027,6 @@ def last_digit_analysis_route():
         return redirect(url_for('index'))
 
 
-
-@app.route('/save_generated_pick', methods=['POST'])
-def save_generated_pick_route():
-    try:
-        white_balls_str = request.form.get('generated_white_balls')
-        powerball_str = request.form.get('generated_powerball')
-
-        if not white_balls_str or not powerball_str:
-            flash("No numbers generated to save.", 'error')
-            return redirect(url_for('index'))
-
-        white_balls = [int(x.strip()) for x in white_balls_str.split(',') if x.strip().isdigit()]
-        powerball = int(powerball_str)
-
-        if len(white_balls) != 5:
-            flash("Invalid white balls format. Expected 5 numbers.", 'error')
-            return redirect(url_for('index'))
-
-        if not (all(1 <= n <= 69 for n in white_balls) and 1 <= powerball <= 26):
-            flash("White balls must be between 1-69 and Powerball between 1-26 for saving.", 'error')
-            return redirect(url_for('index'))
-
-        success, message = save_generated_numbers_to_db(white_balls, powerball)
-        if success:
-            flash(message, 'info')
-        else:
-            flash(message, 'error')
-
-    except ValueError:
-        flash("Invalid number format for saving generated numbers.", 'error')
-    except Exception as e:
-        flash(f"An error occurred while saving generated numbers: {e}", 'error')
-    return redirect(url_for('index'))
-
-
 @app.route('/api/last_digit_analysis', methods=['GET'])
 def last_digit_analysis_api():
     """Pure-stats endpoint (no AI) powering the analyzer panel."""
@@ -7181,12 +7144,14 @@ def generate_last_digit_smart_pick_route():
                 'success': False,
                 'error': 'Not enough eligible numbers left in the strongest group after exclusions.'
             }), 400
+
+        seed_group_a_count = sum(1 for n in seed_numbers if n in group_a)
  
         generated_sets = generate_smart_picks(
             df_source=df,
             num_sets=1,
             excluded_numbers=excluded_numbers,
-            num_from_group_a=0,
+            num_from_group_a=seed_group_a_count,
             odd_even_choice='Any',
             sum_range_tuple=None,
             prioritize_monthly_hot=False,
@@ -7249,6 +7214,41 @@ def generate_last_digit_smart_pick_route():
     except Exception as e:
         traceback.print_exc()
         return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
+
+
+
+@app.route('/save_generated_pick', methods=['POST'])
+def save_generated_pick_route():
+    try:
+        white_balls_str = request.form.get('generated_white_balls')
+        powerball_str = request.form.get('generated_powerball')
+
+        if not white_balls_str or not powerball_str:
+            flash("No numbers generated to save.", 'error')
+            return redirect(url_for('index'))
+
+        white_balls = [int(x.strip()) for x in white_balls_str.split(',') if x.strip().isdigit()]
+        powerball = int(powerball_str)
+
+        if len(white_balls) != 5:
+            flash("Invalid white balls format. Expected 5 numbers.", 'error')
+            return redirect(url_for('index'))
+
+        if not (all(1 <= n <= 69 for n in white_balls) and 1 <= powerball <= 26):
+            flash("White balls must be between 1-69 and Powerball between 1-26 for saving.", 'error')
+            return redirect(url_for('index'))
+
+        success, message = save_generated_numbers_to_db(white_balls, powerball)
+        if success:
+            flash(message, 'info')
+        else:
+            flash(message, 'error')
+
+    except ValueError:
+        flash("Invalid number format for saving generated numbers.", 'error')
+    except Exception as e:
+        flash(f"An error occurred while saving generated numbers: {e}", 'error')
+    return redirect(url_for('index'))
 
 
 
