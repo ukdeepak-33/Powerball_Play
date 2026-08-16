@@ -486,6 +486,10 @@
             <div class="ai-pick-result" id="ai-pick-result">
                 <div class="ai-pick-numbers" id="ai-pick-numbers"></div>
                 <div class="ai-summary-text" id="ai-pick-explanation"></div>
+                <button class="ai-generate-btn" id="ai-save-btn" style="margin-top:14px; background:linear-gradient(135deg, #16a34a 0%, #15803d 100%); box-shadow:0 4px 8px rgba(21,128,61,0.3);" onclick="saveLastDigitPick()">
+                    💾 Save this pick
+                </button>
+                <div id="ai-save-status" style="margin-top:10px; font-size:13px;"></div>
             </div>
         </div>
 
@@ -849,6 +853,7 @@
 
         // ===== AI Same-Last-Digit panels =====
         let aiGroupSize = 2;
+        let currentGeneratedPick = null;
 
         function setGroupSize(size) {
             aiGroupSize = size;
@@ -931,6 +936,11 @@
                     data.ai_explanation || data.ai_error ||
                     `Seeded ${data.seed_numbers.join(', ')} (last digit ${data.seed_last_digit}), the strongest same-last-digit group this year.`;
 
+                currentGeneratedPick = { white_balls: data.white_balls, powerball: data.powerball };
+                document.getElementById('ai-save-status').textContent = '';
+                document.getElementById('ai-save-btn').disabled = false;
+                document.getElementById('ai-save-btn').textContent = '💾 Save this pick';
+
                 resultEl.style.display = 'block';
 
             } catch (err) {
@@ -939,6 +949,42 @@
             } finally {
                 btn.disabled = false;
                 loadingEl.style.display = 'none';
+            }
+        }
+
+        async function saveLastDigitPick() {
+            if (!currentGeneratedPick) return;
+
+            const saveBtn = document.getElementById('ai-save-btn');
+            const statusEl = document.getElementById('ai-save-status');
+
+            saveBtn.disabled = true;
+            statusEl.style.color = '#6c757d';
+            statusEl.textContent = 'Saving…';
+
+            try {
+                const res = await fetch('/api/save_last_digit_pick', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentGeneratedPick)
+                });
+                const data = await res.json();
+
+                if (!data.success) {
+                    statusEl.style.color = '#dc3545';
+                    statusEl.textContent = '⚠️ ' + data.error;
+                    saveBtn.disabled = false;
+                    return;
+                }
+
+                statusEl.style.color = '#16a34a';
+                statusEl.textContent = '✅ ' + data.message;
+                saveBtn.textContent = '✅ Saved';
+
+            } catch (err) {
+                statusEl.style.color = '#dc3545';
+                statusEl.textContent = '⚠️ Could not save: ' + err.message;
+                saveBtn.disabled = false;
             }
         }
 
