@@ -7241,8 +7241,6 @@ def generate_last_digit_smart_pick_route():
         return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
 
 
-
-
 @app.route('/debug_data_health', methods=['GET'])
 def debug_data_health_route():
     try:
@@ -7257,9 +7255,6 @@ def debug_data_health_route():
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
-
-
-
 
 @app.route('/save_generated_pick', methods=['POST'])
 def save_generated_pick_route():
@@ -7293,6 +7288,80 @@ def save_generated_pick_route():
     except Exception as e:
         flash(f"An error occurred while saving generated numbers: {e}", 'error')
     return redirect(url_for('index'))
+
+
+@app.route('/api/save_last_digit_pick', methods=['POST'])
+def save_last_digit_pick_route():
+    """
+    Saves a generated pick to Supabase, same table as your existing
+    /save_generated_pick, but as a JSON API (no form/redirect) so the
+    AI panel's state stays intact after saving. Checks for duplicates
+    against BOTH:
+      1. Previously saved generated picks (via save_generated_numbers_to_db,
+         which already does this)
+      2. Official historical Powerball draws (white balls + powerball),
+         which was NOT previously checked at save time.
+    """
+    try:
+        data = request.get_json() or {}
+        white_balls = data.get('white_balls')
+        powerball = data.get('powerball')
+ 
+        if not white_balls or powerball is None:
+            return jsonify({'success': False, 'error': 'Missing white_balls or powerball.'}), 400
+ 
+        white_balls = [int(n) for n in white_balls]
+        powerball = int(powerball)
+ 
+        if len(set(white_balls)) != 5:
+            return jsonify({'success': False, 'error': 'Expected 5 unique white ball numbers.'}), 400
+ 
+        if not (all(GLOBAL_WHITE_BALL_RANGE[0] <= n <= GLOBAL_WHITE_BALL_RANGE[1] for n in white_balls)
+                and GLOBAL_POWERBALL_RANGE[0] <= powerball <= GLOBAL_POWERBALL_RANGE[1]):
+            return jsonify({
+                'success': False,
+                'error': f'White balls must be {GLOBAL_WHITE_BALL_RANGE[0]}-{GLOBAL_WHITE_BALL_RANGE[1]}, '
+                         f'Powerball must be {GLOBAL_POWERBALL_RANGE[0]}-{GLOBAL_POWERBALL_RANGE[1]}.'
+            }), 400
+ 
+        # Check 1: has this exact white-ball-set + powerball combo ever
+        # actually been drawn officially? Built fresh from df each call —
+        # cheap (thousands of rows), and avoids touching shared startup state.
+        official_full_draws = {
+            (frozenset(int(row[f'Number {i}']) for i in range(1, 6)), int(row['Powerball']))
+            for _, row in df.iterrows()
+        }
+        if (frozenset(white_balls), powerball) in official_full_draws:
+            return jsonify({
+                'success': False,
+                'error': 'This exact combination has already been drawn in an official Powerball draw. Not saved.'
+            }), 409
+ 
+        # Check 1b: even without an exact powerball match, flag if the same
+        # 5 white balls (any powerball) were ever officially drawn — this is
+        # already avoided during generation via check_exact_match, but this
+        # guards direct/manual saves too, e.g. if this route is reused elsewhere.
+        if check_exact_match(white_balls):
+            return jsonify({
+                'success': False,
+                'error': 'These 5 white balls have already appeared together in an official draw '
+                         '(different Powerball). Not saved.'
+            }), 409
+ 
+        # Check 2: duplicate against previously saved generated picks —
+        # save_generated_numbers_to_db() already does this internally.
+        success, message = save_generated_numbers_to_db(white_balls, powerball)
+ 
+        if not success:
+            return jsonify({'success': False, 'error': message}), 409
+ 
+        return jsonify({'success': True, 'message': message})
+ 
+    except ValueError:
+        return jsonify({'success': False, 'error': 'Invalid number format.'}), 400
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f"An unexpected error occurred: {e}"}), 500
 
 
 
