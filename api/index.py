@@ -55,6 +55,12 @@ group_a = [3, 5, 6, 7, 9, 11, 15, 16, 18, 21, 23, 24, 27, 31, 32, 33, 36, 42, 44
 GLOBAL_WHITE_BALL_RANGE = (1, 69)
 GLOBAL_POWERBALL_RANGE = (1, 26)
 
+# Single source of truth for which Groq model all AI features use.
+# When Groq deprecates a model (they do this periodically), change ONLY
+# this line — or better, set a GROQ_MODEL env var on Render — instead of
+# hunting through every AI route in this file.
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-20b")
+
 NUMBER_RANGES = {
     "1-9": (1, 9),
     "10s": (10, 19),
@@ -1002,7 +1008,7 @@ Be concise and factual. Do not make promises about winning.
                 "Content-Type": "application/json"
             },
             json={
-                "model": "openai/gpt-oss-20b",
+                "model": GROQ_MODEL,
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 200,
                 "temperature": 0.4
@@ -6763,7 +6769,7 @@ def analyze_consecutive_trends_ai():
             'https://api.groq.com/openai/v1/chat/completions',
             headers={'Authorization': f'Bearer {GROQ_API_KEY}', 'Content-Type': 'application/json'},
             json={
-                'model': 'openai/gpt-oss-20b',
+                'model': GROQ_MODEL,
                 'messages': [{'role': 'user', 'content': prompt}],
                 'max_tokens': 300,
                 'temperature': 0.6,
@@ -6960,7 +6966,7 @@ def api_frequency_ai_analysis():
                 'Content-Type':  'application/json'
             },
             json={
-                'model':       'openai/gpt-oss-20b',
+                'model':       GROQ_MODEL,
                 'messages':    [{'role': 'user', 'content': prompt}],
                 'max_tokens':  350,
                 'temperature': 0.4
@@ -7021,7 +7027,7 @@ Keep insights analytical, specific with number references, and concise (max 350 
 
         client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
         response = client.chat.completions.create(
-            model="openai/gpt-oss-20b",
+            model=GROQ_MODEL,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=500,
             temperature=0.6
@@ -7158,7 +7164,7 @@ Be analytical, specific, and reference the actual numbers. Avoid generic stateme
                 'Content-Type': 'application/json'
             },
             json={
-                'model': 'openai/gpt-oss-20b',
+                'model': GROQ_MODEL,
                 'messages': [{'role': 'user', 'content': prompt}],
                 'max_tokens': 400,
                 'temperature': 0.7
@@ -7384,7 +7390,7 @@ Be specific — reference actual frequencies and percentages. Format each sectio
                 'Content-Type': 'application/json'
             },
             json={
-                'model':       'openai/gpt-oss-20b',
+                'model':       GROQ_MODEL,
                 'messages':    [{'role': 'user', 'content': prompt}],
                 'max_tokens':  650,
                 'temperature': 0.55
@@ -7490,7 +7496,7 @@ Be specific and reference actual numbers. Format each section header on its own 
                 'Content-Type': 'application/json'
             },
             json={
-                'model':       'openai/gpt-oss-20b',
+                'model':       GROQ_MODEL,
                 'messages':    [{'role': 'user', 'content': prompt}],
                 'max_tokens':  600,
                 'temperature': 0.6
@@ -7696,7 +7702,7 @@ Be specific — reference actual pair numbers and counts throughout."""
                 'Content-Type': 'application/json'
             },
             json={
-                'model':       'openai/gpt-oss-20b',
+                'model':       GROQ_MODEL,
                 'messages':    [{'role': 'user', 'content': prompt}],
                 'max_tokens':  600,
                 'temperature': 0.6
@@ -7867,7 +7873,7 @@ Be specific — reference actual numbers, ages, and gaps throughout."""
                 'Content-Type': 'application/json'
             },
             json={
-                'model':       'openai/gpt-oss-20b',
+                'model':       GROQ_MODEL,
                 'messages':    [{'role': 'user', 'content': prompt}],
                 'max_tokens':  580,
                 'temperature': 0.6
@@ -8171,7 +8177,7 @@ Be specific — always reference actual ball numbers, percentages, and counts.""
                 'Content-Type': 'application/json'
             },
             json={
-                'model':       'openai/gpt-oss-20b',
+                'model':       GROQ_MODEL,
                 'messages':    [{'role': 'user', 'content': prompt}],
                 'max_tokens':  900,
                 'temperature': 0.6
@@ -8393,7 +8399,7 @@ Always reference specific PB numbers and counts."""
                 'Content-Type': 'application/json'
             },
             json={
-                'model':       'openai/gpt-oss-20b',
+                'model':       GROQ_MODEL,
                 'messages':    [{'role': 'user', 'content': prompt}],
                 'max_tokens':  700,
                 'temperature': 0.6
@@ -8502,7 +8508,7 @@ End with one NEXT DRAW SUM — a single specific sum recommendation with a one-s
                 'Content-Type':  'application/json'
             },
             json={
-                'model':       'openai/gpt-oss-20b',
+                'model':       GROQ_MODEL,
                 'messages':    [{'role': 'user', 'content': prompt}],
                 'max_tokens':  680,
                 'temperature': 0.6
@@ -8647,7 +8653,7 @@ Based on pair dominance, trend analysis, and recent momentum — name ONE specif
                 'Content-Type':  'application/json'
             },
             json={
-                'model':       'openai/gpt-oss-20b',
+                'model':       GROQ_MODEL,
                 'messages':    [{'role': 'user', 'content': prompt}],
                 'max_tokens':  600,
                 'temperature': 0.6
@@ -8776,7 +8782,7 @@ Justify each prediction with data from the analysis above."""
                 'Content-Type':  'application/json'
             },
             json={
-                'model':       'openai/gpt-oss-20b',
+                'model':       GROQ_MODEL,
                 'messages':    [{'role': 'user', 'content': prompt}],
                 'max_tokens':  720,
                 'temperature': 0.6
@@ -8871,7 +8877,7 @@ Based purely on historical frequency patterns, give a specific number strategy f
                 'Content-Type':  'application/json'
             },
             json={
-                'model':       'openai/gpt-oss-20b',
+                'model':       GROQ_MODEL,
                 'messages':    [{'role': 'user', 'content': prompt}],
                 'max_tokens':  700,
                 'temperature': 0.6
@@ -9059,7 +9065,7 @@ def grouped_patterns_yearly_ai_analysis():
                 'Content-Type':  'application/json',
             },
             json={
-                'model':       'openai/gpt-oss-20b',
+                'model':       GROQ_MODEL,
                 'messages':    [{'role': 'user', 'content': prompt}],
                 'max_tokens':  950,
                 'temperature': 0.55,
@@ -9190,7 +9196,7 @@ def triplets_ai_analysis():
             'https://api.groq.com/openai/v1/chat/completions',
             headers={'Authorization': 'Bearer ' + groq_api_key, 'Content-Type': 'application/json'},
             json={
-                'model':       'openai/gpt-oss-20b',
+                'model':       GROQ_MODEL,
                 'messages':    [{'role': 'user', 'content': prompt}],
                 'max_tokens':  800,
                 'temperature': 0.55,
@@ -9289,7 +9295,7 @@ def white_ball_gap_ai_analysis():
             'https://api.groq.com/openai/v1/chat/completions',
             headers={'Authorization': 'Bearer ' + GROQ_API_KEY, 'Content-Type': 'application/json'},
             json={
-                'model':       'openai/gpt-oss-20b',
+                'model':       GROQ_MODEL,
                 'messages':    [{'role': 'user', 'content': prompt}],
                 'max_tokens':  600,
                 'temperature': 0.55,
@@ -9401,7 +9407,7 @@ def historical_draws_ai_analysis():
             'https://api.groq.com/openai/v1/chat/completions',
             headers={'Authorization': 'Bearer ' + GROQ_API_KEY, 'Content-Type': 'application/json'},
             json={
-                'model':       'openai/gpt-oss-20b',
+                'model':       GROQ_MODEL,
                 'messages':    [{'role': 'user', 'content': prompt}],
                 'max_tokens':  800,
                 'temperature': 0.55,
@@ -9514,7 +9520,7 @@ def powerball_frequency_ai_analysis():
             'https://api.groq.com/openai/v1/chat/completions',
             headers={'Authorization': 'Bearer ' + GROQ_API_KEY, 'Content-Type': 'application/json'},
             json={
-                'model':       'openai/gpt-oss-20b',
+                'model':       GROQ_MODEL,
                 'messages':    [{'role': 'user', 'content': prompt}],
                 'max_tokens':  600,
                 'temperature': 0.55,
@@ -9614,7 +9620,7 @@ Give a one-line verdict: STRONG SET / DECENT SET / NEEDS ADJUSTMENT."""
             'https://api.groq.com/openai/v1/chat/completions',
             headers={'Authorization': 'Bearer ' + GROQ_API_KEY, 'Content-Type': 'application/json'},
             json={
-                'model':       'openai/gpt-oss-20b',
+                'model':       GROQ_MODEL,
                 'messages':    [{'role': 'user', 'content': prompt}],
                 'max_tokens':  700,
                 'temperature': 0.55,
